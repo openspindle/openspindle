@@ -1,5 +1,5 @@
-import { useEffect, useId, useMemo, useRef, useState } from "react";
-import type { ReactNode } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react"
+import type { ReactNode } from "react"
 import {
   RpcError,
   useChooseTool,
@@ -7,13 +7,13 @@ import {
   useOpenSpindle,
   useTools,
   useWorkspace,
-} from "@openspindle/plugin-sdk";
+} from "@openspindle/plugin-sdk"
 import type {
   Operation,
   PlateSummary,
   Tool,
   useOperation,
-} from "@openspindle/plugin-sdk";
+} from "@openspindle/plugin-sdk"
 import {
   Attachment,
   AttachmentAction,
@@ -39,28 +39,23 @@ import {
   SelectTrigger,
   SelectValue,
   ToolCard,
-} from "@openspindle/plugin-sdk/ui";
-import { LIMITS, inputs, parameters } from "../src/manifest.mjs";
+} from "@openspindle/plugin-sdk/ui"
+import { LIMITS, inputs, parameters } from "../src/manifest.mjs"
 import type {
   DrillMethod,
   ParameterDefinition,
   SelectParameter,
-} from "../src/manifest.mjs";
+} from "../src/manifest.mjs"
 import {
   generatedToolSlots,
   multipleToolsMessage,
   operationWarnings,
   readGeneration,
-} from "./generation";
-import { ACCEPT, hasAcceptedExtension, matchInputs } from "./inputs";
-import { syncOperationAssignments } from "./operation-assignments";
-import type { PCBOperationData, Values } from "./operation-data";
-import {
-  dataJson,
-  operationName,
-  readData,
-  stableJson,
-} from "./operation-data";
+} from "./generation"
+import { ACCEPT, hasAcceptedExtension, matchInputs } from "./inputs"
+import { syncOperationAssignments } from "./operation-assignments"
+import type { PCBOperationData, Values } from "./operation-data"
+import { dataJson, operationName, readData, stableJson } from "./operation-data"
 import {
   drillMethod,
   geometryFields,
@@ -69,56 +64,52 @@ import {
   recommendedKinds,
   toolFields,
   toolValues,
-} from "./operation-settings";
+} from "./operation-settings"
 
-type Stock = NonNullable<PlateSummary["stock"]>;
+type Stock = NonNullable<PlateSummary["stock"]>
 
 /** The editor's working copy of one operation's data. */
 type Draft = {
-  readonly operationId: string;
+  readonly operationId: string
   /** The revision this draft has seen; saves send it, so unseen changes fail with CONFLICT. */
-  readonly revision: string;
+  readonly revision: string
   /** The saved data at that revision (sorted-key JSON), to tell data changes from others. */
-  readonly dataKey: string;
-  readonly data: PCBOperationData;
+  readonly dataKey: string
+  readonly data: PCBOperationData
   /** Edits that are not saved yet. */
-  readonly edited: boolean;
-};
+  readonly edited: boolean
+}
 
 /** Unsaved edits per operation, kept while this frame lives. */
-const drafts = new Map<string, Draft>();
+const drafts = new Map<string, Draft>()
 /** The toolpath update of each operation; a newer edit supersedes it. */
-const updates = new Map<string, AbortController>();
+const updates = new Map<string, AbortController>()
 
 function initialDraft(operation: Operation, saved: PCBOperationData): Draft {
   // Workspace tool assignments are authoritative for generated operations.
   const data =
     operation.nc === null
       ? saved
-      : syncOperationAssignments(
-          saved,
-          operation.nc,
-          operation.toolAssignments,
-        );
+      : syncOperationAssignments(saved, operation.nc, operation.toolAssignments)
   return {
     operationId: operation.id,
     revision: operation.revision,
     dataKey: stableJson(operation.data),
     data,
     edited: data !== saved,
-  };
+  }
 }
 
 /** One of the editor's own saves: what it sent, from which draft, as saved data reads. */
 type OwnSave = {
-  readonly dataKey: string;
-  readonly sent: PCBOperationData;
-  readonly startedFrom: PCBOperationData;
-};
+  readonly dataKey: string
+  readonly sent: PCBOperationData
+  readonly startedFrom: PCBOperationData
+}
 
 /** The draft after one of its own saves; edits made meanwhile stay on top of it. */
 function followSave(draft: Draft, revision: string, own: OwnSave): Draft {
-  if (draft.revision === revision) return draft;
+  if (draft.revision === revision) return draft
   if (draft.data === own.startedFrom)
     return {
       operationId: draft.operationId,
@@ -126,8 +117,8 @@ function followSave(draft: Draft, revision: string, own: OwnSave): Draft {
       dataKey: own.dataKey,
       data: own.sent,
       edited: false,
-    };
-  return { ...draft, revision, dataKey: own.dataKey };
+    }
+  return { ...draft, revision, dataKey: own.dataKey }
 }
 
 /**
@@ -139,25 +130,25 @@ function rebase(
   draft: Draft,
   operation: Operation,
   saved: PCBOperationData,
-  own: OwnSave | null,
+  own: OwnSave | null
 ): { draft: Draft; replaced: boolean } {
-  if (draft.revision === operation.revision) return { draft, replaced: false };
-  const dataKey = stableJson(operation.data);
+  if (draft.revision === operation.revision) return { draft, replaced: false }
+  const dataKey = stableJson(operation.data)
   if (own && dataKey === own.dataKey)
     return {
       draft: followSave(draft, operation.revision, own),
       replaced: false,
-    };
+    }
   if (dataKey !== draft.dataKey)
-    return { draft: initialDraft(operation, saved), replaced: draft.edited };
+    return { draft: initialDraft(operation, saved), replaced: draft.edited }
   const data =
     operation.nc === null
       ? draft.data
       : syncOperationAssignments(
           draft.data,
           operation.nc,
-          operation.toolAssignments,
-        );
+          operation.toolAssignments
+        )
   return {
     draft: {
       ...draft,
@@ -166,7 +157,7 @@ function rebase(
       edited: draft.edited || data !== draft.data,
     },
     replaced: false,
-  };
+  }
 }
 
 /**
@@ -177,30 +168,30 @@ function effectiveValues(
   data: PCBOperationData,
   method: DrillMethod,
   tool: Tool | undefined,
-  stock: Stock | null,
+  stock: Stock | null
 ): Values {
-  const role = data.file.role;
-  const values: Values = {};
+  const role = data.file.role
+  const values: Values = {}
   for (const parameter of parameters) {
-    if (parameter.type === "boolean") values[parameter.id] = parameter.default;
-    else values[parameter.id] = String(parameter.default);
+    if (parameter.type === "boolean") values[parameter.id] = parameter.default
+    else values[parameter.id] = String(parameter.default)
   }
   if (stock) {
-    values.zcut = String(-Number((stock.height + 0.2).toFixed(2)));
-    values.zdrill = values.zcut;
+    values.zcut = String(-Number((stock.height + 0.2).toFixed(2)))
+    values.zdrill = values.zcut
     values.zbridges = String(
-      -Number(Math.max(0, stock.height - 0.6).toFixed(2)),
-    );
+      -Number(Math.max(0, stock.height - 0.6).toFixed(2))
+    )
   }
-  values.drillMethod = method;
+  values.drillMethod = method
   // Cutting values come from the library or an explicit edit, never example defaults.
-  for (const key of toolFields(role, method)) values[key] = "";
+  for (const key of toolFields(role, method)) values[key] = ""
   if (tool) {
-    const preset = tool.presets.find((item) => item.id === data.presetId);
-    Object.assign(values, toolValues(role, method, tool, preset, data.values));
+    const preset = tool.presets.find((item) => item.id === data.presetId)
+    Object.assign(values, toolValues(role, method, tool, preset, data.values))
   }
-  Object.assign(values, data.values);
-  return values;
+  Object.assign(values, data.values)
+  return values
 }
 
 const recipeKey = (data: PCBOperationData, values: Values) =>
@@ -209,47 +200,47 @@ const recipeKey = (data: PCBOperationData, values: Values) =>
     values,
     toolId: data.toolId,
     presetId: data.presetId,
-  });
+  })
 
 /** The recipe of the saved program; null while the operation is pending. */
 function generatedRecipe(operation: Operation): string | null {
-  if (operation.nc === null) return null;
-  const data = readData(operation.data);
-  if (!data) return null;
-  return recipeKey(data, data.generatedValues ?? data.values);
+  if (operation.nc === null) return null
+  const data = readData(operation.data)
+  if (!data) return null
+  return recipeKey(data, data.generatedValues ?? data.values)
 }
 
 /** The editor's labels where they differ from the conversion core's. */
 const parameterLabel = (parameter: ParameterDefinition) =>
-  parameter.id === "cutSide" ? "Machine from" : parameter.label;
+  parameter.id === "cutSide" ? "Machine from" : parameter.label
 
 /** The drill method, chosen above the tool because it decides the kind of tool. */
 const methodParameter = parameters.find(
   (parameter): parameter is SelectParameter =>
-    parameter.id === "drillMethod" && parameter.type === "select",
-);
+    parameter.id === "drillMethod" && parameter.type === "select"
+)
 
 const isConflict = (error: unknown) =>
-  error instanceof RpcError && error.code === "CONFLICT";
+  error instanceof RpcError && error.code === "CONFLICT"
 
 /** The companion refused a program that uses more than one tool slot. */
 function refusedToolSlots(error: unknown): boolean {
   if (!(error instanceof RpcError) || error.code !== "INVALID_PARAMS")
-    return false;
-  const { data } = error;
+    return false
+  const { data } = error
   return (
     typeof data === "object" &&
     data !== null &&
     "reason" in data &&
     data.reason === "multiple-tool-slots"
-  );
+  )
 }
 
 const errorText = (error: unknown, fallback: string) =>
-  error instanceof Error && error.message ? error.message : fallback;
+  error instanceof Error && error.message ? error.message : fallback
 
 function clip(text: string, length: number) {
-  return text.length > length ? `${text.slice(0, length - 1)}…` : text;
+  return text.length > length ? `${text.slice(0, length - 1)}…` : text
 }
 
 /**
@@ -263,108 +254,108 @@ export function OperationEditor({
   save,
   disabled,
 }: {
-  operation: Operation;
+  operation: Operation
   /** The operation's data, read. */
-  saved: PCBOperationData;
+  saved: PCBOperationData
   /** The operation's revision-checked save (useOperation). */
-  save: ReturnType<typeof useOperation>["save"];
-  disabled: boolean;
+  save: ReturnType<typeof useOperation>["save"]
+  disabled: boolean
 }) {
-  const { peer } = useOpenSpindle();
-  const workspace = useWorkspace();
-  const tools = useTools();
-  const companion = useCompanion();
-  const chooseTool = useChooseTool();
-  const id = useId();
+  const { peer } = useOpenSpindle()
+  const workspace = useWorkspace()
+  const tools = useTools()
+  const companion = useCompanion()
+  const chooseTool = useChooseTool()
+  const id = useId()
 
   const [state, setState] = useState(() => {
-    const stored = drafts.get(operation.id);
+    const stored = drafts.get(operation.id)
     return {
       draft: stored
         ? rebase(stored, operation, saved, null).draft
         : initialDraft(operation, saved),
       seen: operation.revision,
-    };
-  });
+    }
+  })
   const [error, setError] = useState<string | null>(
-    saved.generationError ?? null,
-  );
-  const [notice, setNotice] = useState<string | null>(null);
-  const [updating, setUpdating] = useState(false);
-  const [readingSource, setReadingSource] = useState(false);
-  const [choosingTool, setChoosingTool] = useState(false);
-  const [chosen, setChosen] = useState<Tool | null>(null);
-  const [forced, setForced] = useState(false);
-  const [retry, setRetry] = useState(0);
+    saved.generationError ?? null
+  )
+  const [notice, setNotice] = useState<string | null>(null)
+  const [updating, setUpdating] = useState(false)
+  const [readingSource, setReadingSource] = useState(false)
+  const [choosingTool, setChoosingTool] = useState(false)
+  const [chosen, setChosen] = useState<Tool | null>(null)
+  const [forced, setForced] = useState(false)
+  const [retry, setRetry] = useState(0)
 
-  const ownSave = useRef<OwnSave | null>(null);
+  const ownSave = useRef<OwnSave | null>(null)
   // A new revision of the operation: follow it now, so no render pairs it with a stale draft.
-  let draft = state.draft;
+  let draft = state.draft
   if (state.seen !== operation.revision) {
-    const next = rebase(draft, operation, saved, ownSave.current);
+    const next = rebase(draft, operation, saved, ownSave.current)
     if (next.replaced)
       setNotice(
-        "This operation was changed elsewhere; its saved settings replaced your unsaved changes.",
-      );
-    draft = next.draft;
-    setState({ draft: next.draft, seen: operation.revision });
+        "This operation was changed elsewhere; its saved settings replaced your unsaved changes."
+      )
+    draft = next.draft
+    setState({ draft: next.draft, seen: operation.revision })
   }
 
-  const latest = useRef(draft);
-  const mounted = useRef(true);
-  const request = useRef<AbortController | null>(null);
-  const readLock = useRef(false);
-  const replaceInput = useRef<HTMLInputElement>(null);
-  const rejectedSource = useRef<string | null>(null);
-  const lastSaved = useRef<{ revision: string; key: string } | null>(null);
+  const latest = useRef(draft)
+  const mounted = useRef(true)
+  const request = useRef<AbortController | null>(null)
+  const readLock = useRef(false)
+  const replaceInput = useRef<HTMLInputElement>(null)
+  const rejectedSource = useRef<string | null>(null)
+  const lastSaved = useRef<{ revision: string; key: string } | null>(null)
   useEffect(() => {
-    mounted.current = true;
+    mounted.current = true
     return () => {
-      mounted.current = false;
-    };
-  }, []);
+      mounted.current = false
+    }
+  }, [])
   useEffect(() => {
-    latest.current = draft;
-    if (draft.edited) drafts.set(draft.operationId, draft);
-    else drafts.delete(draft.operationId);
-  }, [draft]);
+    latest.current = draft
+    if (draft.edited) drafts.set(draft.operationId, draft)
+    else drafts.delete(draft.operationId)
+  }, [draft])
 
-  const data = draft.data;
-  const role = data.file.role;
-  const method = useMemo(() => drillMethod(data), [data]);
-  const group = operationGroup(role);
-  const cuttingFields = toolFields(role, method);
-  const library = tools.data ?? [];
+  const data = draft.data
+  const role = data.file.role
+  const method = useMemo(() => drillMethod(data), [data])
+  const group = operationGroup(role)
+  const cuttingFields = toolFields(role, method)
+  const library = tools.data ?? []
   // A tool chosen a moment ago may not be in the library list yet.
   const tool =
     library.find((item) => item.id === data.toolId) ??
-    (chosen?.id === data.toolId ? chosen : undefined);
+    (chosen?.id === data.toolId ? chosen : undefined)
   const plate = workspace.data?.plates.find(
-    (item) => item.id === operation.plateId,
-  );
-  const stock = plate?.stock ?? null;
-  const values = effectiveValues(data, method, tool, stock);
-  const valuesKey = stableJson(values);
+    (item) => item.id === operation.plateId
+  )
+  const stock = plate?.stock ?? null
+  const values = effectiveValues(data, method, tool, stock)
+  const valuesKey = stableJson(values)
   // valuesKey stands for values: the key only changes when a value does.
   const generationKey = useMemo(
     () => recipeKey(data, values),
-    [data, valuesKey],
-  );
-  const generatedKey = useMemo(() => generatedRecipe(operation), [operation]);
+    [data, valuesKey]
+  )
+  const generatedKey = useMemo(() => generatedRecipe(operation), [operation])
   const upToDateKey =
     lastSaved.current?.revision === operation.revision
       ? lastSaved.current.key
-      : generatedKey;
+      : generatedKey
   const savedSlots =
-    operation.nc === null ? [] : generatedToolSlots(operation.nc);
-  const invalidSavedSource = savedSlots.length > 1;
+    operation.nc === null ? [] : generatedToolSlots(operation.nc)
+  const invalidSavedSource = savedSlots.length > 1
   const missingCuttingValues = cuttingFields.filter(
-    (key) => String(values[key] ?? "").trim() === "",
-  );
-  const inactive = disabled || readingSource || choosingTool;
-  const companionStatus = companion.status.data;
+    (key) => String(values[key] ?? "").trim() === ""
+  )
+  const inactive = disabled || readingSource || choosingTool
+  const companionStatus = companion.status.data
   // Until setup has installed pcb2gcode, updates wait instead of failing.
-  const needsSetup = companionStatus?.health?.status === "needs-setup";
+  const needsSetup = companionStatus?.health?.status === "needs-setup"
   const canGenerate =
     !!group &&
     !!tool &&
@@ -372,8 +363,8 @@ export function OperationEditor({
     !missingCuttingValues.length &&
     !data.generationError &&
     !invalidSavedSource &&
-    !needsSetup;
-  const needsUpdate = canGenerate && (forced || upToDateKey !== generationKey);
+    !needsSetup
+  const needsUpdate = canGenerate && (forced || upToDateKey !== generationKey)
 
   function setData(update: (data: PCBOperationData) => PCBOperationData) {
     setState((current) => ({
@@ -383,38 +374,38 @@ export function OperationEditor({
         data: update(current.draft.data),
         edited: true,
       },
-    }));
+    }))
   }
 
   function stopUpdate() {
-    request.current?.abort();
-    updates.get(operation.id)?.abort();
+    request.current?.abort()
+    updates.get(operation.id)?.abort()
   }
 
   /** Applies an edit; it clears a refused generation so the operation can try again. */
   function change(next: PCBOperationData): PCBOperationData {
-    stopUpdate();
-    const cleared: PCBOperationData = { ...next };
-    delete cleared.generationError;
-    setData(() => cleared);
-    setError(null);
-    setNotice(null);
-    return cleared;
+    stopUpdate()
+    const cleared: PCBOperationData = { ...next }
+    delete cleared.generationError
+    setData(() => cleared)
+    setError(null)
+    setNotice(null)
+    return cleared
   }
 
   /** Keeps the draft (and a kept working copy) in step with one of its own saves. */
   function settle(result: Operation, own: OwnSave) {
-    const stored = drafts.get(result.id);
+    const stored = drafts.get(result.id)
     if (stored) {
-      const next = followSave(stored, result.revision, own);
-      if (next.edited) drafts.set(result.id, next);
-      else drafts.delete(result.id);
+      const next = followSave(stored, result.revision, own)
+      if (next.edited) drafts.set(result.id, next)
+      else drafts.delete(result.id)
     }
     if (mounted.current)
       setState((current) => ({
         ...current,
         draft: followSave(current.draft, result.revision, own),
-      }));
+      }))
   }
 
   /**
@@ -426,107 +417,107 @@ export function OperationEditor({
   async function persist(
     next: PCBOperationData,
     program: { nc: string | null; toolAssignments: Record<string, string> },
-    startedFrom: PCBOperationData,
+    startedFrom: PCBOperationData
   ): Promise<Operation> {
-    const name = operationName(next);
-    const data = dataJson(next);
-    const own: OwnSave = { dataKey: stableJson(data), sent: next, startedFrom };
-    ownSave.current = own;
+    const name = operationName(next)
+    const json = dataJson(next)
+    const own: OwnSave = { dataKey: stableJson(json), sent: next, startedFrom }
+    ownSave.current = own
     try {
       const result = await save.mutateAsync({
         revision: latest.current.revision,
         ...(name === operationName(saved) ? {} : { name }),
-        data,
+        data: json,
         nc: program.nc,
         toolAssignments: program.toolAssignments,
-      });
-      settle(result, own);
-      return result;
+      })
+      settle(result, own)
+      return result
     } finally {
-      if (ownSave.current === own) ownSave.current = null;
+      if (ownSave.current === own) ownSave.current = null
     }
   }
 
   /** A generation the plugin refuses leaves the operation pending with the reason. */
   async function reject(rejected: PCBOperationData, message: string) {
-    stopUpdate();
-    const blocked: PCBOperationData = { ...rejected, generationError: message };
-    setData(() => blocked);
-    setError(message);
-    setUpdating(false);
+    stopUpdate()
+    const blocked: PCBOperationData = { ...rejected, generationError: message }
+    setData(() => blocked)
+    setError(message)
+    setUpdating(false)
     try {
-      await persist(blocked, { nc: null, toolAssignments: {} }, blocked);
+      await persist(blocked, { nc: null, toolAssignments: {} }, blocked)
     } catch (problem) {
       if (!isConflict(problem))
         setError(
-          `Could not block this operation: ${errorText(problem, "saving failed.")}`,
-        );
+          `Could not block this operation: ${errorText(problem, "saving failed.")}`
+        )
     }
   }
 
   /** A new source or type that needs a tool first is kept as a pending operation. */
   async function savePending(next: PCBOperationData) {
     try {
-      await persist(next, { nc: null, toolAssignments: {} }, next);
+      await persist(next, { nc: null, toolAssignments: {} }, next)
     } catch (problem) {
       if (!isConflict(problem))
         setError(
-          `Could not save this operation: ${errorText(problem, "saving failed.")}`,
-        );
+          `Could not save this operation: ${errorText(problem, "saving failed.")}`
+        )
     }
   }
 
   function changeSource(next: PCBOperationData) {
-    const applied = change(next);
-    if (!applied.toolId) void savePending(applied);
+    const applied = change(next)
+    if (!applied.toolId) void savePending(applied)
   }
 
   function notifyWarnings(name: string, warnings: readonly string[]) {
     const text = warnings
       .map((warning) => warning.replace(/\s+/g, " ").trim())
       .filter(Boolean)
-      .join(" ");
-    if (!text) return;
+      .join(" ")
+    if (!text) return
     peer
       .call("ui.notify", {
         message: clip(`${name} updated. ${text}`, 500),
         tone: "warning",
       })
-      .catch(() => undefined);
+      .catch(() => undefined)
   }
 
   const update = useRef<(controller: AbortController) => Promise<void>>(
-    async () => {},
-  );
+    async () => {}
+  )
   update.current = async (controller) => {
-    const startedFrom = data;
-    const startedKey = generationKey;
-    const recipe = values;
-    setError(null);
+    const startedFrom = data
+    const startedKey = generationKey
+    const recipe = values
+    setError(null)
     try {
-      controller.signal.throwIfAborted();
+      controller.signal.throwIfAborted()
       if ((role === "outline" || role === "drill") && !stock)
         throw new Error(
-          "Assign stock to this plate in the workspace before generating this operation.",
-        );
-      const settings: Record<string, number | boolean | string> = {};
+          "Assign stock to this plate in the workspace before generating this operation."
+        )
+      const settings: Record<string, number | boolean | string> = {}
       for (const parameter of parameters) {
-        if (parameter.group !== group && parameter.group !== "board") continue;
-        if ((parameter.method ?? method) !== method) continue;
-        const value = recipe[parameter.id];
+        if (parameter.group !== group && parameter.group !== "board") continue
+        if ((parameter.method ?? method) !== method) continue
+        const value = recipe[parameter.id] as string | boolean | undefined
         if (parameter.type === "number") {
-          const number = Number(value);
+          const number = Number(value)
           if (String(value).trim() === "" || !Number.isFinite(number))
-            throw new Error(`${parameterLabel(parameter)} is required.`);
+            throw new Error(`${parameterLabel(parameter)} is required.`)
           if (number < parameter.min || number > parameter.max)
             throw new Error(
-              `${parameterLabel(parameter)} is outside its supported range.`,
-            );
-          settings[parameter.id] = number;
-        } else if (value !== undefined) settings[parameter.id] = value;
+              `${parameterLabel(parameter)} is outside its supported range.`
+            )
+          settings[parameter.id] = number
+        } else if (value !== undefined) settings[parameter.id] = value
       }
       // Separate operations share the KiCad origin; never shift one file on its own.
-      settings.zeroStart = false;
+      settings.zeroStart = false
       const generated = readGeneration(
         await companion.call(
           "generate",
@@ -535,85 +526,83 @@ export function OperationEditor({
             files: [{ ...startedFrom.file }],
             parameters: settings,
           },
-          { signal: controller.signal },
-        ),
-      );
-      controller.signal.throwIfAborted();
+          { signal: controller.signal }
+        )
+      )
+      controller.signal.throwIfAborted()
       if (generated.programs.length !== 1)
-        throw new Error("This source must produce exactly one operation.");
-      const source = generated.programs[0].source;
-      const emitted = generatedToolSlots(source);
+        throw new Error("This source must produce exactly one operation.")
+      const source = generated.programs[0].source
+      const emitted = generatedToolSlots(source)
       if (emitted.length > 1) {
-        await reject(startedFrom, multipleToolsMessage(emitted, role));
-        return;
+        await reject(startedFrom, multipleToolsMessage(emitted, role))
+        return
       }
       const sent: PCBOperationData = {
         ...startedFrom,
         generatedValues: recipe,
-      };
-      delete sent.generationError;
+      }
+      delete sent.generationError
       const result = await persist(
         sent,
         {
           nc: source,
           toolAssignments: { [emitted[0] ?? "default"]: startedFrom.toolId },
         },
-        startedFrom,
-      );
-      lastSaved.current = { revision: result.revision, key: startedKey };
-      if (mounted.current) setForced(false);
+        startedFrom
+      )
+      lastSaved.current = { revision: result.revision, key: startedKey }
+      if (mounted.current) setForced(false)
       notifyWarnings(
         result.name,
         operationWarnings(generated.warnings, {
           role,
           drillSide: settings.drillSide,
           zeroStart: settings.zeroStart,
-        }),
-      );
+        })
+      )
     } catch (problem) {
-      if (controller.signal.aborted || isConflict(problem)) return;
-      const message = errorText(problem, "Could not update this toolpath.");
-      if (refusedToolSlots(problem)) await reject(startedFrom, message);
-      else setError(message);
+      if (controller.signal.aborted || isConflict(problem)) return
+      const message = errorText(problem, "Could not update this toolpath.")
+      if (refusedToolSlots(problem)) await reject(startedFrom, message)
+      else setError(message)
     } finally {
-      if (updates.get(operation.id) === controller)
-        updates.delete(operation.id);
+      if (updates.get(operation.id) === controller) updates.delete(operation.id)
       if (request.current === controller) {
-        request.current = null;
-        setUpdating(false);
+        request.current = null
+        setUpdating(false)
       }
     }
-  };
+  }
 
   // A saved program with several tool slots, which this editor never saves: block it once.
   useEffect(() => {
-    if (!invalidSavedSource || disabled || operation.nc === null) return;
-    if (rejectedSource.current === operation.nc) return;
-    rejectedSource.current = operation.nc;
-    void reject(data, multipleToolsMessage(savedSlots, role));
-  }, [invalidSavedSource, disabled, operation.nc, retry]);
+    if (!invalidSavedSource || disabled || operation.nc === null) return
+    if (rejectedSource.current === operation.nc) return
+    rejectedSource.current = operation.nc
+    void reject(data, multipleToolsMessage(savedSlots, role))
+  }, [invalidSavedSource, disabled, operation.nc, retry])
 
   useEffect(() => {
-    updates.get(operation.id)?.abort();
-    updates.delete(operation.id);
+    updates.get(operation.id)?.abort()
+    updates.delete(operation.id)
     if (inactive || !needsUpdate) {
-      setUpdating(false);
-      return;
+      setUpdating(false)
+      return
     }
-    const controller = new AbortController();
-    updates.set(operation.id, controller);
-    request.current = controller;
-    setUpdating(true);
-    const timer = setTimeout(() => void update.current(controller), 450);
+    const controller = new AbortController()
+    updates.set(operation.id, controller)
+    request.current = controller
+    setUpdating(true)
+    const timer = setTimeout(() => void update.current(controller), 450)
     return () => {
       // Leaving the operation lets its scheduled update finish.
-      if (!mounted.current) return;
-      clearTimeout(timer);
-      controller.abort();
-      if (updates.get(operation.id) === controller)
-        updates.delete(operation.id);
-      if (request.current === controller) request.current = null;
-    };
+      if (!mounted.current) return
+      clearTimeout(timer)
+      controller.abort()
+      if (updates.get(operation.id) === controller) updates.delete(operation.id)
+      if (request.current === controller) request.current = null
+    }
   }, [
     generationKey,
     needsUpdate,
@@ -621,10 +610,10 @@ export function OperationEditor({
     retry,
     draft.revision,
     operation.id,
-  ]);
+  ])
 
   function updateValue(key: string, value: string | boolean) {
-    change({ ...data, values: { ...data.values, [key]: value } });
+    change({ ...data, values: { ...data.values, [key]: value } })
   }
 
   /**
@@ -633,28 +622,28 @@ export function OperationEditor({
    * and cancelling keeps the current tool.
    */
   async function selectTool() {
-    if (inactive) return;
-    stopUpdate();
-    setChoosingTool(true);
-    setError(null);
+    if (inactive) return
+    stopUpdate()
+    setChoosingTool(true)
+    setError(null)
     // The preset step offers the chosen tool's PCB preset (or one for the stock material).
-    const defaultPresetIds: Record<string, string> = {};
+    const defaultPresetIds: Record<string, string> = {}
     for (const item of library) {
-      const preset = preferredPreset(item, stock?.material);
-      if (preset) defaultPresetIds[item.id] = preset.id;
+      const preset = preferredPreset(item, stock?.material)
+      if (preset) defaultPresetIds[item.id] = preset.id
     }
     try {
       const choice = await chooseTool.mutateAsync({
         selectedToolId: tool?.id ?? null,
         recommendedKinds: recommendedKinds(role, method),
         presetStep: { defaultPresetIds },
-      });
+      })
       if (choice.status === "chosen" && mounted.current)
-        applyTool(choice.tool, choice.presetId);
+        applyTool(choice.tool, choice.presetId)
     } catch (problem) {
-      setError(errorText(problem, "Could not open the tool library."));
+      setError(errorText(problem, "Could not open the tool library."))
     } finally {
-      if (mounted.current) setChoosingTool(false);
+      if (mounted.current) setChoosingTool(false)
     }
   }
 
@@ -664,73 +653,73 @@ export function OperationEditor({
       !selected.presets.some((item) => item.id === presetId)
     ) {
       setError(
-        "This tool or preset has changed. Choose it again from the library.",
-      );
-      return;
+        "This tool or preset has changed. Choose it again from the library."
+      )
+      return
     }
-    const overrides: Values = { ...data.values };
+    const overrides: Values = { ...data.values }
     for (const key of cuttingFields) {
-      delete overrides[key];
+      delete overrides[key]
       // Declining the preset keeps the current cutting values; a new tool brings its size.
-      const geometry = geometryFields.includes(key);
+      const geometry = geometryFields.includes(key)
       if (presetId === null && (!geometry || selected.id === data.toolId))
-        overrides[key] = values[key] ?? "";
+        overrides[key] = values[key] ?? ""
     }
-    setChosen(selected);
+    setChosen(selected)
     change({
       ...data,
       toolId: selected.id,
       presetId: presetId ?? "",
       values: overrides,
-    });
-    void tools.refetch();
+    })
+    void tools.refetch()
   }
 
   /** Another method takes another kind of tool: the operation waits for one again. */
   function changeMethod(next: DrillMethod) {
-    if (next === method) return;
-    const kept: Values = { ...data.values, drillMethod: next };
-    for (const key of cuttingFields) delete kept[key];
-    changeSource({ ...data, toolId: "", presetId: "", values: kept });
+    if (next === method) return
+    const kept: Values = { ...data.values, drillMethod: next }
+    for (const key of cuttingFields) delete kept[key]
+    changeSource({ ...data, toolId: "", presetId: "", values: kept })
   }
 
   async function replace(file: File | undefined) {
-    if (!file || inactive || readLock.current) return;
-    stopUpdate();
-    readLock.current = true;
-    setReadingSource(true);
-    setError(null);
+    if (!file || inactive || readLock.current) return
+    stopUpdate()
+    readLock.current = true
+    setReadingSource(true)
+    setError(null)
     try {
       if (!hasAcceptedExtension(file.name))
-        throw new Error("Choose a Gerber or drill file.");
+        throw new Error("Choose a Gerber or drill file.")
       if (file.size > LIMITS.inputFile)
-        throw new Error("Choose a source file smaller than 8 MiB.");
-      const content = await file.text();
-      const roles = matchInputs({ name: file.name, content });
-      const detected = roles.length === 1 ? roles[0] : "";
+        throw new Error("Choose a source file smaller than 8 MiB.")
+      const content = await file.text()
+      const roles = matchInputs({ name: file.name, content })
+      const detected = roles.length === 1 ? roles[0] : ""
       // Keeping the operation's identity, a file of another type starts over.
-      let next = data;
+      let next = data
       if (detected !== role)
-        next = { ...data, values: {}, toolId: "", presetId: "" };
+        next = { ...data, values: {}, toolId: "", presetId: "" }
       // Whatever sizes the new file has, the chosen tool keeps the method it was chosen for.
       else if (group === "drilling" && data.toolId)
-        next = { ...data, values: { ...data.values, drillMethod: method } };
+        next = { ...data, values: { ...data.values, drillMethod: method } }
       changeSource({
         ...next,
         file: { name: file.name, content, role: detected },
-      });
+      })
     } catch (problem) {
-      setError(errorText(problem, "Could not read this file."));
+      setError(errorText(problem, "Could not read this file."))
     } finally {
-      readLock.current = false;
-      setReadingSource(false);
+      readLock.current = false
+      setReadingSource(false)
     }
   }
 
   function renderParameter(parameter: ParameterDefinition) {
-    const inputId = `${id}-${parameter.id}`;
-    const value = values[parameter.id];
-    let control: ReactNode;
+    const inputId = `${id}-${parameter.id}`
+    const value = values[parameter.id]
+    let control: ReactNode
     if (parameter.type === "boolean") {
       control = (
         <Checkbox
@@ -739,7 +728,7 @@ export function OperationEditor({
           disabled={inactive}
           onCheckedChange={(checked) => updateValue(parameter.id, checked)}
         />
-      );
+      )
     } else if (parameter.type === "select") {
       control = (
         <Select
@@ -747,7 +736,7 @@ export function OperationEditor({
           value={String(value)}
           disabled={inactive}
           onValueChange={(next) => {
-            if (next !== null) updateValue(parameter.id, next);
+            if (next !== null) updateValue(parameter.id, next)
           }}
         >
           <SelectTrigger id={inputId} className="w-[118px] min-w-0 shrink-0">
@@ -763,7 +752,7 @@ export function OperationEditor({
             </SelectGroup>
           </SelectContent>
         </Select>
-      );
+      )
     } else {
       control = (
         <MeasurementInput
@@ -778,7 +767,7 @@ export function OperationEditor({
           disabled={inactive || (!tool && cuttingFields.includes(parameter.id))}
           onChange={(event) => updateValue(parameter.id, event.target.value)}
         />
-      );
+      )
     }
     return (
       <Field
@@ -789,30 +778,30 @@ export function OperationEditor({
         <FieldLabel htmlFor={inputId}>{parameterLabel(parameter)}</FieldLabel>
         {control}
       </Field>
-    );
+    )
   }
 
-  let sourceType = "Gerber";
-  if (role === "drill") sourceType = "Excellon";
+  let sourceType = "Gerber"
+  if (role === "drill") sourceType = "Excellon"
   const sourceSize = Math.max(
     1,
-    Math.ceil(new TextEncoder().encode(data.file.content).byteLength / 1024),
-  );
+    Math.ceil(new TextEncoder().encode(data.file.content).byteLength / 1024)
+  )
   const mirrored =
     role === "back" ||
     (role === "drill" && values.drillSide === "back") ||
-    (role === "outline" && values.cutSide === "back");
+    (role === "outline" && values.cutSide === "back")
   const mirrorAxis = parameters.find(
-    (parameter) => parameter.id === "mirrorAxis",
-  );
-  let toolLabel = "Choose tool from library…";
-  if (tools.isPending) toolLabel = "Loading tools…";
-  let companionProblem: string | null = null;
+    (parameter) => parameter.id === "mirrorAxis"
+  )
+  let toolLabel = "Choose tool from library…"
+  if (tools.isPending) toolLabel = "Loading tools…"
+  let companionProblem: string | null = null
   if (companionStatus?.state === "failed")
-    companionProblem = `The PCB companion stopped: ${companionStatus.lastError ?? "it failed repeatedly"}. Restart it from Plugins.`;
+    companionProblem = `The PCB companion stopped: ${companionStatus.lastError ?? "it failed repeatedly"}. Restart it from Plugins.`
   else if (companionStatus?.health && companionStatus.health.status !== "ready")
     companionProblem =
-      companionStatus.health.message ?? "The PCB companion is not ready.";
+      companionStatus.health.message ?? "The PCB companion is not ready."
 
   return (
     <div className="flex min-w-0 flex-col gap-5">
@@ -876,8 +865,8 @@ export function OperationEditor({
           aria-label="Replace operation source"
           disabled={inactive}
           onChange={(event) => {
-            void replace(event.target.files?.[0]);
-            event.target.value = "";
+            void replace(event.target.files?.[0])
+            event.target.value = ""
           }}
         />
         <FieldGroup>
@@ -894,14 +883,14 @@ export function OperationEditor({
               value={role}
               disabled={inactive}
               onValueChange={(value) => {
-                if (value === null || value === role) return;
+                if (value === null || value === role) return
                 changeSource({
                   ...data,
                   file: { ...data.file, role: value },
                   toolId: "",
                   presetId: "",
                   values: {},
-                });
+                })
               }}
             >
               <SelectTrigger id={`${id}-role`} className="w-full">
@@ -929,8 +918,7 @@ export function OperationEditor({
                 value={method}
                 disabled={inactive}
                 onValueChange={(value) => {
-                  if (value === "drill" || value === "mill")
-                    changeMethod(value);
+                  if (value === "drill" || value === "mill") changeMethod(value)
                 }}
               >
                 <SelectTrigger id={`${id}-method`} className="w-full">
@@ -967,9 +955,9 @@ export function OperationEditor({
                   {missingCuttingValues
                     .map((key) => {
                       const parameter = parameters.find(
-                        (item) => item.id === key,
-                      );
-                      return parameter ? parameterLabel(parameter) : key;
+                        (item) => item.id === key
+                      )
+                      return parameter ? parameterLabel(parameter) : key
                     })
                     .join(", ")}
                   .
@@ -981,7 +969,7 @@ export function OperationEditor({
                     (parameter) =>
                       parameter.group === group &&
                       parameter !== methodParameter &&
-                      (parameter.method ?? method) === method,
+                      (parameter.method ?? method) === method
                   )
                   .map(renderParameter)}
               </FieldGroup>
@@ -1004,10 +992,10 @@ export function OperationEditor({
             variant="outline"
             disabled={inactive}
             onClick={() => {
-              rejectedSource.current = null;
-              setForced(true);
-              change(data);
-              setRetry((current) => current + 1);
+              rejectedSource.current = null
+              setForced(true)
+              change(data)
+              setRetry((current) => current + 1)
             }}
           >
             Retry toolpath update
@@ -1015,5 +1003,5 @@ export function OperationEditor({
         </div>
       )}
     </div>
-  );
+  )
 }

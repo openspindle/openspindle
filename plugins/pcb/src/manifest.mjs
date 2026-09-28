@@ -13,7 +13,7 @@ const number = (id, label, value, min, max, step, unit) => ({
   max,
   step,
   ...(unit ? { unit } : {}),
-});
+})
 const side = (id, label) => ({
   id,
   label,
@@ -23,7 +23,7 @@ const side = (id, label) => ({
     { value: "front", label: "Front" },
     { value: "back", label: "Back (mirrored)" },
   ],
-});
+})
 const parameterGroups = {
   zsafe: "board",
   zchange: "board",
@@ -53,13 +53,13 @@ const parameterGroups = {
   bridges: "outline",
   bridgesnum: "outline",
   zbridges: "outline",
-};
+}
 /** Drilling values only one drill method uses; the others apply to both. */
 const parameterMethods = {
   milldrillDiameter: "mill",
   milldrillInfeed: "mill",
   milldrillFeed: "mill",
-};
+}
 
 /** Case-insensitive literal detection rules: content markers first, then file names. */
 export const inputs = [
@@ -104,7 +104,7 @@ export const inputs = [
     multiple: true,
     detect: { suffixes: [".drl", ".xln"], contentIncludesAll: ["M48"] },
   },
-];
+]
 
 export const parameters = [
   number("zsafe", "Travel clearance", 2, 0.1, 100, 0.1, "mm"),
@@ -115,7 +115,7 @@ export const parameters = [
     0.1,
     100,
     0.1,
-    "mm",
+    "mm"
   ),
   number("zwork", "Depth", -0.05, -2, -0.001, 0.001, "mm"),
   number(
@@ -125,7 +125,7 @@ export const parameters = [
     0.01,
     10,
     0.000001,
-    "mm",
+    "mm"
   ),
   number("isolationWidth", "Minimum clearance", 0.2, 0, 10, 0.01, "mm"),
   number("millFeed", "Feed rate", 120, 1, 10000, 1, "mm/min"),
@@ -173,7 +173,7 @@ export const parameters = [
   ...(parameterMethods[parameter.id]
     ? { method: parameterMethods[parameter.id] }
     : {}),
-}));
+}))
 
 export const LIMITS = Object.freeze({
   inputFile: 8 * 1024 * 1024,
@@ -183,4 +183,4 @@ export const LIMITS = Object.freeze({
   outputCount: 64,
   log: 64 * 1024,
   timeout: 120_000,
-});
+})

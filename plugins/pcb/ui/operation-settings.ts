@@ -1,23 +1,23 @@
-import type { CuttingPreset, Tool } from "@openspindle/plugin-sdk";
-import { parameters } from "../src/manifest.mjs";
-import type { DrillMethod } from "../src/manifest.mjs";
-import { holeSizeCount } from "./excellon";
-import type { PCBOperationData, Values } from "./operation-data";
+import type { CuttingPreset, Tool } from "@openspindle/plugin-sdk"
+import { parameters } from "../src/manifest.mjs"
+import type { DrillMethod } from "../src/manifest.mjs"
+import { holeSizeCount } from "./excellon"
+import type { PCBOperationData, Values } from "./operation-data"
 
-type Role = string | null;
-type OperationGroup = "isolation" | "drilling" | "outline";
+type Role = string | null
+type OperationGroup = "isolation" | "drilling" | "outline"
 /** How an operation cuts: its group, with holes milled by an end mill apart from drilled ones. */
-type Machining = OperationGroup | "milldrilling";
+type Machining = OperationGroup | "milldrilling"
 
 const normalized = (value: string) =>
-  value.toLowerCase().replace(/[-_]/g, " ").replace(/\s+/g, " ").trim();
-const tapered = (tool: Tool) => /chamfer|engraving/.test(normalized(tool.kind));
+  value.toLowerCase().replace(/[-_]/g, " ").replace(/\s+/g, " ").trim()
+const tapered = (tool: Tool) => /chamfer|engraving/.test(normalized(tool.kind))
 
 export function operationGroup(role: Role): OperationGroup | null {
-  if (role === "front" || role === "back") return "isolation";
-  if (role === "drill") return "drilling";
-  if (role === "outline") return "outline";
-  return null;
+  if (role === "front" || role === "back") return "isolation"
+  if (role === "drill") return "drilling"
+  if (role === "outline") return "outline"
+  return null
 }
 
 /**
@@ -25,16 +25,16 @@ export function operationGroup(role: Role): OperationGroup | null {
  * several hole sizes, which one drill cannot make.
  */
 export function drillMethod(data: PCBOperationData): DrillMethod {
-  const chosen = data.values.drillMethod;
-  if (chosen === "drill" || chosen === "mill") return chosen;
+  const chosen = data.values.drillMethod
+  if (chosen === "drill" || chosen === "mill") return chosen
   return data.file.role === "drill" && holeSizeCount(data.file.content) > 1
     ? "mill"
-    : "drill";
+    : "drill"
 }
 
 function machining(role: Role, method: DrillMethod): Machining | null {
-  const group = operationGroup(role);
-  return group === "drilling" && method === "mill" ? "milldrilling" : group;
+  const group = operationGroup(role)
+  return group === "drilling" && method === "mill" ? "milldrilling" : group
 }
 
 /** Tool types the app's chooser opens on; any tool in the library can still be chosen. */
@@ -49,40 +49,40 @@ const RECOMMENDED_KINDS: Readonly<Record<Machining, readonly string[]>> = {
   outline: ["flat end mill"],
   drilling: ["drill"],
   milldrilling: ["flat end mill"],
-};
+}
 
 export function recommendedKinds(role: Role, method: DrillMethod): string[] {
-  const kind = machining(role, method);
-  return kind ? [...RECOMMENDED_KINDS[kind]] : [];
+  const kind = machining(role, method)
+  return kind ? [...RECOMMENDED_KINDS[kind]] : []
 }
 
 /** A preset named PCB, else one for the stock material; never an arbitrary first preset. */
 export function preferredPreset(
   tool: Tool | undefined,
-  stockMaterial?: string | null,
+  stockMaterial?: string | null
 ): CuttingPreset | undefined {
-  if (!tool) return undefined;
-  const pcb = tool.presets.find((preset) => /\bpcb\b/i.test(preset.name));
-  if (pcb) return pcb;
-  const material = normalized(stockMaterial ?? "");
-  if (!material) return undefined;
+  if (!tool) return undefined
+  const pcb = tool.presets.find((preset) => /\bpcb\b/i.test(preset.name))
+  if (pcb) return pcb
+  const material = normalized(stockMaterial ?? "")
+  if (!material) return undefined
   return tool.presets.find(
     (preset) =>
       normalized(preset.name) === material ||
-      normalized(preset.material ?? "") === material,
-  );
+      normalized(preset.material ?? "") === material
+  )
 }
 
-const DEGREES = Math.PI / 180;
+const DEGREES = Math.PI / 180
 
 /** Half a tapered tip's included angle: half its point angle, else its taper angle. */
 function taperHalfAngle(tool: Tool): number | null {
-  const { pointAngle, taperAngle } = tool.geometry;
+  const { pointAngle, taperAngle } = tool.geometry
   if (pointAngle !== null && pointAngle > 0 && pointAngle < 180)
-    return pointAngle / 2;
+    return pointAngle / 2
   if (taperAngle !== null && taperAngle > 0 && taperAngle < 90)
-    return taperAngle;
-  return null;
+    return taperAngle
+  return null
 }
 
 /**
@@ -92,14 +92,14 @@ function taperHalfAngle(tool: Tool): number | null {
  */
 function isolationWidth(
   tool: Tool,
-  zwork: Values[string] | undefined,
+  zwork: Values[string] | undefined
 ): number | null {
-  if (!tapered(tool)) return tool.diameter;
-  const tip = tool.geometry.tipDiameter;
-  const half = taperHalfAngle(tool);
-  const depth = typeof zwork === "string" ? -Number(zwork) : Number.NaN;
-  if (tip === null || half === null || !(depth > 0)) return tip;
-  return Number((tip + 2 * depth * Math.tan(half * DEGREES)).toFixed(3));
+  if (!tapered(tool)) return tool.diameter
+  const tip = tool.geometry.tipDiameter
+  const half = taperHalfAngle(tool)
+  const depth = typeof zwork === "string" ? -Number(zwork) : Number.NaN
+  if (tip === null || half === null || !(depth > 0)) return tip
+  return Number((tip + 2 * depth * Math.tan(half * DEGREES)).toFixed(3))
 }
 
 const inheritedFields = {
@@ -119,24 +119,24 @@ const inheritedFields = {
     "cutSpeed",
     "cutInfeed",
   ],
-} as const;
+} as const
 
 /** The cutting values a tool's geometry supplies: they follow the tool, never a preset. */
 export const geometryFields: readonly string[] = [
   "millDiameter",
   "cutterDiameter",
   "milldrillDiameter",
-];
+]
 
 /** The cutting values an operation takes from its tool and preset. */
 export function toolFields(role: Role, method: DrillMethod): string[] {
-  const kind = machining(role, method);
-  return kind ? [...inheritedFields[kind]] : [];
+  const kind = machining(role, method)
+  return kind ? [...inheritedFields[kind]] : []
 }
 
 function precision(value: number): number {
-  const [mantissa, exponent = "0"] = String(value).toLowerCase().split("e");
-  return Math.max(0, (mantissa.split(".")[1]?.length ?? 0) - Number(exponent));
+  const [mantissa, exponent = "0"] = String(value).toLowerCase().split("e")
+  return Math.max(0, (mantissa.split(".")[1]?.length ?? 0) - Number(exponent))
 }
 
 /**
@@ -149,56 +149,57 @@ export function toolValues(
   method: DrillMethod,
   tool: Tool | undefined,
   preset: CuttingPreset | undefined,
-  edits: Values,
+  edits: Values
 ): Values {
-  if (!tool) return {};
-  const values: Values = {};
+  if (!tool) return {}
+  const values: Values = {}
   const put = (id: string, reading: number | null | undefined) => {
-    if (typeof reading !== "number" || !Number.isFinite(reading)) return;
-    const field = parameters.find((parameter) => parameter.id === id);
-    if (!field || field.type !== "number") return;
-    let value = reading;
+    if (typeof reading !== "number" || !Number.isFinite(reading)) return
+    const field = parameters.find((parameter) => parameter.id === id)
+    if (!field || field.type !== "number") return
+    let value = reading
     if (value >= field.min && value <= field.max && field.step > 0) {
       const places = Math.min(
         12,
-        Math.max(precision(field.step), precision(field.min)),
-      );
+        Math.max(precision(field.step), precision(field.min))
+      )
       value = Number(
         (
           field.min +
           Math.round((value - field.min) / field.step) * field.step
-        ).toFixed(places),
-      );
+        ).toFixed(places)
+      )
     }
-    values[id] = String(value);
-  };
-  const kind = machining(role, method);
+    values[id] = String(value)
+  }
+  const kind = machining(role, method)
   if (kind === "isolation") {
-    put("millFeed", preset?.feedRate);
-    put("millVertfeed", preset?.plungeFeed);
-    put("millSpeed", preset?.rpm);
+    put("millFeed", preset?.feedRate)
+    put("millVertfeed", preset?.plungeFeed)
+    put("millSpeed", preset?.rpm)
     // Copper isolation uses one depth; the preset's enabled stepdown supplies it.
     if (preset?.useStepdown === true && preset.stepdown !== null)
-      put("zwork", -preset.stepdown);
+      put("zwork", -preset.stepdown)
     // A tapered tip cuts wider the deeper it goes; an entered width still wins.
-    put("millDiameter", isolationWidth(tool, edits.zwork ?? values.zwork));
+    const depth = edits.zwork as string | boolean | undefined
+    put("millDiameter", isolationWidth(tool, depth ?? values.zwork))
   } else if (kind === "outline") {
-    put("cutterDiameter", tool.diameter);
-    put("cutFeed", preset?.feedRate);
-    put("cutVertfeed", preset?.plungeFeed);
-    put("cutSpeed", preset?.rpm);
-    if (preset?.useStepdown === true) put("cutInfeed", preset.stepdown);
+    put("cutterDiameter", tool.diameter)
+    put("cutFeed", preset?.feedRate)
+    put("cutVertfeed", preset?.plungeFeed)
+    put("cutSpeed", preset?.rpm)
+    if (preset?.useStepdown === true) put("cutInfeed", preset.stepdown)
   } else if (kind === "drilling") {
     // Diameter belongs to the Excellon table, never to a substitute selected tool.
-    put("drillFeed", preset?.plungeFeed);
-    put("drillSpeed", preset?.rpm);
+    put("drillFeed", preset?.plungeFeed)
+    put("drillSpeed", preset?.rpm)
   } else if (kind === "milldrilling") {
     // One end mill makes every hole, circling those wider than itself.
-    put("milldrillDiameter", tool.diameter);
-    put("milldrillFeed", preset?.feedRate);
-    put("drillFeed", preset?.plungeFeed);
-    put("drillSpeed", preset?.rpm);
-    if (preset?.useStepdown === true) put("milldrillInfeed", preset.stepdown);
+    put("milldrillDiameter", tool.diameter)
+    put("milldrillFeed", preset?.feedRate)
+    put("drillFeed", preset?.plungeFeed)
+    put("drillSpeed", preset?.rpm)
+    if (preset?.useStepdown === true) put("milldrillInfeed", preset.stepdown)
   }
-  return values;
+  return values
 }
