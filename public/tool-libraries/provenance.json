@@ -10,6 +10,14 @@
     "Expressions are inert source metadata and were never evaluated; description, product ID and vendor expressions follow the tidied values.",
     "Converted the transcribed Dreanique TRS dimension tables to Fusion thread mills; each item code is checked against its pitch, cutting diameter and shank cells.",
     "Dreanique thread mills have one flute and one profile (NOF and NT 1), as the code key states; the right hand, 60 degree ISO metric profile and absent coolant supply are assumed, as the tables do not state them. L1 is the shoulder length. Neck diameter, flute and body lengths, tool numbers and cutting presets are not in the tables and are left out.",
+    "Converted the Dreanique W2B dimension table, from the Dreanique Official Store's AliExpress listing (the tools' product link), to Fusion ball end mills; each item code is checked against its radius and flute length cells, and the listing's own drawings of 13 of the sizes agree with the table.",
+    "Dreanique W2B ball end mills have two carbide flutes, as the listing states; the right hand and absent coolant supply are assumed. D1 is the cutting diameter, L1 the flute length, D the shank diameter and L the overall length. Shoulder, neck and body lengths, tool numbers and cutting presets are not in the table and are left out, except where SpeTool supplies them (below). When the Wayback Machine archived the listing (31 August 2022) it offered 13 of the table's 17 sizes, all but W2B-R0.5-L04, W2B-R0.75-L06, W2B-R5.0-L45 and W2B-R6.0-L45.",
+    "Dreanique's W2B presets (named Recommended) come from the recommended cutting parameters on the W2B listing: the low end of its spindle speed and feed ranges, with the ranges in each preset's description. The table gives no material, depth, plunge feed or stepover. Ø3 takes the Ø2.5 row, which the Ø3.1 row equals.",
+    "Converted Dreanique's SP1F dimension table to Fusion flat end mills with one flute (O-flutes). Its D3.1 codes and 3.1 mm cells are 3.175 mm (1/8″) cutters, as Dreanique's DSA1F table and SpeTool's descriptions of its SP1F-D3.1 bits give. Each has three presets from Dreanique's SP1F/DSP1F cutting parameter table: soft wood and plastic, acrylic (compressed air) and aluminium and copper (compressed air; the table allows air or mist). They take the low end of the speed and feed ranges; the wood and acrylic stepdown is the low end of the depth range, the aluminium stepdown the slotting limit, 0.5 × D. The listing's other SP1F table, with narrower ranges in two groups, is not used. The SP1F listing's address is not known, so these tools have no product link.",
+    "Converted Dreanique's DSA1F (one flute) and DAU3E (three flutes) dimension tables to DLC-coated Fusion flat end mills for aluminium. Their presets (Aluminium and copper, with mist) come from the DSA1F, DW1F and DAU3E column of the cutting parameter table on the DSA1F listing: the low end of the speed and feed ranges and the slotting depth, 0.5 × D. DAU3E's Ø3 and Ø3.5 take the next smaller rows, Ø2.5 and Ø3.1.",
+    "For every Dreanique family, each item code is checked against its diameter and flute length cells; the right hand and absent coolant supply are assumed.",
+    "SpeTool sells Dreanique tools under its own product IDs, with Dreanique's item codes as SKUs (W2B, SP1F, SA1F, SP2FC, ST2F, AU3E and more). Four are in this catalog, matched by SKU and dimensions: W04801 is W2B-R3.0-L24, W04802 is W2B-R4.0-L32, W03501 is SP1F-D3.1-L15 and W03502 is SP1F-D3.1-L12. Their Dreanique records take SpeTool's preset (named SpeTool default) and its body, shoulder and assembly gauge lengths; SpeTool's tool numbers are left out. SpeTool's W03503 record describes the uncoated SA1F-D6.0-L22, not the DLC-coated DSA1F-D6.0-L22 (SpeTool sells a DLC variant under the same number), and W03504 and W03505 are SpeTool-coated SP1F bits (SP1FT), so none of those three is copied. SpeTool sells no other W2B size and no thread mills.",
+    "Translated SpeTool's Chinese preset name 默认预设 (default preset) to Default, as its other default presets are named.",
     "The Makera Wired Probe 2.0's dimensions in makera-probe.json, and its model public/models/makera-wired-probe-2.glb (scripts/wired-probe.mjs), are estimated from Makera's product photos, scaled by the known diameters of its shank adapters; they are not measured."
   ],
   "sourceRepository": "https://github.com/MakeraInc/CarveraProfiles",
@@ -149,10 +157,10 @@
     {
       "id": "dreanique",
       "name": "Dreanique",
-      "description": "Dreanique solid carbide thread mills",
+      "description": "Dreanique solid carbide thread mills, ball end mills, O-flute bits and aluminium end mills",
       "fileName": "dreanique.json",
       "url": "/tool-libraries/dreanique.json",
-      "count": 23,
+      "count": 114,
       "sources": [
         {
           "path": "resources/dreanique/trs-thread-mill-code-key.png",
@@ -161,6 +169,45 @@
         {
           "path": "resources/dreanique/trs-thread-mill-dimensions.webp",
           "sha256": "197ea75d144d32af23f0ce51bf273662626f6e5142fbecbf9806064b2e07a271"
+        },
+        {
+          "path": "resources/dreanique/w2b-ball-end-mill-dimensions.webp",
+          "sha256": "5e2723fe2ef098d6a22ac840721ebdfd8fba1c38587bf56e1fb03e95baf2ba4e",
+          "url": "https://ae01.alicdn.com/kf/Hea072b12ecbb4da0bfb38c4489f8fbfaB/Dreanique-1pc-Carbide-Ball-Nose-End-Milling-Cutter-2-Flutes-R0-5-R4-0-End-Mill.jpg"
+        },
+        {
+          "path": "resources/dreanique/w2b-cutting-parameters.webp",
+          "sha256": "fec9561b9ccb6368f81b3b2d971093caaab5dae99732afd043900b92256dd420",
+          "description": "Recommended cutting parameters from the W2B listing, supplied by the user."
+        },
+        {
+          "path": "resources/dreanique/sp1f-dimensions.avif",
+          "sha256": "d567a6956f844d5a9d4ee74cbcd81e86bcceee9162bd29087941389b1b004026",
+          "description": "SP1F dimension table, supplied by the user."
+        },
+        {
+          "path": "resources/dreanique/sp1f-cutting-parameters.avif",
+          "sha256": "75851051f2fd1d6f97ab5b482452abf00d13a1a8d781f228d3011f407c218414",
+          "description": "The SP1F listing's cutting parameters in two groups (wood and plastic; acrylic, aluminium and copper), supplied by the user; not used for the presets."
+        },
+        {
+          "description": "Dreanique's SP1F/DSP1F cutting parameter table (soft wood and plastic, acrylic, aluminium and copper, with depths), which the SP1F presets use; supplied by the user in chat, not yet saved here."
+        },
+        {
+          "path": "resources/dreanique/DSA1F-dimensions.avif",
+          "sha256": "c1b95514e3110de8a3abfeb8745519b7474501fe55857ebbaf480cebd6edc82e",
+          "description": "DSA1F dimension table, supplied by the user.",
+          "url": "https://www.aliexpress.com/item/1005001910635126.html"
+        },
+        {
+          "description": "The DSA1F listing's cutting parameters (SA1F; DSA1F, DW1F and DAU3E), which the DSA1F and DAU3E presets use; supplied by the user in chat, not yet saved here.",
+          "url": "https://www.aliexpress.com/item/1005001910635126.html"
+        },
+        {
+          "path": "resources/dreanique/DAU3E-dimensions.avif",
+          "sha256": "1e0208be9bbab05de1343c542c8dcad032a85c68ebdb3320596b84af24c1dbcc",
+          "description": "DAU3E dimension table, supplied by the user.",
+          "url": "https://www.aliexpress.com/item/1005004027451152.html"
         }
       ],
       "mergedDuplicates": []
@@ -208,6 +255,15 @@
         "NOF": 3
       },
       "evidence": "SpeTool W04902 is a 3 flute roughing cutter: https://spetools.com/en-eu/products/spetool-eu-sc-up-cut-3-fl-8mm-dia-x-32mm-cl-x-8mm-shank-x-75mm-ovl-roughing-cutter"
+    },
+    {
+      "guid": "88949f54-441d-4ddc-9edc-10bd630ba0d0",
+      "vendorDescription": "SpeTool W04801 Ball End Mill 6 mm Cutting Diameter 6 mm Shank 24 mm Cutting Length Double Flute Router Bit Solid Carbide Milling Cutter for DIY Woodworking Carving Engraving",
+      "preset": {
+        "v_f_plunge": 1333,
+        "f_n": 0.09521428571428571
+      },
+      "evidence": "SpeTool's W04801 preset plunges at 13333 mm/min, over three times its 4000 mm/min cutting feed. Its ramp feed is 1333 mm/min, and W04802's preset plunges at its ramp feed, a third of its cutting feed, so 13333 has one 3 too many; the feed per revolution follows the plunge feed. The Dreanique W2B-R3.0-L24, the same tool, takes the corrected preset."
     }
   ]
 }

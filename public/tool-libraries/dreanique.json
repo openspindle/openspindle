@@ -759,6 +759,5540 @@
       "unit": "millimeters",
       "vendor": "Dreanique",
       "vendor-description": "TRS-P2.0-P3.0-H14"
+    },
+    {
+      "BMC": "carbide",
+      "description": "Ball nose Ø1 × 4 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 1,
+        "HAND": true,
+        "LCF": 4,
+        "NOF": 2,
+        "OAL": 38.1,
+        "SFDM": 3.175
+      },
+      "guid": "23708984-c430-52bf-b3d7-de9286f4d5bc",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "W2B-R0.5-L04",
+      "product-link": "https://www.aliexpress.com/item/1005002020503413.html",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique: 14000–18000 rpm, 800–1200 mm/min. The preset takes the low end.",
+            "f_z": 0.02857142857142857,
+            "guid": "eeae9b45-dad3-5f11-9b0b-915e0305da55",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Recommended",
+            "v_c": 43.982297150257104,
+            "v_f": 800
+          }
+        ]
+      },
+      "type": "ball end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "W2B-R0.5-L04"
+    },
+    {
+      "BMC": "carbide",
+      "description": "Ball nose Ø1.5 × 6 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 1.5,
+        "HAND": true,
+        "LCF": 6,
+        "NOF": 2,
+        "OAL": 38.1,
+        "SFDM": 3.175
+      },
+      "guid": "abe30adb-8882-58dd-94d5-4ec7628812d8",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "W2B-R0.75-L06",
+      "product-link": "https://www.aliexpress.com/item/1005002020503413.html",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique: 14000–18000 rpm, 1000–1200 mm/min. The preset takes the low end.",
+            "f_z": 0.03571428571428571,
+            "guid": "9fbcae38-31a2-542a-b80e-66921d8a19ca",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Recommended",
+            "v_c": 65.97344572538566,
+            "v_f": 1000
+          }
+        ]
+      },
+      "type": "ball end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "W2B-R0.75-L06"
+    },
+    {
+      "BMC": "carbide",
+      "description": "Ball nose Ø2 × 8 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 2,
+        "HAND": true,
+        "LCF": 8,
+        "NOF": 2,
+        "OAL": 38.1,
+        "SFDM": 3.175
+      },
+      "guid": "25286b18-8e63-5614-82c5-5ead2ae7752c",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "W2B-R1.0-L08",
+      "product-link": "https://www.aliexpress.com/item/1005002020503413.html",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique: 14000–18000 rpm, 1100–1200 mm/min. The preset takes the low end.",
+            "f_z": 0.039285714285714285,
+            "guid": "3f64fbd7-b117-5bea-9959-38d09f911a86",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Recommended",
+            "v_c": 87.96459430051421,
+            "v_f": 1100
+          }
+        ]
+      },
+      "type": "ball end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "W2B-R1.0-L08"
+    },
+    {
+      "BMC": "carbide",
+      "description": "Ball nose Ø3 × 12 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 3,
+        "HAND": true,
+        "LCF": 12,
+        "NOF": 2,
+        "OAL": 38.1,
+        "SFDM": 3.175
+      },
+      "guid": "bd496b73-beba-5cdf-8aac-7f013a9be25d",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "W2B-R1.5-L12",
+      "product-link": "https://www.aliexpress.com/item/1005002020503413.html",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique has no Ø3 row; this is its Ø2.5 row. Dreanique: 14000–18000 rpm, 1200–1400 mm/min. The preset takes the low end.",
+            "f_z": 0.04285714285714286,
+            "guid": "d4a14a66-75fe-59b2-a487-0a06293db903",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Recommended",
+            "v_c": 131.94689145077132,
+            "v_f": 1200
+          }
+        ]
+      },
+      "type": "ball end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "W2B-R1.5-L12"
+    },
+    {
+      "BMC": "carbide",
+      "description": "Ball nose Ø3 × 22 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 3,
+        "HAND": true,
+        "LCF": 22,
+        "NOF": 2,
+        "OAL": 50,
+        "SFDM": 3.175
+      },
+      "guid": "658dcc6a-14c1-55cc-814a-5188114bfcb5",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "W2B-R1.5-L22",
+      "product-link": "https://www.aliexpress.com/item/1005002020503413.html",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique has no Ø3 row; this is its Ø2.5 row. Dreanique: 14000–18000 rpm, 1200–1400 mm/min. The preset takes the low end.",
+            "f_z": 0.04285714285714286,
+            "guid": "49916a8e-75c7-5c69-ba8b-d7e0e135d700",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Recommended",
+            "v_c": 131.94689145077132,
+            "v_f": 1200
+          }
+        ]
+      },
+      "type": "ball end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "W2B-R1.5-L22"
+    },
+    {
+      "BMC": "carbide",
+      "description": "Ball nose Ø4 × 12 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 4,
+        "HAND": true,
+        "LCF": 12,
+        "NOF": 2,
+        "OAL": 50,
+        "SFDM": 4
+      },
+      "guid": "4953412a-ed27-5848-b05b-3389defde93b",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "W2B-R2.0-L12",
+      "product-link": "https://www.aliexpress.com/item/1005002020503413.html",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique: 14000–18000 rpm, 2000–3000 mm/min. The preset takes the low end.",
+            "f_z": 0.07142857142857142,
+            "guid": "c5773459-2dc8-53f2-8d60-f5abc179f3d2",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Recommended",
+            "v_c": 175.92918860102841,
+            "v_f": 2000
+          }
+        ]
+      },
+      "type": "ball end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "W2B-R2.0-L12"
+    },
+    {
+      "BMC": "carbide",
+      "description": "Ball nose Ø4 × 22 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 4,
+        "HAND": true,
+        "LCF": 22,
+        "NOF": 2,
+        "OAL": 50,
+        "SFDM": 4
+      },
+      "guid": "0d578a13-9c10-5c61-9915-bdc6513e183f",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "W2B-R2.0-L22",
+      "product-link": "https://www.aliexpress.com/item/1005002020503413.html",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique: 14000–18000 rpm, 2000–3000 mm/min. The preset takes the low end.",
+            "f_z": 0.07142857142857142,
+            "guid": "11a2e3e2-e41c-5109-aafa-e633065b8165",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Recommended",
+            "v_c": 175.92918860102841,
+            "v_f": 2000
+          }
+        ]
+      },
+      "type": "ball end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "W2B-R2.0-L22"
+    },
+    {
+      "BMC": "carbide",
+      "description": "Ball nose Ø6 × 18 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 6,
+        "HAND": true,
+        "LCF": 18,
+        "NOF": 2,
+        "OAL": 50,
+        "SFDM": 6
+      },
+      "guid": "bf7d65fa-94a9-5205-b197-6c083ad45900",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "W2B-R3.0-L18",
+      "product-link": "https://www.aliexpress.com/item/1005002020503413.html",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique: 12000–14000 rpm, 3000–4000 mm/min. The preset takes the low end.",
+            "f_z": 0.125,
+            "guid": "11d28918-1292-5ad8-85ef-9aa3af112bb5",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 12000,
+            "n_ramp": 12000,
+            "name": "Recommended",
+            "v_c": 226.1946710584651,
+            "v_f": 3000
+          }
+        ]
+      },
+      "type": "ball end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "W2B-R3.0-L18"
+    },
+    {
+      "BMC": "carbide",
+      "description": "Ball nose Ø6 × 24 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 6,
+        "HAND": true,
+        "LB": 36,
+        "LCF": 24,
+        "NOF": 2,
+        "OAL": 50,
+        "SFDM": 6,
+        "assemblyGaugeLength": 36,
+        "shoulder-diameter": 6,
+        "shoulder-length": 24
+      },
+      "guid": "48511c88-11df-54ff-a445-9df952b27517",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "W2B-R3.0-L24",
+      "product-link": "https://www.aliexpress.com/item/1005002020503413.html",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique: 12000–14000 rpm, 3000–4000 mm/min. The preset takes the low end.",
+            "f_z": 0.125,
+            "guid": "fe2118d5-58ae-56aa-9ff1-118e188bdf5f",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 12000,
+            "n_ramp": 12000,
+            "name": "Recommended",
+            "v_c": 226.1946710584651,
+            "v_f": 3000
+          },
+          {
+            "f_n": 0.09521428571428571,
+            "f_z": 0.14285714285714285,
+            "guid": "8d67ac0b-3231-5bbf-bfec-6b656f910c05",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "SpeTool default",
+            "ramp-angle": 2,
+            "stepdown": 6,
+            "stepover": 2.4,
+            "tool-coolant": "air",
+            "use-stepdown": true,
+            "use-stepover": true,
+            "v_c": 263.89378290154264,
+            "v_f": 4000,
+            "v_f_leadIn": 4000,
+            "v_f_leadOut": 4000,
+            "v_f_plunge": 1333,
+            "v_f_ramp": 1333,
+            "v_f_transition": 4000
+          }
+        ]
+      },
+      "type": "ball end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "W2B-R3.0-L24"
+    },
+    {
+      "BMC": "carbide",
+      "description": "Ball nose Ø6 × 32 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 6,
+        "HAND": true,
+        "LCF": 32,
+        "NOF": 2,
+        "OAL": 75,
+        "SFDM": 6
+      },
+      "guid": "770531ae-3dcb-5d21-bfba-11b7aa56276c",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "W2B-R3.0-L32",
+      "product-link": "https://www.aliexpress.com/item/1005002020503413.html",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique: 12000–14000 rpm, 3000–4000 mm/min. The preset takes the low end.",
+            "f_z": 0.125,
+            "guid": "818e0e89-7491-58bf-ace6-3940f01c8070",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 12000,
+            "n_ramp": 12000,
+            "name": "Recommended",
+            "v_c": 226.1946710584651,
+            "v_f": 3000
+          }
+        ]
+      },
+      "type": "ball end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "W2B-R3.0-L32"
+    },
+    {
+      "BMC": "carbide",
+      "description": "Ball nose Ø8 × 22 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 8,
+        "HAND": true,
+        "LCF": 22,
+        "NOF": 2,
+        "OAL": 60,
+        "SFDM": 8
+      },
+      "guid": "69400ef4-6eff-5e00-8f73-546ff6f90cdb",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "W2B-R4.0-L22",
+      "product-link": "https://www.aliexpress.com/item/1005002020503413.html",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique: 10000–12000 rpm, 4000–5000 mm/min. The preset takes the low end.",
+            "f_z": 0.2,
+            "guid": "11f52c29-b59f-51fd-9ea3-eff6a220dc58",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 10000,
+            "n_ramp": 10000,
+            "name": "Recommended",
+            "v_c": 251.32741228718345,
+            "v_f": 4000
+          }
+        ]
+      },
+      "type": "ball end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "W2B-R4.0-L22"
+    },
+    {
+      "BMC": "carbide",
+      "description": "Ball nose Ø8 × 32 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 8,
+        "HAND": true,
+        "LB": 50,
+        "LCF": 32,
+        "NOF": 2,
+        "OAL": 75,
+        "SFDM": 8,
+        "assemblyGaugeLength": 50,
+        "shoulder-diameter": 8,
+        "shoulder-length": 32
+      },
+      "guid": "9641ed89-1227-5ea5-a911-ff4daad72542",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "W2B-R4.0-L32",
+      "product-link": "https://www.aliexpress.com/item/1005002020503413.html",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique: 10000–12000 rpm, 4000–5000 mm/min. The preset takes the low end.",
+            "f_z": 0.2,
+            "guid": "695c36da-fdeb-5a39-b51c-29d5a1cf0e66",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 10000,
+            "n_ramp": 10000,
+            "name": "Recommended",
+            "v_c": 251.32741228718345,
+            "v_f": 4000
+          },
+          {
+            "f_n": 0.13883333333333334,
+            "f_z": 0.20833333333333337,
+            "guid": "f2fcc1a8-6850-5213-bfd9-1534fef11507",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 12000,
+            "n_ramp": 12000,
+            "name": "SpeTool default",
+            "ramp-angle": 2,
+            "stepdown": 8,
+            "stepover": 3.2,
+            "tool-coolant": "air",
+            "use-stepdown": true,
+            "use-stepover": true,
+            "v_c": 301.59289474462014,
+            "v_f": 5000,
+            "v_f_leadIn": 5000,
+            "v_f_leadOut": 5000,
+            "v_f_plunge": 1666,
+            "v_f_ramp": 1666,
+            "v_f_transition": 5000
+          }
+        ]
+      },
+      "type": "ball end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "W2B-R4.0-L32"
+    },
+    {
+      "BMC": "carbide",
+      "description": "Ball nose Ø8 × 42 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 8,
+        "HAND": true,
+        "LCF": 42,
+        "NOF": 2,
+        "OAL": 100,
+        "SFDM": 8
+      },
+      "guid": "1c0b2b52-51bc-525a-9f02-049a7c0fa1ad",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "W2B-R4.0-L42",
+      "product-link": "https://www.aliexpress.com/item/1005002020503413.html",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique: 10000–12000 rpm, 4000–5000 mm/min. The preset takes the low end.",
+            "f_z": 0.2,
+            "guid": "4927e325-17db-51dd-a61b-e20f0438d1d5",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 10000,
+            "n_ramp": 10000,
+            "name": "Recommended",
+            "v_c": 251.32741228718345,
+            "v_f": 4000
+          }
+        ]
+      },
+      "type": "ball end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "W2B-R4.0-L42"
+    },
+    {
+      "BMC": "carbide",
+      "description": "Ball nose Ø10 × 35 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 10,
+        "HAND": true,
+        "LCF": 35,
+        "NOF": 2,
+        "OAL": 75,
+        "SFDM": 10
+      },
+      "guid": "96d0d26e-57c7-5fb8-ae02-8b4d0df8977f",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "W2B-R5.0-L35",
+      "product-link": "https://www.aliexpress.com/item/1005002020503413.html",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique: 10000–12000 rpm, 6000–7000 mm/min. The preset takes the low end.",
+            "f_z": 0.3,
+            "guid": "702ce4fb-c7ba-5899-9ef9-ae29f4b0e769",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 10000,
+            "n_ramp": 10000,
+            "name": "Recommended",
+            "v_c": 314.15926535897927,
+            "v_f": 6000
+          }
+        ]
+      },
+      "type": "ball end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "W2B-R5.0-L35"
+    },
+    {
+      "BMC": "carbide",
+      "description": "Ball nose Ø10 × 45 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 10,
+        "HAND": true,
+        "LCF": 45,
+        "NOF": 2,
+        "OAL": 100,
+        "SFDM": 10
+      },
+      "guid": "d9ec4d93-1766-5256-82cf-c6f06c483529",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "W2B-R5.0-L45",
+      "product-link": "https://www.aliexpress.com/item/1005002020503413.html",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique: 10000–12000 rpm, 6000–7000 mm/min. The preset takes the low end.",
+            "f_z": 0.3,
+            "guid": "2a3178b7-c442-548d-9c2c-e476a937b363",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 10000,
+            "n_ramp": 10000,
+            "name": "Recommended",
+            "v_c": 314.15926535897927,
+            "v_f": 6000
+          }
+        ]
+      },
+      "type": "ball end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "W2B-R5.0-L45"
+    },
+    {
+      "BMC": "carbide",
+      "description": "Ball nose Ø12 × 35 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 12,
+        "HAND": true,
+        "LCF": 35,
+        "NOF": 2,
+        "OAL": 75,
+        "SFDM": 12
+      },
+      "guid": "1aa3b987-e76b-5e78-acc5-b6f51b6d92c3",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "W2B-R6.0-L35",
+      "product-link": "https://www.aliexpress.com/item/1005002020503413.html",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique: 8000–10000 rpm, 6000–7000 mm/min. The preset takes the low end.",
+            "f_z": 0.375,
+            "guid": "e1de3bbd-3a28-54dd-95ea-0b0e9187e636",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 8000,
+            "n_ramp": 8000,
+            "name": "Recommended",
+            "v_c": 301.59289474462014,
+            "v_f": 6000
+          }
+        ]
+      },
+      "type": "ball end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "W2B-R6.0-L35"
+    },
+    {
+      "BMC": "carbide",
+      "description": "Ball nose Ø12 × 45 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 12,
+        "HAND": true,
+        "LCF": 45,
+        "NOF": 2,
+        "OAL": 100,
+        "SFDM": 12
+      },
+      "guid": "33c46e66-ced7-59e4-b11a-8067095d5a40",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "W2B-R6.0-L45",
+      "product-link": "https://www.aliexpress.com/item/1005002020503413.html",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique: 8000–10000 rpm, 6000–7000 mm/min. The preset takes the low end.",
+            "f_z": 0.375,
+            "guid": "af3f8a7a-6376-57ab-bdf7-617febdc74dc",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 8000,
+            "n_ramp": 8000,
+            "name": "Recommended",
+            "v_c": 301.59289474462014,
+            "v_f": 6000
+          }
+        ]
+      },
+      "type": "ball end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "W2B-R6.0-L45"
+    },
+    {
+      "BMC": "carbide",
+      "description": "O-flute Ø1 × 3 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 1,
+        "HAND": true,
+        "LCF": 3,
+        "NOF": 1,
+        "OAL": 38.1,
+        "SFDM": 3.175
+      },
+      "guid": "3ddb45ad-014c-56bc-9d61-a41df14f3dd0",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "SP1F-D1.0-L03",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique, soft wood and plastic: 14000–22000 rpm, 800–1200 mm/min, 1–1.5 mm deep. The preset takes the low end.",
+            "f_z": 0.05714285714285714,
+            "guid": "992e5712-dfd8-5b65-871e-bf387fef47ec",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Soft wood and plastic",
+            "stepdown": 1,
+            "use-stepdown": true,
+            "v_c": 43.982297150257104,
+            "v_f": 800
+          },
+          {
+            "description": "Dreanique, acrylic: 14000–22000 rpm, 800–1200 mm/min, 1–1.5 mm deep; compressed air strongly recommended. The preset takes the low end.",
+            "f_z": 0.05714285714285714,
+            "guid": "e3838d72-334e-51e0-b544-84c2896cdd9c",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Acrylic",
+            "stepdown": 1,
+            "tool-coolant": "air",
+            "use-stepdown": true,
+            "v_c": 43.982297150257104,
+            "v_f": 800
+          },
+          {
+            "description": "Dreanique, aluminium and copper: 14000–18000 rpm, 600–900 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; compressed air or mist strongly recommended. The preset takes the low end and the slotting depth.",
+            "f_z": 0.04285714285714286,
+            "guid": "a67a4256-a34f-50ad-9d09-69aa34caf2d6",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Aluminium and copper",
+            "stepdown": 0.5,
+            "tool-coolant": "air",
+            "use-stepdown": true,
+            "v_c": 43.982297150257104,
+            "v_f": 600
+          }
+        ]
+      },
+      "type": "flat end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "SP1F-D1.0-L03"
+    },
+    {
+      "BMC": "carbide",
+      "description": "O-flute Ø1 × 4 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 1,
+        "HAND": true,
+        "LCF": 4,
+        "NOF": 1,
+        "OAL": 38.1,
+        "SFDM": 3.175
+      },
+      "guid": "b1915c41-bc65-599f-8892-d94fe0d65c4b",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "SP1F-D1.0-L04",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique, soft wood and plastic: 14000–22000 rpm, 800–1200 mm/min, 1–1.5 mm deep. The preset takes the low end.",
+            "f_z": 0.05714285714285714,
+            "guid": "e68cdf75-6729-5491-ae07-b650da3db8ee",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Soft wood and plastic",
+            "stepdown": 1,
+            "use-stepdown": true,
+            "v_c": 43.982297150257104,
+            "v_f": 800
+          },
+          {
+            "description": "Dreanique, acrylic: 14000–22000 rpm, 800–1200 mm/min, 1–1.5 mm deep; compressed air strongly recommended. The preset takes the low end.",
+            "f_z": 0.05714285714285714,
+            "guid": "1547329d-886a-5d84-9212-cd184b656998",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Acrylic",
+            "stepdown": 1,
+            "tool-coolant": "air",
+            "use-stepdown": true,
+            "v_c": 43.982297150257104,
+            "v_f": 800
+          },
+          {
+            "description": "Dreanique, aluminium and copper: 14000–18000 rpm, 600–900 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; compressed air or mist strongly recommended. The preset takes the low end and the slotting depth.",
+            "f_z": 0.04285714285714286,
+            "guid": "f71c9131-a183-5273-91ca-a7a612e45f81",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Aluminium and copper",
+            "stepdown": 0.5,
+            "tool-coolant": "air",
+            "use-stepdown": true,
+            "v_c": 43.982297150257104,
+            "v_f": 600
+          }
+        ]
+      },
+      "type": "flat end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "SP1F-D1.0-L04"
+    },
+    {
+      "BMC": "carbide",
+      "description": "O-flute Ø1.5 × 5 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 1.5,
+        "HAND": true,
+        "LCF": 5,
+        "NOF": 1,
+        "OAL": 38.1,
+        "SFDM": 3.175
+      },
+      "guid": "420359a9-ecb7-5872-8243-c9ca10339d48",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "SP1F-D1.5-L05",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique, soft wood and plastic: 14000–22000 rpm, 1000–1200 mm/min, 1.5–2.2 mm deep. The preset takes the low end.",
+            "f_z": 0.07142857142857142,
+            "guid": "68eac1b7-c50d-5347-8e49-3a0839d32a9d",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Soft wood and plastic",
+            "stepdown": 1.5,
+            "use-stepdown": true,
+            "v_c": 65.97344572538566,
+            "v_f": 1000
+          },
+          {
+            "description": "Dreanique, acrylic: 14000–22000 rpm, 1000–1200 mm/min, 1.5–2.2 mm deep; compressed air strongly recommended. The preset takes the low end.",
+            "f_z": 0.07142857142857142,
+            "guid": "c0aa69ad-7c5b-5a89-ae2f-c537b13d7ab4",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Acrylic",
+            "stepdown": 1.5,
+            "tool-coolant": "air",
+            "use-stepdown": true,
+            "v_c": 65.97344572538566,
+            "v_f": 1000
+          },
+          {
+            "description": "Dreanique, aluminium and copper: 14000–18000 rpm, 800–1000 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; compressed air or mist strongly recommended. The preset takes the low end and the slotting depth.",
+            "f_z": 0.05714285714285714,
+            "guid": "2408d519-cd7c-5b89-9ee9-4bd15562030b",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Aluminium and copper",
+            "stepdown": 0.75,
+            "tool-coolant": "air",
+            "use-stepdown": true,
+            "v_c": 65.97344572538566,
+            "v_f": 800
+          }
+        ]
+      },
+      "type": "flat end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "SP1F-D1.5-L05"
+    },
+    {
+      "BMC": "carbide",
+      "description": "O-flute Ø2 × 4 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 2,
+        "HAND": true,
+        "LCF": 4,
+        "NOF": 1,
+        "OAL": 38.1,
+        "SFDM": 3.175
+      },
+      "guid": "8d98ebbb-3097-5337-bc3e-3a761d238a9f",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "SP1F-D2.0-L04",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique, soft wood and plastic: 14000–22000 rpm, 1100–1300 mm/min, 2–3 mm deep. The preset takes the low end.",
+            "f_z": 0.07857142857142857,
+            "guid": "dedaab37-138d-5b4e-9150-b832f796c2db",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Soft wood and plastic",
+            "stepdown": 2,
+            "use-stepdown": true,
+            "v_c": 87.96459430051421,
+            "v_f": 1100
+          },
+          {
+            "description": "Dreanique, acrylic: 14000–22000 rpm, 1100–1300 mm/min, 2–3 mm deep; compressed air strongly recommended. The preset takes the low end.",
+            "f_z": 0.07857142857142857,
+            "guid": "ecbddb92-39bc-5d62-b8ae-eb3fc17cf548",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Acrylic",
+            "stepdown": 2,
+            "tool-coolant": "air",
+            "use-stepdown": true,
+            "v_c": 87.96459430051421,
+            "v_f": 1100
+          },
+          {
+            "description": "Dreanique, aluminium and copper: 14000–18000 rpm, 800–1000 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; compressed air or mist strongly recommended. The preset takes the low end and the slotting depth.",
+            "f_z": 0.05714285714285714,
+            "guid": "d4d8ae97-caf2-573f-b0cf-abdac89816f5",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Aluminium and copper",
+            "stepdown": 1,
+            "tool-coolant": "air",
+            "use-stepdown": true,
+            "v_c": 87.96459430051421,
+            "v_f": 800
+          }
+        ]
+      },
+      "type": "flat end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "SP1F-D2.0-L04"
+    },
+    {
+      "BMC": "carbide",
+      "description": "O-flute Ø2 × 6 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 2,
+        "HAND": true,
+        "LCF": 6,
+        "NOF": 1,
+        "OAL": 38.1,
+        "SFDM": 3.175
+      },
+      "guid": "fdcfd159-fa8c-5a91-b249-7b6a22e5833c",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "SP1F-D2.0-L06",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique, soft wood and plastic: 14000–22000 rpm, 1100–1300 mm/min, 2–3 mm deep. The preset takes the low end.",
+            "f_z": 0.07857142857142857,
+            "guid": "9fc4d000-9e60-5e21-b9e8-d68e8d47c288",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Soft wood and plastic",
+            "stepdown": 2,
+            "use-stepdown": true,
+            "v_c": 87.96459430051421,
+            "v_f": 1100
+          },
+          {
+            "description": "Dreanique, acrylic: 14000–22000 rpm, 1100–1300 mm/min, 2–3 mm deep; compressed air strongly recommended. The preset takes the low end.",
+            "f_z": 0.07857142857142857,
+            "guid": "57f00d7e-a6c1-5e5b-b72e-3f1d559bb066",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Acrylic",
+            "stepdown": 2,
+            "tool-coolant": "air",
+            "use-stepdown": true,
+            "v_c": 87.96459430051421,
+            "v_f": 1100
+          },
+          {
+            "description": "Dreanique, aluminium and copper: 14000–18000 rpm, 800–1000 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; compressed air or mist strongly recommended. The preset takes the low end and the slotting depth.",
+            "f_z": 0.05714285714285714,
+            "guid": "fe29f998-10d7-52b2-bae1-e7cc4a0307f0",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Aluminium and copper",
+            "stepdown": 1,
+            "tool-coolant": "air",
+            "use-stepdown": true,
+            "v_c": 87.96459430051421,
+            "v_f": 800
+          }
+        ]
+      },
+      "type": "flat end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "SP1F-D2.0-L06"
+    },
+    {
+      "BMC": "carbide",
+      "description": "O-flute Ø2 × 8 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 2,
+        "HAND": true,
+        "LCF": 8,
+        "NOF": 1,
+        "OAL": 38.1,
+        "SFDM": 3.175
+      },
+      "guid": "8d5feada-ec7f-53c3-ab5e-726dafd894e5",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "SP1F-D2.0-L08",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique, soft wood and plastic: 14000–22000 rpm, 1100–1300 mm/min, 2–3 mm deep. The preset takes the low end.",
+            "f_z": 0.07857142857142857,
+            "guid": "d2a7d7f5-ac96-5ab7-8833-f0e5d8f4c3d3",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Soft wood and plastic",
+            "stepdown": 2,
+            "use-stepdown": true,
+            "v_c": 87.96459430051421,
+            "v_f": 1100
+          },
+          {
+            "description": "Dreanique, acrylic: 14000–22000 rpm, 1100–1300 mm/min, 2–3 mm deep; compressed air strongly recommended. The preset takes the low end.",
+            "f_z": 0.07857142857142857,
+            "guid": "f93d87e9-7d42-5071-92c0-13e24ea63847",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Acrylic",
+            "stepdown": 2,
+            "tool-coolant": "air",
+            "use-stepdown": true,
+            "v_c": 87.96459430051421,
+            "v_f": 1100
+          },
+          {
+            "description": "Dreanique, aluminium and copper: 14000–18000 rpm, 800–1000 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; compressed air or mist strongly recommended. The preset takes the low end and the slotting depth.",
+            "f_z": 0.05714285714285714,
+            "guid": "870f9486-b70b-5a7a-8860-2bc09e30e9bd",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Aluminium and copper",
+            "stepdown": 1,
+            "tool-coolant": "air",
+            "use-stepdown": true,
+            "v_c": 87.96459430051421,
+            "v_f": 800
+          }
+        ]
+      },
+      "type": "flat end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "SP1F-D2.0-L08"
+    },
+    {
+      "BMC": "carbide",
+      "description": "O-flute Ø2.5 × 4 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 2.5,
+        "HAND": true,
+        "LCF": 4,
+        "NOF": 1,
+        "OAL": 38.1,
+        "SFDM": 3.175
+      },
+      "guid": "bf3977c1-10be-54fc-8662-5bd02bc57914",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "SP1F-D2.5-L04",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique, soft wood and plastic: 14000–22000 rpm, 1200–1400 mm/min, 2.5–3.8 mm deep. The preset takes the low end.",
+            "f_z": 0.08571428571428572,
+            "guid": "9b0747bd-91f5-5ed0-97b3-f1db8279d308",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Soft wood and plastic",
+            "stepdown": 2.5,
+            "use-stepdown": true,
+            "v_c": 109.95574287564276,
+            "v_f": 1200
+          },
+          {
+            "description": "Dreanique, acrylic: 14000–22000 rpm, 1200–1400 mm/min, 2.5–3.8 mm deep; compressed air strongly recommended. The preset takes the low end.",
+            "f_z": 0.08571428571428572,
+            "guid": "d230b5bf-49d7-585f-99d6-ebd9aa03bde2",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Acrylic",
+            "stepdown": 2.5,
+            "tool-coolant": "air",
+            "use-stepdown": true,
+            "v_c": 109.95574287564276,
+            "v_f": 1200
+          },
+          {
+            "description": "Dreanique, aluminium and copper: 14000–18000 rpm, 800–1100 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; compressed air or mist strongly recommended. The preset takes the low end and the slotting depth.",
+            "f_z": 0.05714285714285714,
+            "guid": "2496f572-7b8f-5c74-a225-059c664d89b2",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Aluminium and copper",
+            "stepdown": 1.25,
+            "tool-coolant": "air",
+            "use-stepdown": true,
+            "v_c": 109.95574287564276,
+            "v_f": 800
+          }
+        ]
+      },
+      "type": "flat end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "SP1F-D2.5-L04"
+    },
+    {
+      "BMC": "carbide",
+      "description": "O-flute Ø2.5 × 6 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 2.5,
+        "HAND": true,
+        "LCF": 6,
+        "NOF": 1,
+        "OAL": 38.1,
+        "SFDM": 3.175
+      },
+      "guid": "bd9c6c7e-4d17-5598-96e3-349e275b0356",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "SP1F-D2.5-L06",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique, soft wood and plastic: 14000–22000 rpm, 1200–1400 mm/min, 2.5–3.8 mm deep. The preset takes the low end.",
+            "f_z": 0.08571428571428572,
+            "guid": "9ae4fead-1485-5bde-af01-0b46b2e2f677",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Soft wood and plastic",
+            "stepdown": 2.5,
+            "use-stepdown": true,
+            "v_c": 109.95574287564276,
+            "v_f": 1200
+          },
+          {
+            "description": "Dreanique, acrylic: 14000–22000 rpm, 1200–1400 mm/min, 2.5–3.8 mm deep; compressed air strongly recommended. The preset takes the low end.",
+            "f_z": 0.08571428571428572,
+            "guid": "e78a02fe-dbf0-5148-8a2b-a11dc3badfb5",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Acrylic",
+            "stepdown": 2.5,
+            "tool-coolant": "air",
+            "use-stepdown": true,
+            "v_c": 109.95574287564276,
+            "v_f": 1200
+          },
+          {
+            "description": "Dreanique, aluminium and copper: 14000–18000 rpm, 800–1100 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; compressed air or mist strongly recommended. The preset takes the low end and the slotting depth.",
+            "f_z": 0.05714285714285714,
+            "guid": "085f08b5-c2d0-51ff-9e91-9e6ca41048a8",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Aluminium and copper",
+            "stepdown": 1.25,
+            "tool-coolant": "air",
+            "use-stepdown": true,
+            "v_c": 109.95574287564276,
+            "v_f": 800
+          }
+        ]
+      },
+      "type": "flat end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "SP1F-D2.5-L06"
+    },
+    {
+      "BMC": "carbide",
+      "description": "O-flute Ø2.5 × 8 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 2.5,
+        "HAND": true,
+        "LCF": 8,
+        "NOF": 1,
+        "OAL": 38.1,
+        "SFDM": 3.175
+      },
+      "guid": "868ce3bc-fce3-5119-89f0-4132952287c8",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "SP1F-D2.5-L08",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique, soft wood and plastic: 14000–22000 rpm, 1200–1400 mm/min, 2.5–3.8 mm deep. The preset takes the low end.",
+            "f_z": 0.08571428571428572,
+            "guid": "a8591321-8527-5d0b-9d4f-ad2303f88c3a",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Soft wood and plastic",
+            "stepdown": 2.5,
+            "use-stepdown": true,
+            "v_c": 109.95574287564276,
+            "v_f": 1200
+          },
+          {
+            "description": "Dreanique, acrylic: 14000–22000 rpm, 1200–1400 mm/min, 2.5–3.8 mm deep; compressed air strongly recommended. The preset takes the low end.",
+            "f_z": 0.08571428571428572,
+            "guid": "b5c08ab6-41f1-539c-af00-4c104b6a25cf",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Acrylic",
+            "stepdown": 2.5,
+            "tool-coolant": "air",
+            "use-stepdown": true,
+            "v_c": 109.95574287564276,
+            "v_f": 1200
+          },
+          {
+            "description": "Dreanique, aluminium and copper: 14000–18000 rpm, 800–1100 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; compressed air or mist strongly recommended. The preset takes the low end and the slotting depth.",
+            "f_z": 0.05714285714285714,
+            "guid": "4a77bbd1-27ab-5ff5-b71f-3f68193645d3",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Aluminium and copper",
+            "stepdown": 1.25,
+            "tool-coolant": "air",
+            "use-stepdown": true,
+            "v_c": 109.95574287564276,
+            "v_f": 800
+          }
+        ]
+      },
+      "type": "flat end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "SP1F-D2.5-L08"
+    },
+    {
+      "BMC": "carbide",
+      "description": "O-flute Ø2.5 × 10 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 2.5,
+        "HAND": true,
+        "LCF": 10,
+        "NOF": 1,
+        "OAL": 38.1,
+        "SFDM": 3.175
+      },
+      "guid": "d13a8414-e273-53be-aa47-2444afb973f4",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "SP1F-D2.5-L10",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique, soft wood and plastic: 14000–22000 rpm, 1200–1400 mm/min, 2.5–3.8 mm deep. The preset takes the low end.",
+            "f_z": 0.08571428571428572,
+            "guid": "5bac86ca-d636-50c3-94da-3eb71431e05a",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Soft wood and plastic",
+            "stepdown": 2.5,
+            "use-stepdown": true,
+            "v_c": 109.95574287564276,
+            "v_f": 1200
+          },
+          {
+            "description": "Dreanique, acrylic: 14000–22000 rpm, 1200–1400 mm/min, 2.5–3.8 mm deep; compressed air strongly recommended. The preset takes the low end.",
+            "f_z": 0.08571428571428572,
+            "guid": "79e32659-1499-5679-942c-5117fb99dc9e",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Acrylic",
+            "stepdown": 2.5,
+            "tool-coolant": "air",
+            "use-stepdown": true,
+            "v_c": 109.95574287564276,
+            "v_f": 1200
+          },
+          {
+            "description": "Dreanique, aluminium and copper: 14000–18000 rpm, 800–1100 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; compressed air or mist strongly recommended. The preset takes the low end and the slotting depth.",
+            "f_z": 0.05714285714285714,
+            "guid": "9a8414a4-2b58-5309-961e-a43bf0663f9d",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Aluminium and copper",
+            "stepdown": 1.25,
+            "tool-coolant": "air",
+            "use-stepdown": true,
+            "v_c": 109.95574287564276,
+            "v_f": 800
+          }
+        ]
+      },
+      "type": "flat end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "SP1F-D2.5-L10"
+    },
+    {
+      "BMC": "carbide",
+      "description": "O-flute Ø3.175 × 5 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 3.175,
+        "HAND": true,
+        "LCF": 5,
+        "NOF": 1,
+        "OAL": 38.1,
+        "SFDM": 3.175
+      },
+      "guid": "2bfe0f38-9c7b-5bac-80fe-f40df7fd86bb",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "SP1F-D3.1-L05",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique, soft wood and plastic: 14000–22000 rpm, 1400–2000 mm/min, 3.1–4.6 mm deep. The preset takes the low end.",
+            "f_z": 0.1,
+            "guid": "d1bcc5bd-d7e6-5c29-8dfe-b10cbaa5eb82",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Soft wood and plastic",
+            "stepdown": 3.1,
+            "use-stepdown": true,
+            "v_c": 139.64379345206632,
+            "v_f": 1400
+          },
+          {
+            "description": "Dreanique, acrylic: 14000–22000 rpm, 1400–2000 mm/min, 3.1–4.6 mm deep; compressed air strongly recommended. The preset takes the low end.",
+            "f_z": 0.1,
+            "guid": "31f0039d-45aa-51cc-9298-1095804aec6e",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Acrylic",
+            "stepdown": 3.1,
+            "tool-coolant": "air",
+            "use-stepdown": true,
+            "v_c": 139.64379345206632,
+            "v_f": 1400
+          },
+          {
+            "description": "Dreanique, aluminium and copper: 14000–18000 rpm, 900–1200 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; compressed air or mist strongly recommended. The preset takes the low end and the slotting depth.",
+            "f_z": 0.06428571428571428,
+            "guid": "08ab63cc-e000-5acc-b65c-6092f2d4d15f",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Aluminium and copper",
+            "stepdown": 1.5875,
+            "tool-coolant": "air",
+            "use-stepdown": true,
+            "v_c": 139.64379345206632,
+            "v_f": 900
+          }
+        ]
+      },
+      "type": "flat end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "SP1F-D3.1-L05"
+    },
+    {
+      "BMC": "carbide",
+      "description": "O-flute Ø3.175 × 6 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 3.175,
+        "HAND": true,
+        "LCF": 6,
+        "NOF": 1,
+        "OAL": 38.1,
+        "SFDM": 3.175
+      },
+      "guid": "12b1932d-668b-5362-baa2-1787c8f2c552",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "SP1F-D3.1-L06",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique, soft wood and plastic: 14000–22000 rpm, 1400–2000 mm/min, 3.1–4.6 mm deep. The preset takes the low end.",
+            "f_z": 0.1,
+            "guid": "00228bc4-6941-53dc-8021-fcbf691f8b8b",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Soft wood and plastic",
+            "stepdown": 3.1,
+            "use-stepdown": true,
+            "v_c": 139.64379345206632,
+            "v_f": 1400
+          },
+          {
+            "description": "Dreanique, acrylic: 14000–22000 rpm, 1400–2000 mm/min, 3.1–4.6 mm deep; compressed air strongly recommended. The preset takes the low end.",
+            "f_z": 0.1,
+            "guid": "00404981-8f4f-58b5-a898-34052676a8b7",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Acrylic",
+            "stepdown": 3.1,
+            "tool-coolant": "air",
+            "use-stepdown": true,
+            "v_c": 139.64379345206632,
+            "v_f": 1400
+          },
+          {
+            "description": "Dreanique, aluminium and copper: 14000–18000 rpm, 900–1200 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; compressed air or mist strongly recommended. The preset takes the low end and the slotting depth.",
+            "f_z": 0.06428571428571428,
+            "guid": "0e527e91-0db6-5ad3-bbe4-3bd8e7fa63fb",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Aluminium and copper",
+            "stepdown": 1.5875,
+            "tool-coolant": "air",
+            "use-stepdown": true,
+            "v_c": 139.64379345206632,
+            "v_f": 900
+          }
+        ]
+      },
+      "type": "flat end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "SP1F-D3.1-L06"
+    },
+    {
+      "BMC": "carbide",
+      "description": "O-flute Ø3.175 × 7 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 3.175,
+        "HAND": true,
+        "LCF": 7,
+        "NOF": 1,
+        "OAL": 38.1,
+        "SFDM": 3.175
+      },
+      "guid": "03b9c04f-4930-5e9d-b91e-698bbb885035",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "SP1F-D3.1-L07",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique, soft wood and plastic: 14000–22000 rpm, 1400–2000 mm/min, 3.1–4.6 mm deep. The preset takes the low end.",
+            "f_z": 0.1,
+            "guid": "e3a696bb-f931-54d5-80fe-473a74b8688f",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Soft wood and plastic",
+            "stepdown": 3.1,
+            "use-stepdown": true,
+            "v_c": 139.64379345206632,
+            "v_f": 1400
+          },
+          {
+            "description": "Dreanique, acrylic: 14000–22000 rpm, 1400–2000 mm/min, 3.1–4.6 mm deep; compressed air strongly recommended. The preset takes the low end.",
+            "f_z": 0.1,
+            "guid": "02c67109-9d10-51de-8e0e-6ad60f293fb5",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Acrylic",
+            "stepdown": 3.1,
+            "tool-coolant": "air",
+            "use-stepdown": true,
+            "v_c": 139.64379345206632,
+            "v_f": 1400
+          },
+          {
+            "description": "Dreanique, aluminium and copper: 14000–18000 rpm, 900–1200 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; compressed air or mist strongly recommended. The preset takes the low end and the slotting depth.",
+            "f_z": 0.06428571428571428,
+            "guid": "eb8ae22b-625e-5919-907d-3d74f1830eba",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Aluminium and copper",
+            "stepdown": 1.5875,
+            "tool-coolant": "air",
+            "use-stepdown": true,
+            "v_c": 139.64379345206632,
+            "v_f": 900
+          }
+        ]
+      },
+      "type": "flat end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "SP1F-D3.1-L07"
+    },
+    {
+      "BMC": "carbide",
+      "description": "O-flute Ø3.175 × 8 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 3.175,
+        "HAND": true,
+        "LCF": 8,
+        "NOF": 1,
+        "OAL": 38.1,
+        "SFDM": 3.175
+      },
+      "guid": "660768b1-222d-5744-b0b7-5365aaae0656",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "SP1F-D3.1-L08",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique, soft wood and plastic: 14000–22000 rpm, 1400–2000 mm/min, 3.1–4.6 mm deep. The preset takes the low end.",
+            "f_z": 0.1,
+            "guid": "d5dfdef1-72e6-5d6e-8722-3d4f23bf07a7",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Soft wood and plastic",
+            "stepdown": 3.1,
+            "use-stepdown": true,
+            "v_c": 139.64379345206632,
+            "v_f": 1400
+          },
+          {
+            "description": "Dreanique, acrylic: 14000–22000 rpm, 1400–2000 mm/min, 3.1–4.6 mm deep; compressed air strongly recommended. The preset takes the low end.",
+            "f_z": 0.1,
+            "guid": "58c0426d-aec1-5080-9c3c-96a20a283d20",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Acrylic",
+            "stepdown": 3.1,
+            "tool-coolant": "air",
+            "use-stepdown": true,
+            "v_c": 139.64379345206632,
+            "v_f": 1400
+          },
+          {
+            "description": "Dreanique, aluminium and copper: 14000–18000 rpm, 900–1200 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; compressed air or mist strongly recommended. The preset takes the low end and the slotting depth.",
+            "f_z": 0.06428571428571428,
+            "guid": "17929729-d2e9-5cde-be5f-9b3b06a56776",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Aluminium and copper",
+            "stepdown": 1.5875,
+            "tool-coolant": "air",
+            "use-stepdown": true,
+            "v_c": 139.64379345206632,
+            "v_f": 900
+          }
+        ]
+      },
+      "type": "flat end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "SP1F-D3.1-L08"
+    },
+    {
+      "BMC": "carbide",
+      "description": "O-flute Ø3.175 × 10 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 3.175,
+        "HAND": true,
+        "LCF": 10,
+        "NOF": 1,
+        "OAL": 38.1,
+        "SFDM": 3.175
+      },
+      "guid": "6760c7a6-7211-54d9-ac76-c963268bcb89",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "SP1F-D3.1-L10",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique, soft wood and plastic: 14000–22000 rpm, 1400–2000 mm/min, 3.1–4.6 mm deep. The preset takes the low end.",
+            "f_z": 0.1,
+            "guid": "d73af035-e5b5-5d47-9ae6-bb7544b86310",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Soft wood and plastic",
+            "stepdown": 3.1,
+            "use-stepdown": true,
+            "v_c": 139.64379345206632,
+            "v_f": 1400
+          },
+          {
+            "description": "Dreanique, acrylic: 14000–22000 rpm, 1400–2000 mm/min, 3.1–4.6 mm deep; compressed air strongly recommended. The preset takes the low end.",
+            "f_z": 0.1,
+            "guid": "dfaaf8a6-2294-5a73-bf61-7c69bbfa6cf3",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Acrylic",
+            "stepdown": 3.1,
+            "tool-coolant": "air",
+            "use-stepdown": true,
+            "v_c": 139.64379345206632,
+            "v_f": 1400
+          },
+          {
+            "description": "Dreanique, aluminium and copper: 14000–18000 rpm, 900–1200 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; compressed air or mist strongly recommended. The preset takes the low end and the slotting depth.",
+            "f_z": 0.06428571428571428,
+            "guid": "28d01917-177b-52d6-aea0-b5f12b567529",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Aluminium and copper",
+            "stepdown": 1.5875,
+            "tool-coolant": "air",
+            "use-stepdown": true,
+            "v_c": 139.64379345206632,
+            "v_f": 900
+          }
+        ]
+      },
+      "type": "flat end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "SP1F-D3.1-L10"
+    },
+    {
+      "BMC": "carbide",
+      "description": "O-flute Ø3.175 × 12 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 3.175,
+        "HAND": true,
+        "LB": 25,
+        "LCF": 12,
+        "NOF": 1,
+        "OAL": 38.1,
+        "SFDM": 3.175,
+        "assemblyGaugeLength": 25,
+        "shoulder-diameter": 3.175,
+        "shoulder-length": 12
+      },
+      "guid": "a70587af-d71d-5460-b29f-09dafcac44bd",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "SP1F-D3.1-L12",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique, soft wood and plastic: 14000–22000 rpm, 1400–2000 mm/min, 3.1–4.6 mm deep. The preset takes the low end.",
+            "f_z": 0.1,
+            "guid": "9fb281cc-b7f6-5fc3-9bc9-5f76d3bb4884",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Soft wood and plastic",
+            "stepdown": 3.1,
+            "use-stepdown": true,
+            "v_c": 139.64379345206632,
+            "v_f": 1400
+          },
+          {
+            "description": "Dreanique, acrylic: 14000–22000 rpm, 1400–2000 mm/min, 3.1–4.6 mm deep; compressed air strongly recommended. The preset takes the low end.",
+            "f_z": 0.1,
+            "guid": "aa3328ee-053c-5473-a705-34c45cbacbba",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Acrylic",
+            "stepdown": 3.1,
+            "tool-coolant": "air",
+            "use-stepdown": true,
+            "v_c": 139.64379345206632,
+            "v_f": 1400
+          },
+          {
+            "description": "Dreanique, aluminium and copper: 14000–18000 rpm, 900–1200 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; compressed air or mist strongly recommended. The preset takes the low end and the slotting depth.",
+            "f_z": 0.06428571428571428,
+            "guid": "d1386b39-a21d-56a6-bad1-1037392f7c9b",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Aluminium and copper",
+            "stepdown": 1.5875,
+            "tool-coolant": "air",
+            "use-stepdown": true,
+            "v_c": 139.64379345206632,
+            "v_f": 900
+          },
+          {
+            "f_n": 0.016666666666666666,
+            "f_z": 0.05,
+            "guid": "bce5353f-3403-5c15-859d-7ab040448ae2",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 18000,
+            "n_ramp": 18000,
+            "name": "SpeTool default",
+            "ramp-angle": 2,
+            "stepdown": 3.175,
+            "stepover": 1.27,
+            "tool-coolant": "air",
+            "use-stepdown": true,
+            "use-stepover": true,
+            "v_c": 179.54202015265668,
+            "v_f": 900,
+            "v_f_leadIn": 900,
+            "v_f_leadOut": 900,
+            "v_f_plunge": 300,
+            "v_f_ramp": 300,
+            "v_f_transition": 900
+          }
+        ]
+      },
+      "type": "flat end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "SP1F-D3.1-L12"
+    },
+    {
+      "BMC": "carbide",
+      "description": "O-flute Ø3.175 × 15 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 3.175,
+        "HAND": true,
+        "LB": 25,
+        "LCF": 15,
+        "NOF": 1,
+        "OAL": 38.1,
+        "SFDM": 3.175,
+        "assemblyGaugeLength": 25,
+        "shoulder-diameter": 3.175,
+        "shoulder-length": 15
+      },
+      "guid": "f2c68b8a-8c2a-5f26-a225-cf5cea576cd9",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "SP1F-D3.1-L15",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique, soft wood and plastic: 14000–22000 rpm, 1400–2000 mm/min, 3.1–4.6 mm deep. The preset takes the low end.",
+            "f_z": 0.1,
+            "guid": "6a3ed924-43db-5dee-a1e4-95e3e119d97a",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Soft wood and plastic",
+            "stepdown": 3.1,
+            "use-stepdown": true,
+            "v_c": 139.64379345206632,
+            "v_f": 1400
+          },
+          {
+            "description": "Dreanique, acrylic: 14000–22000 rpm, 1400–2000 mm/min, 3.1–4.6 mm deep; compressed air strongly recommended. The preset takes the low end.",
+            "f_z": 0.1,
+            "guid": "4fb36e01-bce7-5296-9ba1-313dd367e5db",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Acrylic",
+            "stepdown": 3.1,
+            "tool-coolant": "air",
+            "use-stepdown": true,
+            "v_c": 139.64379345206632,
+            "v_f": 1400
+          },
+          {
+            "description": "Dreanique, aluminium and copper: 14000–18000 rpm, 900–1200 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; compressed air or mist strongly recommended. The preset takes the low end and the slotting depth.",
+            "f_z": 0.06428571428571428,
+            "guid": "89dd0670-06ae-5339-b009-6cb27d24b0f8",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Aluminium and copper",
+            "stepdown": 1.5875,
+            "tool-coolant": "air",
+            "use-stepdown": true,
+            "v_c": 139.64379345206632,
+            "v_f": 900
+          },
+          {
+            "f_n": 0.016666666666666666,
+            "f_z": 0.05,
+            "guid": "f4cd91bc-5698-5475-95a2-76e0e07a03bb",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 18000,
+            "n_ramp": 18000,
+            "name": "SpeTool default",
+            "ramp-angle": 2,
+            "stepdown": 3.175,
+            "stepover": 1.27,
+            "tool-coolant": "air",
+            "use-stepdown": true,
+            "use-stepover": true,
+            "v_c": 179.54202015265668,
+            "v_f": 900,
+            "v_f_leadIn": 900,
+            "v_f_leadOut": 900,
+            "v_f_plunge": 300,
+            "v_f_ramp": 300,
+            "v_f_transition": 900
+          }
+        ]
+      },
+      "type": "flat end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "SP1F-D3.1-L15"
+    },
+    {
+      "BMC": "carbide",
+      "description": "O-flute Ø3.175 × 17 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 3.175,
+        "HAND": true,
+        "LCF": 17,
+        "NOF": 1,
+        "OAL": 38.1,
+        "SFDM": 3.175
+      },
+      "guid": "cd9edf01-308f-593d-a119-4a7374c03780",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "SP1F-D3.1-L17",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique, soft wood and plastic: 14000–22000 rpm, 1400–2000 mm/min, 3.1–4.6 mm deep. The preset takes the low end.",
+            "f_z": 0.1,
+            "guid": "fe784e82-1c06-55cb-9cf8-cb131b6484d3",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Soft wood and plastic",
+            "stepdown": 3.1,
+            "use-stepdown": true,
+            "v_c": 139.64379345206632,
+            "v_f": 1400
+          },
+          {
+            "description": "Dreanique, acrylic: 14000–22000 rpm, 1400–2000 mm/min, 3.1–4.6 mm deep; compressed air strongly recommended. The preset takes the low end.",
+            "f_z": 0.1,
+            "guid": "485fbd42-18dc-5525-af9f-5d107b50db78",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Acrylic",
+            "stepdown": 3.1,
+            "tool-coolant": "air",
+            "use-stepdown": true,
+            "v_c": 139.64379345206632,
+            "v_f": 1400
+          },
+          {
+            "description": "Dreanique, aluminium and copper: 14000–18000 rpm, 900–1200 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; compressed air or mist strongly recommended. The preset takes the low end and the slotting depth.",
+            "f_z": 0.06428571428571428,
+            "guid": "a379d073-7dac-52e8-80d9-b9312060c0a5",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Aluminium and copper",
+            "stepdown": 1.5875,
+            "tool-coolant": "air",
+            "use-stepdown": true,
+            "v_c": 139.64379345206632,
+            "v_f": 900
+          }
+        ]
+      },
+      "type": "flat end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "SP1F-D3.1-L17"
+    },
+    {
+      "BMC": "carbide",
+      "description": "O-flute Ø3.175 × 22 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 3.175,
+        "HAND": true,
+        "LCF": 22,
+        "NOF": 1,
+        "OAL": 50,
+        "SFDM": 3.175
+      },
+      "guid": "a53a2b2a-a3df-5138-8624-4a5870ba7cd2",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "SP1F-D3.1-L22",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique, soft wood and plastic: 14000–22000 rpm, 1400–2000 mm/min, 3.1–4.6 mm deep. The preset takes the low end.",
+            "f_z": 0.1,
+            "guid": "03f2e499-ab0c-5086-9103-0a29c8bc7b51",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Soft wood and plastic",
+            "stepdown": 3.1,
+            "use-stepdown": true,
+            "v_c": 139.64379345206632,
+            "v_f": 1400
+          },
+          {
+            "description": "Dreanique, acrylic: 14000–22000 rpm, 1400–2000 mm/min, 3.1–4.6 mm deep; compressed air strongly recommended. The preset takes the low end.",
+            "f_z": 0.1,
+            "guid": "aa846154-4842-5ee3-8d45-83522bc4c140",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Acrylic",
+            "stepdown": 3.1,
+            "tool-coolant": "air",
+            "use-stepdown": true,
+            "v_c": 139.64379345206632,
+            "v_f": 1400
+          },
+          {
+            "description": "Dreanique, aluminium and copper: 14000–18000 rpm, 900–1200 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; compressed air or mist strongly recommended. The preset takes the low end and the slotting depth.",
+            "f_z": 0.06428571428571428,
+            "guid": "644d60e3-d09e-56df-b05b-7cc01b5903d5",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Aluminium and copper",
+            "stepdown": 1.5875,
+            "tool-coolant": "air",
+            "use-stepdown": true,
+            "v_c": 139.64379345206632,
+            "v_f": 900
+          }
+        ]
+      },
+      "type": "flat end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "SP1F-D3.1-L22"
+    },
+    {
+      "BMC": "carbide",
+      "description": "O-flute Ø4 × 8 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 4,
+        "HAND": true,
+        "LCF": 8,
+        "NOF": 1,
+        "OAL": 50,
+        "SFDM": 4
+      },
+      "guid": "4cec923a-2192-5794-9902-1b9fbb147f1c",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "SP1F-D4.0-L08",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique, soft wood and plastic: 14000–20000 rpm, 2000–3500 mm/min, 4–6 mm deep. The preset takes the low end.",
+            "f_z": 0.14285714285714285,
+            "guid": "ebc518b3-948b-5968-802e-140469a3ee5d",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Soft wood and plastic",
+            "stepdown": 4,
+            "use-stepdown": true,
+            "v_c": 175.92918860102841,
+            "v_f": 2000
+          },
+          {
+            "description": "Dreanique, acrylic: 14000–20000 rpm, 2000–3500 mm/min, 4–6 mm deep; compressed air strongly recommended. The preset takes the low end.",
+            "f_z": 0.14285714285714285,
+            "guid": "254568bf-35b5-5370-8848-8808d336a6ec",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Acrylic",
+            "stepdown": 4,
+            "tool-coolant": "air",
+            "use-stepdown": true,
+            "v_c": 175.92918860102841,
+            "v_f": 2000
+          },
+          {
+            "description": "Dreanique, aluminium and copper: 14000–18000 rpm, 1300–1800 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; compressed air or mist strongly recommended. The preset takes the low end and the slotting depth.",
+            "f_z": 0.09285714285714286,
+            "guid": "0b7498ce-440b-5476-9b50-312efc5fe669",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Aluminium and copper",
+            "stepdown": 2,
+            "tool-coolant": "air",
+            "use-stepdown": true,
+            "v_c": 175.92918860102841,
+            "v_f": 1300
+          }
+        ]
+      },
+      "type": "flat end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "SP1F-D4.0-L08"
+    },
+    {
+      "BMC": "carbide",
+      "description": "O-flute Ø4 × 12 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 4,
+        "HAND": true,
+        "LCF": 12,
+        "NOF": 1,
+        "OAL": 50,
+        "SFDM": 4
+      },
+      "guid": "6c5303d7-a37b-5859-89fb-a991b7776a73",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "SP1F-D4.0-L12",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique, soft wood and plastic: 14000–20000 rpm, 2000–3500 mm/min, 4–6 mm deep. The preset takes the low end.",
+            "f_z": 0.14285714285714285,
+            "guid": "abdbd1ae-1daf-5612-b428-e01ec4f0570c",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Soft wood and plastic",
+            "stepdown": 4,
+            "use-stepdown": true,
+            "v_c": 175.92918860102841,
+            "v_f": 2000
+          },
+          {
+            "description": "Dreanique, acrylic: 14000–20000 rpm, 2000–3500 mm/min, 4–6 mm deep; compressed air strongly recommended. The preset takes the low end.",
+            "f_z": 0.14285714285714285,
+            "guid": "d0279a28-dd4f-59e9-9b15-3a114c31c1f0",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Acrylic",
+            "stepdown": 4,
+            "tool-coolant": "air",
+            "use-stepdown": true,
+            "v_c": 175.92918860102841,
+            "v_f": 2000
+          },
+          {
+            "description": "Dreanique, aluminium and copper: 14000–18000 rpm, 1300–1800 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; compressed air or mist strongly recommended. The preset takes the low end and the slotting depth.",
+            "f_z": 0.09285714285714286,
+            "guid": "d993d27f-0706-5ae6-909e-bc5d8c1f9a47",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Aluminium and copper",
+            "stepdown": 2,
+            "tool-coolant": "air",
+            "use-stepdown": true,
+            "v_c": 175.92918860102841,
+            "v_f": 1300
+          }
+        ]
+      },
+      "type": "flat end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "SP1F-D4.0-L12"
+    },
+    {
+      "BMC": "carbide",
+      "description": "O-flute Ø4 × 15 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 4,
+        "HAND": true,
+        "LCF": 15,
+        "NOF": 1,
+        "OAL": 50,
+        "SFDM": 4
+      },
+      "guid": "9a870cae-19e5-5b72-8f6c-bc1f0b150815",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "SP1F-D4.0-L15",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique, soft wood and plastic: 14000–20000 rpm, 2000–3500 mm/min, 4–6 mm deep. The preset takes the low end.",
+            "f_z": 0.14285714285714285,
+            "guid": "9e088462-3a23-576a-8917-09c2c01f4932",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Soft wood and plastic",
+            "stepdown": 4,
+            "use-stepdown": true,
+            "v_c": 175.92918860102841,
+            "v_f": 2000
+          },
+          {
+            "description": "Dreanique, acrylic: 14000–20000 rpm, 2000–3500 mm/min, 4–6 mm deep; compressed air strongly recommended. The preset takes the low end.",
+            "f_z": 0.14285714285714285,
+            "guid": "f9e4e62d-9eb5-5e3d-8da4-d7a275369f09",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Acrylic",
+            "stepdown": 4,
+            "tool-coolant": "air",
+            "use-stepdown": true,
+            "v_c": 175.92918860102841,
+            "v_f": 2000
+          },
+          {
+            "description": "Dreanique, aluminium and copper: 14000–18000 rpm, 1300–1800 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; compressed air or mist strongly recommended. The preset takes the low end and the slotting depth.",
+            "f_z": 0.09285714285714286,
+            "guid": "4240d8f5-9b98-5eae-8616-791e3fc426cd",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Aluminium and copper",
+            "stepdown": 2,
+            "tool-coolant": "air",
+            "use-stepdown": true,
+            "v_c": 175.92918860102841,
+            "v_f": 1300
+          }
+        ]
+      },
+      "type": "flat end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "SP1F-D4.0-L15"
+    },
+    {
+      "BMC": "carbide",
+      "description": "O-flute Ø4 × 17 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 4,
+        "HAND": true,
+        "LCF": 17,
+        "NOF": 1,
+        "OAL": 50,
+        "SFDM": 4
+      },
+      "guid": "239393d8-d09d-5b8a-89be-6f12fe63e3e5",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "SP1F-D4.0-L17",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique, soft wood and plastic: 14000–20000 rpm, 2000–3500 mm/min, 4–6 mm deep. The preset takes the low end.",
+            "f_z": 0.14285714285714285,
+            "guid": "9ff86d10-da22-5e70-b7e5-1c110fc24192",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Soft wood and plastic",
+            "stepdown": 4,
+            "use-stepdown": true,
+            "v_c": 175.92918860102841,
+            "v_f": 2000
+          },
+          {
+            "description": "Dreanique, acrylic: 14000–20000 rpm, 2000–3500 mm/min, 4–6 mm deep; compressed air strongly recommended. The preset takes the low end.",
+            "f_z": 0.14285714285714285,
+            "guid": "e2148330-e77c-54a6-a5a6-b23c0cd4b3d4",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Acrylic",
+            "stepdown": 4,
+            "tool-coolant": "air",
+            "use-stepdown": true,
+            "v_c": 175.92918860102841,
+            "v_f": 2000
+          },
+          {
+            "description": "Dreanique, aluminium and copper: 14000–18000 rpm, 1300–1800 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; compressed air or mist strongly recommended. The preset takes the low end and the slotting depth.",
+            "f_z": 0.09285714285714286,
+            "guid": "4c392cb4-d32a-534b-89b2-f9d5bd93394d",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Aluminium and copper",
+            "stepdown": 2,
+            "tool-coolant": "air",
+            "use-stepdown": true,
+            "v_c": 175.92918860102841,
+            "v_f": 1300
+          }
+        ]
+      },
+      "type": "flat end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "SP1F-D4.0-L17"
+    },
+    {
+      "BMC": "carbide",
+      "description": "O-flute Ø4 × 22 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 4,
+        "HAND": true,
+        "LCF": 22,
+        "NOF": 1,
+        "OAL": 50,
+        "SFDM": 4
+      },
+      "guid": "5701fb5a-1cff-54c8-aa9d-c882e7213797",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "SP1F-D4.0-L22",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique, soft wood and plastic: 14000–20000 rpm, 2000–3500 mm/min, 4–6 mm deep. The preset takes the low end.",
+            "f_z": 0.14285714285714285,
+            "guid": "64df061d-c602-59bd-b743-e36da191fa41",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Soft wood and plastic",
+            "stepdown": 4,
+            "use-stepdown": true,
+            "v_c": 175.92918860102841,
+            "v_f": 2000
+          },
+          {
+            "description": "Dreanique, acrylic: 14000–20000 rpm, 2000–3500 mm/min, 4–6 mm deep; compressed air strongly recommended. The preset takes the low end.",
+            "f_z": 0.14285714285714285,
+            "guid": "056e2dec-5fc7-5980-a852-05cdcb8b6c50",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Acrylic",
+            "stepdown": 4,
+            "tool-coolant": "air",
+            "use-stepdown": true,
+            "v_c": 175.92918860102841,
+            "v_f": 2000
+          },
+          {
+            "description": "Dreanique, aluminium and copper: 14000–18000 rpm, 1300–1800 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; compressed air or mist strongly recommended. The preset takes the low end and the slotting depth.",
+            "f_z": 0.09285714285714286,
+            "guid": "ef807194-29c6-5108-bffe-6ade40e78bb3",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Aluminium and copper",
+            "stepdown": 2,
+            "tool-coolant": "air",
+            "use-stepdown": true,
+            "v_c": 175.92918860102841,
+            "v_f": 1300
+          }
+        ]
+      },
+      "type": "flat end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "SP1F-D4.0-L22"
+    },
+    {
+      "BMC": "carbide",
+      "description": "O-flute Ø5 × 20 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 5,
+        "HAND": true,
+        "LCF": 20,
+        "NOF": 1,
+        "OAL": 50,
+        "SFDM": 5
+      },
+      "guid": "e676a50b-bc8e-5312-a454-eaa0cc812d09",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "SP1F-D5.0-L20",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique, soft wood and plastic: 12000–18000 rpm, 2400–4000 mm/min, 5–7.5 mm deep. The preset takes the low end.",
+            "f_z": 0.2,
+            "guid": "95cd4dd5-9c81-5d98-a0fc-4b81d6cb4174",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 12000,
+            "n_ramp": 12000,
+            "name": "Soft wood and plastic",
+            "stepdown": 5,
+            "use-stepdown": true,
+            "v_c": 188.4955592153876,
+            "v_f": 2400
+          },
+          {
+            "description": "Dreanique, acrylic: 12000–18000 rpm, 2400–4000 mm/min, 5–7.5 mm deep; compressed air strongly recommended. The preset takes the low end.",
+            "f_z": 0.2,
+            "guid": "da221846-6a21-5b23-8507-daa3d862e6ba",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 12000,
+            "n_ramp": 12000,
+            "name": "Acrylic",
+            "stepdown": 5,
+            "tool-coolant": "air",
+            "use-stepdown": true,
+            "v_c": 188.4955592153876,
+            "v_f": 2400
+          },
+          {
+            "description": "Dreanique, aluminium and copper: 12000–16000 rpm, 1300–1800 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; compressed air or mist strongly recommended. The preset takes the low end and the slotting depth.",
+            "f_z": 0.10833333333333334,
+            "guid": "a161046c-a262-5986-8b28-12b6a33fcfc8",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 12000,
+            "n_ramp": 12000,
+            "name": "Aluminium and copper",
+            "stepdown": 2.5,
+            "tool-coolant": "air",
+            "use-stepdown": true,
+            "v_c": 188.4955592153876,
+            "v_f": 1300
+          }
+        ]
+      },
+      "type": "flat end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "SP1F-D5.0-L20"
+    },
+    {
+      "BMC": "carbide",
+      "description": "O-flute Ø6 × 10 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 6,
+        "HAND": true,
+        "LCF": 10,
+        "NOF": 1,
+        "OAL": 50,
+        "SFDM": 6
+      },
+      "guid": "9268f3a6-fb8e-5607-89e0-39ca0ea27a4f",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "SP1F-D6.0-L10",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique, soft wood and plastic: 12000–18000 rpm, 3500–5000 mm/min, 6–9 mm deep. The preset takes the low end.",
+            "f_z": 0.2916666666666667,
+            "guid": "86964abd-3b59-533c-8c4d-27b79581cfbd",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 12000,
+            "n_ramp": 12000,
+            "name": "Soft wood and plastic",
+            "stepdown": 6,
+            "use-stepdown": true,
+            "v_c": 226.1946710584651,
+            "v_f": 3500
+          },
+          {
+            "description": "Dreanique, acrylic: 12000–18000 rpm, 3500–5000 mm/min, 6–9 mm deep; compressed air strongly recommended. The preset takes the low end.",
+            "f_z": 0.2916666666666667,
+            "guid": "b3f41662-b2f3-504f-b8d4-7d3d591df03c",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 12000,
+            "n_ramp": 12000,
+            "name": "Acrylic",
+            "stepdown": 6,
+            "tool-coolant": "air",
+            "use-stepdown": true,
+            "v_c": 226.1946710584651,
+            "v_f": 3500
+          },
+          {
+            "description": "Dreanique, aluminium and copper: 12000–14000 rpm, 1500–2000 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; compressed air or mist strongly recommended. The preset takes the low end and the slotting depth.",
+            "f_z": 0.125,
+            "guid": "eac14f71-e29c-5718-b5f0-598d8a97f2f1",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 12000,
+            "n_ramp": 12000,
+            "name": "Aluminium and copper",
+            "stepdown": 3,
+            "tool-coolant": "air",
+            "use-stepdown": true,
+            "v_c": 226.1946710584651,
+            "v_f": 1500
+          }
+        ]
+      },
+      "type": "flat end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "SP1F-D6.0-L10"
+    },
+    {
+      "BMC": "carbide",
+      "description": "O-flute Ø6 × 12 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 6,
+        "HAND": true,
+        "LCF": 12,
+        "NOF": 1,
+        "OAL": 50,
+        "SFDM": 6
+      },
+      "guid": "499e2064-d1c2-5060-a9d8-549735397d77",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "SP1F-D6.0-L12",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique, soft wood and plastic: 12000–18000 rpm, 3500–5000 mm/min, 6–9 mm deep. The preset takes the low end.",
+            "f_z": 0.2916666666666667,
+            "guid": "d0aee754-9c59-5ab0-b046-1c7f91cb8a53",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 12000,
+            "n_ramp": 12000,
+            "name": "Soft wood and plastic",
+            "stepdown": 6,
+            "use-stepdown": true,
+            "v_c": 226.1946710584651,
+            "v_f": 3500
+          },
+          {
+            "description": "Dreanique, acrylic: 12000–18000 rpm, 3500–5000 mm/min, 6–9 mm deep; compressed air strongly recommended. The preset takes the low end.",
+            "f_z": 0.2916666666666667,
+            "guid": "60bd26e8-93ac-534a-b345-da4eea67e20f",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 12000,
+            "n_ramp": 12000,
+            "name": "Acrylic",
+            "stepdown": 6,
+            "tool-coolant": "air",
+            "use-stepdown": true,
+            "v_c": 226.1946710584651,
+            "v_f": 3500
+          },
+          {
+            "description": "Dreanique, aluminium and copper: 12000–14000 rpm, 1500–2000 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; compressed air or mist strongly recommended. The preset takes the low end and the slotting depth.",
+            "f_z": 0.125,
+            "guid": "630f1909-008c-58de-bbf7-296bbda6f121",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 12000,
+            "n_ramp": 12000,
+            "name": "Aluminium and copper",
+            "stepdown": 3,
+            "tool-coolant": "air",
+            "use-stepdown": true,
+            "v_c": 226.1946710584651,
+            "v_f": 1500
+          }
+        ]
+      },
+      "type": "flat end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "SP1F-D6.0-L12"
+    },
+    {
+      "BMC": "carbide",
+      "description": "O-flute Ø6 × 15 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 6,
+        "HAND": true,
+        "LCF": 15,
+        "NOF": 1,
+        "OAL": 50,
+        "SFDM": 6
+      },
+      "guid": "abd3bd39-f24b-5b77-b3be-ee1c80727f5b",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "SP1F-D6.0-L15",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique, soft wood and plastic: 12000–18000 rpm, 3500–5000 mm/min, 6–9 mm deep. The preset takes the low end.",
+            "f_z": 0.2916666666666667,
+            "guid": "a1ca1b0c-6e99-5c90-8253-47e151db1150",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 12000,
+            "n_ramp": 12000,
+            "name": "Soft wood and plastic",
+            "stepdown": 6,
+            "use-stepdown": true,
+            "v_c": 226.1946710584651,
+            "v_f": 3500
+          },
+          {
+            "description": "Dreanique, acrylic: 12000–18000 rpm, 3500–5000 mm/min, 6–9 mm deep; compressed air strongly recommended. The preset takes the low end.",
+            "f_z": 0.2916666666666667,
+            "guid": "6227db57-b615-5f85-8c5c-33ee27720799",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 12000,
+            "n_ramp": 12000,
+            "name": "Acrylic",
+            "stepdown": 6,
+            "tool-coolant": "air",
+            "use-stepdown": true,
+            "v_c": 226.1946710584651,
+            "v_f": 3500
+          },
+          {
+            "description": "Dreanique, aluminium and copper: 12000–14000 rpm, 1500–2000 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; compressed air or mist strongly recommended. The preset takes the low end and the slotting depth.",
+            "f_z": 0.125,
+            "guid": "51b8c9f0-1e44-5a70-b040-0b67a7f20e9d",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 12000,
+            "n_ramp": 12000,
+            "name": "Aluminium and copper",
+            "stepdown": 3,
+            "tool-coolant": "air",
+            "use-stepdown": true,
+            "v_c": 226.1946710584651,
+            "v_f": 1500
+          }
+        ]
+      },
+      "type": "flat end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "SP1F-D6.0-L15"
+    },
+    {
+      "BMC": "carbide",
+      "description": "O-flute Ø6 × 17 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 6,
+        "HAND": true,
+        "LCF": 17,
+        "NOF": 1,
+        "OAL": 50,
+        "SFDM": 6
+      },
+      "guid": "b3b5e9b9-1d09-5aaa-b3d5-1707836fb232",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "SP1F-D6.0-L17",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique, soft wood and plastic: 12000–18000 rpm, 3500–5000 mm/min, 6–9 mm deep. The preset takes the low end.",
+            "f_z": 0.2916666666666667,
+            "guid": "be4fb04f-d922-59fe-b143-8246bebce46e",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 12000,
+            "n_ramp": 12000,
+            "name": "Soft wood and plastic",
+            "stepdown": 6,
+            "use-stepdown": true,
+            "v_c": 226.1946710584651,
+            "v_f": 3500
+          },
+          {
+            "description": "Dreanique, acrylic: 12000–18000 rpm, 3500–5000 mm/min, 6–9 mm deep; compressed air strongly recommended. The preset takes the low end.",
+            "f_z": 0.2916666666666667,
+            "guid": "953a84f9-cf79-5fa2-8ec7-5abc2e9459c2",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 12000,
+            "n_ramp": 12000,
+            "name": "Acrylic",
+            "stepdown": 6,
+            "tool-coolant": "air",
+            "use-stepdown": true,
+            "v_c": 226.1946710584651,
+            "v_f": 3500
+          },
+          {
+            "description": "Dreanique, aluminium and copper: 12000–14000 rpm, 1500–2000 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; compressed air or mist strongly recommended. The preset takes the low end and the slotting depth.",
+            "f_z": 0.125,
+            "guid": "6b3fdb54-dbb8-5cea-a88a-ff99eec1765e",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 12000,
+            "n_ramp": 12000,
+            "name": "Aluminium and copper",
+            "stepdown": 3,
+            "tool-coolant": "air",
+            "use-stepdown": true,
+            "v_c": 226.1946710584651,
+            "v_f": 1500
+          }
+        ]
+      },
+      "type": "flat end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "SP1F-D6.0-L17"
+    },
+    {
+      "BMC": "carbide",
+      "description": "O-flute Ø6 × 22 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 6,
+        "HAND": true,
+        "LCF": 22,
+        "NOF": 1,
+        "OAL": 50,
+        "SFDM": 6
+      },
+      "guid": "4e287679-3525-5191-9df0-7b2fa85905bd",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "SP1F-D6.0-L22",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique, soft wood and plastic: 12000–18000 rpm, 3500–5000 mm/min, 6–9 mm deep. The preset takes the low end.",
+            "f_z": 0.2916666666666667,
+            "guid": "53c62c86-7311-50e9-9097-d381abfd538e",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 12000,
+            "n_ramp": 12000,
+            "name": "Soft wood and plastic",
+            "stepdown": 6,
+            "use-stepdown": true,
+            "v_c": 226.1946710584651,
+            "v_f": 3500
+          },
+          {
+            "description": "Dreanique, acrylic: 12000–18000 rpm, 3500–5000 mm/min, 6–9 mm deep; compressed air strongly recommended. The preset takes the low end.",
+            "f_z": 0.2916666666666667,
+            "guid": "d47e62a6-086c-5832-9401-c26fd39ca09d",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 12000,
+            "n_ramp": 12000,
+            "name": "Acrylic",
+            "stepdown": 6,
+            "tool-coolant": "air",
+            "use-stepdown": true,
+            "v_c": 226.1946710584651,
+            "v_f": 3500
+          },
+          {
+            "description": "Dreanique, aluminium and copper: 12000–14000 rpm, 1500–2000 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; compressed air or mist strongly recommended. The preset takes the low end and the slotting depth.",
+            "f_z": 0.125,
+            "guid": "ada41a8f-65ea-5fc1-b442-d6a0e579abaa",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 12000,
+            "n_ramp": 12000,
+            "name": "Aluminium and copper",
+            "stepdown": 3,
+            "tool-coolant": "air",
+            "use-stepdown": true,
+            "v_c": 226.1946710584651,
+            "v_f": 1500
+          }
+        ]
+      },
+      "type": "flat end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "SP1F-D6.0-L22"
+    },
+    {
+      "BMC": "carbide",
+      "description": "O-flute Ø6 × 32 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 6,
+        "HAND": true,
+        "LCF": 32,
+        "NOF": 1,
+        "OAL": 75,
+        "SFDM": 6
+      },
+      "guid": "e06ea41a-ff74-5a9e-835f-d1e2d27c9b54",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "SP1F-D6.0-L32",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique, soft wood and plastic: 12000–18000 rpm, 3500–5000 mm/min, 6–9 mm deep. The preset takes the low end.",
+            "f_z": 0.2916666666666667,
+            "guid": "5bc4bf4c-3c42-5b6b-97da-e679e4e573b8",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 12000,
+            "n_ramp": 12000,
+            "name": "Soft wood and plastic",
+            "stepdown": 6,
+            "use-stepdown": true,
+            "v_c": 226.1946710584651,
+            "v_f": 3500
+          },
+          {
+            "description": "Dreanique, acrylic: 12000–18000 rpm, 3500–5000 mm/min, 6–9 mm deep; compressed air strongly recommended. The preset takes the low end.",
+            "f_z": 0.2916666666666667,
+            "guid": "e110fa52-43a7-5174-b31b-62e3be31e5ac",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 12000,
+            "n_ramp": 12000,
+            "name": "Acrylic",
+            "stepdown": 6,
+            "tool-coolant": "air",
+            "use-stepdown": true,
+            "v_c": 226.1946710584651,
+            "v_f": 3500
+          },
+          {
+            "description": "Dreanique, aluminium and copper: 12000–14000 rpm, 1500–2000 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; compressed air or mist strongly recommended. The preset takes the low end and the slotting depth.",
+            "f_z": 0.125,
+            "guid": "bc5136d7-7055-5cf1-88e0-6c1314460bf0",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 12000,
+            "n_ramp": 12000,
+            "name": "Aluminium and copper",
+            "stepdown": 3,
+            "tool-coolant": "air",
+            "use-stepdown": true,
+            "v_c": 226.1946710584651,
+            "v_f": 1500
+          }
+        ]
+      },
+      "type": "flat end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "SP1F-D6.0-L32"
+    },
+    {
+      "BMC": "carbide",
+      "coating": "DLC",
+      "description": "Aluminium O-flute Ø1 × 4 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 1,
+        "HAND": true,
+        "LCF": 4,
+        "NOF": 1,
+        "OAL": 38.1,
+        "SFDM": 3.175
+      },
+      "guid": "a52de531-a64e-5f57-a9e2-d208ca17b9e8",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "DSA1F-D1.0-L04",
+      "product-link": "https://www.aliexpress.com/item/1005001910635126.html",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique: 14000–18000 rpm, 700–1000 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; mist or cutting fluid required for aluminium and copper. The preset takes the low end and the slotting depth.",
+            "f_z": 0.05,
+            "guid": "7f2adf0d-ab20-513e-b8f1-5084bbfbd206",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Aluminium and copper",
+            "stepdown": 0.5,
+            "tool-coolant": "mist",
+            "use-stepdown": true,
+            "v_c": 43.982297150257104,
+            "v_f": 700
+          }
+        ]
+      },
+      "type": "flat end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "DSA1F-D1.0-L04"
+    },
+    {
+      "BMC": "carbide",
+      "coating": "DLC",
+      "description": "Aluminium O-flute Ø2 × 6 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 2,
+        "HAND": true,
+        "LCF": 6,
+        "NOF": 1,
+        "OAL": 38.1,
+        "SFDM": 3.175
+      },
+      "guid": "ccb5e724-8d22-5367-913f-63fc281ad666",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "DSA1F-D2.0-L06",
+      "product-link": "https://www.aliexpress.com/item/1005001910635126.html",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique: 14000–18000 rpm, 800–1100 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; mist or cutting fluid required for aluminium and copper. The preset takes the low end and the slotting depth.",
+            "f_z": 0.05714285714285714,
+            "guid": "7b71e3be-f34a-5e5e-9962-21d5559e2888",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Aluminium and copper",
+            "stepdown": 1,
+            "tool-coolant": "mist",
+            "use-stepdown": true,
+            "v_c": 87.96459430051421,
+            "v_f": 800
+          }
+        ]
+      },
+      "type": "flat end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "DSA1F-D2.0-L06"
+    },
+    {
+      "BMC": "carbide",
+      "coating": "DLC",
+      "description": "Aluminium O-flute Ø2 × 8 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 2,
+        "HAND": true,
+        "LCF": 8,
+        "NOF": 1,
+        "OAL": 38.1,
+        "SFDM": 3.175
+      },
+      "guid": "8816860e-0fc1-5034-8798-301382417de1",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "DSA1F-D2.0-L08",
+      "product-link": "https://www.aliexpress.com/item/1005001910635126.html",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique: 14000–18000 rpm, 800–1100 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; mist or cutting fluid required for aluminium and copper. The preset takes the low end and the slotting depth.",
+            "f_z": 0.05714285714285714,
+            "guid": "8bb16aa8-a9ca-5452-ae9c-e503aac3b318",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Aluminium and copper",
+            "stepdown": 1,
+            "tool-coolant": "mist",
+            "use-stepdown": true,
+            "v_c": 87.96459430051421,
+            "v_f": 800
+          }
+        ]
+      },
+      "type": "flat end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "DSA1F-D2.0-L08"
+    },
+    {
+      "BMC": "carbide",
+      "coating": "DLC",
+      "description": "Aluminium O-flute Ø3.175 × 8 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 3.175,
+        "HAND": true,
+        "LCF": 8,
+        "NOF": 1,
+        "OAL": 38.1,
+        "SFDM": 3.175
+      },
+      "guid": "8837a400-7d84-5665-9542-19b465a822d1",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "DSA1F-D3.1-L08",
+      "product-link": "https://www.aliexpress.com/item/1005001910635126.html",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique: 14000–18000 rpm, 900–1300 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; mist or cutting fluid required for aluminium and copper. The preset takes the low end and the slotting depth.",
+            "f_z": 0.06428571428571428,
+            "guid": "bd413e7d-addf-57f1-aeb7-b56e89ce5edb",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Aluminium and copper",
+            "stepdown": 1.5875,
+            "tool-coolant": "mist",
+            "use-stepdown": true,
+            "v_c": 139.64379345206632,
+            "v_f": 900
+          }
+        ]
+      },
+      "type": "flat end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "DSA1F-D3.1-L08"
+    },
+    {
+      "BMC": "carbide",
+      "coating": "DLC",
+      "description": "Aluminium O-flute Ø3.175 × 12 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 3.175,
+        "HAND": true,
+        "LCF": 12,
+        "NOF": 1,
+        "OAL": 38.1,
+        "SFDM": 3.175
+      },
+      "guid": "304e399e-847e-53e4-9999-9c37abe9b78a",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "DSA1F-D3.1-L12",
+      "product-link": "https://www.aliexpress.com/item/1005001910635126.html",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique: 14000–18000 rpm, 900–1300 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; mist or cutting fluid required for aluminium and copper. The preset takes the low end and the slotting depth.",
+            "f_z": 0.06428571428571428,
+            "guid": "303e4b10-48fc-5b9c-a42a-1321d71d7c5f",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Aluminium and copper",
+            "stepdown": 1.5875,
+            "tool-coolant": "mist",
+            "use-stepdown": true,
+            "v_c": 139.64379345206632,
+            "v_f": 900
+          }
+        ]
+      },
+      "type": "flat end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "DSA1F-D3.1-L12"
+    },
+    {
+      "BMC": "carbide",
+      "coating": "DLC",
+      "description": "Aluminium O-flute Ø3.175 × 17 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 3.175,
+        "HAND": true,
+        "LCF": 17,
+        "NOF": 1,
+        "OAL": 38.1,
+        "SFDM": 3.175
+      },
+      "guid": "a174c7ed-135b-537f-8901-f8e833b7a7ca",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "DSA1F-D3.1-L17",
+      "product-link": "https://www.aliexpress.com/item/1005001910635126.html",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique: 14000–18000 rpm, 900–1300 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; mist or cutting fluid required for aluminium and copper. The preset takes the low end and the slotting depth.",
+            "f_z": 0.06428571428571428,
+            "guid": "d8fedfe7-17ff-59bd-a45e-ee5cd5e86e4e",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Aluminium and copper",
+            "stepdown": 1.5875,
+            "tool-coolant": "mist",
+            "use-stepdown": true,
+            "v_c": 139.64379345206632,
+            "v_f": 900
+          }
+        ]
+      },
+      "type": "flat end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "DSA1F-D3.1-L17"
+    },
+    {
+      "BMC": "carbide",
+      "coating": "DLC",
+      "description": "Aluminium O-flute Ø3.175 × 22 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 3.175,
+        "HAND": true,
+        "LCF": 22,
+        "NOF": 1,
+        "OAL": 45,
+        "SFDM": 3.175
+      },
+      "guid": "17aeba52-c982-5544-beb3-8bedd4882ff7",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "DSA1F-D3.1-L22",
+      "product-link": "https://www.aliexpress.com/item/1005001910635126.html",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique: 14000–18000 rpm, 900–1300 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; mist or cutting fluid required for aluminium and copper. The preset takes the low end and the slotting depth.",
+            "f_z": 0.06428571428571428,
+            "guid": "677f25da-d9e0-5520-bc31-8962c16f1313",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Aluminium and copper",
+            "stepdown": 1.5875,
+            "tool-coolant": "mist",
+            "use-stepdown": true,
+            "v_c": 139.64379345206632,
+            "v_f": 900
+          }
+        ]
+      },
+      "type": "flat end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "DSA1F-D3.1-L22"
+    },
+    {
+      "BMC": "carbide",
+      "coating": "DLC",
+      "description": "Aluminium O-flute Ø4 × 8 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 4,
+        "HAND": true,
+        "LCF": 8,
+        "NOF": 1,
+        "OAL": 50,
+        "SFDM": 4
+      },
+      "guid": "5f5e817e-3579-522c-8233-0a47cf0ae459",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "DSA1F-D4.0-L08",
+      "product-link": "https://www.aliexpress.com/item/1005001910635126.html",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique: 14000–18000 rpm, 1200–1600 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; mist or cutting fluid required for aluminium and copper. The preset takes the low end and the slotting depth.",
+            "f_z": 0.08571428571428572,
+            "guid": "5ca26dd5-2a50-5f01-8444-3e41ac82a130",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Aluminium and copper",
+            "stepdown": 2,
+            "tool-coolant": "mist",
+            "use-stepdown": true,
+            "v_c": 175.92918860102841,
+            "v_f": 1200
+          }
+        ]
+      },
+      "type": "flat end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "DSA1F-D4.0-L08"
+    },
+    {
+      "BMC": "carbide",
+      "coating": "DLC",
+      "description": "Aluminium O-flute Ø4 × 12 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 4,
+        "HAND": true,
+        "LCF": 12,
+        "NOF": 1,
+        "OAL": 50,
+        "SFDM": 4
+      },
+      "guid": "f734e892-828a-5eac-93ad-cbec5756cf3d",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "DSA1F-D4.0-L12",
+      "product-link": "https://www.aliexpress.com/item/1005001910635126.html",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique: 14000–18000 rpm, 1200–1600 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; mist or cutting fluid required for aluminium and copper. The preset takes the low end and the slotting depth.",
+            "f_z": 0.08571428571428572,
+            "guid": "9b66d1bb-cb0a-5804-ad43-8cf91b1e2673",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Aluminium and copper",
+            "stepdown": 2,
+            "tool-coolant": "mist",
+            "use-stepdown": true,
+            "v_c": 175.92918860102841,
+            "v_f": 1200
+          }
+        ]
+      },
+      "type": "flat end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "DSA1F-D4.0-L12"
+    },
+    {
+      "BMC": "carbide",
+      "coating": "DLC",
+      "description": "Aluminium O-flute Ø4 × 15 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 4,
+        "HAND": true,
+        "LCF": 15,
+        "NOF": 1,
+        "OAL": 50,
+        "SFDM": 4
+      },
+      "guid": "77d11073-064d-532f-a170-bd7a3e91aad8",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "DSA1F-D4.0-L15",
+      "product-link": "https://www.aliexpress.com/item/1005001910635126.html",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique: 14000–18000 rpm, 1200–1600 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; mist or cutting fluid required for aluminium and copper. The preset takes the low end and the slotting depth.",
+            "f_z": 0.08571428571428572,
+            "guid": "aa1afb17-f3b2-5803-80bd-22015d5a9c30",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Aluminium and copper",
+            "stepdown": 2,
+            "tool-coolant": "mist",
+            "use-stepdown": true,
+            "v_c": 175.92918860102841,
+            "v_f": 1200
+          }
+        ]
+      },
+      "type": "flat end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "DSA1F-D4.0-L15"
+    },
+    {
+      "BMC": "carbide",
+      "coating": "DLC",
+      "description": "Aluminium O-flute Ø4 × 17 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 4,
+        "HAND": true,
+        "LCF": 17,
+        "NOF": 1,
+        "OAL": 50,
+        "SFDM": 4
+      },
+      "guid": "e8fca3c5-3f91-5148-81c4-9d6480684d27",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "DSA1F-D4.0-L17",
+      "product-link": "https://www.aliexpress.com/item/1005001910635126.html",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique: 14000–18000 rpm, 1200–1600 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; mist or cutting fluid required for aluminium and copper. The preset takes the low end and the slotting depth.",
+            "f_z": 0.08571428571428572,
+            "guid": "6d111969-ab28-5201-b35c-669a7f6c6247",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Aluminium and copper",
+            "stepdown": 2,
+            "tool-coolant": "mist",
+            "use-stepdown": true,
+            "v_c": 175.92918860102841,
+            "v_f": 1200
+          }
+        ]
+      },
+      "type": "flat end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "DSA1F-D4.0-L17"
+    },
+    {
+      "BMC": "carbide",
+      "coating": "DLC",
+      "description": "Aluminium O-flute Ø4 × 22 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 4,
+        "HAND": true,
+        "LCF": 22,
+        "NOF": 1,
+        "OAL": 50,
+        "SFDM": 4
+      },
+      "guid": "6f12a6fa-1c3e-5dda-b3e2-d1cbc26ac34d",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "DSA1F-D4.0-L22",
+      "product-link": "https://www.aliexpress.com/item/1005001910635126.html",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique: 14000–18000 rpm, 1200–1600 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; mist or cutting fluid required for aluminium and copper. The preset takes the low end and the slotting depth.",
+            "f_z": 0.08571428571428572,
+            "guid": "b8732ff6-f257-5b14-b3d8-844367462d96",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Aluminium and copper",
+            "stepdown": 2,
+            "tool-coolant": "mist",
+            "use-stepdown": true,
+            "v_c": 175.92918860102841,
+            "v_f": 1200
+          }
+        ]
+      },
+      "type": "flat end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "DSA1F-D4.0-L22"
+    },
+    {
+      "BMC": "carbide",
+      "coating": "DLC",
+      "description": "Aluminium O-flute Ø5 × 22 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 5,
+        "HAND": true,
+        "LCF": 22,
+        "NOF": 1,
+        "OAL": 50,
+        "SFDM": 5
+      },
+      "guid": "92b70913-9821-535d-ab4c-f957e382b8f2",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "DSA1F-D5.0-L22",
+      "product-link": "https://www.aliexpress.com/item/1005001910635126.html",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique: 12000–16000 rpm, 1200–1600 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; mist or cutting fluid required for aluminium and copper. The preset takes the low end and the slotting depth.",
+            "f_z": 0.1,
+            "guid": "6b921761-8941-5746-8cd3-54239431e2c4",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 12000,
+            "n_ramp": 12000,
+            "name": "Aluminium and copper",
+            "stepdown": 2.5,
+            "tool-coolant": "mist",
+            "use-stepdown": true,
+            "v_c": 188.4955592153876,
+            "v_f": 1200
+          }
+        ]
+      },
+      "type": "flat end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "DSA1F-D5.0-L22"
+    },
+    {
+      "BMC": "carbide",
+      "coating": "DLC",
+      "description": "Aluminium O-flute Ø6 × 12 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 6,
+        "HAND": true,
+        "LCF": 12,
+        "NOF": 1,
+        "OAL": 50,
+        "SFDM": 6
+      },
+      "guid": "251036d4-ddd2-5469-9694-ef1bde776928",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "DSA1F-D6.0-L12",
+      "product-link": "https://www.aliexpress.com/item/1005001910635126.html",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique: 12000–14000 rpm, 1300–1700 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; mist or cutting fluid required for aluminium and copper. The preset takes the low end and the slotting depth.",
+            "f_z": 0.10833333333333334,
+            "guid": "f99a9911-3253-57ed-859f-be8924014743",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 12000,
+            "n_ramp": 12000,
+            "name": "Aluminium and copper",
+            "stepdown": 3,
+            "tool-coolant": "mist",
+            "use-stepdown": true,
+            "v_c": 226.1946710584651,
+            "v_f": 1300
+          }
+        ]
+      },
+      "type": "flat end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "DSA1F-D6.0-L12"
+    },
+    {
+      "BMC": "carbide",
+      "coating": "DLC",
+      "description": "Aluminium O-flute Ø6 × 15 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 6,
+        "HAND": true,
+        "LCF": 15,
+        "NOF": 1,
+        "OAL": 50,
+        "SFDM": 6
+      },
+      "guid": "9dd8860f-d5c1-5fcd-94f7-fd270d6abd9b",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "DSA1F-D6.0-L15",
+      "product-link": "https://www.aliexpress.com/item/1005001910635126.html",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique: 12000–14000 rpm, 1300–1700 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; mist or cutting fluid required for aluminium and copper. The preset takes the low end and the slotting depth.",
+            "f_z": 0.10833333333333334,
+            "guid": "c1b7eb74-2ceb-5a77-b65b-91548e49d6dc",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 12000,
+            "n_ramp": 12000,
+            "name": "Aluminium and copper",
+            "stepdown": 3,
+            "tool-coolant": "mist",
+            "use-stepdown": true,
+            "v_c": 226.1946710584651,
+            "v_f": 1300
+          }
+        ]
+      },
+      "type": "flat end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "DSA1F-D6.0-L15"
+    },
+    {
+      "BMC": "carbide",
+      "coating": "DLC",
+      "description": "Aluminium O-flute Ø6 × 17 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 6,
+        "HAND": true,
+        "LCF": 17,
+        "NOF": 1,
+        "OAL": 50,
+        "SFDM": 6
+      },
+      "guid": "fe570835-ce36-5a9b-9240-1ca8aa21f1bc",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "DSA1F-D6.0-L17",
+      "product-link": "https://www.aliexpress.com/item/1005001910635126.html",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique: 12000–14000 rpm, 1300–1700 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; mist or cutting fluid required for aluminium and copper. The preset takes the low end and the slotting depth.",
+            "f_z": 0.10833333333333334,
+            "guid": "8f8924c1-8ece-5550-be32-1197278c0206",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 12000,
+            "n_ramp": 12000,
+            "name": "Aluminium and copper",
+            "stepdown": 3,
+            "tool-coolant": "mist",
+            "use-stepdown": true,
+            "v_c": 226.1946710584651,
+            "v_f": 1300
+          }
+        ]
+      },
+      "type": "flat end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "DSA1F-D6.0-L17"
+    },
+    {
+      "BMC": "carbide",
+      "coating": "DLC",
+      "description": "Aluminium O-flute Ø6 × 22 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 6,
+        "HAND": true,
+        "LCF": 22,
+        "NOF": 1,
+        "OAL": 50,
+        "SFDM": 6
+      },
+      "guid": "a38fa169-c9a5-5d3a-8003-b31ac3c19f2d",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "DSA1F-D6.0-L22",
+      "product-link": "https://www.aliexpress.com/item/1005001910635126.html",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique: 12000–14000 rpm, 1300–1700 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; mist or cutting fluid required for aluminium and copper. The preset takes the low end and the slotting depth.",
+            "f_z": 0.10833333333333334,
+            "guid": "b5794cad-3c33-5df4-994e-d3a978673075",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 12000,
+            "n_ramp": 12000,
+            "name": "Aluminium and copper",
+            "stepdown": 3,
+            "tool-coolant": "mist",
+            "use-stepdown": true,
+            "v_c": 226.1946710584651,
+            "v_f": 1300
+          }
+        ]
+      },
+      "type": "flat end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "DSA1F-D6.0-L22"
+    },
+    {
+      "BMC": "carbide",
+      "coating": "DLC",
+      "description": "Aluminium O-flute Ø6 × 25 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 6,
+        "HAND": true,
+        "LCF": 25,
+        "NOF": 1,
+        "OAL": 60,
+        "SFDM": 6
+      },
+      "guid": "cf045b20-5011-5e7f-ae87-bdd849590f02",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "DSA1F-D6.0-L25",
+      "product-link": "https://www.aliexpress.com/item/1005001910635126.html",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique: 12000–14000 rpm, 1300–1700 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; mist or cutting fluid required for aluminium and copper. The preset takes the low end and the slotting depth.",
+            "f_z": 0.10833333333333334,
+            "guid": "1ae06a3a-9be7-5f47-9f8a-ce5fe9390fd5",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 12000,
+            "n_ramp": 12000,
+            "name": "Aluminium and copper",
+            "stepdown": 3,
+            "tool-coolant": "mist",
+            "use-stepdown": true,
+            "v_c": 226.1946710584651,
+            "v_f": 1300
+          }
+        ]
+      },
+      "type": "flat end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "DSA1F-D6.0-L25"
+    },
+    {
+      "BMC": "carbide",
+      "coating": "DLC",
+      "description": "Aluminium O-flute Ø6 × 32 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 6,
+        "HAND": true,
+        "LCF": 32,
+        "NOF": 1,
+        "OAL": 75,
+        "SFDM": 6
+      },
+      "guid": "8a7797e0-5b61-5949-bcaa-e7a3e12bfc99",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "DSA1F-D6.0-L32",
+      "product-link": "https://www.aliexpress.com/item/1005001910635126.html",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique: 12000–14000 rpm, 1300–1700 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; mist or cutting fluid required for aluminium and copper. The preset takes the low end and the slotting depth.",
+            "f_z": 0.10833333333333334,
+            "guid": "06260be7-5ab5-59f4-b08f-0ac0f2b127c3",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 12000,
+            "n_ramp": 12000,
+            "name": "Aluminium and copper",
+            "stepdown": 3,
+            "tool-coolant": "mist",
+            "use-stepdown": true,
+            "v_c": 226.1946710584651,
+            "v_f": 1300
+          }
+        ]
+      },
+      "type": "flat end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "DSA1F-D6.0-L32"
+    },
+    {
+      "BMC": "carbide",
+      "coating": "DLC",
+      "description": "Aluminium O-flute Ø8 × 12 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 8,
+        "HAND": true,
+        "LCF": 12,
+        "NOF": 1,
+        "OAL": 60,
+        "SFDM": 8
+      },
+      "guid": "ecf59f2a-0d2b-51c5-a437-e9ae8dfde637",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "DSA1F-D8.0-L12",
+      "product-link": "https://www.aliexpress.com/item/1005001910635126.html",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique: 10000–12000 rpm, 1300–1700 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; mist or cutting fluid required for aluminium and copper. The preset takes the low end and the slotting depth.",
+            "f_z": 0.13,
+            "guid": "590b0238-83a8-5191-a349-991975c40754",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 10000,
+            "n_ramp": 10000,
+            "name": "Aluminium and copper",
+            "stepdown": 4,
+            "tool-coolant": "mist",
+            "use-stepdown": true,
+            "v_c": 251.32741228718345,
+            "v_f": 1300
+          }
+        ]
+      },
+      "type": "flat end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "DSA1F-D8.0-L12"
+    },
+    {
+      "BMC": "carbide",
+      "coating": "DLC",
+      "description": "Aluminium O-flute Ø8 × 17 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 8,
+        "HAND": true,
+        "LCF": 17,
+        "NOF": 1,
+        "OAL": 60,
+        "SFDM": 8
+      },
+      "guid": "df79e3dc-6294-5936-812f-0af336180806",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "DSA1F-D8.0-L17",
+      "product-link": "https://www.aliexpress.com/item/1005001910635126.html",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique: 10000–12000 rpm, 1300–1700 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; mist or cutting fluid required for aluminium and copper. The preset takes the low end and the slotting depth.",
+            "f_z": 0.13,
+            "guid": "ecb2df81-3889-50e6-876e-cf211ad65566",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 10000,
+            "n_ramp": 10000,
+            "name": "Aluminium and copper",
+            "stepdown": 4,
+            "tool-coolant": "mist",
+            "use-stepdown": true,
+            "v_c": 251.32741228718345,
+            "v_f": 1300
+          }
+        ]
+      },
+      "type": "flat end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "DSA1F-D8.0-L17"
+    },
+    {
+      "BMC": "carbide",
+      "coating": "DLC",
+      "description": "Aluminium O-flute Ø8 × 22 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 8,
+        "HAND": true,
+        "LCF": 22,
+        "NOF": 1,
+        "OAL": 60,
+        "SFDM": 8
+      },
+      "guid": "c0b0ec86-c934-5724-92ff-263f1d115fb3",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "DSA1F-D8.0-L22",
+      "product-link": "https://www.aliexpress.com/item/1005001910635126.html",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique: 10000–12000 rpm, 1300–1700 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; mist or cutting fluid required for aluminium and copper. The preset takes the low end and the slotting depth.",
+            "f_z": 0.13,
+            "guid": "018074b0-0461-5532-b117-39c82331537a",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 10000,
+            "n_ramp": 10000,
+            "name": "Aluminium and copper",
+            "stepdown": 4,
+            "tool-coolant": "mist",
+            "use-stepdown": true,
+            "v_c": 251.32741228718345,
+            "v_f": 1300
+          }
+        ]
+      },
+      "type": "flat end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "DSA1F-D8.0-L22"
+    },
+    {
+      "BMC": "carbide",
+      "coating": "DLC",
+      "description": "Aluminium O-flute Ø8 × 25 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 8,
+        "HAND": true,
+        "LCF": 25,
+        "NOF": 1,
+        "OAL": 60,
+        "SFDM": 8
+      },
+      "guid": "27023225-0e69-5341-baf3-0234997a8f21",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "DSA1F-D8.0-L25",
+      "product-link": "https://www.aliexpress.com/item/1005001910635126.html",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique: 10000–12000 rpm, 1300–1700 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; mist or cutting fluid required for aluminium and copper. The preset takes the low end and the slotting depth.",
+            "f_z": 0.13,
+            "guid": "69393d0a-0c33-54ca-b73a-f64d65abeeec",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 10000,
+            "n_ramp": 10000,
+            "name": "Aluminium and copper",
+            "stepdown": 4,
+            "tool-coolant": "mist",
+            "use-stepdown": true,
+            "v_c": 251.32741228718345,
+            "v_f": 1300
+          }
+        ]
+      },
+      "type": "flat end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "DSA1F-D8.0-L25"
+    },
+    {
+      "BMC": "carbide",
+      "coating": "DLC",
+      "description": "Aluminium O-flute Ø8 × 32 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 8,
+        "HAND": true,
+        "LCF": 32,
+        "NOF": 1,
+        "OAL": 75,
+        "SFDM": 8
+      },
+      "guid": "a216fa2e-1d3c-535c-b991-08bb2d8b92c4",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "DSA1F-D8.0-L32",
+      "product-link": "https://www.aliexpress.com/item/1005001910635126.html",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique: 10000–12000 rpm, 1300–1700 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; mist or cutting fluid required for aluminium and copper. The preset takes the low end and the slotting depth.",
+            "f_z": 0.13,
+            "guid": "46275876-af43-598f-ab42-51741ac82270",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 10000,
+            "n_ramp": 10000,
+            "name": "Aluminium and copper",
+            "stepdown": 4,
+            "tool-coolant": "mist",
+            "use-stepdown": true,
+            "v_c": 251.32741228718345,
+            "v_f": 1300
+          }
+        ]
+      },
+      "type": "flat end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "DSA1F-D8.0-L32"
+    },
+    {
+      "BMC": "carbide",
+      "coating": "DLC",
+      "description": "Aluminium O-flute Ø10 × 32 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 10,
+        "HAND": true,
+        "LCF": 32,
+        "NOF": 1,
+        "OAL": 75,
+        "SFDM": 10
+      },
+      "guid": "81663959-3f24-5edf-a245-fc33a80a5046",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "DSA1F-D10.0-L32",
+      "product-link": "https://www.aliexpress.com/item/1005001910635126.html",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique: 10000–12000 rpm, 1400–2000 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; mist or cutting fluid required for aluminium and copper. The preset takes the low end and the slotting depth.",
+            "f_z": 0.14,
+            "guid": "3508b481-677d-5907-837a-bed9789f98da",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 10000,
+            "n_ramp": 10000,
+            "name": "Aluminium and copper",
+            "stepdown": 5,
+            "tool-coolant": "mist",
+            "use-stepdown": true,
+            "v_c": 314.15926535897927,
+            "v_f": 1400
+          }
+        ]
+      },
+      "type": "flat end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "DSA1F-D10.0-L32"
+    },
+    {
+      "BMC": "carbide",
+      "coating": "DLC",
+      "description": "Aluminium O-flute Ø10 × 42 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 10,
+        "HAND": true,
+        "LCF": 42,
+        "NOF": 1,
+        "OAL": 90,
+        "SFDM": 10
+      },
+      "guid": "946686de-e239-5487-a786-bdcb01b36ea7",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "DSA1F-D10.0-L42",
+      "product-link": "https://www.aliexpress.com/item/1005001910635126.html",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique: 10000–12000 rpm, 1400–2000 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; mist or cutting fluid required for aluminium and copper. The preset takes the low end and the slotting depth.",
+            "f_z": 0.14,
+            "guid": "7813ff42-1d59-5160-875a-312598277687",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 10000,
+            "n_ramp": 10000,
+            "name": "Aluminium and copper",
+            "stepdown": 5,
+            "tool-coolant": "mist",
+            "use-stepdown": true,
+            "v_c": 314.15926535897927,
+            "v_f": 1400
+          }
+        ]
+      },
+      "type": "flat end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "DSA1F-D10.0-L42"
+    },
+    {
+      "BMC": "carbide",
+      "coating": "DLC",
+      "description": "Aluminium end mill Ø1 × 3 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 1,
+        "HAND": true,
+        "LCF": 3,
+        "NOF": 3,
+        "OAL": 50,
+        "SFDM": 4
+      },
+      "guid": "e23312d5-8de3-50d4-8fc9-9025502c67af",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "DAU3E-D1.0-L03",
+      "product-link": "https://www.aliexpress.com/item/1005004027451152.html",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique: 14000–18000 rpm, 700–1000 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; mist or cutting fluid required for aluminium and copper. The preset takes the low end and the slotting depth.",
+            "f_z": 0.016666666666666666,
+            "guid": "09efdad6-63f4-5497-8924-68389f029412",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Aluminium and copper",
+            "stepdown": 0.5,
+            "tool-coolant": "mist",
+            "use-stepdown": true,
+            "v_c": 43.982297150257104,
+            "v_f": 700
+          }
+        ]
+      },
+      "type": "flat end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "DAU3E-D1.0-L03"
+    },
+    {
+      "BMC": "carbide",
+      "coating": "DLC",
+      "description": "Aluminium end mill Ø1.5 × 4.5 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 1.5,
+        "HAND": true,
+        "LCF": 4.5,
+        "NOF": 3,
+        "OAL": 50,
+        "SFDM": 4
+      },
+      "guid": "bb4e7ff1-c4ce-5fef-9a8f-6e63d2114bcb",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "DAU3E-D1.5-L4.5",
+      "product-link": "https://www.aliexpress.com/item/1005004027451152.html",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique: 14000–18000 rpm, 800–1100 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; mist or cutting fluid required for aluminium and copper. The preset takes the low end and the slotting depth.",
+            "f_z": 0.01904761904761905,
+            "guid": "297d8766-6d42-5359-b46b-7e632df84a53",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Aluminium and copper",
+            "stepdown": 0.75,
+            "tool-coolant": "mist",
+            "use-stepdown": true,
+            "v_c": 65.97344572538566,
+            "v_f": 800
+          }
+        ]
+      },
+      "type": "flat end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "DAU3E-D1.5-L4.5"
+    },
+    {
+      "BMC": "carbide",
+      "coating": "DLC",
+      "description": "Aluminium end mill Ø2 × 6 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 2,
+        "HAND": true,
+        "LCF": 6,
+        "NOF": 3,
+        "OAL": 50,
+        "SFDM": 4
+      },
+      "guid": "1234d1d5-52d1-5ab7-b619-c2c60ab42af8",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "DAU3E-D2.0-L06",
+      "product-link": "https://www.aliexpress.com/item/1005004027451152.html",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique: 14000–18000 rpm, 800–1100 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; mist or cutting fluid required for aluminium and copper. The preset takes the low end and the slotting depth.",
+            "f_z": 0.01904761904761905,
+            "guid": "a8b96016-48a8-52d7-88a9-144646562281",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Aluminium and copper",
+            "stepdown": 1,
+            "tool-coolant": "mist",
+            "use-stepdown": true,
+            "v_c": 87.96459430051421,
+            "v_f": 800
+          }
+        ]
+      },
+      "type": "flat end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "DAU3E-D2.0-L06"
+    },
+    {
+      "BMC": "carbide",
+      "coating": "DLC",
+      "description": "Aluminium end mill Ø2.5 × 7.5 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 2.5,
+        "HAND": true,
+        "LCF": 7.5,
+        "NOF": 3,
+        "OAL": 50,
+        "SFDM": 4
+      },
+      "guid": "d86a9f18-c906-5192-855d-4903f9181ac0",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "DAU3E-D2.5-L7.5",
+      "product-link": "https://www.aliexpress.com/item/1005004027451152.html",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique: 14000–18000 rpm, 800–1200 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; mist or cutting fluid required for aluminium and copper. The preset takes the low end and the slotting depth.",
+            "f_z": 0.01904761904761905,
+            "guid": "eff69e7e-c906-5469-961c-ff63cf419f39",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Aluminium and copper",
+            "stepdown": 1.25,
+            "tool-coolant": "mist",
+            "use-stepdown": true,
+            "v_c": 109.95574287564276,
+            "v_f": 800
+          }
+        ]
+      },
+      "type": "flat end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "DAU3E-D2.5-L7.5"
+    },
+    {
+      "BMC": "carbide",
+      "coating": "DLC",
+      "description": "Aluminium end mill Ø3 × 9 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 3,
+        "HAND": true,
+        "LCF": 9,
+        "NOF": 3,
+        "OAL": 50,
+        "SFDM": 4
+      },
+      "guid": "09c2342f-9fd4-53c0-85e3-f28fa2a16ef6",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "DAU3E-D3.0-L09",
+      "product-link": "https://www.aliexpress.com/item/1005004027451152.html",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique has no Ø3 row; this is its Ø2.5 row. Dreanique: 14000–18000 rpm, 800–1200 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; mist or cutting fluid required for aluminium and copper. The preset takes the low end and the slotting depth.",
+            "f_z": 0.01904761904761905,
+            "guid": "dc165a35-0c29-52a3-bbce-851a21cf2222",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Aluminium and copper",
+            "stepdown": 1.5,
+            "tool-coolant": "mist",
+            "use-stepdown": true,
+            "v_c": 131.94689145077132,
+            "v_f": 800
+          }
+        ]
+      },
+      "type": "flat end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "DAU3E-D3.0-L09"
+    },
+    {
+      "BMC": "carbide",
+      "coating": "DLC",
+      "description": "Aluminium end mill Ø3.5 × 11 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 3.5,
+        "HAND": true,
+        "LCF": 11,
+        "NOF": 3,
+        "OAL": 50,
+        "SFDM": 4
+      },
+      "guid": "a9663cc4-f3dc-5b50-b80b-936fcc994c01",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "DAU3E-D3.5-L11",
+      "product-link": "https://www.aliexpress.com/item/1005004027451152.html",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique has no Ø3.5 row; this is its Ø3.1 row. Dreanique: 14000–18000 rpm, 900–1300 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; mist or cutting fluid required for aluminium and copper. The preset takes the low end and the slotting depth.",
+            "f_z": 0.02142857142857143,
+            "guid": "9b9fce8e-96b4-5d5d-affc-42eb4b200c3c",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Aluminium and copper",
+            "stepdown": 1.75,
+            "tool-coolant": "mist",
+            "use-stepdown": true,
+            "v_c": 153.93804002589985,
+            "v_f": 900
+          }
+        ]
+      },
+      "type": "flat end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "DAU3E-D3.5-L11"
+    },
+    {
+      "BMC": "carbide",
+      "coating": "DLC",
+      "description": "Aluminium end mill Ø4 × 12 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 4,
+        "HAND": true,
+        "LCF": 12,
+        "NOF": 3,
+        "OAL": 50,
+        "SFDM": 4
+      },
+      "guid": "7e1977e5-523f-56a1-8987-b8a0976f3597",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "DAU3E-D4.0-L12",
+      "product-link": "https://www.aliexpress.com/item/1005004027451152.html",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique: 14000–18000 rpm, 1200–1600 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; mist or cutting fluid required for aluminium and copper. The preset takes the low end and the slotting depth.",
+            "f_z": 0.02857142857142857,
+            "guid": "268f14c5-4aec-5160-9aec-7c642bc35cf8",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 14000,
+            "n_ramp": 14000,
+            "name": "Aluminium and copper",
+            "stepdown": 2,
+            "tool-coolant": "mist",
+            "use-stepdown": true,
+            "v_c": 175.92918860102841,
+            "v_f": 1200
+          }
+        ]
+      },
+      "type": "flat end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "DAU3E-D4.0-L12"
+    },
+    {
+      "BMC": "carbide",
+      "coating": "DLC",
+      "description": "Aluminium end mill Ø5 × 15 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 5,
+        "HAND": true,
+        "LCF": 15,
+        "NOF": 3,
+        "OAL": 50,
+        "SFDM": 6
+      },
+      "guid": "9c012af8-dba7-5e83-84b6-8e337552ca71",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "DAU3E-D5.0-L15",
+      "product-link": "https://www.aliexpress.com/item/1005004027451152.html",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique: 12000–16000 rpm, 1200–1600 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; mist or cutting fluid required for aluminium and copper. The preset takes the low end and the slotting depth.",
+            "f_z": 0.03333333333333333,
+            "guid": "f8a583a3-6564-55b8-a36d-773b908f2548",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 12000,
+            "n_ramp": 12000,
+            "name": "Aluminium and copper",
+            "stepdown": 2.5,
+            "tool-coolant": "mist",
+            "use-stepdown": true,
+            "v_c": 188.4955592153876,
+            "v_f": 1200
+          }
+        ]
+      },
+      "type": "flat end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "DAU3E-D5.0-L15"
+    },
+    {
+      "BMC": "carbide",
+      "coating": "DLC",
+      "description": "Aluminium end mill Ø5 × 30 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 5,
+        "HAND": true,
+        "LCF": 30,
+        "NOF": 3,
+        "OAL": 75,
+        "SFDM": 6
+      },
+      "guid": "0117b600-9463-5713-94b5-8c262d79fad2",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "DAU3EL-D5.0-L30",
+      "product-link": "https://www.aliexpress.com/item/1005004027451152.html",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique: 12000–16000 rpm, 1200–1600 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; mist or cutting fluid required for aluminium and copper. The preset takes the low end and the slotting depth.",
+            "f_z": 0.03333333333333333,
+            "guid": "b927a5f3-5387-5d3d-9c67-1e027e0bc31e",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 12000,
+            "n_ramp": 12000,
+            "name": "Aluminium and copper",
+            "stepdown": 2.5,
+            "tool-coolant": "mist",
+            "use-stepdown": true,
+            "v_c": 188.4955592153876,
+            "v_f": 1200
+          }
+        ]
+      },
+      "type": "flat end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "DAU3EL-D5.0-L30"
+    },
+    {
+      "BMC": "carbide",
+      "coating": "DLC",
+      "description": "Aluminium end mill Ø6 × 18 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 6,
+        "HAND": true,
+        "LCF": 18,
+        "NOF": 3,
+        "OAL": 50,
+        "SFDM": 6
+      },
+      "guid": "5ad5d1bc-41d8-5ce0-9d83-722d7729fd6c",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "DAU3E-D6.0-L18",
+      "product-link": "https://www.aliexpress.com/item/1005004027451152.html",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique: 12000–14000 rpm, 1300–1700 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; mist or cutting fluid required for aluminium and copper. The preset takes the low end and the slotting depth.",
+            "f_z": 0.03611111111111111,
+            "guid": "7baee754-83fb-560f-a40e-0f0aa89db3bd",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 12000,
+            "n_ramp": 12000,
+            "name": "Aluminium and copper",
+            "stepdown": 3,
+            "tool-coolant": "mist",
+            "use-stepdown": true,
+            "v_c": 226.1946710584651,
+            "v_f": 1300
+          }
+        ]
+      },
+      "type": "flat end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "DAU3E-D6.0-L18"
+    },
+    {
+      "BMC": "carbide",
+      "coating": "DLC",
+      "description": "Aluminium end mill Ø6 × 30 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 6,
+        "HAND": true,
+        "LCF": 30,
+        "NOF": 3,
+        "OAL": 75,
+        "SFDM": 6
+      },
+      "guid": "63a400d7-a606-55b4-a5a1-2390c8410a58",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "DAU3EL-D6.0-L30",
+      "product-link": "https://www.aliexpress.com/item/1005004027451152.html",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique: 12000–14000 rpm, 1300–1700 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; mist or cutting fluid required for aluminium and copper. The preset takes the low end and the slotting depth.",
+            "f_z": 0.03611111111111111,
+            "guid": "c9748305-3ba3-5982-9778-9960e2332584",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 12000,
+            "n_ramp": 12000,
+            "name": "Aluminium and copper",
+            "stepdown": 3,
+            "tool-coolant": "mist",
+            "use-stepdown": true,
+            "v_c": 226.1946710584651,
+            "v_f": 1300
+          }
+        ]
+      },
+      "type": "flat end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "DAU3EL-D6.0-L30"
+    },
+    {
+      "BMC": "carbide",
+      "coating": "DLC",
+      "description": "Aluminium end mill Ø8 × 24 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 8,
+        "HAND": true,
+        "LCF": 24,
+        "NOF": 3,
+        "OAL": 60,
+        "SFDM": 8
+      },
+      "guid": "5610651c-ebf8-53dc-9b79-272037a388e6",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "DAU3E-D8.0-L24",
+      "product-link": "https://www.aliexpress.com/item/1005004027451152.html",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique: 10000–12000 rpm, 1300–1700 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; mist or cutting fluid required for aluminium and copper. The preset takes the low end and the slotting depth.",
+            "f_z": 0.043333333333333335,
+            "guid": "96240f80-3633-52d5-9623-da93c502fc5e",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 10000,
+            "n_ramp": 10000,
+            "name": "Aluminium and copper",
+            "stepdown": 4,
+            "tool-coolant": "mist",
+            "use-stepdown": true,
+            "v_c": 251.32741228718345,
+            "v_f": 1300
+          }
+        ]
+      },
+      "type": "flat end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "DAU3E-D8.0-L24"
+    },
+    {
+      "BMC": "carbide",
+      "coating": "DLC",
+      "description": "Aluminium end mill Ø8 × 32 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 8,
+        "HAND": true,
+        "LCF": 32,
+        "NOF": 3,
+        "OAL": 75,
+        "SFDM": 8
+      },
+      "guid": "d53a7e6f-9cc1-52ce-b44d-6ae0792f2ef4",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "DAU3EL-D8.0-L32",
+      "product-link": "https://www.aliexpress.com/item/1005004027451152.html",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique: 10000–12000 rpm, 1300–1700 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; mist or cutting fluid required for aluminium and copper. The preset takes the low end and the slotting depth.",
+            "f_z": 0.043333333333333335,
+            "guid": "0aa3b5b0-0f3e-5c2d-8e5e-9f15a66175f9",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 10000,
+            "n_ramp": 10000,
+            "name": "Aluminium and copper",
+            "stepdown": 4,
+            "tool-coolant": "mist",
+            "use-stepdown": true,
+            "v_c": 251.32741228718345,
+            "v_f": 1300
+          }
+        ]
+      },
+      "type": "flat end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "DAU3EL-D8.0-L32"
+    },
+    {
+      "BMC": "carbide",
+      "coating": "DLC",
+      "description": "Aluminium end mill Ø10 × 30 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 10,
+        "HAND": true,
+        "LCF": 30,
+        "NOF": 3,
+        "OAL": 75,
+        "SFDM": 10
+      },
+      "guid": "22d9d386-0212-5761-8e2e-1111f22c0514",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "DAU3E-D10-L30",
+      "product-link": "https://www.aliexpress.com/item/1005004027451152.html",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique: 10000–12000 rpm, 1400–2000 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; mist or cutting fluid required for aluminium and copper. The preset takes the low end and the slotting depth.",
+            "f_z": 0.04666666666666667,
+            "guid": "b692bb76-6b85-5e86-b98f-fea5cb4163c4",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 10000,
+            "n_ramp": 10000,
+            "name": "Aluminium and copper",
+            "stepdown": 5,
+            "tool-coolant": "mist",
+            "use-stepdown": true,
+            "v_c": 314.15926535897927,
+            "v_f": 1400
+          }
+        ]
+      },
+      "type": "flat end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "DAU3E-D10-L30"
+    },
+    {
+      "BMC": "carbide",
+      "coating": "DLC",
+      "description": "Aluminium end mill Ø10 × 40 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 10,
+        "HAND": true,
+        "LCF": 40,
+        "NOF": 3,
+        "OAL": 100,
+        "SFDM": 10
+      },
+      "guid": "9fdfde4e-2ae6-560c-81fe-0b11c32b168d",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "DAU3EL-D10-L40",
+      "product-link": "https://www.aliexpress.com/item/1005004027451152.html",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique: 10000–12000 rpm, 1400–2000 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; mist or cutting fluid required for aluminium and copper. The preset takes the low end and the slotting depth.",
+            "f_z": 0.04666666666666667,
+            "guid": "b01a194e-b74f-5991-8752-863634ef9da6",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 10000,
+            "n_ramp": 10000,
+            "name": "Aluminium and copper",
+            "stepdown": 5,
+            "tool-coolant": "mist",
+            "use-stepdown": true,
+            "v_c": 314.15926535897927,
+            "v_f": 1400
+          }
+        ]
+      },
+      "type": "flat end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "DAU3EL-D10-L40"
+    },
+    {
+      "BMC": "carbide",
+      "coating": "DLC",
+      "description": "Aluminium end mill Ø12 × 35 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 12,
+        "HAND": true,
+        "LCF": 35,
+        "NOF": 3,
+        "OAL": 75,
+        "SFDM": 12
+      },
+      "guid": "64287097-1ee0-5996-b204-01bfa2e576e3",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "DAU3E-D12-L35",
+      "product-link": "https://www.aliexpress.com/item/1005004027451152.html",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique: 8000–10000 rpm, 1400–2000 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; mist or cutting fluid required for aluminium and copper. The preset takes the low end and the slotting depth.",
+            "f_z": 0.058333333333333334,
+            "guid": "93e369f7-3ccd-5c9c-af2e-381ddb189816",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 8000,
+            "n_ramp": 8000,
+            "name": "Aluminium and copper",
+            "stepdown": 6,
+            "tool-coolant": "mist",
+            "use-stepdown": true,
+            "v_c": 301.59289474462014,
+            "v_f": 1400
+          }
+        ]
+      },
+      "type": "flat end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "DAU3E-D12-L35"
+    },
+    {
+      "BMC": "carbide",
+      "coating": "DLC",
+      "description": "Aluminium end mill Ø12 × 45 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 12,
+        "HAND": true,
+        "LCF": 45,
+        "NOF": 3,
+        "OAL": 100,
+        "SFDM": 12
+      },
+      "guid": "4c690920-5731-5704-b7a3-ee211cf40ef3",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "DAU3EL-D12-L45",
+      "product-link": "https://www.aliexpress.com/item/1005004027451152.html",
+      "start-values": {
+        "presets": [
+          {
+            "description": "Dreanique: 8000–10000 rpm, 1400–2000 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; mist or cutting fluid required for aluminium and copper. The preset takes the low end and the slotting depth.",
+            "f_z": 0.058333333333333334,
+            "guid": "89658017-98a7-57bc-8469-1f6a680949c6",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 8000,
+            "n_ramp": 8000,
+            "name": "Aluminium and copper",
+            "stepdown": 6,
+            "tool-coolant": "mist",
+            "use-stepdown": true,
+            "v_c": 301.59289474462014,
+            "v_f": 1400
+          }
+        ]
+      },
+      "type": "flat end mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "DAU3EL-D12-L45"
     }
   ]
 }

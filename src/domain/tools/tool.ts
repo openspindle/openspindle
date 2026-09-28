@@ -317,7 +317,7 @@ const exceeds = (value: number | null, limit: number | null) =>
 
 /** Physical consistency of a tool's dimensions. */
 function checkGeometry(
-  tool: { diameter: number | null; geometry: ToolGeometry },
+  tool: { kind: string; diameter: number | null; geometry: ToolGeometry },
   context: z.RefinementCtx
 ) {
   const { geometry } = tool
@@ -328,8 +328,13 @@ function checkGeometry(
       report(field, "exceeds overallLength.")
   if (exceeds(geometry.tipDiameter, tool.diameter))
     report("tipDiameter", "exceeds the cutting diameter.")
+  // A radius mill's corner is concave, rounding over outside its tip diameter, so its
+  // radius may exceed half of it (a round-over bit: an 8 mm radius on a 0.7 mm tip).
   const halfDiameter = tool.diameter === null ? null : tool.diameter / 2
-  if (exceeds(geometry.cornerRadius, halfDiameter))
+  if (
+    toolKindKey(tool.kind) !== "radius mill" &&
+    exceeds(geometry.cornerRadius, halfDiameter)
+  )
     report("cornerRadius", "exceeds half the cutting diameter.")
   if (exceeds(geometry.threadPitchMin, geometry.threadPitchMax))
     report("threadPitchMin", "exceeds threadPitchMax.")
