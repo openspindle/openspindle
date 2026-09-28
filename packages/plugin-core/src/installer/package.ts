@@ -102,8 +102,8 @@ function checkContents(
 }
 
 /**
- * The single install pipeline for every source and host: reads the manifest, refuses what
- * the source may not carry, then reads, checks, hashes and forwards every declared file
+ * The single install pipeline for every source and host: reads the manifest, refuses a
+ * plugin for another platform, then reads, checks, hashes and forwards every declared file
  * within the source's limits.
  */
 export async function validatePackage(
@@ -118,10 +118,6 @@ export async function validatePackage(
   const manifest = parseManifest(
     parseJson(decodeUtf8(manifestBytes, MANIFEST_FILE), MANIFEST_FILE)
   )
-  if (manifest.companion && origin.kind === "github")
-    fail(
-      "Plugins from GitHub cannot include companion programs. Companions install from a local folder during development."
-    )
   assertPlatform(manifest, options.platform)
   const files = declaredFiles(manifest, options.platform)
   if (files.length + 1 > limits.files)

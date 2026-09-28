@@ -86,14 +86,17 @@ function Permissions({ review }: { review: InstallReview }) {
 function Companion({
   companion,
   executables,
+  source,
 }: {
   companion: NonNullable<InstallReview["companion"]>
   executables: readonly string[]
+  source: PackageOrigin
 }) {
   const start =
     companion.activation === "on-view"
       ? "when one of its views opens"
       : "when one of its views first needs it"
+  const origin = source.kind === "github" ? "this repository" : "this folder"
   return (
     <Alert>
       <TriangleAlert />
@@ -102,7 +105,7 @@ function Companion({
         <p>
           Its {companion.runtime === "node" ? "Node" : "native"} companion
           starts {start} and can read and change your files like any program you
-          run. Install development plugins only from folders you trust.
+          run. Install it only if you trust {origin}.
         </p>
         {executables.length > 0 && (
           <p className="break-all">
@@ -136,6 +139,7 @@ export function InstallReviewDetails({ review }: { review: InstallReview }) {
         <Companion
           companion={review.companion}
           executables={review.executables}
+          source={review.source}
         />
       )}
       <Permissions review={review} />

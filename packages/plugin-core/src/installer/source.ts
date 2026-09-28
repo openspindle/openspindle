@@ -59,7 +59,7 @@ export interface FolderPort {
   readFile: (path: string, maxBytes: number) => Promise<Uint8Array>
 }
 
-/** Development installs may carry native companions and larger runtimes. */
+/** Development folders may carry larger packages, such as a bundled runtime. */
 export const FOLDER_PACKAGE_LIMITS = {
   files: 1024,
   fileBytes: 256 * 1024 * 1024,

@@ -89,7 +89,7 @@ function describe(validated: ValidatedPackage) {
     `Permissions: ${manifest.permissions.length ? manifest.permissions.join(", ") : "none"}`
   )
   if (manifest.companion)
-    console.log(`Companion: ${manifest.companion.runtime}, local folder only`)
+    console.log(`Companion: ${manifest.companion.runtime}`)
   for (const file of manifest.executables) console.log(`Executable: ${file}`)
   console.log(
     `${validated.inventory.length} files, ${validated.totalBytes} bytes, digest ${validated.digest}`
