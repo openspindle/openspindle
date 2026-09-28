@@ -66,8 +66,12 @@ jobs:
       - run: npm ci
 
       # The universal app as a release builds it, but ad-hoc signed and not notarized, and without
-      # an update feed, which electron-builder writes only beside a DMG or zip target.
+      # an update feed, which electron-builder writes only beside a DMG or zip target. In a pull
+      # request's build electron-builder skips all signing unless told otherwise, which leaves an
+      # app macOS refuses to open; signing ad hoc takes no secrets.
       - run: npm run package:mac -- --universal
+        env:
+          CSC_FOR_PULL_REQUEST: "true"
 
       # ditto keeps the bundle's symlinks, which its signature covers.
       - name: Zip the app
