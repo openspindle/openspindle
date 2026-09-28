@@ -1,0 +1,42 @@
+{
+  "manifestVersion": 2,
+  "id": "pcb",
+  "name": "PCB",
+  "version": "0.2.0",
+  "description": "KiCad Gerber and Excellon operations, generated on this computer by pcb2gcode from Homebrew.",
+  "apiVersion": 2,
+  "apiRevision": 2,
+  "permissions": ["workspace:read", "operations:write", "tools:read"],
+  "ui": {
+    "entry": "dist/view.js",
+    "styles": "dist/view.css",
+    "views": [
+      {
+        "id": "importer",
+        "slot": "process.importer",
+        "title": "PCB"
+      },
+      {
+        "id": "editor",
+        "slot": "operation.editor",
+        "title": "PCB"
+      }
+    ]
+  },
+  "toolbar": [
+    {
+      "id": "pcb",
+      "label": "PCB",
+      "icon": "pcb",
+      "viewId": "importer"
+    }
+  ],
+  "companion": {
+    "runtime": "node",
+    "entry": "dist/companion.mjs",
+    "activation": "on-view",
+    "idleShutdownSeconds": 300
+  },
+  "files": ["LICENSE", "THIRD_PARTY_NOTICES.md"],
+  "platforms": ["darwin-arm64"]
+}

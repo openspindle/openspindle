@@ -1,0 +1,7 @@
+/*
+ * The frame already ships the app theme and the UI kit's styles; this adds only the
+ * utilities the PCB views use. `source(none)` limits the scan to the views themselves.
+ */
+@import "tailwindcss/utilities.css" layer(utilities) source(none);
+@reference "@openspindle/plugin-sdk/theme.css";
+@source "./";
