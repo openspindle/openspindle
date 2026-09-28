@@ -1,7 +1,7 @@
 {
   "name": "openspindle",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "A desktop app for preparing, checking and running jobs on a Makera Z1 CNC machine.",
   "author": "OpenSpindle contributors",
   "license": "MIT",
@@ -27,7 +27,7 @@
     "prepackage:mac": "test -f node_modules/electron/dist/LICENSES.chromium.html || install-electron",
     "package:mac": "electron-vite build && electron-builder --mac --dir -c.mac.identity=- -c.mac.notarize=false",
     "predist:mac": "test -f node_modules/electron/dist/LICENSES.chromium.html || install-electron",
-    "dist:mac":"node --env-file-if-exists=.env node_modules/electron-vite/bin/electron-vite.js build && node --env-file-if-exists=.env node_modules/electron-builder/cli.js --mac",
+    "dist:mac": "node --env-file-if-exists=.env node_modules/electron-vite/bin/electron-vite.js build && node --env-file-if-exists=.env node_modules/electron-builder/cli.js --mac",
     "typecheck": "tsc -p tsconfig.json && tsc -p electron/tsconfig.json && tsc -p tools/z1-simulator/tsconfig.json",
     "lint": "eslint src electron packages vite.config.ts electron.vite.config.ts tools",
     "format": "prettier --write src electron packages tools vite.config.ts electron.vite.config.ts",
