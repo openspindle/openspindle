@@ -5484,26 +5484,7 @@
       "product-id": "DAU3E-D1.0-L03",
       "product-link": "https://www.aliexpress.com/item/1005004027451152.html",
       "start-values": {
-        "presets": [
-          {
-            "description": "Dreanique: 14000–18000 rpm, 700–1000 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; mist or cutting fluid required for aluminium and copper. The preset takes the low end and the slotting depth.",
-            "f_z": 0.016666666666666666,
-            "guid": "09efdad6-63f4-5497-8924-68389f029412",
-            "material": {
-              "category": "all",
-              "query": "",
-              "use-hardness": false
-            },
-            "n": 14000,
-            "n_ramp": 14000,
-            "name": "Aluminium and copper",
-            "stepdown": 0.5,
-            "tool-coolant": "mist",
-            "use-stepdown": true,
-            "v_c": 43.982297150257104,
-            "v_f": 700
-          }
-        ]
+        "presets": []
       },
       "type": "flat end mill",
       "unit": "millimeters",
@@ -5533,26 +5514,7 @@
       "product-id": "DAU3E-D1.5-L4.5",
       "product-link": "https://www.aliexpress.com/item/1005004027451152.html",
       "start-values": {
-        "presets": [
-          {
-            "description": "Dreanique: 14000–18000 rpm, 800–1100 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; mist or cutting fluid required for aluminium and copper. The preset takes the low end and the slotting depth.",
-            "f_z": 0.01904761904761905,
-            "guid": "297d8766-6d42-5359-b46b-7e632df84a53",
-            "material": {
-              "category": "all",
-              "query": "",
-              "use-hardness": false
-            },
-            "n": 14000,
-            "n_ramp": 14000,
-            "name": "Aluminium and copper",
-            "stepdown": 0.75,
-            "tool-coolant": "mist",
-            "use-stepdown": true,
-            "v_c": 65.97344572538566,
-            "v_f": 800
-          }
-        ]
+        "presets": []
       },
       "type": "flat end mill",
       "unit": "millimeters",
@@ -5582,26 +5544,7 @@
       "product-id": "DAU3E-D2.0-L06",
       "product-link": "https://www.aliexpress.com/item/1005004027451152.html",
       "start-values": {
-        "presets": [
-          {
-            "description": "Dreanique: 14000–18000 rpm, 800–1100 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; mist or cutting fluid required for aluminium and copper. The preset takes the low end and the slotting depth.",
-            "f_z": 0.01904761904761905,
-            "guid": "a8b96016-48a8-52d7-88a9-144646562281",
-            "material": {
-              "category": "all",
-              "query": "",
-              "use-hardness": false
-            },
-            "n": 14000,
-            "n_ramp": 14000,
-            "name": "Aluminium and copper",
-            "stepdown": 1,
-            "tool-coolant": "mist",
-            "use-stepdown": true,
-            "v_c": 87.96459430051421,
-            "v_f": 800
-          }
-        ]
+        "presets": []
       },
       "type": "flat end mill",
       "unit": "millimeters",
@@ -5631,26 +5574,7 @@
       "product-id": "DAU3E-D2.5-L7.5",
       "product-link": "https://www.aliexpress.com/item/1005004027451152.html",
       "start-values": {
-        "presets": [
-          {
-            "description": "Dreanique: 14000–18000 rpm, 800–1200 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; mist or cutting fluid required for aluminium and copper. The preset takes the low end and the slotting depth.",
-            "f_z": 0.01904761904761905,
-            "guid": "eff69e7e-c906-5469-961c-ff63cf419f39",
-            "material": {
-              "category": "all",
-              "query": "",
-              "use-hardness": false
-            },
-            "n": 14000,
-            "n_ramp": 14000,
-            "name": "Aluminium and copper",
-            "stepdown": 1.25,
-            "tool-coolant": "mist",
-            "use-stepdown": true,
-            "v_c": 109.95574287564276,
-            "v_f": 800
-          }
-        ]
+        "presets": []
       },
       "type": "flat end mill",
       "unit": "millimeters",
@@ -5680,26 +5604,7 @@
       "product-id": "DAU3E-D3.0-L09",
       "product-link": "https://www.aliexpress.com/item/1005004027451152.html",
       "start-values": {
-        "presets": [
-          {
-            "description": "Dreanique has no Ø3 row; this is its Ø2.5 row. Dreanique: 14000–18000 rpm, 800–1200 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; mist or cutting fluid required for aluminium and copper. The preset takes the low end and the slotting depth.",
-            "f_z": 0.01904761904761905,
-            "guid": "dc165a35-0c29-52a3-bbce-851a21cf2222",
-            "material": {
-              "category": "all",
-              "query": "",
-              "use-hardness": false
-            },
-            "n": 14000,
-            "n_ramp": 14000,
-            "name": "Aluminium and copper",
-            "stepdown": 1.5,
-            "tool-coolant": "mist",
-            "use-stepdown": true,
-            "v_c": 131.94689145077132,
-            "v_f": 800
-          }
-        ]
+        "presets": []
       },
       "type": "flat end mill",
       "unit": "millimeters",
@@ -5729,26 +5634,7 @@
       "product-id": "DAU3E-D3.5-L11",
       "product-link": "https://www.aliexpress.com/item/1005004027451152.html",
       "start-values": {
-        "presets": [
-          {
-            "description": "Dreanique has no Ø3.5 row; this is its Ø3.1 row. Dreanique: 14000–18000 rpm, 900–1300 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; mist or cutting fluid required for aluminium and copper. The preset takes the low end and the slotting depth.",
-            "f_z": 0.02142857142857143,
-            "guid": "9b9fce8e-96b4-5d5d-affc-42eb4b200c3c",
-            "material": {
-              "category": "all",
-              "query": "",
-              "use-hardness": false
-            },
-            "n": 14000,
-            "n_ramp": 14000,
-            "name": "Aluminium and copper",
-            "stepdown": 1.75,
-            "tool-coolant": "mist",
-            "use-stepdown": true,
-            "v_c": 153.93804002589985,
-            "v_f": 900
-          }
-        ]
+        "presets": []
       },
       "type": "flat end mill",
       "unit": "millimeters",
@@ -5778,26 +5664,7 @@
       "product-id": "DAU3E-D4.0-L12",
       "product-link": "https://www.aliexpress.com/item/1005004027451152.html",
       "start-values": {
-        "presets": [
-          {
-            "description": "Dreanique: 14000–18000 rpm, 1200–1600 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; mist or cutting fluid required for aluminium and copper. The preset takes the low end and the slotting depth.",
-            "f_z": 0.02857142857142857,
-            "guid": "268f14c5-4aec-5160-9aec-7c642bc35cf8",
-            "material": {
-              "category": "all",
-              "query": "",
-              "use-hardness": false
-            },
-            "n": 14000,
-            "n_ramp": 14000,
-            "name": "Aluminium and copper",
-            "stepdown": 2,
-            "tool-coolant": "mist",
-            "use-stepdown": true,
-            "v_c": 175.92918860102841,
-            "v_f": 1200
-          }
-        ]
+        "presets": []
       },
       "type": "flat end mill",
       "unit": "millimeters",
@@ -5827,26 +5694,7 @@
       "product-id": "DAU3E-D5.0-L15",
       "product-link": "https://www.aliexpress.com/item/1005004027451152.html",
       "start-values": {
-        "presets": [
-          {
-            "description": "Dreanique: 12000–16000 rpm, 1200–1600 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; mist or cutting fluid required for aluminium and copper. The preset takes the low end and the slotting depth.",
-            "f_z": 0.03333333333333333,
-            "guid": "f8a583a3-6564-55b8-a36d-773b908f2548",
-            "material": {
-              "category": "all",
-              "query": "",
-              "use-hardness": false
-            },
-            "n": 12000,
-            "n_ramp": 12000,
-            "name": "Aluminium and copper",
-            "stepdown": 2.5,
-            "tool-coolant": "mist",
-            "use-stepdown": true,
-            "v_c": 188.4955592153876,
-            "v_f": 1200
-          }
-        ]
+        "presets": []
       },
       "type": "flat end mill",
       "unit": "millimeters",
@@ -5876,26 +5724,7 @@
       "product-id": "DAU3EL-D5.0-L30",
       "product-link": "https://www.aliexpress.com/item/1005004027451152.html",
       "start-values": {
-        "presets": [
-          {
-            "description": "Dreanique: 12000–16000 rpm, 1200–1600 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; mist or cutting fluid required for aluminium and copper. The preset takes the low end and the slotting depth.",
-            "f_z": 0.03333333333333333,
-            "guid": "b927a5f3-5387-5d3d-9c67-1e027e0bc31e",
-            "material": {
-              "category": "all",
-              "query": "",
-              "use-hardness": false
-            },
-            "n": 12000,
-            "n_ramp": 12000,
-            "name": "Aluminium and copper",
-            "stepdown": 2.5,
-            "tool-coolant": "mist",
-            "use-stepdown": true,
-            "v_c": 188.4955592153876,
-            "v_f": 1200
-          }
-        ]
+        "presets": []
       },
       "type": "flat end mill",
       "unit": "millimeters",
@@ -5925,26 +5754,7 @@
       "product-id": "DAU3E-D6.0-L18",
       "product-link": "https://www.aliexpress.com/item/1005004027451152.html",
       "start-values": {
-        "presets": [
-          {
-            "description": "Dreanique: 12000–14000 rpm, 1300–1700 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; mist or cutting fluid required for aluminium and copper. The preset takes the low end and the slotting depth.",
-            "f_z": 0.03611111111111111,
-            "guid": "7baee754-83fb-560f-a40e-0f0aa89db3bd",
-            "material": {
-              "category": "all",
-              "query": "",
-              "use-hardness": false
-            },
-            "n": 12000,
-            "n_ramp": 12000,
-            "name": "Aluminium and copper",
-            "stepdown": 3,
-            "tool-coolant": "mist",
-            "use-stepdown": true,
-            "v_c": 226.1946710584651,
-            "v_f": 1300
-          }
-        ]
+        "presets": []
       },
       "type": "flat end mill",
       "unit": "millimeters",
@@ -5974,26 +5784,7 @@
       "product-id": "DAU3EL-D6.0-L30",
       "product-link": "https://www.aliexpress.com/item/1005004027451152.html",
       "start-values": {
-        "presets": [
-          {
-            "description": "Dreanique: 12000–14000 rpm, 1300–1700 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; mist or cutting fluid required for aluminium and copper. The preset takes the low end and the slotting depth.",
-            "f_z": 0.03611111111111111,
-            "guid": "c9748305-3ba3-5982-9778-9960e2332584",
-            "material": {
-              "category": "all",
-              "query": "",
-              "use-hardness": false
-            },
-            "n": 12000,
-            "n_ramp": 12000,
-            "name": "Aluminium and copper",
-            "stepdown": 3,
-            "tool-coolant": "mist",
-            "use-stepdown": true,
-            "v_c": 226.1946710584651,
-            "v_f": 1300
-          }
-        ]
+        "presets": []
       },
       "type": "flat end mill",
       "unit": "millimeters",
@@ -6023,26 +5814,7 @@
       "product-id": "DAU3E-D8.0-L24",
       "product-link": "https://www.aliexpress.com/item/1005004027451152.html",
       "start-values": {
-        "presets": [
-          {
-            "description": "Dreanique: 10000–12000 rpm, 1300–1700 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; mist or cutting fluid required for aluminium and copper. The preset takes the low end and the slotting depth.",
-            "f_z": 0.043333333333333335,
-            "guid": "96240f80-3633-52d5-9623-da93c502fc5e",
-            "material": {
-              "category": "all",
-              "query": "",
-              "use-hardness": false
-            },
-            "n": 10000,
-            "n_ramp": 10000,
-            "name": "Aluminium and copper",
-            "stepdown": 4,
-            "tool-coolant": "mist",
-            "use-stepdown": true,
-            "v_c": 251.32741228718345,
-            "v_f": 1300
-          }
-        ]
+        "presets": []
       },
       "type": "flat end mill",
       "unit": "millimeters",
@@ -6072,26 +5844,7 @@
       "product-id": "DAU3EL-D8.0-L32",
       "product-link": "https://www.aliexpress.com/item/1005004027451152.html",
       "start-values": {
-        "presets": [
-          {
-            "description": "Dreanique: 10000–12000 rpm, 1300–1700 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; mist or cutting fluid required for aluminium and copper. The preset takes the low end and the slotting depth.",
-            "f_z": 0.043333333333333335,
-            "guid": "0aa3b5b0-0f3e-5c2d-8e5e-9f15a66175f9",
-            "material": {
-              "category": "all",
-              "query": "",
-              "use-hardness": false
-            },
-            "n": 10000,
-            "n_ramp": 10000,
-            "name": "Aluminium and copper",
-            "stepdown": 4,
-            "tool-coolant": "mist",
-            "use-stepdown": true,
-            "v_c": 251.32741228718345,
-            "v_f": 1300
-          }
-        ]
+        "presets": []
       },
       "type": "flat end mill",
       "unit": "millimeters",
@@ -6121,26 +5874,7 @@
       "product-id": "DAU3E-D10-L30",
       "product-link": "https://www.aliexpress.com/item/1005004027451152.html",
       "start-values": {
-        "presets": [
-          {
-            "description": "Dreanique: 10000–12000 rpm, 1400–2000 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; mist or cutting fluid required for aluminium and copper. The preset takes the low end and the slotting depth.",
-            "f_z": 0.04666666666666667,
-            "guid": "b692bb76-6b85-5e86-b98f-fea5cb4163c4",
-            "material": {
-              "category": "all",
-              "query": "",
-              "use-hardness": false
-            },
-            "n": 10000,
-            "n_ramp": 10000,
-            "name": "Aluminium and copper",
-            "stepdown": 5,
-            "tool-coolant": "mist",
-            "use-stepdown": true,
-            "v_c": 314.15926535897927,
-            "v_f": 1400
-          }
-        ]
+        "presets": []
       },
       "type": "flat end mill",
       "unit": "millimeters",
@@ -6170,26 +5904,7 @@
       "product-id": "DAU3EL-D10-L40",
       "product-link": "https://www.aliexpress.com/item/1005004027451152.html",
       "start-values": {
-        "presets": [
-          {
-            "description": "Dreanique: 10000–12000 rpm, 1400–2000 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; mist or cutting fluid required for aluminium and copper. The preset takes the low end and the slotting depth.",
-            "f_z": 0.04666666666666667,
-            "guid": "b01a194e-b74f-5991-8752-863634ef9da6",
-            "material": {
-              "category": "all",
-              "query": "",
-              "use-hardness": false
-            },
-            "n": 10000,
-            "n_ramp": 10000,
-            "name": "Aluminium and copper",
-            "stepdown": 5,
-            "tool-coolant": "mist",
-            "use-stepdown": true,
-            "v_c": 314.15926535897927,
-            "v_f": 1400
-          }
-        ]
+        "presets": []
       },
       "type": "flat end mill",
       "unit": "millimeters",
@@ -6219,26 +5934,7 @@
       "product-id": "DAU3E-D12-L35",
       "product-link": "https://www.aliexpress.com/item/1005004027451152.html",
       "start-values": {
-        "presets": [
-          {
-            "description": "Dreanique: 8000–10000 rpm, 1400–2000 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; mist or cutting fluid required for aluminium and copper. The preset takes the low end and the slotting depth.",
-            "f_z": 0.058333333333333334,
-            "guid": "93e369f7-3ccd-5c9c-af2e-381ddb189816",
-            "material": {
-              "category": "all",
-              "query": "",
-              "use-hardness": false
-            },
-            "n": 8000,
-            "n_ramp": 8000,
-            "name": "Aluminium and copper",
-            "stepdown": 6,
-            "tool-coolant": "mist",
-            "use-stepdown": true,
-            "v_c": 301.59289474462014,
-            "v_f": 1400
-          }
-        ]
+        "presets": []
       },
       "type": "flat end mill",
       "unit": "millimeters",
@@ -6268,26 +5964,7 @@
       "product-id": "DAU3EL-D12-L45",
       "product-link": "https://www.aliexpress.com/item/1005004027451152.html",
       "start-values": {
-        "presets": [
-          {
-            "description": "Dreanique: 8000–10000 rpm, 1400–2000 mm/min, up to 0.5 × D deep slotting and 1.5 × D side milling; mist or cutting fluid required for aluminium and copper. The preset takes the low end and the slotting depth.",
-            "f_z": 0.058333333333333334,
-            "guid": "89658017-98a7-57bc-8469-1f6a680949c6",
-            "material": {
-              "category": "all",
-              "query": "",
-              "use-hardness": false
-            },
-            "n": 8000,
-            "n_ramp": 8000,
-            "name": "Aluminium and copper",
-            "stepdown": 6,
-            "tool-coolant": "mist",
-            "use-stepdown": true,
-            "v_c": 301.59289474462014,
-            "v_f": 1400
-          }
-        ]
+        "presets": []
       },
       "type": "flat end mill",
       "unit": "millimeters",
