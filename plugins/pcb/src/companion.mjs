@@ -1,33 +1,20 @@
 import { RpcError, serveCompanion } from "@openspindle/plugin-sdk/companion"
 import { InputError, MultipleToolSlotsError, generate } from "./converter.mjs"
-import {
-  RuntimeError,
-  SetupNeededError,
-  findRuntime,
-  installRuntime,
-} from "./runtime.mjs"
+import { RuntimeError, SetupNeededError, checkRuntime } from "./runtime.mjs"
 
 /*
  * The PCB plugin's companion. OpenSpindle starts it while a PCB view is open and calls it
- * over a private channel; the views reach it only through companion.call. It runs
- * Homebrew's pcb2gcode one job at a time, and its setup installs pcb2gcode with Homebrew.
- * It never talks to a machine.
+ * over a private channel; the views reach it only through companion.call. It runs the
+ * pcb2gcode chosen in the plugin's settings one job at a time (choosing another restarts
+ * it), and never talks to a machine.
  */
 
 let verification = null
-/** Aborted on shutdown, so no pcb2gcode or brew process outlives the companion. */
+/** Aborted on shutdown, so no pcb2gcode process outlives the companion. */
 const lifetime = new AbortController()
 
 const describe = (error) =>
   error instanceof Error ? error.message : String(error)
-
-/** A runtime problem with what setup does about it, as the plugin card and editor show it. */
-function withAdvice(error) {
-  if (!(error instanceof SetupNeededError)) return describe(error)
-  if (!error.command)
-    return `${error.message} Install Homebrew from https://brew.sh, then run setup.`
-  return `${error.message} Run setup to ${error.command} it with Homebrew.`
-}
 
 /**
  * The code views receive: INVALID_PARAMS for a request or file the plugin refuses (with
@@ -44,13 +31,15 @@ function coded(error) {
   if (error instanceof InputError)
     return new RpcError("INVALID_PARAMS", error.message)
   if (error instanceof RuntimeError)
-    return new RpcError("UNAVAILABLE", withAdvice(error))
+    return new RpcError("UNAVAILABLE", error.message)
   return error
 }
 
-/** Homebrew's pcb2gcode: checked once per start, and again after a failure. */
-function runtime() {
-  verification ??= findRuntime({ signal: lifetime.signal }).catch((error) => {
+/** The chosen pcb2gcode: checked once per start, and again after a failure. */
+function runtime({ info }) {
+  verification ??= checkRuntime(info.settings.pcb2gcode, {
+    signal: lifetime.signal,
+  }).catch((error) => {
     verification = null
     throw error
   })
@@ -67,7 +56,7 @@ function whenAborted(signal) {
 
 let queue = Promise.resolve()
 
-/** One pcb2gcode or brew process at a time; a job cancelled while it waits leaves the queue. */
+/** One pcb2gcode process at a time; a job cancelled while it waits leaves the queue. */
 async function exclusive(signal, run) {
   const previous = queue
   let release
@@ -83,30 +72,15 @@ async function exclusive(signal, run) {
   }
 }
 
-/** Passes output to `write` line by line, as it comes. */
-function lines(write) {
-  let rest = ""
-  return {
-    push(chunk) {
-      const parts = (rest + chunk).split(/\r?\n/)
-      rest = parts.pop()
-      for (const line of parts) if (line.trim()) write(line)
-    },
-    end() {
-      if (rest.trim()) write(rest)
-      rest = ""
-    },
-  }
-}
-
-async function health() {
+/** Ready once the chosen pcb2gcode runs, naming its version. */
+async function health(context) {
   try {
-    await runtime()
-    return { status: "ready", message: null }
+    const { version } = await runtime(context)
+    return { status: "ready", message: `pcb2gcode ${version}` }
   } catch (error) {
     return {
       status: error instanceof SetupNeededError ? "needs-setup" : "degraded",
-      message: withAdvice(error).slice(0, 2000),
+      message: describe(error).slice(0, 2000),
     }
   }
 }
@@ -121,39 +95,6 @@ process.once("SIGTERM", () => {
 
 serveCompanion({
   health,
-  /**
-   * Installs pcb2gcode with Homebrew, or reinstalls a copy that does not run. brew's output
-   * goes to the plugin's log; a failure leaves the companion needing setup, with the reason.
-   */
-  async setup({ host, signal }) {
-    const cancel = AbortSignal.any([signal, lifetime.signal])
-    const label = "Installing pcb2gcode with Homebrew"
-    const output = lines((line) => host.log("info", line))
-    host.progress({ label, value: null })
-    verification = null
-    try {
-      const installed = await exclusive(cancel, () =>
-        installRuntime({ signal: cancel, onOutput: output.push })
-      )
-      host.log("info", `pcb2gcode ${installed.version} is ready.`)
-      return health()
-    } catch (error) {
-      if (cancel.aborted) throw new RpcError("CANCELLED", "Setup cancelled.")
-      host.log("error", `Setup failed: ${describe(error)}`)
-      if (error instanceof SetupNeededError) return health()
-      return {
-        status: "needs-setup",
-        message:
-          `Homebrew could not install pcb2gcode: ${describe(error)} Run setup to try again.`.slice(
-            0,
-            2000
-          ),
-      }
-    } finally {
-      output.end()
-      host.progress({ label, value: 1, done: true })
-    }
-  },
   shutdown: stopJobs,
   methods: {
     /**
@@ -164,7 +105,7 @@ serveCompanion({
       const signal = AbortSignal.any([context.signal, lifetime.signal])
       const started = Date.now()
       try {
-        const { executable } = await runtime()
+        const { executable } = await runtime(context)
         const result = await exclusive(signal, () =>
           generate(params, { executable, signal })
         )

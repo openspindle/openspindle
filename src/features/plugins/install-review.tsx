@@ -24,8 +24,13 @@ export const VIEW_SLOT_LABELS: Record<ViewSlot, string> = {
   "operation.editor": "Editor for its operations",
 }
 
-/** Where a package came from: a repository at one commit, or a development folder. */
+/**
+ * Where a package came from: a repository at one commit, a development folder, or the app
+ * itself.
+ */
 export function PluginSource({ source }: { source: PackageOrigin }) {
+  if (source.kind === "bundled")
+    return <FieldDescription>Comes with OpenSpindle</FieldDescription>
   if (source.kind === "folder")
     return (
       <FieldDescription className="break-all">

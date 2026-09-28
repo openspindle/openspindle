@@ -27,6 +27,7 @@ import type {
 } from "./contract/files"
 import type { CameraEvent } from "./contract/machine-rpc"
 import type {
+  ChooseSettingResult,
   CompanionEvent,
   CompanionLogEntry,
   InstallRequest,
@@ -180,6 +181,17 @@ export interface PluginHost {
   discardInstall: (reviewId: string) => Promise<void>
   setEnabled: (pluginId: string, enabled: boolean) => Promise<PluginSummary>
   remove: (pluginId: string) => Promise<void>
+  /** Checks and stores one of a plugin's settings (null clears it). */
+  setSetting: (
+    pluginId: string,
+    settingId: string,
+    value: string | null
+  ) => Promise<PluginSummary>
+  /** Asks for a setting's program with a native dialog, then stores it. */
+  chooseSetting: (
+    pluginId: string,
+    settingId: string
+  ) => Promise<ChooseSettingResult>
   /** The verified view bundle a plugin frame starts with. */
   readBundle: (pluginId: string) => Promise<PluginBundle>
   /** Renders a template program from the installed, verified template. */

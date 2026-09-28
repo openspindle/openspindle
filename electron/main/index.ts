@@ -31,6 +31,10 @@ import {
 
 const RENDERER_ROOT = fileURLToPath(new URL("../renderer", import.meta.url))
 const PRELOAD = fileURLToPath(new URL("../preload/index.cjs", import.meta.url))
+/** The plugins that come with the app: packaged apps carry them among their resources. */
+const BUNDLED_PLUGINS = app.isPackaged
+  ? path.join(process.resourcesPath, "plugins")
+  : fileURLToPath(new URL("../plugins", import.meta.url))
 /** Packaged apps carry their icon; dev and preview runs start Electron's own bundle. */
 const DEV_ICON = app.isPackaged
   ? undefined
@@ -116,6 +120,7 @@ function start(diagnostics: Diagnostics) {
   const pluginPlatform = new PluginPlatform({
     userData: app.getPath("userData"),
     temp: app.getPath("temp"),
+    bundled: BUNDLED_PLUGINS,
     machine: machine.controller,
     window: currentWindow,
     fetch: (input, init) => net.fetch(input, init),

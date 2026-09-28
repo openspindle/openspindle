@@ -41,6 +41,7 @@ import { Switch } from "@/components/ui/switch"
 import type { PluginSummary } from "@/platform/contract/plugin-rpc"
 import { formatBytes, plural } from "@/domain/primitives"
 import { PluginSource } from "./install-review"
+import { PluginSettings } from "./plugin-settings"
 import {
   useCompanionLogs,
   useCompanionSetup,
@@ -172,7 +173,7 @@ function CompanionPanel({
           <RotateCw data-icon="inline-start" />
           Restart
         </Button>
-        {status.health?.status === "needs-setup" && (
+        {status.setup && status.health?.status === "needs-setup" && (
           <Button
             variant="outline"
             size="sm"
@@ -231,7 +232,10 @@ function RemoveButton({ plugin }: { plugin: PluginSummary }) {
   )
 }
 
-/** One installed plugin: what it is and may do, and enable, update and remove. */
+/**
+ * One installed plugin: what it is and may do, its settings, and enable, update and remove.
+ * A plugin that comes with the app updates with it and can only be disabled.
+ */
 export function InstalledPluginCard({
   plugin,
   onReview,
@@ -243,6 +247,7 @@ export function InstalledPluginCard({
   const setEnabled = useSetPluginEnabled()
   const update = usePrepareUpdate()
   const development = plugin.source.kind === "folder"
+  const bundled = plugin.source.kind === "bundled"
   return (
     <Card size="sm">
       <CardHeader>
@@ -276,27 +281,32 @@ export function InstalledPluginCard({
             </Badge>
           ))}
         </div>
+        {plugin.manifest.settings.length > 0 && (
+          <PluginSettings plugin={plugin} />
+        )}
         {plugin.companion && (
           <CompanionPanel plugin={plugin} status={plugin.companion} />
         )}
       </CardContent>
-      <CardFooter className="gap-2">
-        <Button
-          variant="outline"
-          disabled={update.isPending}
-          onClick={() =>
-            update.mutate(plugin.id, {
-              onSuccess: (result) => {
-                if (result.status === "review") onReview(result.review)
-              },
-            })
-          }
-        >
-          <RefreshCw data-icon="inline-start" />
-          {development ? "Reload" : "Check for update"}
-        </Button>
-        <RemoveButton plugin={plugin} />
-      </CardFooter>
+      {!bundled && (
+        <CardFooter className="gap-2">
+          <Button
+            variant="outline"
+            disabled={update.isPending}
+            onClick={() =>
+              update.mutate(plugin.id, {
+                onSuccess: (result) => {
+                  if (result.status === "review") onReview(result.review)
+                },
+              })
+            }
+          >
+            <RefreshCw data-icon="inline-start" />
+            {development ? "Reload" : "Check for update"}
+          </Button>
+          <RemoveButton plugin={plugin} />
+        </CardFooter>
+      )}
     </Card>
   )
 }

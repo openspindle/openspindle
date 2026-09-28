@@ -57,6 +57,10 @@
       "universalify@2.0.1",
       "zod@4.6.5"
     ],
+    "plugin-pcb-companion": [
+      "zod@4.6.5"
+    ],
+    "plugin-pcb-view": [],
     "preload": [
       "@sentry/electron@7.20.0"
     ],

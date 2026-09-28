@@ -2,10 +2,10 @@
   "manifestVersion": 2,
   "id": "pcb",
   "name": "PCB",
-  "version": "0.2.0",
-  "description": "KiCad Gerber and Excellon operations, generated on this computer by pcb2gcode from Homebrew.",
+  "version": "0.3.0",
+  "description": "KiCad Gerber and Excellon operations, generated on this computer by pcb2gcode.",
   "apiVersion": 2,
-  "apiRevision": 2,
+  "apiRevision": 3,
   "permissions": ["workspace:read", "operations:write", "tools:read"],
   "ui": {
     "entry": "dist/view.js",
@@ -37,6 +37,12 @@
     "activation": "on-view",
     "idleShutdownSeconds": 300
   },
-  "files": ["LICENSE", "THIRD_PARTY_NOTICES.md"],
-  "platforms": ["darwin-arm64"]
+  "settings": [
+    {
+      "id": "pcb2gcode",
+      "type": "executable",
+      "label": "pcb2gcode",
+      "description": "The pcb2gcode program, which you install yourself. With Homebrew, run brew install pcb2gcode and choose /opt/homebrew/bin/pcb2gcode (/usr/local/bin/pcb2gcode on an Intel Mac)."
+    }
+  ]
 }

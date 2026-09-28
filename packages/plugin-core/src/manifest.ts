@@ -19,7 +19,7 @@ import {
  * The plugin API this host implements. Plugins declare what they target, and only this
  * version and revision are accepted.
  */
-export const PLUGIN_API = { version: 2, revision: 2 } as const
+export const PLUGIN_API = { version: 2, revision: 3 } as const
 
 export const MANIFEST_FILE = "openspindle-plugin.json"
 
@@ -198,6 +198,20 @@ export const CompanionSchema = z.discriminatedUnion(
 )
 export type CompanionDeclaration = z.infer<typeof CompanionSchema>
 
+/**
+ * A value the user sets on the plugin's card in the plugin manager, which the companion
+ * receives. `executable`: a program on this computer, by its full path.
+ */
+export const SettingSchema = strictSchema("Setting", {
+  id: identifierSchema("Setting ID"),
+  type: z.literal("executable", {
+    error: "Setting type must be executable.",
+  }),
+  label: textSchema("Setting label", 80),
+  description: textSchema("Setting description").optional(),
+})
+export type SettingDeclaration = z.infer<typeof SettingSchema>
+
 export const ManifestSchema = strictSchema(
   "Plugin manifest",
   {
@@ -219,6 +233,12 @@ export const ManifestSchema = strictSchema(
     programs: ProcessProgramsSchema.default([]),
     toolbar: listSchema(ToolbarItemSchema, "Toolbar items", 16).optional(),
     companion: CompanionSchema.optional(),
+    settings: listSchema(SettingSchema, "Settings", 16)
+      .refine(
+        (settings) => isUnique(settings.map((setting) => setting.id)),
+        "Setting IDs must be unique."
+      )
+      .default([]),
     files: listSchema(
       packagePathSchema(
         "Package file",
@@ -273,6 +293,13 @@ export const ManifestSchema = strictSchema(
     context.addIssue({
       code: "custom",
       message: "A companion is only reachable from the plugin's own views.",
+    })
+  if (manifest.settings.length && !manifest.companion)
+    context.addIssue({
+      code: "custom",
+      message:
+        "Settings reach the plugin's companion, so only a plugin with one can have them.",
+      path: ["settings"],
     })
   if (manifest.executables.length && !manifest.companion)
     context.addIssue({

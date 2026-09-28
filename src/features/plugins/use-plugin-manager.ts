@@ -84,6 +84,42 @@ export function useRemovePlugin() {
   })
 }
 
+/** Checks and stores one of a plugin's settings; its companion restarts with it. */
+export function useSetPluginSetting() {
+  const plugins = useHost().plugins
+  const refresh = useRefresh()
+  return useMutation({
+    scope,
+    mutationFn: ({
+      pluginId,
+      settingId,
+      value,
+    }: {
+      pluginId: string
+      settingId: string
+      value: string | null
+    }) => plugins.setSetting(pluginId, settingId, value),
+    onSettled: refresh,
+  })
+}
+
+/** Chooses a setting's program in a native dialog, then stores it as useSetPluginSetting does. */
+export function useChoosePluginSetting() {
+  const plugins = useHost().plugins
+  const refresh = useRefresh()
+  return useMutation({
+    scope,
+    mutationFn: ({
+      pluginId,
+      settingId,
+    }: {
+      pluginId: string
+      settingId: string
+    }) => plugins.chooseSetting(pluginId, settingId),
+    onSettled: refresh,
+  })
+}
+
 export function useRestartCompanion() {
   const companions = useHost().plugins.companions
   return useMutation({

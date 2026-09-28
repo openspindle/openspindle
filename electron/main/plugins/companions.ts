@@ -284,6 +284,8 @@ class CompanionSupervisor {
   readonly logs = new LogRing()
   private state: CompanionStatus["state"] = "stopped"
   private health: CompanionHealth | null = null
+  /** Whether the companion's setup does anything, as its handshake said. */
+  private hasSetup = false
   private process: CompanionProcess | null = null
   private peer: Peer<CompanionContract> | null = null
   private starting: Promise<Peer<CompanionContract>> | null = null
@@ -306,6 +308,7 @@ class CompanionSupervisor {
     return {
       state: this.state,
       health: this.health,
+      setup: this.hasSetup,
       restarts: this.restarts,
       lastError: this.lastError,
       retryAt: this.retryAt,
@@ -531,13 +534,14 @@ class CompanionSupervisor {
           this.exited(current, `closed its channel (${reason ?? "no reason"})`),
       })
       this.peer = peer
-      await peer.call(
+      const initialized = await peer.call(
         "openspindle.initialize",
         {
           protocol: COMPANION_PROTOCOL,
           api: { version: PLUGIN_API.version, revision: PLUGIN_API.revision },
           plugin: { id: record.id, version: record.version },
           grants: record.grants,
+          settings: record.settings,
           paths,
           platform: this.deps.platform,
         },
@@ -549,6 +553,7 @@ class CompanionSupervisor {
       // Stopped (disabled, removed, updated) while the handshake was running.
       if (this.process !== launched)
         throw new RpcError("CANCELLED", "the companion was stopped")
+      this.hasSetup = initialized.setup
       this.health = health
       this.logs.push({ level: "info", source: "host", message: "Started." })
       this.setState("running")
@@ -684,6 +689,7 @@ class CompanionSupervisor {
 const STOPPED: CompanionStatus = {
   state: "stopped",
   health: null,
+  setup: false,
   restarts: 0,
   lastError: null,
   retryAt: null,

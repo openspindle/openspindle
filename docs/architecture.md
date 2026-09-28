@@ -25,6 +25,7 @@ src/features/         UI features: shell, prepare, job, device, tool library, mo
 src/routes/           thin TanStack Router file routes: /prepare, /job, /device, /settings
 src/components/       shadcn ui components and shared workspace components (bed viewer)
 src/plugin-runtime/   the sandboxed plugin frame (built separately into plugin-frame/)
+plugins/              plugins that come with the app (the PCB plugin), built into out/plugins/
 tools/z1-simulator/   a development-only Makera Z1 simulator
 ```
 
@@ -83,7 +84,7 @@ Problems the user can act on are `Diagnostic`s. An error in the app's own code i
 
 ## Plugins
 
-Plugins run in sandboxed frames (opaque origin, strict CSP) and reach the app only through a typed RPC API whose methods each require a capability granted at install. A broker (Mediator) maps plugin calls onto the same workspace commands and machine gateway the app uses. Companions are local helper programs that the app starts and stops for a plugin's views. See [plugins.md](plugins.md).
+Plugins run in sandboxed frames (opaque origin, strict CSP) and reach the app only through a typed RPC API whose methods each require a capability granted at install. A broker (Mediator) maps plugin calls onto the same workspace commands and machine gateway the app uses. Companions are local helper programs that the app starts and stops for a plugin's views. The plugins that come with the app are built with it and installed from its own files at start, through the same pipeline. See [plugins.md](plugins.md).
 
 ## Patterns at a glance
 

@@ -1,6 +1,6 @@
 # OpenSpindle plugins
 
-Plugins extend OpenSpindle with reusable NC programs, their own views and, during development, local helper programs. They run sandboxed and reach the app only through its typed API. What a plugin may do is fixed when it is installed: the user reviews the requested capabilities once, and there are no per-call prompts. No capability allows motion, spindle control, overrides, pause/resume or running programs, and plugins never start machine jobs.
+Plugins extend OpenSpindle with reusable NC programs, their own views and local helper programs. They run sandboxed and reach the app only through its typed API. What a plugin may do is fixed when it is installed: the user reviews the requested capabilities once, and there are no per-call prompts. No capability allows motion, spindle control, overrides, pause/resume or running programs, and plugins never start machine jobs.
 
 The platform is `@openspindle/plugin-core` (manifests, capabilities, templates, contracts, the install pipeline), `@openspindle/plugin-sdk` (what plugin authors build against), the main-process services in `electron/main/plugins/`, the frame runtime in `src/plugin-runtime/` and the workspace side in `src/platform/` (hosts), `src/app/plugin-host/` (the broker) and `src/features/plugins/` (manager, frames, dialogs).
 
@@ -12,10 +12,13 @@ A plugin is a folder (or repository) with `openspindle-plugin.json` at its root 
 - **Toolbar items**: icons over the viewer that open a program's form or one of the plugin's importer views. Hovering one shows its label, the plugin's name and what the program (or, for a view, the plugin) does.
 - **Views**: React views that run in a sandboxed frame, one bundle for all of a plugin's views: importers (in Add operation) and editors (for the plugin's operations).
 - **A companion**: a Node or native program the app starts and stops for the plugin's views, for work a sandboxed view cannot do (running a converter, for example). Its setup step can install what it needs, such as a converter from a package manager.
+- **Settings**: values the user sets on the plugin's card, which its companion receives, such as the path of a program it runs.
+
+Some plugins come with OpenSpindle: the [PCB plugin](pcb.md) is one. They are built and installed like any other (see [Plugins that come with OpenSpindle](#plugins-that-come-with-openspindle)).
 
 ## In the app
 
-- **Plugin manager** (the **Plugins** menu command, Add operation's **Manage plugins**, and the fix for missing plugins). It lists installed plugins with their version, source (repository and commit, or development folder), contents and granted permissions; each can be enabled or disabled, checked for an update (a repository's latest commit) or reloaded (a development folder), and removed. Plugins with a companion show its state and health, **Restart**, **Run setup** when it needs setup, and its log.
+- **Plugin manager** (the **Plugins** menu command, Add operation's **Manage plugins**, and the fix for missing plugins). It lists installed plugins with their version, source (repository and commit, development folder, or "Comes with OpenSpindle"), contents and granted permissions; each can be enabled or disabled, checked for an update (a repository's latest commit) or reloaded (a development folder), and removed. Plugins that come with OpenSpindle update with it and can only be disabled. A plugin's settings are on its card: a program's full path is stored with **Save** (an empty path clears it) or picked with **Choose…**, and OpenSpindle checks it is a program the user can run. Plugins with a companion show its state and health, **Restart**, **Run setup** when it needs setup and has a setup step, and its log.
 - **Installing.** Enter a public GitHub repository URL, or (for development) choose **Install from folder**. The plugin is downloaded or read and checked first; a review then shows its name, version (and the installed one for updates), source, each requested permission with its explanation (new ones marked for updates, dropped ones listed), a warning for companions with the programs they run, its views, programs, files and size. Nothing is installed until the review is confirmed; cancelling or closing discards it.
 - **Add operation** lists, next to NC files and the built-in probing operations (auto-level, auto Z-height and auto-scan), each enabled plugin's template programs (a parameter form that adds the operation) and importer views (the view runs in the dialog; the operations it creates are selected, and it closes the dialog when done). Toolbar items open the same program form or importer view directly.
 - **Operations** a plugin created (`plugin` operations) open the plugin's editor view in the operation inspector. The view stays mounted while the selection moves between that plugin's operations (its context's `operationId` changes), so work it started, such as a generation, finishes instead of being discarded. Template operations show their parameter form; **Apply** regenerates them, and an installed version newer than the one that generated them asks for **Update**. Operations whose plugin is not installed keep their data and NC; a warning with **Manage plugins** appears on them, and Prepare shows an **Install** banner for the selected plate.
@@ -28,10 +31,10 @@ A plugin is a folder (or repository) with `openspindle-plugin.json` at its root 
   "manifestVersion": 2,
   "id": "pcb",
   "name": "PCB",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Gerber and Excellon operations with pcb2gcode.",
   "apiVersion": 2,
-  "apiRevision": 2,
+  "apiRevision": 3,
   "permissions": ["workspace:read", "operations:write", "tools:read"],
   "ui": {
     "entry": "dist/view.js",
@@ -51,29 +54,31 @@ A plugin is a folder (or repository) with `openspindle-plugin.json` at its root 
     "activation": "on-view",
     "idleShutdownSeconds": 300
   },
-  "files": [
-    "vendor/darwin-arm64/bin/pcb2gcode",
-    "vendor/darwin-arm64/runtime.json",
-    "licenses/gtk+/COPYING"
-  ],
-  "executables": ["vendor/darwin-arm64/bin/pcb2gcode"],
-  "platforms": ["darwin-arm64"]
+  "settings": [
+    {
+      "id": "pcb2gcode",
+      "type": "executable",
+      "label": "pcb2gcode",
+      "description": "The pcb2gcode program, which you install yourself."
+    }
+  ]
 }
 ```
 
-| Field                                  | Meaning                                                                                                                                                                                                                                                              |
-| -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `manifestVersion`                      | `2`.                                                                                                                                                                                                                                                                 |
-| `id`, `name`, `version`, `description` | Lowercase kebab-case ID, `major.minor.patch` version (optionally with a prerelease suffix). The ID stays bound to the source it was first installed from.                                                                                                            |
-| `apiVersion`, `apiRevision`            | The plugin API the plugin targets. This host implements API 2, revision 2 and accepts only that: a plugin for another version or revision is refused, saying whether it or OpenSpindle needs an update.                                                              |
-| `permissions`                          | Capabilities the plugin asks for (below). Omitted means none.                                                                                                                                                                                                        |
-| `ui`                                   | The view bundle (`entry`, `.js`/`.mjs`), optional stylesheet (`styles`) and up to 8 views, each with an `id`, a `slot` (`process.importer` or `operation.editor`) and a `title`.                                                                                     |
-| `programs`                             | Template programs (below): up to 16 programs, 20 parameters each, 256 KiB per template, 1 MiB in total.                                                                                                                                                              |
-| `toolbar`                              | Up to 16 items with `id`, `label`, `icon` (`probe`, `grid`, `path`, `tool`, `pcb`) and exactly one of `programId` or `viewId`. Only importer views appear in the toolbar.                                                                                            |
-| `companion`                            | `runtime: "node"` with an `entry` (`.mjs` for an ES module, `.js`/`.cjs` for CommonJS), or `runtime: "native"` with `executables` per platform. Optional fixed `args`, `activation` (`on-demand` or `on-view`) and `idleShutdownSeconds` (10 to 86400, default 300). |
-| `files`                                | Other files the package ships (runtimes, licenses, assets). Program templates, the view bundle and styles, and the companion are included automatically.                                                                                                             |
-| `executables`                          | Files from `files` the companion runs (up to 64), installed with execute permission. Only plugins with a companion may list them. The review lists them.                                                                                                             |
-| `platforms`                            | Restricts the plugin to these platforms (`darwin-arm64`, `darwin-x64`, `linux-arm64`, `linux-x64`, `win32-arm64`, `win32-x64`).                                                                                                                                      |
+| Field                                  | Meaning                                                                                                                                                                                                                                                                        |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `manifestVersion`                      | `2`.                                                                                                                                                                                                                                                                           |
+| `id`, `name`, `version`, `description` | Lowercase kebab-case ID, `major.minor.patch` version (optionally with a prerelease suffix). The ID stays bound to the source it was first installed from.                                                                                                                      |
+| `apiVersion`, `apiRevision`            | The plugin API the plugin targets. This host implements API 2, revision 3 and accepts only that: a plugin for another version or revision is refused, saying whether it or OpenSpindle needs an update.                                                                        |
+| `permissions`                          | Capabilities the plugin asks for (below). Omitted means none.                                                                                                                                                                                                                  |
+| `ui`                                   | The view bundle (`entry`, `.js`/`.mjs`), optional stylesheet (`styles`) and up to 8 views, each with an `id`, a `slot` (`process.importer` or `operation.editor`) and a `title`.                                                                                               |
+| `programs`                             | Template programs (below): up to 16 programs, 20 parameters each, 256 KiB per template, 1 MiB in total.                                                                                                                                                                        |
+| `toolbar`                              | Up to 16 items with `id`, `label`, `icon` (`probe`, `grid`, `path`, `tool`, `pcb`) and exactly one of `programId` or `viewId`. Only importer views appear in the toolbar.                                                                                                      |
+| `companion`                            | `runtime: "node"` with an `entry` (`.mjs` for an ES module, `.js`/`.cjs` for CommonJS), or `runtime: "native"` with `executables` per platform. Optional fixed `args`, `activation` (`on-demand` or `on-view`) and `idleShutdownSeconds` (10 to 86400, default 300).           |
+| `settings`                             | Up to 16 values the user sets on the plugin's card, which its companion receives (below): each with an `id`, a `type` (`executable`: a program on this computer, by its full path), a `label` and an optional `description`. Only a plugin with a companion can have settings. |
+| `files`                                | Other files the package ships (runtimes, licenses, assets). Program templates, the view bundle and styles, and the companion are included automatically.                                                                                                                       |
+| `executables`                          | Files from `files` the companion runs (up to 64), installed with execute permission. Only plugins with a companion may list them. The review lists them.                                                                                                                       |
+| `platforms`                            | Restricts the plugin to these platforms (`darwin-arm64`, `darwin-x64`, `linux-arm64`, `linux-x64`, `win32-arm64`, `win32-x64`).                                                                                                                                                |
 
 Every path is package-relative and POSIX: segments of ASCII letters, digits, `_`, `-`, `+` and inner dots; no absolute paths, `..`, backslashes, URL escapes, hidden segments (a leading dot) or names Windows cannot store; paths that differ only by letter case are refused. The manifest is limited to 64 KiB, a view bundle to 4 MiB and its stylesheet to 1 MiB.
 
@@ -139,13 +144,19 @@ Grants are the manifest's permissions, reviewed at install. An update shows whic
 
 One pipeline (`validatePackage` in `@openspindle/plugin-core`) serves every source and host:
 
-1. **Open a source.** _GitHub_: `https://github.com/owner/repository`, optionally ending in `.git` or `/tree/<branch-or-tag>` (refs may contain slashes); private repositories, credentials, queries, fragments, other hosts and redirects are refused. The requested or default branch is resolved through the GitHub API to one immutable commit, and files are read from `raw.githubusercontent.com` at that commit with streamed size limits and request deadlines; public API rate limits and missing repositories show as errors. _Local folder_: a developer's working copy, recorded as `development: true`; files are read through symbolic links but never outside the folder.
+1. **Open a source.** _GitHub_: `https://github.com/owner/repository`, optionally ending in `.git` or `/tree/<branch-or-tag>` (refs may contain slashes); private repositories, credentials, queries, fragments, other hosts and redirects are refused. The requested or default branch is resolved through the GitHub API to one immutable commit, and files are read from `raw.githubusercontent.com` at that commit with streamed size limits and request deadlines; public API rate limits and missing repositories show as errors. _Local folder_: a developer's working copy, recorded as `development: true`; files are read through symbolic links but never outside the folder. _The app_: a plugin that comes with OpenSpindle, from the app's own files (below).
 2. **Read the manifest.** Plugins limited to other platforms, or without a companion for this one, are refused.
 3. **Read every declared file** within the source's limits (GitHub: 64 files, 4 MiB each, 16 MiB total; folders: 1024 files, 256 MiB each, 1 GiB total), check text files are UTF-8, check each template against its program's parameters, and record a SHA-256 **inventory** of every file plus a digest over it. Files stream into a staging folder instead of being installed.
 4. **Review** (see [In the app](#in-the-app)).
-5. **Confirm.** The staged package moves into place and the record is written; an update keeps the enabled state. A plugin ID stays bound to its source (the same repository, compared case-insensitively, or the same folder).
+5. **Confirm.** The staged package moves into place and the record is written; an update keeps the enabled state and the settings the new version still declares. A plugin ID stays bound to its source (the same repository, compared case-insensitively, or the same folder), and the ID of a plugin that comes with OpenSpindle belongs to it.
 
 Packages live in `userData/plugins/<id>/<version>/` with an `index.json` written atomically; interrupted installs leave only staging folders, which are cleared at start. Every file the app later uses (the view bundle, templates, the companion program) is read back and checked against the inventory, so a package changed after its review is refused ("reinstall the plugin"). Disabling keeps the files; removing deletes the package and the companion's data.
+
+### Plugins that come with OpenSpindle
+
+Their sources are in `plugins/<folder>/`, and they use only the SDK and the plugin API, as any plugin does. Every build of the app (`tools/vite/bundled-plugins.ts`, on the main process's build) builds each one as `openspindle-plugin build` would, its views from `ui/index.tsx` and its Node companion from the source that file names, into `out/plugins/<id>/`; packaged apps carry that folder among their resources, outside the app's archive.
+
+At start, once the index is read, the app passes each of them through the same pipeline (source `bundled`) without a review: they are part of the app. A package whose digest matches the installed one is left alone; a changed one (an app update) replaces it and keeps its enabled state and settings, as does any copy of that plugin ID installed from GitHub or a folder, and installing another plugin with that ID is refused. A plugin the app no longer comes with is removed. One that fails to install is logged, and the others are unaffected. They can be disabled but not removed, and they have no update check: they update with OpenSpindle.
 
 ## Views and the sandbox
 
@@ -201,7 +212,8 @@ A companion is a program on the user's computer, with the user's own file access
 
 - **Environment.** Only an allow-list of variables (`PATH`, `HOME`, locale and time zone, Windows system folders) plus `OPENSPINDLE_PLUGIN_ID`, `OPENSPINDLE_PLUGIN_VERSION`, `OPENSPINDLE_PLUGIN_ROOT` (the package, read-only), `OPENSPINDLE_PLUGIN_DATA` (private and persistent, also the working directory) and `OPENSPINDLE_PLUGIN_TMP` (emptied at start and stop; also `TMPDIR`/`TMP`/`TEMP`).
 - **Lifecycle.** `on-demand` companions start on the first call; `on-view` companions start when a view opens. Open views and running calls keep a companion alive; otherwise it stops after `idleShutdownSeconds`. Before starting, the program's bytes are checked against the inventory. Views receive every status change (`companion.status`).
-- **Handshake.** The app calls `openspindle.initialize` (API version, plugin identity, grants, folders, platform), then `health` (`ready`, `needs-setup` or `degraded`). `setup` runs only when asked (the manager's **Run setup**, or a view). Views call plugin-defined methods through `invoke`; an `RpcError` a method throws reaches the view with its code. `openspindle.shutdown` asks for a clean exit before the app ends the process.
+- **Handshake.** The app calls `openspindle.initialize` (API version, plugin identity, grants, settings, folders, platform), which answers whether the companion has a setup step, then `health` (`ready`, `needs-setup` or `degraded`). `setup` runs only when asked (the manager's **Run setup**, offered when there is a setup step, or a view). Views call plugin-defined methods through `invoke`; an `RpcError` a method throws reaches the view with its code. `openspindle.shutdown` asks for a clean exit before the app ends the process.
+- **Settings.** `openspindle.initialize` carries what the user set for the manifest's settings, by ID (a setting without a value is absent). Changing one restarts an enabled companion, so its health reflects the new value; a companion that needs a setting reports `needs-setup` until it has one that works, with a message saying where to set it.
 - **What a companion may call.** `host.log`, `host.progress` (shown as app progress while a view is open), `host.emit` (events for the plugin's open views) and, with `machine:read`, `machine.snapshot`. Nothing else.
 - **Failures.** A crash (the process exits or its channel closes) is counted; the next start waits 1, 2, 4 and then 8 seconds, and after 5 crashes within 10 minutes the companion stays stopped until it is restarted. Calls that were running fail with `UNAVAILABLE` and the reason. Each plugin keeps its last 500 log lines (lifecycle, `host.log`, stderr and stray stdout) for the plugin manager.
 - **Native protocol.** One JSON message per line, UTF-8, at most 64 MiB per line, in the `@openspindle/rpc` message format (`{ "rpc": 1, "kind": "call" | "result" | "error" | "cancel", ... }`). Lines that are not JSON are logged and skipped. Exit when stdin closes.
@@ -243,7 +255,7 @@ export default definePlugin({ views: { editor: Editor } })
 
   `source(none)` turns off Tailwind's automatic scanning of the whole project (its README, companion sources), so only the views' own folder is scanned. Numbers shown as values take `font-numeric`, as in the app: their digits and signs are set in Space Mono, while words and units stay in Space Grotesk. `MeasurementInput` and `ToolCard` already use it.
 
-- `serveCompanion({ methods, initialize?, health?, setup?, shutdown? })` from `@openspindle/plugin-sdk/companion`: the companion side of the protocol, over the utility-process port or NDJSON stdio (stdout is reserved for the protocol, so console output goes to stderr). It returns the host (`log`, `progress`, `emit`, `machineSnapshot`). `RpcError` (and `RpcErrorCode`) are re-exported there for coded failures.
+- `serveCompanion({ methods, initialize?, health?, setup?, shutdown? })` from `@openspindle/plugin-sdk/companion`: the companion side of the protocol, over the utility-process port or NDJSON stdio (stdout is reserved for the protocol, so console output goes to stderr). Methods, `health` and `setup` receive a context whose `info` is what `openspindle.initialize` sent, the settings among it. It returns the host (`log`, `progress`, `emit`, `machineSnapshot`). `RpcError` (and `RpcErrorCode`) are re-exported there for coded failures.
 - Vite presets from `@openspindle/plugin-sdk/vite`: `openSpindleView({ entry, outFile, stylesFile? })` builds the views as one ES module whose React, ReactDOM, SDK, UI kit and TanStack Query come from the frame global, compiled for the frame's production React whatever `NODE_ENV` the build runs under (`frameReact()`, which the app's own frame build uses too); `openSpindleCompanion({ entry, outFile })` bundles a Node companion into one file.
 - The `openspindle-plugin` CLI: `build [folder] [--view ui/index.tsx] [--companion <entry>]` (uses the plugin's own `vite.config`, for example for Tailwind CSS), `validate [folder]` (manifest, every declared file and the SHA-256 inventory; also checks an `openspindle-inventory.json` if present) and `pack [folder] [--out dist-plugin]` (copies exactly the package's files, executables with execute permission, plus `openspindle-inventory.json` into `<out>/<id>-<version>/`).
 
@@ -251,7 +263,7 @@ export default definePlugin({ views: { editor: Editor } })
 
 ## Host services
 
-The main process serves the `plugins.*` part of the host contract (`src/platform/contract/plugin-rpc.ts`) to the app window only: managing plugins (listing them, preparing an install or update from GitHub or a folder, confirming or discarding it, enabling and removing, with a `plugins.changed` event after every change), the verified view bundles and rendered template programs, and the plugin-scoped machine and companion services, each under the plugin's own principal.
+The main process serves the `plugins.*` part of the host contract (`src/platform/contract/plugin-rpc.ts`) to the app window only: managing plugins (listing them, preparing an install or update from GitHub or a folder, confirming or discarding it, enabling and removing, setting a setting, typed or chosen with a native dialog (`plugins.setSetting`, `plugins.chooseSetting`), with a `plugins.changed` event after every change), the verified view bundles and rendered template programs, and the plugin-scoped machine and companion services, each under the plugin's own principal.
 
 What views call there (`plugins.machine.*`, and `plugins.companion.call`, `status` and `setup`, which the plugin manager's **Run setup** uses too) counts against an in-flight budget of its own in the main process: 64 calls across all plugins. A machine read may wait for a running program to end and a companion call runs as long as the companion takes, with no timeout; once plugins keep 64 waiting, further ones fail with `BUSY`. The app's other calls, managing plugins among them, count against a budget of their own, and Stop is never refused.
 

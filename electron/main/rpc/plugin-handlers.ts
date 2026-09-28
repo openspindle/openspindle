@@ -43,6 +43,12 @@ export function createPluginHandlers(
         await platform.remove(pluginId)
         return null
       },
+      "plugins.setSetting": ({ pluginId, settingId, value }) =>
+        platform.setSetting(pluginId, settingId, value),
+      "plugins.chooseSetting": async ({ pluginId, settingId }) => {
+        const plugin = await platform.chooseSetting(pluginId, settingId)
+        return plugin ? { status: "chosen", plugin } : { status: "canceled" }
+      },
       "plugins.readBundle": ({ pluginId }) => platform.readBundle(pluginId),
       "plugins.renderProgram": ({ pluginId, programId, values }) =>
         platform.renderProgram(pluginId, programId, values),

@@ -347,6 +347,16 @@ export const ProgramFileSchema = z.strictObject({
   text: ProgramTextSchema,
 })
 
+/**
+ * What the user set for a plugin's settings, by setting ID; a setting without a value is
+ * absent. An executable is the program's full path.
+ */
+export const SettingValuesSchema = z.partialRecord(
+  z.string().max(64),
+  z.string().min(1).max(4096)
+)
+export type SettingValues = z.infer<typeof SettingValuesSchema>
+
 /** Plugin-defined companion method names. */
 export const CompanionMethodSchema = z
   .string()
@@ -373,6 +383,8 @@ export const COMPANION_STATES = [
 export const CompanionStatusSchema = z.object({
   state: z.enum(COMPANION_STATES),
   health: CompanionHealthSchema.nullable(),
+  /** Whether the companion has a setup step (Run setup); known once it has started. */
+  setup: z.boolean(),
   restarts: z.int().nonnegative(),
   lastError: z.string().nullable(),
   /** When the next automatic start is allowed during backoff. */

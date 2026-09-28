@@ -13,6 +13,7 @@ import {
   PluginIdSchema,
   PluginIdentitySchema,
   ProgressSchema,
+  SettingValuesSchema,
   Sha256Schema,
   VersionSchema,
   ViewDeclarationSchema,
@@ -43,6 +44,8 @@ export const PluginSummarySchema = z.object({
   files: z.int().nonnegative(),
   bytes: z.int().nonnegative(),
   digest: Sha256Schema,
+  /** What the user set for the manifest's settings. */
+  settings: SettingValuesSchema,
   /** Null when the plugin has no companion. */
   companion: CompanionStatusSchema.nullable(),
 })
@@ -64,6 +67,7 @@ export function pluginSummary(
     files: record.inventory.length,
     bytes: record.inventory.reduce((total, entry) => total + entry.bytes, 0),
     digest: record.digest,
+    settings: record.settings,
     companion,
   }
 }
@@ -83,6 +87,12 @@ export const PrepareInstallResultSchema = z.discriminatedUnion("status", [
   z.object({ status: z.literal("review"), review: InstallReviewSchema }),
 ])
 export type PrepareInstallResult = z.infer<typeof PrepareInstallResultSchema>
+
+export const ChooseSettingResultSchema = z.discriminatedUnion("status", [
+  z.object({ status: z.literal("canceled") }),
+  z.object({ status: z.literal("chosen"), plugin: PluginSummarySchema }),
+])
+export type ChooseSettingResult = z.infer<typeof ChooseSettingResultSchema>
 
 /** What a plugin frame is started with; read and verified against the inventory. */
 export const PluginBundleSchema = z.object({
@@ -150,6 +160,25 @@ export const pluginMethods = {
     timeoutMs: 30_000,
   },
   "plugins.remove": { params: PluginRef, result: z.null(), timeoutMs: 30_000 },
+  // Checks the value and restarts the plugin's companion with it.
+  "plugins.setSetting": {
+    params: z.strictObject({
+      pluginId: PluginIdSchema,
+      settingId: z.string().max(64),
+      value: z.string().max(4096).nullable(),
+    }),
+    result: PluginSummarySchema,
+    timeoutMs: 60_000,
+  },
+  // Waits on a native dialog, then stores what was chosen as setSetting does.
+  "plugins.chooseSetting": {
+    params: z.strictObject({
+      pluginId: PluginIdSchema,
+      settingId: z.string().max(64),
+    }),
+    result: ChooseSettingResultSchema,
+    timeoutMs: 0,
+  },
   "plugins.readBundle": {
     params: PluginRef,
     result: PluginBundleSchema,

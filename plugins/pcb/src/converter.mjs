@@ -11,7 +11,7 @@ import {
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { inputs, parameters, LIMITS } from "./manifest.mjs"
-import { findRuntime, runProcess } from "./runtime.mjs"
+import { runProcess } from "./runtime.mjs"
 import { pluginVersion } from "./version.mjs"
 
 export class InputError extends Error {}
@@ -296,17 +296,13 @@ export function augmentProgram(source, label, request) {
   ].join("\n")
 }
 
-/**
- * Converts Gerber/Excellon text with pcb2gcode. Without an `executable`, Homebrew's
- * pcb2gcode is found and checked first.
- */
+/** Converts Gerber/Excellon text with the pcb2gcode program at `executable`. */
 export async function generate(
   input,
   { executable, runner = runProcess, signal, timeout = LIMITS.timeout } = {}
 ) {
   const request = validateRequest(input)
   const { files, parameters } = request
-  executable ??= (await findRuntime({ signal })).executable
   const work = await mkdtemp(join(tmpdir(), "openspindle-pcb-"))
   try {
     const drills = files.filter((file) => file.role === "drill")

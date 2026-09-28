@@ -24,6 +24,10 @@ export function electronPlugins(peer: Peer<HostContract>): PluginHost {
     remove: async (pluginId) => {
       await peer.call("plugins.remove", { pluginId })
     },
+    setSetting: (pluginId, settingId, value) =>
+      peer.call("plugins.setSetting", { pluginId, settingId, value }),
+    chooseSetting: (pluginId, settingId) =>
+      peer.call("plugins.chooseSetting", { pluginId, settingId }),
     readBundle: (pluginId) => peer.call("plugins.readBundle", { pluginId }),
     renderProgram: (pluginId, programId, values) =>
       peer.call("plugins.renderProgram", { pluginId, programId, values }),

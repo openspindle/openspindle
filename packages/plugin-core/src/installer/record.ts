@@ -5,6 +5,8 @@ import {
   diffPermissions,
 } from "../capabilities.ts"
 import type { Capability } from "../capabilities.ts"
+import { SettingValuesSchema } from "../dto.ts"
+import type { SettingValues } from "../dto.ts"
 import { fail } from "../errors.ts"
 import {
   ManifestSchema,
@@ -31,6 +33,8 @@ export const InstalledPluginRecordSchema = z
     installedAt: z.iso.datetime(),
     /** Granted at install from the manifest's permissions; never widened at runtime. */
     grants: z.array(CapabilitySchema),
+    /** What the user set for the manifest's settings; an update keeps them. */
+    settings: SettingValuesSchema.default({}),
   })
   .superRefine((record, context) => {
     if (
@@ -50,6 +54,15 @@ export const InstalledPluginRecordSchema = z
         code: "custom",
         message: "Grants must be permissions the manifest requests.",
       })
+    if (
+      Object.keys(record.settings).some(
+        (id) => !record.manifest.settings.some((setting) => setting.id === id)
+      )
+    )
+      context.addIssue({
+        code: "custom",
+        message: "Settings must be ones the manifest declares.",
+      })
   })
 export type InstalledPluginRecord = z.infer<typeof InstalledPluginRecordSchema>
 
@@ -67,14 +80,21 @@ export function assertInstallable(
     )
 }
 
-/** Everything granted is what the manifest asks for; there are no per-call prompts. */
+/**
+ * Everything granted is what the manifest asks for; there are no per-call prompts. The
+ * settings are the ones the plugin had, less those its manifest no longer declares.
+ */
 export function createInstalledRecord(
   validated: ValidatedPackage,
   options: {
     readonly installedAt: Date
     readonly enabled: boolean
+    readonly settings: SettingValues
   }
 ): InstalledPluginRecord {
+  const declared = new Set(
+    validated.manifest.settings.map((setting) => setting.id)
+  )
   return parseWith(InstalledPluginRecordSchema, {
     id: validated.manifest.id,
     version: validated.manifest.version,
@@ -85,6 +105,9 @@ export function createInstalledRecord(
     enabled: options.enabled,
     installedAt: options.installedAt.toISOString(),
     grants: validated.manifest.permissions,
+    settings: Object.fromEntries(
+      Object.entries(options.settings).filter(([id]) => declared.has(id))
+    ),
   })
 }
 

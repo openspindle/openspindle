@@ -24,6 +24,8 @@ export const PackageOriginSchema = z.discriminatedUnion("kind", [
     path: z.string().min(1).max(4096),
     development: z.literal(true),
   }),
+  /** A plugin that comes with the app, installed from the app's own files. */
+  z.strictObject({ kind: z.literal("bundled") }),
 ])
 export type PackageOrigin = z.infer<typeof PackageOriginSchema>
 
@@ -43,11 +45,16 @@ export interface PackageReader {
   readFile: (path: string, maxBytes: number) => Promise<Uint8Array>
 }
 
-/** The same identity means the same owner: one repository, or one development folder. */
-export const originIdentity = (origin: PackageOrigin) =>
-  origin.kind === "github"
-    ? `github:${origin.repository.toLowerCase()}`
-    : `folder:${origin.path}`
+/**
+ * The same identity means the same owner: one repository, one development folder, or the
+ * app itself.
+ */
+export function originIdentity(origin: PackageOrigin): string {
+  if (origin.kind === "github")
+    return `github:${origin.repository.toLowerCase()}`
+  if (origin.kind === "folder") return `folder:${origin.path}`
+  return "bundled"
+}
 
 /**
  * A host's access to one local folder. Implementations resolve paths inside the folder
@@ -59,21 +66,40 @@ export interface FolderPort {
   readFile: (path: string, maxBytes: number) => Promise<Uint8Array>
 }
 
-/** Development folders may carry larger packages, such as a bundled runtime. */
+/**
+ * Local folders (a developer's working copy, or a plugin that comes with the app) may carry
+ * larger packages, such as a converter's runtime.
+ */
 export const FOLDER_PACKAGE_LIMITS = {
   files: 1024,
   fileBytes: 256 * 1024 * 1024,
   totalBytes: 1024 * 1024 * 1024,
 } as const
 
-/** A developer's working copy, installed as a development package. */
-export function openFolderSource(folder: FolderPort): PackageReader {
+function folderReader(
+  folder: FolderPort,
+  origin: PackageOrigin
+): PackageReader {
   return {
-    origin: { kind: "folder", path: folder.path, development: true },
+    origin,
     limits: FOLDER_PACKAGE_LIMITS,
     readFile: (path, maxBytes) => {
       if (!isPackagePath(path)) fail(`${path} is not a valid package path.`)
       return folder.readFile(path, maxBytes)
     },
   }
+}
+
+/** A developer's working copy, installed as a development package. */
+export function openFolderSource(folder: FolderPort): PackageReader {
+  return folderReader(folder, {
+    kind: "folder",
+    path: folder.path,
+    development: true,
+  })
+}
+
+/** A plugin that comes with the app, read from the app's own files. */
+export function openBundledSource(folder: FolderPort): PackageReader {
+  return folderReader(folder, { kind: "bundled" })
 }

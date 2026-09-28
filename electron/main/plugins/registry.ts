@@ -24,6 +24,7 @@ import type {
 import { nodeSha256 } from "@openspindle/plugin-sdk/node"
 import { z } from "zod"
 import { writeFileAtomic } from "../services/atomic-write"
+import { declaredSetting } from "./settings"
 
 const INDEX_FILE = "index.json"
 const STAGING = ".staging"
@@ -211,6 +212,29 @@ export class PluginRegistry {
   setEnabled(id: string, enabled: boolean): Promise<InstalledPluginRecord> {
     return this.mutate(async () => {
       const record = { ...this.require(id), enabled }
+      this.records.set(id, record)
+      await this.writeIndex()
+      return record
+    })
+  }
+
+  /**
+   * Sets the value of one of the plugin's settings, or clears it (null). The setting is
+   * checked against the record this replaces, which an update may have changed meanwhile.
+   */
+  setSetting(
+    id: string,
+    settingId: string,
+    value: string | null
+  ): Promise<InstalledPluginRecord> {
+    return this.mutate(async () => {
+      const current = this.require(id)
+      declaredSetting(current, settingId)
+      const settings = Object.fromEntries(
+        Object.entries(current.settings).filter(([key]) => key !== settingId)
+      )
+      if (value !== null) settings[settingId] = value
+      const record = { ...current, settings }
       this.records.set(id, record)
       await this.writeIndex()
       return record

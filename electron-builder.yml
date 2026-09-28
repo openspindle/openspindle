@@ -5,6 +5,8 @@ directories:
   output: release
 files:
   - out/**
+  # Shipped among the resources instead (below).
+  - "!out/plugins/**"
 # The About panel's credits, which production builds keep in build/third-party-notices.json, and the
 # licenses of Electron and of the Chromium, Node.js and other software it includes, which they refer to.
 extraResources:
@@ -12,6 +14,10 @@ extraResources:
     to: third-party-notices.json
   - from: node_modules/electron/dist/LICENSE
     to: LICENSE.electron.txt
+  # The plugins that come with the app, which it installs from here at start: one package
+  # folder each, as tools/vite/bundled-plugins.ts builds them.
+  - from: out/plugins
+    to: plugins
 # Writes LICENSES.chromium.txt: Electron's LICENSES.chromium.html (20 MB) with each text it repeats
 # printed once, about 1.5 MB.
 afterPack: ./tools/packaging/chromium-licenses.ts

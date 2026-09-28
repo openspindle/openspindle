@@ -21,7 +21,7 @@ OpenSpindle is a desktop app for preparing, checking and running jobs on a Maker
 - Machine controls, the machine's camera and its height map
 - A tool library with Fusion 360 import and Makera, Genmitsu, SpeTool, Dreanique and FoxAlien catalogs
 - STEP-NC project files, and NC export with the plate's setup
-- Sandboxed plugins, such as the PCB plugin for KiCad Gerber and Excellon files
+- Sandboxed plugins, and the PCB plugin for KiCad Gerber and Excellon files, which runs the pcb2gcode you install
 - Error reports and logs under your control; no account or cloud service
 - A signed and notarized app for Apple silicon and Intel Macs that updates itself
 
@@ -57,6 +57,7 @@ If something behaves differently, **Help › Export Protocol Trace…** saves th
 ## Documentation
 
 - [Auto-level](docs/auto-level.md), [auto Z-height](docs/auto-z-height.md) and [auto-scan](docs/auto-scan.md)
+- [PCB operations](docs/pcb.md) from KiCad Gerber and Excellon files, and setting up pcb2gcode
 - [Stored anchors](docs/stored-anchors.md), [models](docs/models.md) and [design rules](docs/design-rules.md)
 - [Device controls](docs/device-controls.md), [running programs](docs/device-jobs.md) and [the height map](docs/device-height-map.md)
 - [Project files](docs/step-nc-projects.md) and [exported NC](docs/plate-definition.md)

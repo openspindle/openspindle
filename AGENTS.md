@@ -39,6 +39,7 @@ OpenSpindle is an Electron desktop app for preparing and running jobs on a Maker
 See docs/architecture.md. In short:
 
 - `src/machine` is the machine domain: host-agnostic (no React, TanStack, Electron or Node imports), relative `.ts` imports, host capabilities through `core/ports.ts`. It runs in Electron main and the Z1 simulator; the renderer uses only `src/machine/contract`.
+- `plugins/<folder>` holds the plugins that come with the app, such as the PCB plugin. They are plugins like any other: they use only the plugin SDK and the plugin API, and every build of the app builds and bundles them (docs/plugins.md). Vendor tools such as pcb2gcode are the user's own install, chosen in the plugin's settings; the app ships none.
 - `src/domain` is the pure workspace domain (plates, operations and their kinds, tools, fixtures and machine kits, compile, the probing operations). Every workspace change is a `WorkspaceCommand` handled by `applyCommand`; add a command rather than mutating state elsewhere. New operation sources register a kind in `src/domain/operations/kinds.ts`.
 - `src/formats` holds file formats, `src/persistence` the versioned repositories, `src/platform` the Host abstraction and RPC clients, `src/app` application state (TanStack stores, diagnostics, the plugin broker).
 - `src/features/<feature>` holds UI; `src/routes` stays thin. Dialogs are opened through the typed dialog atom in `src/features/shell/dialogs.ts` and rendered by the dialog host.

@@ -4,6 +4,7 @@ import {
   assertInstallable,
   createInstallReview,
   createInstalledRecord,
+  openBundledSource,
   openFolderSource,
   openGitHubSource,
   validatePackage,
@@ -49,7 +50,8 @@ export type InstallerOptions = {
 /**
  * Two-phase installs through the shared plugin-core pipeline: prepare downloads (GitHub,
  * at a pinned commit) or reads (a development folder), validates and stages the package
- * and returns a review; only a confirmed review is recorded and granted.
+ * and returns a review; only a confirmed review is recorded and granted. Plugins that come
+ * with the app pass the same pipeline without a review.
  */
 export class PluginInstaller {
   private readonly reviews = new Map<string, PendingReview>()
@@ -73,6 +75,11 @@ export class PluginInstaller {
   /** Reads the plugin's source again: the repository's latest commit, or the folder. */
   prepareUpdate(record: InstalledPluginRecord): Promise<PrepareInstallResult> {
     const { source } = record
+    if (source.kind === "bundled")
+      throw new RpcError(
+        "INVALID_PARAMS",
+        `${record.manifest.name} comes with OpenSpindle and updates with it.`
+      )
     return this.exclusive((signal) =>
       this.open(
         source.kind === "github"
@@ -101,11 +108,50 @@ export class PluginInstaller {
           createInstalledRecord(validated, {
             installedAt: new Date(),
             enabled: existing?.enabled ?? true,
+            settings: existing?.settings ?? {},
           })
         )
       })
     } catch (error) {
       await this.options.registry.discard(pending.staged)
+      throw error
+    }
+  }
+
+  /**
+   * Installs a plugin that comes with the app, from the app's own files and without a
+   * review: it is part of the app. It owns its ID, replacing any other copy of the plugin.
+   * An unchanged package is left alone; a changed one (an app update) keeps its enabled
+   * state and settings. Resolves with the plugin's ID.
+   */
+  async installBundled(folder: string): Promise<string> {
+    const reader = openBundledSource(await openNodeFolder(folder))
+    const options = { platform: this.options.platform, sha256: nodeSha256 }
+    const { manifest, digest } = await validatePackage(reader, options)
+    await this.options.registry.ready
+    const existing = this.options.registry.get(manifest.id)
+    if (existing?.source.kind === "bundled" && existing.digest === digest)
+      return manifest.id
+    const staged = await this.options.registry.stage()
+    try {
+      const validated = await validatePackage(reader, {
+        ...options,
+        sink: staged.sink,
+      })
+      await this.options.registry.withLock(manifest.id, async () => {
+        await this.options.beforeCommit(manifest.id)
+        await this.options.registry.commit(
+          staged,
+          createInstalledRecord(validated, {
+            installedAt: new Date(),
+            enabled: existing?.enabled ?? true,
+            settings: existing?.settings ?? {},
+          })
+        )
+      })
+      return manifest.id
+    } catch (error) {
+      await this.options.registry.discard(staged)
       throw error
     }
   }

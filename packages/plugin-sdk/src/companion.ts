@@ -35,7 +35,10 @@ export type CompanionHost = {
 
 export type CompanionContext = CallContext & {
   readonly host: CompanionHost
-  /** The plugin, its grants and its private data and temporary folders. */
+  /**
+   * The plugin, its grants, what the user set for its settings (changing one restarts the
+   * companion) and its private data and temporary folders.
+   */
   readonly info: CompanionInitialize
 }
 

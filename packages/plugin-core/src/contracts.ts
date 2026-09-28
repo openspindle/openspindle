@@ -26,6 +26,7 @@ import {
   PlateIdSchema,
   ProgramFileSchema,
   ProgressSchema,
+  SettingValuesSchema,
   ToolChoiceRequestSchema,
   ToolChoiceSchema,
   ToolSchema,
@@ -229,6 +230,8 @@ export const CompanionInitializeSchema = z.strictObject({
   api: z.strictObject({ version: z.int(), revision: z.int() }),
   plugin: z.strictObject({ id: PluginIdSchema, version: VersionSchema }),
   grants: z.array(CapabilitySchema),
+  /** What the user set for the manifest's settings; changing one restarts the companion. */
+  settings: SettingValuesSchema,
   paths: z.strictObject({
     /** The installed package; treat it as read-only. */
     package: z.string(),
