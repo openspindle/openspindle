@@ -182,12 +182,12 @@
           "description": "Recommended cutting parameters from the W2B listing, supplied by the user."
         },
         {
-          "path": "resources/dreanique/sp1f-dimensions.avif",
+          "path": "resources/dreanique/SP1F-dimensions.avif",
           "sha256": "d567a6956f844d5a9d4ee74cbcd81e86bcceee9162bd29087941389b1b004026",
           "description": "SP1F dimension table, supplied by the user."
         },
         {
-          "path": "resources/dreanique/sp1f-cutting-parameters.avif",
+          "path": "resources/dreanique/SP1F-cutting-parameters.avif",
           "sha256": "75851051f2fd1d6f97ab5b482452abf00d13a1a8d781f228d3011f407c218414",
           "description": "The SP1F listing's cutting parameters in two groups (wood and plastic; acrylic, aluminium and copper), supplied by the user; not used for the presets."
         },
