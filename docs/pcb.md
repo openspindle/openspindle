@@ -12,11 +12,13 @@ It is a plugin like any other ([plugins](plugins.md)): both views run in sandbox
 
 ## pcb2gcode
 
-OpenSpindle does not include pcb2gcode: install it, then tell the plugin where it is. With [Homebrew](https://brew.sh), `brew install pcb2gcode` installs it as `/opt/homebrew/bin/pcb2gcode` (`/usr/local/bin/pcb2gcode` on an Intel Mac). The plugin is tested with pcb2gcode 3.0.4.
+OpenSpindle does not include pcb2gcode: install it, with [Homebrew](https://brew.sh) for example (`brew install pcb2gcode`). The plugin is tested with pcb2gcode 3.0.4.
 
-In **Plugins…**, the PCB plugin's card has a **pcb2gcode** setting: enter the program's full path and choose **Save**, or choose **Choose…** and select the program (the dialog shows hidden folders such as `/opt`). OpenSpindle checks that it is a program you can run and keeps the path as entered, so Homebrew's link keeps working when pcb2gcode is upgraded. The companion then restarts and runs `pcb2gcode --version`: the card shows **Ready** with the version. An empty path clears the setting.
+In **Plugins…**, the PCB plugin's card has a **pcb2gcode** setting. While it is empty, the plugin looks for pcb2gcode where Homebrew installs it: `/opt/homebrew/bin/pcb2gcode` (Apple silicon), then `/usr/local/bin/pcb2gcode` (Intel Macs, where builds from source install it too). It uses the first one that belongs to you or the system (owned by you or root), that no other user can change, and that runs `pcb2gcode --version` and reports a version, and the card says so: "pcb2gcode 3.0.4 at /opt/homebrew/bin/pcb2gcode, found automatically". Nothing else is searched, not even the `PATH` (apps opened from the Dock get only the system's part of it), so another account's install, or a program elsewhere, is only used when you choose it.
 
-Until the setting names a pcb2gcode that runs, the companion reports that it **needs setup**, the card and the PCB editor say why, and operations wait instead of failing. A program that fails `--version` or reports no version is refused the same way; a program that reports one is shown with it, so a wrong choice shows on the card.
+To use another pcb2gcode, enter its full path and choose **Save**, or choose **Choose…** and select it (the dialog shows hidden folders such as `/opt`). OpenSpindle checks that it is a program you can run and keeps the path as entered, so a link such as Homebrew's keeps working when pcb2gcode is upgraded. A path in the setting always wins, also when it does not run. The companion then restarts and runs `pcb2gcode --version`: the card shows **Ready** with the version. An empty path goes back to looking for it.
+
+Until a pcb2gcode that runs is set or found, the companion reports that it **needs setup**, the card and the PCB editor say why, and operations wait instead of failing. After installing pcb2gcode while OpenSpindle is open, choose **Check again** in the PCB editor, or **Run setup** on the plugin's card. A program that fails `--version` or reports no version is refused the same way; a program that reports one is shown with it, so a wrong choice shows on the card.
 
 pcb2gcode is distributed by its authors under GPL-3.0-or-later. The companion runs it as a separate program, and pcb2gcode, Homebrew and KiCad do not endorse this integration.
 
@@ -47,7 +49,7 @@ The plugin requests metric input/output, disables implicit `millproject` files, 
 
 ## How pcb2gcode runs
 
-Jobs run one at a time in temporary directories inside the companion's private temporary folder, with bounded inputs (8 MiB per file), output, logs and a two-minute time limit, and with only fixed flags and checked values: no shell, configuration files or extra pcb2gcode options. Cancelling an update (for example by editing again) or stopping the companion ends its pcb2gcode process. The companion accepts file contents, never file paths, URLs or shell commands; the only program it runs is the one the setting names.
+Jobs run one at a time in temporary directories inside the companion's private temporary folder, with bounded inputs (8 MiB per file), output, logs and a two-minute time limit, and with only fixed flags and checked values: no shell, configuration files or extra pcb2gcode options. Cancelling an update (for example by editing again) or stopping the companion ends its pcb2gcode process. The companion accepts file contents, never file paths, URLs or shell commands; the only program it runs is the one the setting names or, while it names none, the one found where Homebrew installs it (above).
 
 ## Developing
 
@@ -57,9 +59,9 @@ The plugin's sources are in `plugins/pcb/`, and it builds against the plugin SDK
 | ------------------------- | ---------------------------------------------------------------------------------------------- |
 | `openspindle-plugin.json` | The manifest: permissions, views, toolbar item, companion and the pcb2gcode setting.           |
 | `ui/`                     | The views (`definePlugin` in `ui/index.tsx`), with Tailwind CSS.                               |
-| `src/companion.mjs`       | The companion (`serveCompanion`): `health` and `generate`.                                     |
+| `src/companion.mjs`       | The companion (`serveCompanion`): `health`, `setup` (which looks again) and `generate`.        |
 | `src/converter.mjs`       | The conversion core: request validation, pcb2gcode arguments, output checks and program notes. |
-| `src/runtime.mjs`         | Checks the chosen pcb2gcode, and runs programs within limits.                                  |
+| `src/runtime.mjs`         | Finds the chosen or installed pcb2gcode and checks it, and runs programs within limits.        |
 | `src/manifest.mjs`        | The recognized inputs and pcb2gcode parameters, shared by the views and the companion.         |
 
 Every build of the app builds it (`tools/vite/bundled-plugins.ts`) into `out/plugins/pcb/`, which packaged apps carry among their resources, and the app installs it from there at start ([plugins](plugins.md#plugins-that-come-with-openspindle)). `npm run dev` builds it once as it starts, so restart it after changing the plugin. Bump the manifest's version when the plugin changes what it generates: every program names it.
@@ -70,6 +72,6 @@ The views call one companion method with `companion.call`:
 | ---------- | -------------------------------------------------------------------- | -------------------------------------------------------------- |
 | `generate` | `{ schemaVersion: 1, files: [{ role, name, content }], parameters }` | `{ schemaVersion: 1, programs: [{ name, source }], warnings }` |
 
-Failures carry a code: `INVALID_PARAMS` for a request or file the plugin refuses (a value out of range, or a program with several tool slots, whose `data` is `{ reason: "multiple-tool-slots", slots }`), `UNAVAILABLE` when pcb2gcode cannot run, `CANCELLED` when the update is cancelled or the companion stops, and `FAILED` when pcb2gcode fails. `health` reports `ready` (with the version), `needs-setup` (no pcb2gcode chosen, or the program chosen does not run) or `degraded`; the companion has no setup step. Operation data is `schemaVersion: 1`: the file, explicit values, generated values, tool, preset and a refusal reason.
+Failures carry a code: `INVALID_PARAMS` for a request or file the plugin refuses (a value out of range, or a program with several tool slots, whose `data` is `{ reason: "multiple-tool-slots", slots }`), `UNAVAILABLE` when pcb2gcode cannot run, `CANCELLED` when the update is cancelled or the companion stops, and `FAILED` when pcb2gcode fails. `health` reports `ready` (with the version, and where it was found when it was), `needs-setup` (no pcb2gcode chosen or found, or the one there does not run) or `degraded`; `setup` looks for pcb2gcode again and reports its health. Operation data is `schemaVersion: 1`: the file, explicit values, generated values, tool, preset and a refusal reason.
 
 References: [pcb2gcode v3.0.4 options](https://github.com/pcb2gcode/pcb2gcode/blob/v3.0.4/src/options.cpp) and [KiCad Gerber and drill output](https://docs.kicad.org/9.0/en/pcbnew/pcbnew.html#fabrication-outputs).

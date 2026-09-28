@@ -1,12 +1,13 @@
 import { RpcError, serveCompanion } from "@openspindle/plugin-sdk/companion"
 import { InputError, MultipleToolSlotsError, generate } from "./converter.mjs"
-import { RuntimeError, SetupNeededError, checkRuntime } from "./runtime.mjs"
+import { RuntimeError, SetupNeededError, findRuntime } from "./runtime.mjs"
 
 /*
  * The PCB plugin's companion. OpenSpindle starts it while a PCB view is open and calls it
  * over a private channel; the views reach it only through companion.call. It runs the
- * pcb2gcode chosen in the plugin's settings one job at a time (choosing another restarts
- * it), and never talks to a machine.
+ * pcb2gcode chosen in the plugin's settings (choosing another restarts it), or while none
+ * is chosen the one found where it is usually installed, one job at a time. It never talks
+ * to a machine.
  */
 
 let verification = null
@@ -35,9 +36,9 @@ function coded(error) {
   return error
 }
 
-/** The chosen pcb2gcode: checked once per start, and again after a failure. */
+/** The chosen or found pcb2gcode: checked once per start, and again after a failure. */
 function runtime({ info }) {
-  verification ??= checkRuntime(info.settings.pcb2gcode, {
+  verification ??= findRuntime(info.settings.pcb2gcode, {
     signal: lifetime.signal,
   }).catch((error) => {
     verification = null
@@ -72,11 +73,16 @@ async function exclusive(signal, run) {
   }
 }
 
-/** Ready once the chosen pcb2gcode runs, naming its version. */
+/** Ready once the chosen or found pcb2gcode runs, with its version and where it was found. */
 async function health(context) {
   try {
-    const { version } = await runtime(context)
-    return { status: "ready", message: `pcb2gcode ${version}` }
+    const { executable, version, found } = await runtime(context)
+    return {
+      status: "ready",
+      message: found
+        ? `pcb2gcode ${version} at ${executable}, found automatically`
+        : `pcb2gcode ${version}`,
+    }
   } catch (error) {
     return {
       status: error instanceof SetupNeededError ? "needs-setup" : "degraded",
@@ -95,6 +101,11 @@ process.once("SIGTERM", () => {
 
 serveCompanion({
   health,
+  /** Looks for pcb2gcode again, after installing it for example. */
+  setup(context) {
+    verification = null
+    return health(context)
+  },
   shutdown: stopJobs,
   methods: {
     /**

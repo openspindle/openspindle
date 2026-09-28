@@ -42,7 +42,7 @@
       "id": "pcb2gcode",
       "type": "executable",
       "label": "pcb2gcode",
-      "description": "The pcb2gcode program, which you install yourself. With Homebrew, run brew install pcb2gcode and choose /opt/homebrew/bin/pcb2gcode (/usr/local/bin/pcb2gcode on an Intel Mac)."
+      "description": "The pcb2gcode program, which you install yourself. While this is empty, the one Homebrew installs (brew install pcb2gcode) is found automatically; enter a path to use another."
     }
   ]
 }

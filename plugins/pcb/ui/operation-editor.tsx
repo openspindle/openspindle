@@ -354,8 +354,9 @@ export function OperationEditor({
   )
   const inactive = disabled || readingSource || choosingTool
   const companionStatus = companion.status.data
-  // Until pcb2gcode is chosen in the plugin's settings and runs, updates wait instead of
-  // failing; a new choice restarts the companion, whose status then says it is ready.
+  // Until a pcb2gcode is chosen in the plugin's settings or found, and runs, updates wait
+  // instead of failing. A new choice restarts the companion and Check again looks again;
+  // either way its status then says it is ready.
   const needsSetup = companionStatus?.health?.status === "needs-setup"
   const canGenerate =
     !!group &&
@@ -807,7 +808,25 @@ export function OperationEditor({
   return (
     <div className="flex min-w-0 flex-col gap-5">
       {companionProblem && (
-        <FieldDescription role="alert">{companionProblem}</FieldDescription>
+        <div className="flex flex-col gap-2">
+          <FieldDescription role="alert">{companionProblem}</FieldDescription>
+          {companion.setup.error && (
+            <FieldDescription role="alert">
+              {companion.setup.error.message}
+            </FieldDescription>
+          )}
+          {needsSetup && (
+            <Button
+              type="button"
+              variant="outline"
+              className="self-start"
+              disabled={companion.setup.isPending}
+              onClick={() => companion.setup.mutate()}
+            >
+              {companion.setup.isPending ? "Checking…" : "Check again"}
+            </Button>
+          )}
+        </div>
       )}
       <form
         className="flex flex-col gap-5"
