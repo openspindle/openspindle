@@ -151,8 +151,12 @@ export class PlatePath {
     )
     this.workArea.emphasize(state.active)
     this.probes.present(state)
+    // While playback simulates the moves the tool is on the move under way, even where the step
+    // on show ends the program, such as a firmware routine on the program's last line.
     this.toolpath.showTool(
-      state.active && state.progress < 100 ? count : null,
+      state.active && (playhead !== null || state.progress < 100)
+        ? count
+        : null,
       playhead ? null : (state.previewLine ?? null),
       playhead
     )

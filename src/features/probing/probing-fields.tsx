@@ -304,7 +304,13 @@ export function PlacementFields({
         : []),
     ]
     const z = value.offset?.z
-    const toAnchor = (id: string, x: number, y: number, h = z) =>
+    // The height is always passed: an emptied Z is undefined, which must clear it.
+    const toAnchor = (
+      id: string,
+      x: number,
+      y: number,
+      h: number | undefined
+    ) =>
       setPlacement({
         kind: "anchor",
         anchorId: id,
@@ -336,7 +342,7 @@ export function PlacementFields({
                 value.kind === "anchor"
                   ? value.offset
                   : (lastAnchor?.offset ?? { x: 0, y: 0 })
-              toAnchor(reference, x, y)
+              toAnchor(reference, x, y, z)
             }}
             onPointChange={({ X = 0, Y = 0, Z }) => {
               if (value.kind === "anchor") toAnchor(value.anchorId, X, Y, Z)
