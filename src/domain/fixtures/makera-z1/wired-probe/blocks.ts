@@ -5,6 +5,8 @@
  */
 import type { NcBlock, NcWord } from "@/machine/contract"
 import type { ProbingSections } from "../../../probing/probe"
+import { PROBE_3D_TOOL } from "../../../tools/tool-table"
+import { runsOriginRoutine } from "../3d-probe/blocks"
 
 /** The firmware's own routines (ATCHandler's M495): its Z probe, and its auto-leveling grid. */
 export const FIRMWARE_ROUTINE = 495
@@ -47,11 +49,13 @@ const firmwareProbing = (words: Words, letter: "O" | "A") =>
 const probesGrid = (words: Words) =>
   hasCode(words, "G", GRID) || firmwareProbing(words, "A")
 
-/** Whether a block touches: a straight probing move, or the firmware's Z probe. */
+/** Whether a block touches: a straight probing move, the firmware's Z probe or its 3D probing. */
 const touches = (words: Words) =>
   words.some(
     (word) => word.letter === "G" && TOUCH_CODES.includes(word.value)
-  ) || firmwareProbing(words, "O")
+  ) ||
+  firmwareProbing(words, "O") ||
+  runsOriginRoutine(words)
 
 /**
  * Blocks that continue a touch-off once one has started: further touches, setting a work offset
@@ -82,16 +86,22 @@ function continuesTouchOff({ words }: NcBlock): boolean {
   )
 }
 
-/** A touch-off that probes along Z only, or the firmware's Z probe, sets a height; others touch a side. */
-const touchOffName = (words: Words) =>
-  !firmwareProbing(words, "O") &&
-  words.some((word) => word.letter === "X" || word.letter === "Y")
+/**
+ * The 3D probe's touch-offs, and the firmware's 3D probing, find a work origin; a touch-off that
+ * probes along Z only, or the firmware's Z probe, sets a height; others touch a side.
+ */
+function touchOffName(words: Words, tool: number | null) {
+  if (tool === PROBE_3D_TOOL || runsOriginRoutine(words)) return "3D probing"
+  return !firmwareProbing(words, "O") &&
+    words.some((word) => word.letter === "X" || word.letter === "Y")
     ? "Touch-off"
     : "Z-height probing"
+}
 
 /** How the Z1's probing reads in a program's sections. */
 export const WIRED_PROBE_SECTIONS: ProbingSections = {
   probesGrid: ({ words }) => probesGrid(words),
-  touchOff: ({ words }) => (touches(words) ? touchOffName(words) : null),
+  touchOff: ({ words }, tool) =>
+    touches(words) ? touchOffName(words, tool) : null,
   continuesTouchOff,
 }

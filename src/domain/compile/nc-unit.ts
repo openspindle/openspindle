@@ -5,11 +5,12 @@ import { fail, ok } from "../primitives"
 import type { Result } from "../primitives"
 
 /**
- * The probing an operation's NC may do, with the probe (T0) active: none, a height grid
- * (auto-level), a touch-off that sets work Z (auto Z-height) or an outline traced without
- * touching (auto-scan). The machine's kit says which of its blocks each may hold.
+ * The probing an operation's NC may do, with a probe active: none, a height grid (auto-level),
+ * a touch-off that sets work Z (auto Z-height), an outline traced without touching (auto-scan)
+ * or a corner or centre found with the 3D probe to set the work origin (3D probing). The
+ * machine's kit says which of its blocks each may hold.
  */
-export type NcProbing = "none" | "grid" | "touch-off" | "outline"
+export type NcProbing = "none" | "grid" | "touch-off" | "outline" | "origin"
 
 /** What an operation's NC may contain beyond plain three-axis machining. */
 export type NcPolicy = {

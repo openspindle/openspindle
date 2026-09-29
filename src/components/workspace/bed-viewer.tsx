@@ -1,15 +1,32 @@
+import { CircleAlert, TriangleAlert } from "lucide-react"
+import { cn } from "cn"
 import { Button } from "@/components/ui/button"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import { useEffect, useRef, useState } from "react"
 import { useHost } from "@/platform/host-context"
 import { plateLabel } from "@/domain/plate/plate"
-import type { ViewerPlate } from "@/components/workspace/viewer/viewer-input"
+import type {
+  ViewerPlate,
+  ViewerProblem,
+  ViewerProblemRef,
+} from "@/components/workspace/viewer/viewer-input"
+import { problemMarkerId } from "./bed-viewer-layout"
 import type { LineRange } from "./bed-viewer-layout"
+import type { Playhead } from "@/domain/nc/move-times"
 import { BedScene } from "./viewer/bed-scene"
 import type { ViewMode } from "./viewer/bed-scene"
 import type { ArrangeEvents, ArrangeView } from "./viewer/setup-arranger"
 
 export type { Stock } from "@/domain/stock/stock"
-export type { ViewerPlate } from "@/components/workspace/viewer/viewer-input"
+export type {
+  ViewerPlate,
+  ViewerProblem,
+  ViewerProblemRef,
+} from "@/components/workspace/viewer/viewer-input"
 export type { ViewMode } from "./viewer/bed-scene"
 export type {
   ArrangeDrag,
@@ -26,6 +43,8 @@ type Props = {
   selectedLineRanges?: LineRange[]
   previewLine?: number | null
   previewProbePoint?: number | null
+  /** Where simulated playback is along the selected plate's moves; null shows up to the line. */
+  playhead?: Playhead | null
   progress: number
   showRapids: boolean
   showStock: boolean
@@ -37,6 +56,11 @@ type Props = {
   arrangement?: ArrangeView
   /** Given on the first render, it makes setup items selectable and movable. */
   onArrange?: ArrangeEvents
+  /** Problems marked where they are on their plates' beds, which name them on hover. */
+  problems?: readonly ViewerProblem[]
+  /** The problem shown: drawn stronger, and panned to when it is near an edge or beyond. */
+  shownProblem?: ViewerProblemRef | null
+  onSelectProblem?: (problem: ViewerProblem) => void
 }
 
 export function BedViewer({
@@ -46,6 +70,7 @@ export function BedViewer({
   selectedLineRanges,
   previewLine,
   previewProbePoint,
+  playhead,
   progress,
   showRapids,
   showStock,
@@ -55,9 +80,13 @@ export function BedViewer({
   onZoomChange,
   arrangement,
   onArrange,
+  problems,
+  shownProblem,
+  onSelectProblem,
 }: Props) {
   const container = useRef<HTMLDivElement>(null)
   const labels = useRef(new Map<string, HTMLButtonElement>())
+  const problemMarkers = useRef(new Map<string, HTMLElement>())
   const select = useRef(onSelectPlate)
   const zoomChange = useRef(onZoomChange)
   const arrange = useRef(onArrange)
@@ -88,6 +117,7 @@ export function BedViewer({
     const scene = BedScene.create(
       container.current,
       labels.current,
+      problemMarkers.current,
       {
         selectPlate: (id) => select.current(id),
         zoomChange: (value) => zoomChange.current?.(value),
@@ -114,18 +144,24 @@ export function BedViewer({
       selectedLineRanges,
       previewLine,
       previewProbePoint,
+      playhead,
       progress,
       showRapids,
       showStock,
+      problems,
+      shownProblem,
     })
   }, [
     selectedPlateId,
     selectedLineRanges,
     previewLine,
     previewProbePoint,
+    playhead,
     progress,
     showRapids,
     showStock,
+    problems,
+    shownProblem,
   ])
   // Unchanged plates keep their objects; the scene renders only when something changed.
   useEffect(() => {
@@ -135,6 +171,10 @@ export function BedViewer({
   useEffect(() => {
     if (arrangement) sceneRef.current?.arrange(arrangement)
   }, [arrangement])
+  // After the plates and the problems, so the shown problem is laid out where it is marked.
+  useEffect(() => {
+    if (shownProblem) sceneRef.current?.reveal(shownProblem)
+  }, [shownProblem])
   useEffect(() => {
     sceneRef.current?.setView(view)
   }, [view, resetKey])
@@ -168,6 +208,51 @@ export function BedViewer({
             >
               <span className="truncate">{label}</span>
             </Button>
+          )
+        })}
+        {problems?.map((problem) => {
+          const id = problemMarkerId(problem)
+          const isError = problem.severity === "error"
+          const Icon = isError ? CircleAlert : TriangleAlert
+          const shown =
+            shownProblem?.plateId === problem.plateId &&
+            shownProblem.key === problem.key
+          // The marker stands just above its point, which the view draws under it.
+          return (
+            <div
+              key={id}
+              className="pointer-events-auto invisible absolute -translate-x-1/2 -translate-y-full pb-1"
+              ref={(element) => {
+                if (element) problemMarkers.current.set(id, element)
+                else problemMarkers.current.delete(id)
+              }}
+            >
+              <Tooltip>
+                <TooltipTrigger
+                  delay={100}
+                  render={
+                    <button
+                      type="button"
+                      className={cn(
+                        "grid size-6 place-items-center rounded-full border-2 border-background shadow-md outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
+                        isError
+                          ? "bg-warning text-warning-foreground"
+                          : "bg-amber-500 text-amber-950",
+                        shown && "ring-2 ring-ring"
+                      )}
+                      aria-label={`${isError ? "Error" : "Warning"}: ${problem.message}`}
+                      aria-pressed={shown}
+                      onClick={() => onSelectProblem?.(problem)}
+                    />
+                  }
+                >
+                  <Icon className="size-3.5" />
+                </TooltipTrigger>
+                <TooltipContent className="max-w-72">
+                  {problem.message}
+                </TooltipContent>
+              </Tooltip>
+            </div>
           )
         })}
       </div>

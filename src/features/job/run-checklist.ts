@@ -1,5 +1,5 @@
 import type { CompiledPlate } from "@/domain/compile/compile"
-import { blocking } from "@/domain/diagnostics"
+import { blocking, diagnosticOperation } from "@/domain/diagnostics"
 import type { Diagnostic, QuickFix } from "@/domain/diagnostics"
 import type { Plate } from "@/domain/plate/plate"
 import { QUICK_FIX_LABELS } from "@/features/prepare/quick-fix"
@@ -72,7 +72,7 @@ const OPEN_PREPARE: RunFix = {
 /** Diagnostic quick fixes lead to Prepare, except machine actions, which run here. */
 export function fixFor(diagnostic: Diagnostic): RunFix {
   const fix = diagnostic.fix
-  const operation = diagnostic.operationId
+  const operation = diagnosticOperation(diagnostic)
   if (!fix)
     return {
       kind: "prepare",

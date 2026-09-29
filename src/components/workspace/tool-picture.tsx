@@ -9,6 +9,8 @@ import { cn } from "cn"
 import { toolShape } from "@/domain/tools/tool-shape"
 import type { ToolShapeSource } from "@/domain/tools/tool-shape"
 import type { Tool } from "@/domain/tools/tool"
+import { ToolImage } from "./tool-image"
+import type { ToolImageSubject } from "./tool-image"
 import { toolPictures } from "./tool-pictures"
 import type { ToolFraming, ToolPictureSubject } from "./tool-pictures"
 
@@ -25,6 +27,12 @@ export const THUMBNAIL: ToolPictureSize = {
   height: 48,
   className: "h-12 w-6",
 }
+/** On a tool card: its cutting end, as tall as the card's name and details. */
+export const CARD: ToolPictureSize = {
+  width: 24,
+  height: 40,
+  className: "h-10 w-6",
+}
 /** Beside the editor's fields: the whole tool. */
 export const PORTRAIT: ToolPictureSize = {
   width: 128,
@@ -32,12 +40,18 @@ export const PORTRAIT: ToolPictureSize = {
   className: "h-96 w-32",
 }
 
-/** What a picture of the tool shows: its 3D model, or else the shape its dimensions describe. */
-export type ToolPictureSource = ToolShapeSource & Pick<Tool, "model">
+/**
+ * What a picture of the tool shows: its 3D model, or else the shape its dimensions describe.
+ * A plugin's tool has no model.
+ */
+export type ToolPictureSource = ToolShapeSource & Partial<Pick<Tool, "model">>
 
 /** Whether the tool has a picture: a 3D model, or dimensions that describe a shape. */
-export const hasToolPicture = (tool: ToolPictureSource) =>
-  tool.model !== null || toolShape(tool) !== null
+export function hasToolPicture(tool: ToolPictureSource) {
+  // A plugin built against an earlier plugin kit may pass a tool without its dimensions.
+  const { geometry, shaft } = tool as Partial<ToolPictureSource>
+  return !!tool.model || (!!geometry && !!shaft && toolShape(tool) !== null)
+}
 
 /**
  * A rendered picture of the tool: its 3D model, or the tool its dimensions describe, or
@@ -55,7 +69,7 @@ export function ToolPicture({
   size: ToolPictureSize
   className?: string
 }) {
-  const { model } = tool
+  const model = tool.model ?? null
   const shape = model === null ? toolShape(tool) : null
   const subject = useMemo<ToolPictureSubject | null>(
     () => (model !== null ? { model } : shape && { shape }),
@@ -92,5 +106,25 @@ export function ToolPicture({
       alt=""
       draggable={false}
     />
+  )
+}
+
+/**
+ * The tool beside its name, in the library's list and on tool cards: its cutting end, else its
+ * product photo, else (with `fallback`) a placeholder.
+ */
+export function ToolThumbnail({
+  tool,
+  size = THUMBNAIL,
+  fallback = false,
+}: {
+  tool: ToolPictureSource & ToolImageSubject
+  size?: ToolPictureSize
+  fallback?: boolean
+}) {
+  if (hasToolPicture(tool))
+    return <ToolPicture tool={tool} framing="tip" size={size} />
+  return (
+    <ToolImage tool={tool} fallback={fallback} className={size.className} />
   )
 }

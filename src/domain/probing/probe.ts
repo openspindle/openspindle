@@ -15,6 +15,7 @@ import type {
 import type { ProbeTouch } from "../auto-z-height/probe-touch"
 import type { TouchOffStart } from "../auto-z-height/rules"
 import type { ToolpathBounds } from "../compile/cutting-bounds"
+import type { Probe3dParameters, Probe3dParams } from "../probe-3d/params"
 
 /** A rectangular grid of samples: its first sample, its extent and endpoint-inclusive counts. */
 export type GridShape = Pick<
@@ -70,12 +71,25 @@ export interface OutlineTrace {
   program: (params: AutoScanParams, outline: ToolpathBounds) => string
 }
 
+/**
+ * How a machine finds a work origin with a 3D touch probe: it touches a corner of the stock or of
+ * a pocket, or both sides of a pocket or boss, and sets the work origin there.
+ */
+export interface OriginProbing {
+  readonly parameters: Probe3dParameters
+  /** The NC finding the corner or centre from its start and setting the work origin there. */
+  program: (params: Probe3dParams, start: TouchOffStart) => string
+}
+
 /** How a program's sections see a machine's probing NC, in any NC file. */
 export interface ProbingSections {
   /** Whether a block probes a height grid. */
   probesGrid: (block: NcBlock) => boolean
-  /** The name of the touch-off a block starts; null when it touches nothing. */
-  touchOff: (block: NcBlock) => string | null
+  /**
+   * The name of the touch-off a block starts with `tool` active, which tells which probe
+   * touches; null when it touches nothing.
+   */
+  touchOff: (block: NcBlock, tool: number | null) => string | null
   /**
    * Whether a block continues a touch-off once one has started, such as another touch, setting
    * work Z where it touched or lifting off.
@@ -86,12 +100,13 @@ export interface ProbingSections {
 /**
  * A machine's probe, as its firmware measures with it. The probing operations plan in the
  * machine's terms only through it: placement, anchors and the stock are theirs; defaults,
- * ranges and NC are the probe's. A machine without one offers no probing operations, and one
- * without a pointer offers no auto-scan.
+ * ranges and NC are the probe's. A machine without one offers no probing operations, one
+ * without a pointer offers no auto-scan, and one without a 3D touch probe no 3D probing.
  */
 export interface Probe {
   readonly autoLevel: GridProbing
   readonly autoZHeight: TouchOff
   readonly autoScan: OutlineTrace | null
+  readonly probe3d: OriginProbing | null
   readonly sections: ProbingSections
 }

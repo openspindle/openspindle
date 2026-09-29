@@ -1,6 +1,12 @@
 import { FRAME_TYPES } from "../../src/machine/firmware/makera/codec.ts"
 import type { Frame } from "../../src/machine/firmware/makera/codec.ts"
-import { changeTool, heightTable, levelGrid, probeZ } from "./automation.ts"
+import {
+  changeTool,
+  heightTable,
+  levelGrid,
+  originRoutine,
+  probeZ,
+} from "./automation.ts"
 import type { Grid, Step } from "./automation.ts"
 import { TransferEndpoint } from "./transfer.ts"
 import type { TransferOptions } from "./transfer.ts"
@@ -631,6 +637,15 @@ export class SimulatedZ1 {
     }
     if (/^M0*495\b/.test(code)) {
       this.firmwareProbing(code)
+      this.reply("ok")
+      return
+    }
+    // M480.n: the 3D probe's corner and centre routines, from where the probe is.
+    if (/^M0*480\.\d+/.test(code)) {
+      this.automate(
+        Date.now(),
+        originRoutine(code, [...this.mpos], this.stepMs)
+      )
       this.reply("ok")
       return
     }

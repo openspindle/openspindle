@@ -49,14 +49,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { ToolImage } from "@/components/workspace/tool-image"
+import { THUMBNAIL, ToolThumbnail } from "@/components/workspace/tool-picture"
 import { catalogForTool } from "@/app/tools/tool-catalog-store"
 import type { LoadedToolCatalog } from "@/app/tools/tool-catalog-store"
 import { toolKindKey } from "@/domain/tools/tool"
 import type { Tool } from "@/domain/tools/tool"
 import { formatShankDiameter, formatToolNumber } from "@/domain/tools/format"
 import { OptionSelect } from "@/components/option-select"
-import { THUMBNAIL, ToolPicture, hasToolPicture } from "./tool-picture"
 import { compareToolNames, toolKindLabel } from "./tool-format"
 
 /** Catalog scopes besides a packaged catalog's id. */
@@ -161,11 +160,7 @@ function ToolNameCell({ row, table }: CellContext<Features, ToolRow, string>) {
       }
     >
       <ItemMedia className={THUMBNAIL.className}>
-        {hasToolPicture(tool) ? (
-          <ToolPicture tool={tool} framing="tip" size={THUMBNAIL} />
-        ) : (
-          <ToolImage tool={tool} className={THUMBNAIL.className} />
-        )}
+        <ToolThumbnail tool={tool} />
       </ItemMedia>
       <ItemContent className="min-w-0">
         <ItemTitle className="max-w-full truncate" title={tool.name}>

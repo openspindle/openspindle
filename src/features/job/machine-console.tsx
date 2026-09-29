@@ -1,7 +1,6 @@
 import { memo, useCallback, useLayoutEffect, useRef } from "react"
 import { useVirtualizer } from "@tanstack/react-virtual"
 import { cn } from "cn"
-import { FieldDescription } from "@/components/ui/field"
 import { Separator } from "@/components/ui/separator"
 import type { ConsoleEntry } from "@/machine/contract"
 import { useMachineConsole } from "@/platform/machine"
@@ -83,9 +82,6 @@ export function MachineConsole() {
     <section className="flex h-full min-h-0 flex-col" aria-label="Console">
       <header className="flex flex-col px-3 py-2">
         <span>Console</span>
-        <FieldDescription className="truncate">
-          Commands and the machine's replies
-        </FieldDescription>
       </header>
       <Separator />
       <div

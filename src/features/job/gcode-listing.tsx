@@ -18,7 +18,7 @@ import type { LucideIcon } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Field, FieldDescription, FieldLabel } from "@/components/ui/field"
+import { Field, FieldLabel } from "@/components/ui/field"
 import { Separator } from "@/components/ui/separator"
 import { Switch } from "@/components/ui/switch"
 import type { CompiledPlate } from "@/domain/compile/compile"
@@ -53,21 +53,6 @@ const HEADER_BADGES: Record<
   operation: { variant: "secondary", icon: Layers3 },
   pause: { variant: "outline", icon: Pause },
   section: { variant: "ghost", icon: Route },
-}
-
-function sourceDescription(check: ProgramCheck): string {
-  switch (check.status) {
-    case "ready":
-      return check.program.changeCount
-        ? `As the machine receives it · ${check.program.changeCount.toLocaleString()} lines adjusted`
-        : "As the machine receives it"
-    case "checking":
-      return "Source · checking against the machine's dialect…"
-    case "rejected":
-      return "Source · the machine cannot run this program"
-    case "unavailable":
-      return "Source"
-  }
 }
 
 const changeText = (change: ProgramChange) =>
@@ -217,9 +202,6 @@ export function GCodeListing({
       <header className="flex items-center justify-between gap-3 px-3 py-2">
         <div className="flex min-w-0 flex-col">
           <span>G-code</span>
-          <FieldDescription className="truncate font-numeric">
-            {sourceDescription(check)}
-          </FieldDescription>
         </div>
         <Field orientation="horizontal" className="w-auto gap-2">
           <Switch

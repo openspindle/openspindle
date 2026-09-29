@@ -1,4 +1,4 @@
-import { Check, ChevronRight, Wrench } from "lucide-react"
+import { Check, Wrench } from "lucide-react"
 import { cn } from "cn"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -13,13 +13,15 @@ import {
 import { isProbe } from "@/domain/tools/tool-table"
 import { formatToolNumber } from "@/domain/tools/format"
 import type { Tool } from "@/domain/tools/tool"
-import { ToolImage } from "./tool-image"
 import type { ToolImageSubject } from "./tool-image"
+import { CARD, ToolThumbnail } from "./tool-picture"
+import type { ToolPictureSource } from "./tool-picture"
 
 export type ToolCardProps = {
-  /** Any tool with an identity and a size, including plugin tool DTOs. */
+  /** Any tool with an identity, a size and dimensions, including plugin tool DTOs. */
   tool?:
     | (ToolImageSubject &
+        ToolPictureSource &
         Pick<Tool, "id" | "kind" | "name" | "diameter" | "flutes">)
     | null
   id?: string
@@ -76,14 +78,9 @@ export function ToolCard({
         ) : undefined
       }
     >
-      {slotLabel && (
-        <Badge variant="secondary" className="font-numeric">
-          {slotLabel}
-        </Badge>
-      )}
-      <ItemMedia className="h-8 w-12" variant="icon">
+      <ItemMedia className={CARD.className} variant="icon">
         {tool ? (
-          <ToolImage tool={tool} fallback className="h-8 w-12" />
+          <ToolThumbnail tool={tool} size={CARD} fallback />
         ) : (
           <Wrench aria-hidden="true" />
         )}
@@ -96,10 +93,10 @@ export function ToolCard({
           {details}
         </ItemDescription>
       </ItemContent>
-      {(selected || onClick) && (
-        <ItemActions>
+      {(slotLabel || selected) && (
+        <ItemActions className="self-start">
+          {slotLabel && <Badge className="font-numeric">{slotLabel}</Badge>}
           {selected && <Check aria-label="Selected tool" />}
-          {onClick && !selected && <ChevronRight aria-hidden="true" />}
         </ItemActions>
       )}
     </Item>

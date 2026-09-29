@@ -19,8 +19,13 @@ import type {
   AutoZHeightIssueCode,
   LaterAutoLevel,
 } from "../auto-z-height/rules"
-import { error, warning } from "../diagnostics"
-import type { Diagnostic, QuickFix } from "../diagnostics"
+import { generateProbe3dNc } from "../probe-3d/generate"
+import { defaultProbe3dParams } from "../probe-3d/params"
+import type { Probe3dParams } from "../probe-3d/params"
+import { probe3dOrderIssues, validateProbe3d } from "../probe-3d/rules"
+import type { Probe3dIssueCode } from "../probe-3d/rules"
+import { error, operationSubject } from "../diagnostics"
+import type { Diagnostic, Issue, QuickFix } from "../diagnostics"
 import { kitForPlate } from "../fixtures/catalog"
 import type { FixtureKit } from "../fixtures/fixture-kit"
 import { toolpathBoundsOf } from "../compile/cutting-bounds"
@@ -30,7 +35,7 @@ import type { Plate } from "../plate/plate"
 import { workOriginOnMachine } from "../plate/work-origin"
 import { fail, ok } from "../primitives"
 import type { Result } from "../primitives"
-import type { OutlineTrace, Probe } from "../probing/probe"
+import type { OriginProbing, OutlineTrace, Probe } from "../probing/probe"
 import type { Operation, Phase, SourceKind, SourceOf } from "./operation"
 
 /** The NC an operation contributes and what that NC may contain. */
@@ -46,7 +51,8 @@ export type OperationOf<TKind extends SourceKind> = Operation & {
 }
 
 /** The kinds whose NC, defaults and availability come from the plate's machine's probe. */
-export type ProbingSourceKind = "auto-level" | "auto-z-height" | "auto-scan"
+export type ProbingSourceKind =
+  "auto-level" | "auto-z-height" | "auto-scan" | "probe-3d"
 
 /** A probing kind's operation parameters, by its kind. */
 type ProbingParams<TKind extends SourceKind> = TKind extends "auto-level"
@@ -55,7 +61,9 @@ type ProbingParams<TKind extends SourceKind> = TKind extends "auto-level"
     ? AutoZHeightParams
     : TKind extends "auto-scan"
       ? AutoScanParams
-      : never
+      : TKind extends "probe-3d"
+        ? Probe3dParams
+        : never
 
 /** The connected machine, as far as running an operation depends on it. */
 export type RunContext = {
@@ -150,7 +158,7 @@ const pluginKind: OperationKind<"plugin"> = {
             "operation-pending",
             `Generate "${operation.name}" in its plugin before running it.`,
             {
-              operationId: operation.id,
+              subject: operationSubject(operation.id),
               fix: { kind: "edit-operation", operationId: operation.id },
             }
           )
@@ -173,7 +181,7 @@ const unsupported = (operation: Operation, what: string): Diagnostic =>
   error(
     "probing-unsupported",
     `${operation.name}: this machine has no ${what}.`,
-    { operationId: operation.id }
+    { subject: operationSubject(operation.id) }
   )
 
 /** Issues that block generating the NC; the compiler reports those already. */
@@ -190,26 +198,24 @@ const ANCHOR_READS: ReadonlySet<string> = new Set([
   "anchors-changed",
 ])
 
-/** A probing kind's issue; its code is namespaced by the kind (`auto-level/grid-limit`). */
-type ProbeIssue = {
-  code: string
-  message: string
-  severity: "error" | "warning"
-}
-
+/**
+ * A probing kind's issue as the operation's diagnostic: its code namespaced by the kind
+ * (`auto-level/grid-limit`), and where it is, as the issue says.
+ */
 function issueDiagnostic(
   kind: ProbingSourceKind,
-  issue: ProbeIssue,
+  issue: Issue,
   operation: Operation
 ): Diagnostic {
   const fix: QuickFix = ANCHOR_READS.has(issue.code)
     ? { kind: "read-anchors" }
     : { kind: "edit-operation", operationId: operation.id }
-  const create = issue.severity === "error" ? error : warning
-  return create(`${kind}/${issue.code}`, issue.message, {
-    operationId: operation.id,
+  return {
+    ...issue,
+    code: `${kind}/${issue.code}`,
+    subject: operationSubject(operation.id),
     fix,
-  })
+  }
 }
 
 const autoLevelKind: OperationKind<"auto-level"> = {
@@ -235,7 +241,7 @@ const autoLevelKind: OperationKind<"auto-level"> = {
           "auto-level-invalid",
           `${operation.name}: ${generated.issues.at(0)?.message ?? "the probe grid is invalid."}`,
           {
-            operationId: operation.id,
+            subject: operationSubject(operation.id),
             fix: { kind: "edit-operation", operationId: operation.id },
           }
         )
@@ -318,7 +324,7 @@ const autoZHeightKind: OperationKind<"auto-z-height"> = {
           "auto-z-height-invalid",
           `${operation.name}: ${generated.issues.at(0)?.message ?? "the touch-off is invalid."}`,
           {
-            operationId: operation.id,
+            subject: operationSubject(operation.id),
             fix: { kind: "edit-operation", operationId: operation.id },
           }
         )
@@ -381,7 +387,7 @@ const autoScanKind: OperationKind<"auto-scan"> = {
           "auto-scan-invalid",
           `${operation.name}: ${generated.issues.at(0)?.message ?? "the scan is invalid."}`,
           {
-            operationId: operation.id,
+            subject: operationSubject(operation.id),
             fix: { kind: "edit-operation", operationId: operation.id },
           }
         )
@@ -405,6 +411,72 @@ const autoScanKind: OperationKind<"auto-scan"> = {
   },
 }
 
+/** Issues that block generating the 3D probing NC; the compiler reports those already. */
+const PROBE_3D_BLOCKERS: ReadonlySet<Probe3dIssueCode> = new Set([
+  "invalid-parameters",
+  "anchor-snapshot-missing",
+  "anchor-unavailable",
+  "anchor-point-out-of-range",
+  "pocket-needs-probe-position",
+])
+
+const probe3dKind: OperationKind<"probe-3d"> = {
+  kind: "probe-3d",
+  label: "3D probing",
+  verbatim: true,
+  generated: true,
+  phase: () => "setup",
+  available: (probe) => probe !== null && probe.probe3d !== null,
+  // `available` above confirms `probe3d`; this states that guarantee for the type checker, as
+  // auto-scan's `defaults` does for its trace.
+  defaults: (_plate, probe) =>
+    defaultProbe3dParams((probe.probe3d as OriginProbing).parameters),
+  resolve: (operation, plate, kit) => {
+    const probing = kit.probe?.probe3d
+    if (!probing) return fail(unsupported(operation, "3D probe"))
+    const generated = generateProbe3dNc(
+      operation.source.params,
+      autoLevelPlacement(plate),
+      probing
+    )
+    if (!generated.ok)
+      return fail(
+        error(
+          "probe-3d-invalid",
+          `${operation.name}: ${generated.issues.at(0)?.message ?? "the probing is invalid."}`,
+          {
+            subject: operationSubject(operation.id),
+            fix: { kind: "edit-operation", operationId: operation.id },
+          }
+        )
+      )
+    return ok({
+      nc: generated.program.nc,
+      policy: { probing: "origin", anchoredProbing: false },
+      reviewLines: [],
+    })
+  },
+  validate: (operation, plate, kit) => {
+    const probing = kit.probe?.probe3d
+    if (!probing) return []
+    const { params } = operation.source
+    return [
+      ...validateProbe3d(
+        params,
+        autoLevelPlacement(plate),
+        probing.parameters
+      ).filter((issue) => !PROBE_3D_BLOCKERS.has(issue.code)),
+      ...probe3dOrderIssues(params, laterAutoLevels(plate, operation)),
+    ].map((issue) => issueDiagnostic("probe-3d", issue, operation))
+  },
+  runChecks: (operation, plate, machine) =>
+    autoLevelRunIssues(
+      operation.source.params,
+      autoLevelPlacement(plate),
+      machine
+    ).map((issue) => issueDiagnostic("probe-3d", issue, operation)),
+}
+
 export const OPERATION_KINDS: {
   readonly [TKind in SourceKind]: OperationKind<TKind>
 } = {
@@ -414,6 +486,7 @@ export const OPERATION_KINDS: {
   "auto-level": autoLevelKind,
   "auto-z-height": autoZHeightKind,
   "auto-scan": autoScanKind,
+  "probe-3d": probe3dKind,
 }
 
 /**
@@ -428,7 +501,7 @@ export function kindOf(operation: Operation): OperationKind<SourceKind> {
 
 /**
  * A probing kind's `available` and `defaults`, always both defined for one of `auto-level`,
- * `auto-z-height` or `auto-scan`; this states that guarantee for the type checker, as `kindOf`'s
+ * `auto-z-height`, `auto-scan` or `probe-3d`; this states that guarantee for the type checker, as `kindOf`'s
  * cast above states its own. The UI adds an operation and offers it through this, never reading
  * a probe or `DEFAULT_KIT` itself.
  */

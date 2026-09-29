@@ -10,7 +10,7 @@ import {
   useWorkspaceStore,
 } from "@/app/workspace/workspace-context"
 import type { Plate, PlateTool } from "@/domain/plate/plate"
-import { PROBE_TOOL } from "@/domain/tools/tool-table"
+import { isProbeSlot } from "@/domain/tools/tool-table"
 import { openDialog } from "@/features/shell/dialogs"
 
 export const toolNumberLabel = (number: number | null) =>
@@ -34,7 +34,7 @@ function RenumberField({ plate, entry }: { plate: Plate; entry: PlateTool }) {
   const current = entry.number
   const [draft, setDraft] = useState(String(current ?? ""))
   useEffect(() => setDraft(String(current ?? "")), [current])
-  if (current === null || current === PROBE_TOOL) return null
+  if (current === null || isProbeSlot(current)) return null
   const commit = () => {
     const to = Number(draft)
     if (!draft.trim() || to === current) {

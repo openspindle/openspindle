@@ -1,5 +1,5 @@
-/** Errors block NC generation or Run; warnings inform without blocking. */
-export type AutoLevelIssueSeverity = "error" | "warning"
+import { issueOf } from "../diagnostics"
+import type { Issue } from "../diagnostics"
 
 export type AutoLevelIssueCode =
   // Parameters, within the ranges of the machine's probe
@@ -18,19 +18,8 @@ export type AutoLevelIssueCode =
   | "live-anchors-unavailable"
   | "anchors-changed"
 
-export type AutoLevelIssue = {
-  code: AutoLevelIssueCode
-  /** User-facing explanation, ready to display. */
-  message: string
-  severity: AutoLevelIssueSeverity
-}
+/** Errors block NC generation or Run; warnings inform without blocking. */
+export type AutoLevelIssue = Issue<AutoLevelIssueCode>
 
-export const autoLevelError = (
-  code: AutoLevelIssueCode,
-  message: string
-): AutoLevelIssue => ({ code, message, severity: "error" })
-
-export const autoLevelWarning = (
-  code: AutoLevelIssueCode,
-  message: string
-): AutoLevelIssue => ({ code, message, severity: "warning" })
+export const autoLevelError = issueOf<AutoLevelIssueCode>("error")
+export const autoLevelWarning = issueOf<AutoLevelIssueCode>("warning")

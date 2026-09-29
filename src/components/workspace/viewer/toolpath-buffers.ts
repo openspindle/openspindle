@@ -1,6 +1,6 @@
 import * as THREE from "three"
 import { cuts as isCut } from "@/domain/compile/toolpath-bounds"
-import { PROBE_TOOL } from "@/domain/tools/tool-table"
+import { isProbeSlot } from "@/domain/tools/tool-table"
 import type { GCodeProgram, GCodeSegment } from "@/domain/nc/gcode"
 import type { LineRange } from "../bed-viewer-layout"
 
@@ -8,9 +8,9 @@ import type { LineRange } from "../bed-viewer-layout"
 export type Motion = "cut" | "rapid" | "probe"
 export const MOTIONS: readonly Motion[] = ["cut", "rapid", "probe"]
 
-/** The probe's moves and every probing touch draw apart from cuts and travel. */
+/** The probes' moves and every probing touch draw apart from cuts and travel. */
 export function motionOf(segment: GCodeSegment): Motion {
-  if (segment.tool === PROBE_TOOL || segment.probing) return "probe"
+  if (isProbeSlot(segment.tool) || segment.probing) return "probe"
   return isCut(segment) ? "cut" : "rapid"
 }
 

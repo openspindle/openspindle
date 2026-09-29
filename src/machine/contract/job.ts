@@ -223,13 +223,33 @@ export const GridMeasurementSchema = z.object({
   at: z.number(),
 })
 
+/**
+ * The most contacts one 3D probing routine may report, with room to spare: it makes at most 10,
+ * two on a top and two on each of two sides on each of two axes.
+ */
+export const MAX_ROUTINE_CONTACTS = 16
+
+/**
+ * The contacts one of the machine's 3D probing routines reported during the job, in machine
+ * coordinates and in the order it made them: a top, then its sides, each touched twice.
+ */
+export const ContactsMeasurementSchema = z.object({
+  kind: z.literal("contacts"),
+  contacts: z.array(MachineXyzSchema).max(MAX_ROUTINE_CONTACTS),
+  /** The program line the machine reported at the first contact; null when it reported none. */
+  line: z.int().nonnegative().nullable(),
+  at: z.number(),
+})
+
 export const JobMeasurementSchema = z.discriminatedUnion("kind", [
   TouchMeasurementSchema,
   GridMeasurementSchema,
+  ContactsMeasurementSchema,
 ])
 export type JobMeasurement = z.infer<typeof JobMeasurementSchema>
 export type TouchMeasurement = z.infer<typeof TouchMeasurementSchema>
 export type GridMeasurement = z.infer<typeof GridMeasurementSchema>
+export type ContactsMeasurement = z.infer<typeof ContactsMeasurementSchema>
 
 export const JobStateSchema = z.object({
   id: z.string(),

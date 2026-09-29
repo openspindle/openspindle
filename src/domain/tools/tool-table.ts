@@ -1,7 +1,7 @@
 import { readNcBlock } from "@/machine/contract"
 import { toolKindKey } from "@/domain/tools/tool"
 import type { Tool } from "@/domain/tools/tool"
-import { error } from "../diagnostics"
+import { error, toolSubject } from "../diagnostics"
 import type { Diagnostic } from "../diagnostics"
 import type { Binding, Operation } from "../operations/operation"
 import type { Plate, PlateTool } from "../plate/plate"
@@ -10,7 +10,17 @@ import type { Result } from "../primitives"
 
 /** The firmware's probe slot. */
 export const PROBE_TOOL = 0
+/** The firmware's 3D probe slot: the Z1 keeps its probe port on and its double tap off for it. */
+export const PROBE_3D_TOOL = 9999
 const MAX_TOOL_NUMBER = 999999
+
+/** Whether a tool number is a probe's slot, which only a probe fills and which never moves. */
+export const isProbeSlot = (number: number | null) =>
+  number === PROBE_TOOL || number === PROBE_3D_TOOL
+
+/** What a probe slot holds, as messages name it. */
+const slotName = (number: number) =>
+  number === PROBE_3D_TOOL ? "3D probe" : "probe"
 
 /** Whether a tool is the probe, compared loosely like any other kind ({@link toolKindKey}). */
 export function isProbe(tool: { readonly kind: string }): boolean {
@@ -51,8 +61,27 @@ const sameNumber = (tool: PlateTool, number: number | null) =>
   tool.number === number
 
 /**
+ * The library tool meant for one of an NC program's own tool numbers: the tool whose
+ * post-processor number matches, a probe for a probe slot. T0 takes the probe numbered 0, else
+ * one the 3D probe's slot does not number, else any.
+ */
+function preferredTool(local: number, library: readonly Tool[]) {
+  const numbered = (item: Tool) => item.postProcess.number === local
+  if (local === PROBE_3D_TOOL)
+    return library.find((item) => isProbe(item) && numbered(item))
+  if (local !== PROBE_TOOL) return library.find(numbered)
+  return (
+    library.find((item) => isProbe(item) && numbered(item)) ??
+    library.find(
+      (item) => isProbe(item) && item.postProcess.number !== PROBE_3D_TOOL
+    ) ??
+    library.find((item) => isProbe(item))
+  )
+}
+
+/**
  * Library tools meant for an NC program's own tool numbers: the tool whose post-processor
- * number matches, and the probe for T0.
+ * number matches, and the probes for T0 and the 3D probe's slot.
  */
 export function libraryPreferences(
   locals: readonly (number | null)[],
@@ -61,10 +90,7 @@ export function libraryPreferences(
   const preferred = new Map<number | null, string>()
   for (const local of locals) {
     if (local === null) continue
-    const tool =
-      local === PROBE_TOOL
-        ? library.find((item) => isProbe(item))
-        : library.find((item) => item.postProcess.number === local)
+    const tool = preferredTool(local, library)
     if (tool) preferred.set(local, tool.id)
   }
   return preferred
@@ -86,9 +112,10 @@ export function boundTools(
 }
 
 /**
- * Binds an operation's tools into the plate's table. Existing bindings stay; T0 is always
- * the probe; a tool already in the table is reused; otherwise the operation's own number,
- * the tool's post-processor number, or the lowest free number is taken.
+ * Binds an operation's tools into the plate's table. Existing bindings stay; the probe slots
+ * (T0, and the 3D probe's) keep their number; a tool already in the table is reused; otherwise
+ * the operation's own number, the tool's post-processor number, or the lowest free number is
+ * taken.
  */
 export function bindTools(
   plate: Plate,
@@ -111,14 +138,14 @@ export function bindTools(
     }
     const toolId = options.preferred?.get(local) ?? null
     let number: number | null
-    if (local === null || local === PROBE_TOOL) number = local
+    if (local === null || isProbeSlot(local)) number = local
     else {
       const holder = toolId
         ? table.find(
             (tool) =>
               tool.toolId === toolId &&
               tool.number !== null &&
-              tool.number !== PROBE_TOOL
+              !isProbeSlot(tool.number)
           )
         : undefined
       const post =
@@ -126,7 +153,7 @@ export function bindTools(
           .number ?? null
       if (holder) number = holder.number
       else if (!used.has(local)) number = local
-      else if (post !== null && post !== PROBE_TOOL && !used.has(post))
+      else if (post !== null && !isProbeSlot(post) && !used.has(post))
         number = post
       else number = lowestFree(used)
     }
@@ -198,13 +225,13 @@ export function assignTool(
       `${capitalize(toolNumberText(number))} is not in this plate's tool table.`
     )
   const holder =
-    toolId !== null && number !== null && number !== PROBE_TOOL
+    toolId !== null && number !== null && !isProbeSlot(number)
       ? plate.tools.find(
           (tool) =>
             tool.toolId === toolId &&
             tool.number !== number &&
             tool.number !== null &&
-            tool.number !== PROBE_TOOL
+            !isProbeSlot(tool.number)
         )
       : undefined
   if (holder?.number != null && number !== null)
@@ -221,7 +248,7 @@ export function assignTool(
  * Puts library tools on an operation's own tool numbers (numbers its NC does not select are
  * ignored). An entry only this operation uses is assigned like `assignTool`; an entry other
  * operations share keeps its tool, and this operation moves to an entry holding the new
- * tool or to a free number. The program's implicit tool and the probe slot are one entry
+ * tool or to a free number. The program's implicit tool and the probe slots are one entry
  * per plate, so those are assigned in place.
  */
 export function assignOperationTools(
@@ -243,7 +270,7 @@ export function assignOperationTools(
         item.id !== operationId &&
         item.tools.some((other) => other.plate === binding.plate)
     )
-    if (!shared || binding.plate === null || binding.plate === PROBE_TOOL) {
+    if (!shared || binding.plate === null || isProbeSlot(binding.plate)) {
       const assigned = assignTool(current, binding.plate, toolId)
       if (!assigned.ok) return assigned
       current = assigned.value
@@ -268,15 +295,16 @@ export function assignOperationTools(
   return ok(current)
 }
 
-/** Explicitly moves a table entry to another free number. T0 stays the probe slot. */
+/** Explicitly moves a table entry to another free number. The probe slots stay theirs. */
 export function renumberTool(
   plate: Plate,
   from: number,
   to: number
 ): Result<Plate> {
   if (from === to) return ok(plate)
-  if (from === PROBE_TOOL || to === PROBE_TOOL)
-    return fail("T0 is reserved for the probe.")
+  for (const slot of [from, to])
+    if (isProbeSlot(slot))
+      return fail(`T${slot} is reserved for the ${slotName(slot)}.`)
   if (to < 1 || to > MAX_TOOL_NUMBER || !Number.isInteger(to))
     return fail("Choose a tool number from 1 to 999999.")
   if (!plate.tools.some((tool) => tool.number === from))
@@ -295,8 +323,9 @@ export function renumberTool(
 }
 
 /**
- * Unassigned, dangling and misplaced-probe entries block Run; the table itself never
- * changes on its own.
+ * Unassigned, dangling and misplaced-probe entries block Run: only a probe fills a probe slot
+ * (T0, the 3D probe's), and a probe fills nothing else. The table itself never changes on its
+ * own.
  */
 export function toolDiagnostics(
   plate: Plate,
@@ -304,7 +333,8 @@ export function toolDiagnostics(
 ): Diagnostic[] {
   const diagnostics: Diagnostic[] = []
   for (const entry of plate.tools) {
-    const fix = {
+    const details = {
+      subject: toolSubject(entry.number),
       fix: { kind: "assign-tool", toolNumber: entry.number } as const,
     }
     if (entry.toolId === null) {
@@ -312,7 +342,7 @@ export function toolDiagnostics(
         error(
           "tool-unassigned",
           `${capitalize(toolNumberText(entry.number))} has no tool assigned.`,
-          fix
+          details
         )
       )
       continue
@@ -323,19 +353,27 @@ export function toolDiagnostics(
         error(
           "tool-missing",
           `${capitalize(toolNumberText(entry.number))} uses a tool that is no longer in the library.`,
-          fix
+          details
         )
       )
-    else if (entry.number === PROBE_TOOL && !isProbe(tool))
+    else if (
+      entry.number !== null &&
+      isProbeSlot(entry.number) &&
+      !isProbe(tool)
+    )
       diagnostics.push(
-        error("tool-probe-slot", "T0 is the probe slot; assign a probe.", fix)
+        error(
+          "tool-probe-slot",
+          `T${entry.number} is the ${slotName(entry.number)} slot; assign a probe.`,
+          details
+        )
       )
-    else if (entry.number !== PROBE_TOOL && isProbe(tool))
+    else if (!isProbeSlot(entry.number) && isProbe(tool))
       diagnostics.push(
         error(
           "tool-probe-elsewhere",
           `${capitalize(toolNumberText(entry.number))} would cut with the probe; assign a cutting tool.`,
-          fix
+          details
         )
       )
   }

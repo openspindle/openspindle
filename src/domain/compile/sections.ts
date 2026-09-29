@@ -3,7 +3,7 @@ import type { NcBlock } from "@/machine/contract"
 import { camLabel } from "@/domain/nc/cam-markers"
 import type { GCodeProgram } from "@/domain/nc/gcode"
 import type { FixtureKit } from "../fixtures/fixture-kit"
-import { PROBE_TOOL } from "../tools/tool-table"
+import { isProbeSlot } from "../tools/tool-table"
 
 export type SectionKind =
   | "tool-change"
@@ -109,7 +109,8 @@ export function buildProgramSections(
   if (!lines.some((line) => line.trim())) return []
   const absolute = (index: number) => first + index
   const probing = machine.probe?.sections ?? null
-  const touchOff = (block: NcBlock) => probing?.touchOff(block) ?? null
+  const touchOff = (block: NcBlock, tool: number | null = null) =>
+    probing?.touchOff(block, tool) ?? null
   const probesGrid = (block: NcBlock) => probing?.probesGrid(block) ?? false
   // Without its CAM's toolpath markers, headings in comments name the toolpaths.
   const toolpaths = machine.camMarkers?.toolpaths(lines) ?? null
@@ -209,8 +210,8 @@ export function buildProgramSections(
     if (force) kind = force
     else if (metadataOnly) kind = "metadata"
     else if ((hasSegments || omittedMotion) && !(beforeToolChange && !hasCut))
-      // Feed moves with the probe (T0 is always the probe) trace; they never cut.
-      kind = activeTool === PROBE_TOOL && hasCut ? "scan" : "toolpath"
+      // Feed moves with a probe (T0, or the 3D probe's slot) trace; they never cut.
+      kind = isProbeSlot(activeTool) && hasCut ? "scan" : "toolpath"
     else if (hasCode || heading) kind = "setup"
     let name: string
     if (kind === "toolpath") name = heading?.name ?? `Toolpath ${++pathCount}`
@@ -262,7 +263,7 @@ export function buildProgramSections(
       }
       closeTouchOff()
     }
-    const touchName = touchOff(block)
+    const touchName = touchOff(block, activeTool)
     if (touchName !== null) {
       flush(line - 1)
       touching = { start: line, end: line, name: touchName }

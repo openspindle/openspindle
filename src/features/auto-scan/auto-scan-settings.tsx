@@ -1,10 +1,6 @@
 import { useId } from "react"
-import {
-  FieldDescription,
-  FieldGroup,
-  FieldLegend,
-  FieldSet,
-} from "@/components/ui/field"
+import { FieldGroup, FieldLegend, FieldSet } from "@/components/ui/field"
+import { Hint } from "@/components/workspace/hint"
 import { formatMillimetres } from "@/domain/auto-level/params"
 import {
   AUTO_SCAN_FIELDS,
@@ -85,8 +81,9 @@ function AutoScanForm({
   return (
     <FieldGroup>
       <FieldSet>
-        <FieldLegend variant="label">Outline</FieldLegend>
-        <FieldDescription>{outlineDescription(outline)}</FieldDescription>
+        <FieldLegend>
+          <Hint text={outlineDescription(outline)}>Outline</Hint>
+        </FieldLegend>
         <FieldGroup className="gap-3">
           <NumericFields
             id={id}

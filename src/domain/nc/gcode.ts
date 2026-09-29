@@ -17,7 +17,10 @@ export interface GCodeSegment {
   start: Point3
   end: Point3
   rapid: boolean
-  /** Rate in mm/min; rapids before any F word assume 3000. */
+  /**
+   * Rate in mm/min: the last F, else 3000 for a rapid and 600 for a feed move, or as a firmware
+   * keeps its rates (`GCodeFirmware.rates`).
+   */
   feed: number
   /** One-based source line, including blank lines and comments. */
   line: number
@@ -55,6 +58,11 @@ export type FirmwareEffect = {
 /** A block as a machine's firmware reads it, with the preview's state before it. */
 export type FirmwareBlock = {
   readonly line: number
+  /**
+   * The line as written, for what its numbers cannot tell: a firmware that reads a code's
+   * decimals as a whole subcode tells M480.10 from M480.1.
+   */
+  readonly text: string
   readonly gCodes: readonly number[]
   readonly mCodes: readonly number[]
   /** Its other words, the last of each letter, in program units. */
@@ -84,6 +92,11 @@ export interface GCodeFirmware {
   handles: (letter: "G" | "M", code: number) => boolean
   /** What a block with one of its codes does; null when the preview cannot follow it. */
   run: (block: FirmwareBlock) => FirmwareEffect | null
+  /**
+   * Its rates, mm/min, where it keeps G0's apart from the feed as Smoothieware does: `seek` for
+   * G0, which an F read in G0 mode sets instead of the feed, and `feed` before any F.
+   */
+  readonly rates?: { readonly seek: number; readonly feed: number }
 }
 
 /** The lines a program holds that cannot run as written: the first, and how many. */
@@ -230,6 +243,8 @@ export function parseGCode(
   let plane = 17
   let motion: number | null = null
   let feed: number | null = null
+  /** G0's rate, where the firmware keeps it apart from the feed. */
+  let seek = firmware?.rates?.seek ?? null
   let feedOverride = 1
   let selectedTool = 1
   let tool = 1
@@ -255,7 +270,10 @@ export function parseGCode(
       return
     }
     const nominalFeed =
-      made?.feed ?? feed ?? (rapid ? RAPID_FEED : DEFAULT_FEED)
+      made?.feed ??
+      (rapid
+        ? (seek ?? feed ?? RAPID_FEED)
+        : (feed ?? firmware?.rates?.feed ?? DEFAULT_FEED))
     const movedBy = made?.tool ?? tool
     segments.push({
       start: [...position],
@@ -338,7 +356,10 @@ export function parseGCode(
     // A block the firmware claims has F as the firmware reads it, such as a probing feed.
     if (words.has("F") && !claimed.length) {
       const value = words.get("F")! * scale
-      if (value > 0 && Number.isFinite(value)) feed = value
+      if (value > 0 && Number.isFinite(value)) {
+        if (seek !== null && motion === 0) seek = value
+        else feed = value
+      }
     }
     const sIsOverride = mCodes.some(
       (m) => ![3, 4, 5, 6, 7, 8, 9, 30].includes(m)
@@ -363,6 +384,7 @@ export function parseGCode(
     if (firmware && claimed.length) {
       const effect = firmware.run({
         line,
+        text: lines[index],
         gCodes,
         mCodes,
         words,

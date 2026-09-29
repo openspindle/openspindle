@@ -18,7 +18,10 @@ import {
   inFixtureFrame,
 } from "@/lib/three-assets"
 import type { Stock } from "@/domain/stock/stock"
-import type { ViewerPlate } from "@/components/workspace/viewer/viewer-input"
+import type {
+  ViewerPlate,
+  ViewerProblem,
+} from "@/components/workspace/viewer/viewer-input"
 import {
   ANCHOR_DISPLAY_LIFT,
   STORED_ANCHOR_RADIUS,
@@ -34,14 +37,25 @@ import type { PlatePlacement, ViewerBounds } from "../bed-viewer-layout"
 import type { ViewerPalette } from "./palette"
 import { PlatePath } from "./plate-path"
 import type { PathPresentation } from "./plate-path"
-import { sameFields, samePlate, sameRanges } from "./plate-identity"
+import {
+  sameFields,
+  samePlate,
+  sameProblems,
+  sameRanges,
+} from "./plate-identity"
 import type { FieldEquality } from "./plate-identity"
+import { ProblemView } from "./problem-view"
 import { SetupMarkers } from "./setup-markers"
 import type { Marker } from "./setup-markers"
 import { GRID_COLORS } from "./viewer-stage"
 import type { ViewerAssets } from "./viewer-assets"
 
-export type PlatePresentation = PathPresentation & { showStock: boolean }
+export type PlatePresentation = PathPresentation & {
+  showStock: boolean
+  /** The plate's problems with a place on its bed, and the key of the one shown. */
+  problems: readonly ViewerProblem[]
+  shownProblem: string | null
+}
 
 /** A setup item under the pointer: which, how far along the ray, and where it was hit. */
 export type ItemHit = {
@@ -118,6 +132,11 @@ const PRESENTATION_EQUALITY: FieldEquality<PlatePresentation> = {
   progress: Object.is,
   previewLine: Object.is,
   previewProbePoint: Object.is,
+  playhead: (a, b) =>
+    a === b ||
+    (!!a && !!b && a.segment === b.segment && a.fraction === b.fraction),
+  problems: sameProblems,
+  shownProblem: Object.is,
 }
 
 /** Scene services a plate keeps using after construction. */
@@ -418,6 +437,7 @@ export class PlateView {
   /** The selected item's box outline. */
   private readonly outline = new THREE.Group()
   private readonly markers: SetupMarkers
+  private readonly problems: ProblemView
   private selectedItem: SetupItemRef | null = null
   /** An item drawn moved by a delta, while it is dragged or until its move arrives. */
   private preview: { item: SetupItemRef; delta: Point3 } | null = null
@@ -443,6 +463,7 @@ export class PlateView {
     })
     this.selection = selectionOutline(context.palette.primary, machineBed)
     this.markers = new SetupMarkers(context.palette.primary, context.pixelRatio)
+    this.problems = new ProblemView(context.palette)
     this.decoration.add(
       this.axes,
       this.anchors,
@@ -462,6 +483,7 @@ export class PlateView {
       this.decoration,
       this.outline,
       this.markers.object,
+      this.problems.group,
       this.pick
     )
     this.buildSetup(plate)
@@ -554,6 +576,7 @@ export class PlateView {
     this.root.removeFromParent()
     this.path.dispose()
     this.markers.dispose()
+    this.problems.dispose()
     // Bed and fixture clones share their templates' geometry; release only owned resources.
     disposeObjects(this.stock, this.decoration, this.outline, this.pick)
     disposeMaterials(this.fixtureMaterials)
@@ -714,5 +737,6 @@ export class PlateView {
     this.selection.visible = presentation.active
     this.stock.visible = presentation.showStock
     this.path.present(presentation)
+    this.problems.show(presentation.problems, presentation.shownProblem)
   }
 }

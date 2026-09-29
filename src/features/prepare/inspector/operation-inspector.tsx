@@ -4,11 +4,12 @@ import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useWorkspaceStore } from "@/app/workspace/workspace-context"
-import type { Diagnostic } from "@/domain/diagnostics"
+import { diagnosticOperation } from "@/domain/diagnostics"
+import type { KeyedDiagnostic } from "@/domain/diagnostics"
 import type { Operation } from "@/domain/operations/operation"
 import type { Plate } from "@/domain/plate/plate"
 import type { PrepareSearch } from "@/routes/_workspace/prepare"
-import { usePlateDiagnostics } from "@/app/workspace/use-plate-diagnostics"
+import { useKeyedDiagnostics } from "@/app/workspace/use-plate-diagnostics"
 import { useOperationKindLabel } from "@/features/plugins/use-operation-kind-label"
 import { DiagnosticsList } from "./diagnostics-list"
 import { NameField } from "@/components/name-field"
@@ -59,18 +60,19 @@ function OperationBasics({
  * plugin editor's to explain, and Edit would only open the operation already open.
  */
 function inspectorDiagnostics(
-  diagnostics: readonly Diagnostic[],
+  diagnostics: readonly KeyedDiagnostic[],
   operationId: string
-): Diagnostic[] {
-  return diagnostics.flatMap((diagnostic) => {
+): KeyedDiagnostic[] {
+  return diagnostics.flatMap((keyed) => {
+    const { diagnostic } = keyed
     if (
-      diagnostic.operationId !== operationId ||
+      diagnosticOperation(diagnostic) !== operationId ||
       diagnostic.code === "operation-pending"
     )
       return []
     return diagnostic.fix?.kind === "edit-operation"
-      ? [{ ...diagnostic, fix: undefined }]
-      : [diagnostic]
+      ? [{ ...keyed, diagnostic: { ...diagnostic, fix: undefined } }]
+      : [keyed]
   })
 }
 
@@ -87,7 +89,7 @@ export function OperationInspector({
   onPanel: (panel: PrepareSearch["panel"]) => void
 }) {
   const diagnostics = inspectorDiagnostics(
-    usePlateDiagnostics(plate),
+    useKeyedDiagnostics(plate),
     operation.id
   )
   const kindLabel = useOperationKindLabel(operation)

@@ -23,10 +23,9 @@ import {
   InputGroupAddon,
   InputGroupInput,
 } from "@/components/ui/input-group"
-import { plateDiagnostics } from "@/app/workspace/diagnostics"
+import { useDiagnosticsOf } from "@/app/workspace/use-plate-diagnostics"
 import { useWorkspace } from "@/app/workspace/workspace-context"
 import { openDialog } from "@/features/shell/dialogs"
-import { useInstalledPlugins } from "@/platform/plugins"
 import { sectionSelectionAtom, selectSections } from "../selection"
 import { SelectionBar } from "./selection-bar"
 import { TreeRowView } from "./tree-row"
@@ -59,9 +58,8 @@ const ROW_HEIGHT = 36
 /** Plates, their operations and program sections: select, reorder, group and search. */
 export function PlateTree({ className }: { className?: string }) {
   const plates = useWorkspace((state) => state.plates)
-  const library = useWorkspace((state) => state.tools)
   const selectedPlateId = useWorkspace((state) => state.selectedPlateId)
-  const plugins = useInstalledPlugins().data ?? null
+  const diagnosticsOf = useDiagnosticsOf()
   const selection = usePrepareSelection()
   const addPlate = useAddPlate()
   const [query, setQuery] = useState("")
@@ -71,11 +69,8 @@ export function PlateTree({ className }: { className?: string }) {
     {}
   )
   const data = useMemo(
-    () =>
-      buildTreeRows(plates, (plate) =>
-        plateDiagnostics(plate, { tools: library, plugins })
-      ),
-    [plates, library, plugins]
+    () => buildTreeRows(plates, diagnosticsOf),
+    [plates, diagnosticsOf]
   )
   const searching = query.trim() !== ""
   // The row model reads the expanded state itself, so every expanded row is listed explicitly.

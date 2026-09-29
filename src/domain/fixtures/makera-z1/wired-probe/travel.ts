@@ -1,3 +1,6 @@
+import { formatMillimetres } from "../../../auto-level/params"
+import type { MachineStart } from "../../../auto-level/rules"
+
 /**
  * Machine Z the Z1 moves in (G53): the firmware stops a move above Z -1, its soft limit, and
  * below `soft_endstop.z_min`, -102 in Makera's Z1 and Z1 Pro configurations.
@@ -10,3 +13,24 @@ export const MACHINE_Z = { min: -102, max: -1 } as const
  * compensation cannot lift a G53 move past it.
  */
 export const CLEARANCE_Z = -3
+
+/**
+ * Ordinary queued moves to an anchored start, a touch point's or a 3D probing routine's: up to
+ * the clearance, then over it.
+ */
+export function anchorTravel({
+  anchor,
+  source,
+  target,
+}: MachineStart): string[] {
+  const provenance =
+    source === "factory"
+      ? "FACTORY DEFAULT coordinates - verify against the device before Run"
+      : "firmware configuration snapshot"
+  return [
+    `; Probe placement: stored anchor ${JSON.stringify(anchor.id)}; ${provenance}.`,
+    "; Rises to the machine's clearance before moving in X and Y; verify homing.",
+    `G53 G0 Z${formatMillimetres(CLEARANCE_Z)}`,
+    `G53 G0 X${formatMillimetres(target[0])} Y${formatMillimetres(target[1])}`,
+  ]
+}

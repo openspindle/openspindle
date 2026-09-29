@@ -1,7 +1,7 @@
 import { NC_BLOCK_PROBLEMS, utf8ByteLength } from "@/machine/contract"
 import { MAX_PROGRAM_LINES, parseGCode } from "@/domain/nc/gcode"
 import type { GCodeProgram } from "@/domain/nc/gcode"
-import { error } from "../diagnostics"
+import { PLATE_SUBJECT, error, operationSubject } from "../diagnostics"
 import type { Diagnostic } from "../diagnostics"
 import { kitForPlate } from "../fixtures/catalog"
 import type { FixtureKit } from "../fixtures/fixture-kit"
@@ -136,7 +136,7 @@ function compose(
           "operation-unsafe",
           `${operation.name}, line ${unit.error.line}: ${unit.error.message}`,
           {
-            operationId: operation.id,
+            subject: operationSubject(operation.id),
             line: unit.error.line,
           }
         )
@@ -267,7 +267,10 @@ function unreadableLines(
   return error(
     "nc-unreadable",
     `${where} ${own} ${NC_BLOCK_PROBLEMS[problem]}, so the machine cannot run it as written${more}.`,
-    { ...(operation && { operationId: operation.id }), line: own }
+    {
+      subject: operation ? operationSubject(operation.id) : PLATE_SUBJECT,
+      line: own,
+    }
   )
 }
 
@@ -324,7 +327,9 @@ function compileUncached(plate: Plate): CompiledPlate {
   }
   const lineCount = text ? text.split("\n").length : 0
   if (lineCount > MAX_PROGRAM_LINES || utf8ByteLength(text) > MAX_BYTES) {
-    diagnostics.push(error("program-too-large", TOO_LARGE))
+    diagnostics.push(
+      error("program-too-large", TOO_LARGE, { subject: PLATE_SUBJECT })
+    )
     text = ""
     spans = []
     mode = "empty"

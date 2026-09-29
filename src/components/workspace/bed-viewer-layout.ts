@@ -15,7 +15,11 @@ import {
 } from "@/domain/probing/registration"
 import type { ProbeGrid, ProbeTouch } from "@/domain/probing/registration"
 import { kitForSetup } from "@/domain/fixtures/catalog"
-import type { ViewerPlate } from "@/components/workspace/viewer/viewer-input"
+import type {
+  ViewerPlate,
+  ViewerProblem,
+  ViewerProblemRef,
+} from "@/components/workspace/viewer/viewer-input"
 import { ANCHOR_LIMIT } from "@/domain/anchors/stored-anchors"
 import { COORDINATE_LIMIT } from "@/domain/primitives"
 
@@ -44,6 +48,29 @@ const GRID_DROP = 0.8
 const LABEL_GAP = 18
 /** Room above an empty bed, so it is framed like a plate. */
 const EMPTY_HEADROOM = 30
+
+/** A problem's marker, by its plate and key. */
+export const problemMarkerId = ({ plateId, key }: ViewerProblemRef) =>
+  `${plateId}\n${key}`
+
+/**
+ * Where a problem's marker stands on its plate's bed: at its first place's point, a path's
+ * middle point, or the middle of an area's top.
+ */
+export function problemAnchor({ places: [place] }: ViewerProblem): Point3 {
+  switch (place.kind) {
+    case "point":
+      return place.at
+    case "path":
+      return place.points[Math.floor(place.points.length / 2)]
+    case "area":
+      return [
+        (place.min[0] + place.max[0]) / 2,
+        (place.min[1] + place.max[1]) / 2,
+        Math.max(place.min[2], place.max[2]),
+      ]
+  }
+}
 
 /** Inclusive source-line selection test in the original 1-based numbering. */
 export function lineInRanges(line: number, ranges: readonly LineRange[]) {

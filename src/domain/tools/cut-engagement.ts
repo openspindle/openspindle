@@ -1,6 +1,6 @@
 import type { GCodeSegment, Point3 } from "@/domain/nc/gcode"
 import type { ProfilePoint } from "./tool-shape"
-import { PROBE_TOOL } from "./tool-table"
+import { isProbeSlot } from "./tool-table"
 
 /*
  * Depth and width of cut, predicted by removing the stock that a program's feed moves sweep.
@@ -18,7 +18,7 @@ export const LINE_CUTS = [
   "none",
   /** Rapid moves only. */
   "rapid",
-  /** The probe's moves (T0). */
+  /** The probes' moves (T0, and the 3D probe's slot). */
   "probe",
   /** Feed moves that remove nothing: above the stock, or where it is already cut away. */
   "air",
@@ -323,9 +323,9 @@ function sweep(
   }
 }
 
-/** Feed moves cut, except the probe's; rapids are assumed to stay clear of the stock. */
+/** Feed moves cut, except the probes'; rapids are assumed to stay clear of the stock. */
 const cuts = (segment: GCodeSegment) =>
-  !segment.rapid && segment.tool !== PROBE_TOOL
+  !segment.rapid && !isProbeSlot(segment.tool)
 
 /**
  * The height field over where the program's cuts reach the stock, at a cell size that
@@ -509,7 +509,7 @@ export function simulateCuts(input: CutSimulationInput): CutEngagement {
     if (!cuts(segment) || !spanProfile) {
       flush()
       if (segment.rapid) mark(line, RAPID)
-      else if (segment.tool === PROBE_TOOL) mark(line, PROBE)
+      else if (isProbeSlot(segment.tool)) mark(line, PROBE)
       else mark(line, UNKNOWN)
       continue
     }

@@ -3,6 +3,7 @@ import { utf8ByteLength } from "@/machine/contract"
 import { AutoLevelParamsSchema } from "../auto-level/params"
 import { AutoScanParamsSchema } from "../auto-scan/params"
 import { AutoZHeightParamsSchema } from "../auto-z-height/params"
+import { Probe3dParamsSchema } from "../probe-3d/params"
 import {
   EntityIdSchema,
   TextSchema,
@@ -112,6 +113,12 @@ export const AutoScanSourceSchema = z.object({
   params: AutoScanParamsSchema,
 })
 
+/** Built-in 3D probing: the routine's NC is derived from these parameters when compiling. */
+export const Probe3dSourceSchema = z.object({
+  kind: z.literal("probe-3d"),
+  params: Probe3dParamsSchema,
+})
+
 export const OperationSourceSchema = z.discriminatedUnion("kind", [
   FileSourceSchema,
   TemplateSourceSchema,
@@ -119,6 +126,7 @@ export const OperationSourceSchema = z.discriminatedUnion("kind", [
   AutoLevelSourceSchema,
   AutoZHeightSourceSchema,
   AutoScanSourceSchema,
+  Probe3dSourceSchema,
 ])
 export type OperationSource = z.infer<typeof OperationSourceSchema>
 export type SourceKind = OperationSource["kind"]

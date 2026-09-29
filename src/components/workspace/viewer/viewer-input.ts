@@ -1,4 +1,5 @@
 import type { ToolpathBounds } from "@/domain/compile/toolpath-bounds"
+import type { Place, Severity } from "@/domain/diagnostics"
 import type { FixtureInstance } from "@/domain/fixtures/definitions"
 import type { GCodeProgram, Point3 } from "@/domain/nc/gcode"
 import type { Stock } from "@/domain/stock/stock"
@@ -25,7 +26,7 @@ export type ViewerToolRun = {
   /** Half-open indices into the program's segments; none while the probe only probes. */
   readonly segmentStart: number
   readonly segmentEnd: number
-  /** The tool's number on the plate (0 is the probe); null for the implicit tool. */
+  /** The tool's number on the plate (0 and 9999 are the probes'); null for the implicit tool. */
   readonly tool: number | null
   /** The tool's shape; null when its record describes none, and a marker stands in. */
   readonly shape: ToolShape | null
@@ -61,3 +62,17 @@ export type ViewerPlate = {
    */
   deviceId: string | null
 }
+
+/** A problem the viewer marks where it is on its plate's bed. */
+export type ViewerProblem = {
+  readonly plateId: string
+  /** Stays while the problem does, among its plate's problems. */
+  readonly key: string
+  readonly severity: Severity
+  readonly message: string
+  /** In the plate's bed coordinates; the marker stands at the first. */
+  readonly places: readonly [Place, ...Place[]]
+}
+
+/** Which problem: its plate and its key there. */
+export type ViewerProblemRef = Pick<ViewerProblem, "plateId" | "key">

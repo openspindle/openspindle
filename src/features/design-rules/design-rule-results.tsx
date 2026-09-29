@@ -24,13 +24,16 @@ import {
 import type { DesignRuleViolation } from "@/domain/design-rules/check"
 import { ruleInfo } from "@/domain/design-rules/rules"
 import { plateLabel } from "@/domain/plate/plate"
-import { usePrepareSelection } from "@/features/prepare/plate-tree/use-prepare-selection"
-import { clearSectionSelection } from "@/features/prepare/selection"
+import { useShowProblem } from "@/features/prepare/show-problem"
+import {
+  focusProblem,
+  isFocused,
+  useProblemFocus,
+} from "@/features/viewer/problem-focus"
 import {
   checkPlateDesignRules,
   closeDesignRuleResults,
   isOutOfDate,
-  selectViolation,
   useDesignRuleResults,
 } from "./design-rule-check"
 
@@ -62,7 +65,8 @@ function Summary({
  */
 export function DesignRuleResults() {
   const workspace = useWorkspaceStore()
-  const { result, selected } = useDesignRuleResults()
+  const { result } = useDesignRuleResults()
+  const focus = useProblemFocus()
   // The plate as it is named now; null once it is removed, which closes its results.
   const label = useWorkspace((state) => {
     const index = result
@@ -73,18 +77,10 @@ export function DesignRuleResults() {
   const outOfDate = useWorkspace((state) =>
     result ? isOutOfDate(result, state) : false
   )
-  const selection = usePrepareSelection()
+  const showProblem = useShowProblem()
   if (!result || label === null) return null
   const plateId = result.plate.id
   const { violations, notes } = result.check
-  const show = (violation: DesignRuleViolation, position: number) => {
-    if (violation.operationId)
-      selection.selectOperation(plateId, violation.operationId)
-    else selection.selectPlate(plateId)
-    // Selected sections would be highlighted instead.
-    clearSectionSelection()
-    selectViolation(position)
-  }
   return (
     <Card
       size="sm"
@@ -127,15 +123,12 @@ export function DesignRuleResults() {
             Nothing on this plate breaks a design rule.
           </p>
         )}
-        {violations.map((violation, position) => {
+        {result.violations.map(({ key, diagnostic: violation }) => {
           const error = violation.severity === "error"
           const Icon = error ? CircleAlert : TriangleAlert
-          const shown = selected === position
+          const shown = isFocused(focus, plateId, key)
           return (
-            <Alert
-              key={`${violation.code}:${violation.operationId ?? ""}`}
-              variant={error ? "warning" : "default"}
-            >
+            <Alert key={key} variant={error ? "warning" : "default"}>
               <Icon />
               <AlertTitle>{ruleInfo(violation.rule).label}</AlertTitle>
               <AlertDescription>{violation.message}</AlertDescription>
@@ -143,12 +136,12 @@ export function DesignRuleResults() {
                 <Toggle
                   variant="outline"
                   size="sm"
-                  aria-label={`Show ${ruleInfo(violation.rule).label} in the view`}
+                  aria-label={`Show ${ruleInfo(violation.rule).label} in the 3D view`}
                   pressed={shown}
                   disabled={outOfDate}
                   onPressedChange={(pressed) => {
-                    if (pressed) show(violation, position)
-                    else selectViolation(null)
+                    if (pressed) showProblem({ plateId, key }, violation)
+                    else focusProblem(null)
                   }}
                 >
                   Show

@@ -115,7 +115,7 @@ function AutoLevelForm({
   return (
     <FieldGroup>
       <FieldSet>
-        <FieldLegend variant="label">Probe grid</FieldLegend>
+        <FieldLegend>Probe grid</FieldLegend>
         <FieldGroup className="gap-3">
           <WorkAreaField
             description={gridFitDescription(workArea)}

@@ -2,13 +2,20 @@ import * as THREE from "three"
 import { OrbitControls } from "three/addons/controls/OrbitControls.js"
 import { kitForSetup } from "@/domain/fixtures/catalog"
 import type { Point3 } from "@/domain/nc/gcode"
-import type { ViewerPlate } from "@/components/workspace/viewer/viewer-input"
+import type {
+  ViewerPlate,
+  ViewerProblem,
+  ViewerProblemRef,
+} from "@/components/workspace/viewer/viewer-input"
 import {
   fitOrthographicBounds,
   layoutPlates,
   plateKit,
+  problemAnchor,
+  problemMarkerId,
 } from "../bed-viewer-layout"
 import type { LineRange, PlatePlacement } from "../bed-viewer-layout"
+import type { Playhead } from "@/domain/nc/move-times"
 import { viewerPalette } from "./palette"
 import { reconcilePlates } from "./plate-identity"
 import { PlateView, bedGrid } from "./plate-view"
@@ -27,9 +34,14 @@ export type ViewerPresentation = {
   selectedLineRanges?: readonly LineRange[]
   previewLine?: number | null
   previewProbePoint?: number | null
+  /** Where simulated playback is along the selected plate's moves. */
+  playhead?: Playhead | null
   progress: number
   showRapids: boolean
   showStock: boolean
+  /** Problems to mark where they are on their plates' beds, and the one shown. */
+  problems?: readonly ViewerProblem[]
+  shownProblem?: ViewerProblemRef | null
 }
 
 export type BedSceneEvents = {
@@ -41,6 +53,9 @@ export type BedSceneEvents = {
 }
 
 const NO_RANGES: readonly LineRange[] = []
+const NO_PROBLEMS: readonly ViewerProblem[] = []
+/** A shown problem whose marker is this far from the view's middle, or farther, is panned to. */
+const REVEAL_REACH = 0.8
 /** Camera offset from the orbit target for each preset view. */
 const VIEW_DIRECTIONS: Record<ViewMode, Point3> = {
   perspective: [0, -540, 430],
@@ -55,6 +70,8 @@ const VIEW_DIRECTIONS: Record<ViewMode, Point3> = {
 export class BedScene {
   private readonly container: HTMLElement
   private readonly labels: ReadonlyMap<string, HTMLElement>
+  /** Problem markers, by `problemMarkerId`. */
+  private readonly problemMarkers: ReadonlyMap<string, HTMLElement>
   private readonly events: BedSceneEvents
   private readonly stage: ViewerStage
   private readonly camera = new THREE.OrthographicCamera(
@@ -101,6 +118,7 @@ export class BedScene {
   static create(
     container: HTMLElement,
     labels: ReadonlyMap<string, HTMLElement>,
+    problemMarkers: ReadonlyMap<string, HTMLElement>,
     events: BedSceneEvents,
     meshes: ModelMeshes
   ) {
@@ -110,18 +128,27 @@ export class BedScene {
     } catch {
       return null
     }
-    return new BedScene(container, renderer, labels, events, meshes)
+    return new BedScene(
+      container,
+      renderer,
+      labels,
+      problemMarkers,
+      events,
+      meshes
+    )
   }
 
   private constructor(
     container: HTMLElement,
     renderer: THREE.WebGLRenderer,
     labels: ReadonlyMap<string, HTMLElement>,
+    problemMarkers: ReadonlyMap<string, HTMLElement>,
     events: BedSceneEvents,
     meshes: ModelMeshes
   ) {
     this.container = container
     this.labels = labels
+    this.problemMarkers = problemMarkers
     this.events = events
     // Until plates are laid out, the perspective view looks at the middle of the bed's top.
     const { min, max } = this.emptyBed.bounds
@@ -265,6 +292,33 @@ export class BedScene {
     this.center()
   }
 
+  /**
+   * Brings a problem's marker into the middle of the view when it is near an edge or beyond,
+   * panning without turning or zooming.
+   */
+  reveal(ref: ViewerProblemRef) {
+    const problem = this.presentation.problems?.find(
+      (item) => item.plateId === ref.plateId && item.key === ref.key
+    )
+    const offset = problem ? this.offsetOf(problem.plateId) : null
+    if (!problem || offset === null) return
+    const [x, y, z] = problemAnchor(problem)
+    const target = new THREE.Vector3(x + offset, y, z)
+    const projected = target.clone().project(this.camera)
+    if (
+      Math.abs(projected.x) < REVEAL_REACH &&
+      Math.abs(projected.y) < REVEAL_REACH
+    )
+      return
+    // The view is orthographic: what shows at its middle lies in the target's plane.
+    const middle = new THREE.Vector3(0, 0, projected.z).unproject(this.camera)
+    const shift = target.sub(middle)
+    this.camera.position.add(shift)
+    this.controls.target.add(shift)
+    this.controls.update()
+    this.stage.invalidate()
+  }
+
   setZoom(zoom: number) {
     this.camera.zoom = zoom
     this.camera.updateProjectionMatrix()
@@ -304,6 +358,11 @@ export class BedScene {
   private platePresentation(id: string): PlatePresentation {
     const { selectedPlateId, selectedLineRanges, showRapids, showStock } =
       this.presentation
+    const { problems = NO_PROBLEMS, shownProblem } = this.presentation
+    const marked = {
+      problems: problems.filter((problem) => problem.plateId === id),
+      shownProblem: shownProblem?.plateId === id ? shownProblem.key : null,
+    }
     if (id !== selectedPlateId)
       return {
         active: false,
@@ -311,8 +370,10 @@ export class BedScene {
         showStock,
         ranges: NO_RANGES,
         progress: 100,
+        ...marked,
       }
-    const { progress, previewLine, previewProbePoint } = this.presentation
+    const { progress, previewLine, previewProbePoint, playhead } =
+      this.presentation
     return {
       active: true,
       showRapids,
@@ -321,7 +382,16 @@ export class BedScene {
       progress,
       previewLine,
       previewProbePoint,
+      playhead,
+      ...marked,
     }
+  }
+
+  /** How far a plate is laid out along X; null for a plate not on the bed. */
+  private offsetOf(plateId: string): number | null {
+    return (
+      this.layout.placements.find(({ id }) => id === plateId)?.offsetX ?? null
+    )
   }
 
   private readonly frame = () => {
@@ -332,22 +402,38 @@ export class BedScene {
   }
 
   private positionLabels() {
-    const { clientWidth: width, clientHeight: height } = this.container
+    const { clientWidth: width } = this.container
     for (const placement of this.layout.placements) {
       const label = this.labels.get(placement.id)
       if (!label) continue
-      const projected = this.projected.set(...placement.label)
-      projected.project(this.camera)
-      label.style.left = `${((projected.x + 1) * width) / 2}px`
-      label.style.top = `${((1 - projected.y) * height) / 2}px`
-      label.style.visibility =
-        Math.abs(projected.x) <= 1 &&
-        Math.abs(projected.y) <= 1 &&
-        Math.abs(projected.z) <= 1
-          ? "visible"
-          : "hidden"
+      this.pin(label, placement.label)
       label.style.maxWidth = `${Math.max(34, width / Math.max(1, this.views.size) - 12)}px`
     }
+    for (const problem of this.presentation.problems ?? NO_PROBLEMS) {
+      const marker = this.problemMarkers.get(problemMarkerId(problem))
+      const offset = this.offsetOf(problem.plateId)
+      if (!marker) continue
+      if (offset === null) {
+        marker.style.visibility = "hidden"
+        continue
+      }
+      const [x, y, z] = problemAnchor(problem)
+      this.pin(marker, [x + offset, y, z])
+    }
+  }
+
+  /** Puts an overlay element where a point shows, hidden when the point is out of view. */
+  private pin(element: HTMLElement, point: Point3) {
+    const { clientWidth: width, clientHeight: height } = this.container
+    const projected = this.projected.set(...point).project(this.camera)
+    element.style.left = `${((projected.x + 1) * width) / 2}px`
+    element.style.top = `${((1 - projected.y) * height) / 2}px`
+    element.style.visibility =
+      Math.abs(projected.x) <= 1 &&
+      Math.abs(projected.y) <= 1 &&
+      Math.abs(projected.z) <= 1
+        ? "visible"
+        : "hidden"
   }
 
   private fit() {

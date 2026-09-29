@@ -1,10 +1,10 @@
 import type { GCodeSegment } from "@/domain/nc/gcode"
 import { formatMillimetres } from "../auto-level/params"
-import { warning } from "../diagnostics"
-import type { Diagnostic } from "../diagnostics"
+import { operationSubject, warning } from "../diagnostics"
+import type { Area, Diagnostic } from "../diagnostics"
 import { operationPhase } from "../operations/kinds"
 import type { Plate } from "../plate/plate"
-import { PROBE_TOOL } from "../tools/tool-table"
+import { isProbeSlot } from "../tools/tool-table"
 import type { CompiledPlate } from "./compile"
 
 const EPSILON = 0.001
@@ -47,6 +47,9 @@ export function stockDepthWarnings(
     if (!operation || operationPhase(operation) === "setup") return []
     let highest = -Infinity
     let lowest = Infinity
+    // Where the cuts are on the bed, which the 3D view marks.
+    const min = [Infinity, Infinity]
+    const max = [-Infinity, -Infinity]
     // The segments of the operation's own lines only.
     const end = firstSegment(segments, span.endLine + 1)
     for (
@@ -57,25 +60,35 @@ export function stockDepthWarnings(
       const segment = segments[index]
       if (
         segment.rapid ||
-        segment.tool === PROBE_TOOL ||
+        isProbeSlot(segment.tool) ||
         Math.hypot(
           segment.end[0] - segment.start[0],
           segment.end[1] - segment.start[1]
         ) < EPSILON
       )
         continue
-      for (const z of [segment.start[2], segment.end[2]]) {
-        highest = Math.max(highest, workOrigin[2] + z)
-        lowest = Math.min(lowest, workOrigin[2] + z)
+      for (const point of [segment.start, segment.end]) {
+        highest = Math.max(highest, workOrigin[2] + point[2])
+        lowest = Math.min(lowest, workOrigin[2] + point[2])
+        for (const axis of [0, 1]) {
+          min[axis] = Math.min(min[axis], workOrigin[axis] + point[axis])
+          max[axis] = Math.max(max[axis], workOrigin[axis] + point[axis])
+        }
       }
     }
     if (highest === -Infinity) return []
+    const cuts: Area = {
+      kind: "area",
+      min: [min[0], min[1], lowest],
+      max: [max[0], max[1], highest],
+    }
+    const details = { subject: operationSubject(operation.id), places: [cuts] }
     if (highest < bottom - EPSILON)
       return [
         warning(
           "stock-depth/below",
           `${operation.name} cuts only below the stock: its highest cut is ${mm(bottom - highest)} mm under the stock bottom. Check the work origin's Z; programs usually cut down from Z0 on the stock top.`,
-          { operationId: operation.id }
+          details
         ),
       ]
     if (lowest > top + EPSILON)
@@ -83,7 +96,7 @@ export function stockDepthWarnings(
         warning(
           "stock-depth/above",
           `${operation.name} cuts only above the stock: its lowest cut is ${mm(lowest - top)} mm over the stock top. Check the work origin's Z and the stock height.`,
-          { operationId: operation.id }
+          details
         ),
       ]
     return []

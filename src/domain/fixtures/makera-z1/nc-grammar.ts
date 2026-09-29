@@ -1,8 +1,13 @@
 import type { NcWord } from "@/machine/contract"
-import type { NcBlockEffect, NcUnitState } from "../../compile/nc-unit"
+import type {
+  NcBlockEffect,
+  NcPolicy,
+  NcUnitState,
+} from "../../compile/nc-unit"
 import { COORDINATE_LIMIT, fail, ok } from "../../primitives"
 import type { Result } from "../../primitives"
-import { PROBE_TOOL } from "../../tools/tool-table"
+import { PROBE_3D_TOOL, PROBE_TOOL } from "../../tools/tool-table"
+import { ORIGIN_ROUTINE } from "./3d-probe/blocks"
 import {
   FIRMWARE_ROUTINE,
   GRID,
@@ -22,6 +27,18 @@ const PARK = 28
 
 const FIELDS = "Probe blocks need explicit, unique supported fields."
 
+/** The probe an operation's probing runs with: the 3D probe finds origins, T0 does the rest. */
+const probeFor = ({ probing }: NcPolicy) =>
+  probing === "origin" ? PROBE_3D_TOOL : PROBE_TOOL
+
+/**
+ * The 3D probing routines' subcodes as numbers: M480.1 to M480.9, and M480.10, which reads as
+ * M480.1. The firmware reads the digits after the point as a whole number.
+ */
+const ORIGIN_ROUTINES: readonly number[] = [1, 2, 3, 4, 5, 6, 7, 8, 9].map(
+  (subcode) => Number(`${ORIGIN_ROUTINE}.${subcode}`)
+)
+
 type Reading = Result<NcBlockEffect>
 
 /**
@@ -39,7 +56,8 @@ export const isZ1Park = (words: readonly Pick<NcWord, "letter" | "value">[]) =>
 /**
  * The Z1's own blocks beyond plain three-axis machining, as combining operations reads them: the
  * park its programs may end with, the wired probe's routines, which only its probing operations
- * may run with T0 active, and path control, which its firmware ignores. Null for any other block.
+ * may run with T0 active, the 3D probe's, which only 3D probing may run with its tool active, and
+ * path control, which its firmware ignores. Null for any other block.
  */
 export function readZ1Block(
   words: readonly NcWord[],
@@ -56,6 +74,8 @@ export function readZ1Block(
     return workZ(words, gCodes, state)
   if (mCodes.some((word) => word.value === FIRMWARE_ROUTINE))
     return firmwareProbe(words, gCodes, mCodes, state)
+  if (mCodes.some((word) => Math.trunc(word.value) === ORIGIN_ROUTINE))
+    return originRoutine(words, gCodes, mCodes, state)
   if (mCodes.some((word) => PROBE_SETUP_CODES.includes(word.value)))
     return probeSetup(words, mCodes, state)
   if (gCodes.some((word) => word.value === 53))
@@ -243,6 +263,44 @@ function firmwareProbe(
   return ok({ grid: true, motion: null })
 }
 
+/**
+ * The firmware's 3D probing (ATCHandler's M480): D the ball, X and Y the distances, Z the depth,
+ * each once. The firmware sets the work origin itself and restores the distance mode after.
+ */
+function originRoutine(
+  words: readonly NcWord[],
+  gCodes: readonly NcWord[],
+  mCodes: readonly NcWord[],
+  { policy, activeTool, spindleRunning, metric, absolute }: NcUnitState
+): Reading {
+  if (
+    policy.probing !== "origin" ||
+    activeTool !== PROBE_3D_TOOL ||
+    spindleRunning ||
+    !metric ||
+    !absolute ||
+    gCodes.length ||
+    mCodes.length !== 1 ||
+    !ORIGIN_ROUTINES.includes(mCodes[0].value)
+  )
+    return fail(
+      `The firmware's 3D probing (M480.1 to M480.10) requires a 3D probing operation, active T${PROBE_3D_TOOL}, a stopped spindle and G21 G90.`
+    )
+  const values = probeFields(words, ["N", "M", "D", "X", "Y", "Z"])
+  if (!values) return fail(FIELDS)
+  const ball = values.get("D")
+  const bounded = (letter: string) => {
+    const value = values.get(letter)
+    return value === undefined || (value >= 0 && value <= COORDINATE_LIMIT)
+  }
+  if (ball === undefined || ball <= 0 || !["D", "X", "Y", "Z"].every(bounded))
+    return fail(
+      "M480 needs its ball diameter D and non-negative, bounded X, Y and Z."
+    )
+  // Later coordinates must select their motion again rather than continue the firmware's.
+  return ok({ touch: true, motion: null })
+}
+
 /** Work Z of the active coordinate system at the touched surface. */
 function workZ(
   words: readonly NcWord[],
@@ -281,11 +339,11 @@ function probeSetup(
 ): Reading {
   if (
     policy.probing === "none" ||
-    activeTool !== PROBE_TOOL ||
+    activeTool !== probeFor(policy) ||
     mCodes.length !== 1
   )
     return fail(
-      "Probe setup commands are supported only in probing operations with active T0."
+      "Probe setup commands are supported only in probing operations with their probe active."
     )
   if (!probeFields(words, ["N", "M"])) return fail(FIELDS)
   if (mCodes[0].value === 370 && !policy.anchoredProbing)
@@ -303,7 +361,7 @@ function probeTravel(
 ): Reading {
   if (
     policy.probing === "none" ||
-    activeTool !== PROBE_TOOL ||
+    activeTool !== probeFor(policy) ||
     !metric ||
     !absolute ||
     gCodes.length !== 2 ||
@@ -311,7 +369,7 @@ function probeTravel(
     gCodes[1].value !== 0
   )
     return fail(
-      "Machine-coordinate probe travel requires active T0, G21 G90 and an explicit G53 G0 block."
+      "Machine-coordinate probe travel requires the operation's probe active, G21 G90 and an explicit G53 G0 block."
     )
   const values = probeFields(words, ["N", "G", "X", "Y", "Z"])
   if (!values) return fail(FIELDS)

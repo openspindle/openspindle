@@ -3,16 +3,19 @@ import type { GCodeSegment, Point3 } from "@/domain/nc/gcode"
 import type { Tool } from "@/domain/tools/tool"
 import type { CompiledPlate, OperationSpan } from "../compile/compile"
 import { machineRetract } from "../compile/sections"
-import { error, warning } from "../diagnostics"
-import type { Diagnostic } from "../diagnostics"
+import {
+  PLATE_SUBJECT,
+  diagnosticOperation,
+  error,
+  operationSubject,
+  warning,
+} from "../diagnostics"
+import type { Diagnostic, ProgramLines } from "../diagnostics"
 import type { Plate } from "../plate/plate"
 import { toMicrometre } from "../primitives"
-import { PROBE_TOOL } from "../tools/tool-table"
+import { isProbeSlot } from "../tools/tool-table"
 import { CHECK_RULES, LIMIT_RULES, LIMIT_RULE_INFO } from "./rules"
 import type { DesignRuleId, DesignRules } from "./rules"
-
-/** Inclusive 1-based lines of the compiled program. */
-export type ProgramLines = { readonly start: number; readonly end: number }
 
 /** A rule that moves of one operation break, with where they do. */
 export type DesignRuleViolation = Diagnostic & {
@@ -49,9 +52,9 @@ type Region = {
   readonly bottom: number | null
 }
 
-/** Feed moves cut, except the probe's (T0 is always the probe). */
+/** Feed moves cut, except the probes' (T0, and the 3D probe's slot). */
 const cutting = (segment: GCodeSegment) =>
-  !segment.rapid && segment.tool !== PROBE_TOOL
+  !segment.rapid && !isProbeSlot(segment.tool)
 
 function stockRegion(
   plate: Plate,
@@ -139,6 +142,8 @@ type Group = {
   readonly operationId: string | null
   worst: number
   worstLine: number
+  /** Where the worst move ends, in the program's coordinates. */
+  worstAt: Point3
   lineCount: number
   readonly ranges: { start: number; end: number }[]
 }
@@ -286,6 +291,7 @@ export function checkDesignRules(
         operationId,
         worst: -Infinity,
         worstLine: segment.line,
+        worstAt: segment.end,
         lineCount: 0,
         ranges: [],
       }
@@ -300,6 +306,7 @@ export function checkDesignRules(
     if (value > group.worst) {
       group.worst = value
       group.worstLine = segment.line
+      group.worstAt = segment.end
     }
   }
 
@@ -378,10 +385,13 @@ export function checkDesignRules(
       const subject = operation?.name ?? "The program"
       const message = `${subject} ${breach(group, rules, region)}. ${where(group, line)}`
       const report = rules[group.rule].severity === "error" ? error : warning
+      const [x, y, z] = group.worstAt
+      const [ox, oy, oz] = plate.setup.workOrigin
       return {
         ...report(ruleCode(group.rule), message, {
-          ...(operation ? { operationId: operation.id } : {}),
+          subject: operation ? operationSubject(operation.id) : PLATE_SUBJECT,
           line,
+          places: [{ kind: "point", at: [ox + x, oy + y, oz + z] }],
         }),
         rule: group.rule,
         lineCount: group.lineCount,
@@ -391,8 +401,8 @@ export function checkDesignRules(
     .sort(
       (a, b) =>
         Number(a.severity !== "error") - Number(b.severity !== "error") ||
-        (order.get(a.operationId ?? null) ?? -1) -
-          (order.get(b.operationId ?? null) ?? -1) ||
+        (order.get(diagnosticOperation(a)) ?? -1) -
+          (order.get(diagnosticOperation(b)) ?? -1) ||
         ruleOrder.indexOf(a.rule) - ruleOrder.indexOf(b.rule)
     )
   return { violations, notes }

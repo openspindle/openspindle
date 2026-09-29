@@ -33,7 +33,13 @@ const SLOW = 100
 const RETRACT = 1
 /** The stock top on the bed, and the tool sensor's contact for a tool of that number. */
 const SURFACE_Z = -82.35
-const sensorZ = (tool: number) => (tool === 0 ? -76.5 : -84.47 + tool * 0.01)
+function sensorZ(tool: number) {
+  if (tool === 0) return -76.5
+  // A Z1 Pro measured its 3D probe (T9999) at -67.174 (2026-09-28): 9.4 mm longer, as fitted,
+  // than the wired probe.
+  if (tool === 9999) return -67.17
+  return -84.47 + tool * 0.01
+}
 
 const f3 = (value: number) => value.toFixed(3)
 const f4 = (value: number) => value.toFixed(4)
@@ -256,4 +262,265 @@ export function levelGrid(
       ],
     },
   ]
+}
+
+/**
+ * The features the 3D probing routines find, from where the probe starts: a corner's sides or
+ * walls half the distance away, a 16 × 12 mm pocket, which the default 10 mm searches reach, and
+ * a boss whose sides lie 6 mm inside the distance. The stock top is the Z probe's.
+ */
+const POCKET = { halfX: 8, halfY: 6 }
+const BOSS_INSET = 6
+
+/** A routine's value as the firmware reads it, or its default. */
+const value = (code: string, letter: string, fallback: number) => {
+  const match = new RegExp(`${letter}([+-]?(?:\\d+\\.?\\d*|\\.\\d+))`).exec(
+    code.replace(/^M\S+/, "")
+  )
+  return match ? Number(match[1]) : fallback
+}
+
+/** The firmware's signs for the X and Y distances, by M480 subcode. */
+const SIGNS: Record<number, [number, number]> = {
+  1: [1, 1],
+  2: [-1, 1],
+  3: [-1, -1],
+  4: [1, -1],
+  5: [1, 1],
+  6: [-1, 1],
+  7: [-1, -1],
+  8: [1, -1],
+  9: [1, 1],
+  10: [1, 1],
+}
+
+/**
+ * M480 (ATCHandler's fill_OutCorner_scripts and the others): the 3D probe finds a corner or a
+ * centre from `start` and sets the work origin there. The outside corners' scripts are queued
+ * and echoed after M497.5; the other routines run theirs at once, unechoed, so only their
+ * contacts and replies reach the host.
+ */
+export function originRoutine(code: string, start: Xyz, ms: number): Step[] {
+  const subcode = Number(/^M0*480\.(\d+)/.exec(code)?.[1] ?? 0)
+  if (!Object.hasOwn(SIGNS, subcode)) return []
+  const signs = SIGNS[subcode]
+  const queued = subcode <= 4
+  const radius = value(code, "D", 2) / 2
+  const dx = signs[0] * value(code, "X", 20)
+  const dy = signs[1] * value(code, "Y", 20)
+  const dz = value(code, "Z", 2)
+  const [sx, sy, sz] = start
+  const steps: Step[] = []
+  const line = (
+    echo: string,
+    output: (machine: AutomationMachine) => string[],
+    wait = ms
+  ) =>
+    steps.push({
+      echo: queued ? echo : null,
+      ms: wait,
+      output: (machine) => [...output(machine), "ok"],
+    })
+  const at = (
+    machine: AutomationMachine,
+    x?: number,
+    y?: number,
+    z?: number
+  ) => {
+    if (x !== undefined) machine.mpos[0] = x
+    if (y !== undefined) machine.mpos[1] = y
+    if (z !== undefined) machine.mpos[2] = z
+    return []
+  }
+  const report = (machine: AutomationMachine) => {
+    const [x, y, z] = machine.mpos
+    return [`[PRB:${f3(x)},${f3(y)},${f3(z)}:1]`]
+  }
+  const workZ = (machine: AutomationMachine) => machine.offset[2] - dz
+  /** Down beside a side at a tenth of the speed, as the firmware comes down (M220 S10). */
+  const descend = (over?: (machine: AutomationMachine) => void) => {
+    line("M220S10", () => [])
+    line(
+      `G90 G0 Z${f3(-dz)}`,
+      (machine) => {
+        over?.(machine)
+        return at(machine, undefined, undefined, workZ(machine))
+      },
+      ms * 3
+    )
+    line("M220S100", () => [])
+  }
+  line("M494.1", () => [])
+  line("M497.5", () => [])
+  // The top, twice, then back up to the height the routine started at; a pocket has none.
+  if (subcode !== 9) {
+    for (const pass of [0, 1]) {
+      line(
+        `G38.2 Z${f3(TOOLRACK_Z)} F${f3(SLOW)}`,
+        (machine) => {
+          at(machine, undefined, undefined, SURFACE_Z)
+          return report(machine)
+        },
+        ms * (pass ? 3 : 8)
+      )
+      line("G10 L20 P0 Z0", (machine) => {
+        machine.offset[2] = machine.mpos[2]
+        return []
+      })
+      if (!pass)
+        line(`G91 G0 Z${f3(RETRACT)}`, (machine) =>
+          at(machine, undefined, undefined, SURFACE_Z + RETRACT)
+        )
+    }
+    line(`G53 G0 Z${f3(sz)}`, (machine) =>
+      at(machine, undefined, undefined, sz)
+    )
+  }
+  /**
+   * Two touches on a side, found `side` along `axis` (0 or 1), searching `distance` towards
+   * `direction`, each followed by a retract, after the work origin a corner sets at the second.
+   */
+  const touches = (
+    axis: 0 | 1,
+    side: number,
+    direction: number,
+    distance: number,
+    zero: number | null
+  ) => {
+    const letter = axis ? "Y" : "X"
+    const contact = side - direction * radius
+    const retract = () =>
+      line(`G91 G0 ${letter}${f3(-direction * RETRACT)}`, (machine) => {
+        machine.mpos[axis] = contact - direction * RETRACT
+        return []
+      })
+    for (const [pass, feed] of [
+      [0, SLOW],
+      [1, SLOW / 2],
+    ] as const) {
+      line(
+        `G38.2 ${letter}${f3(direction * distance)} F${f3(feed)}`,
+        (machine) => {
+          machine.mpos[axis] = contact
+          return report(machine)
+        },
+        ms * 3
+      )
+      if (!pass) retract()
+    }
+    if (zero !== null)
+      line(`G10 L20 P0 ${letter}${f3(zero)}`, (machine) => {
+        machine.offset[axis] = contact - zero
+        return []
+      })
+    retract()
+    return contact
+  }
+  if (subcode <= 8) {
+    const inside = subcode >= 5
+    // Outside, the sides are half the distance back from the start; inside, the walls are.
+    const sideX = sx + (inside ? dx / 2 : -dx / 2)
+    const sideY = sy + (inside ? -dy / 2 : dy / 2)
+    const outX = inside ? sx + dx : sx - dx
+    const outY = inside ? sy - dy : sy
+    line(
+      `G91 G0 X${f3(outX - sx)}${inside ? ` Y${f3(outY - sy)}` : ""}`,
+      (machine) => at(machine, outX, outY)
+    )
+    descend()
+    const towardX = inside ? -Math.sign(dx) : Math.sign(dx)
+    touches(
+      0,
+      sideX,
+      towardX,
+      Math.abs(dx),
+      inside ? Math.sign(dx) * radius : -Math.sign(dx) * radius
+    )
+    if (!inside) {
+      line(`G53 G0 Z${f3(sz)}`, (machine) =>
+        at(machine, undefined, undefined, sz)
+      )
+      line(`G53 G0 X${f3(sx)}`, (machine) => at(machine, sx))
+      line(`G91 G0 Y${f3(dy)}`, (machine) => at(machine, undefined, sy + dy))
+      descend()
+    } else line(`G53 G0 X${f3(outX)}`, (machine) => at(machine, outX))
+    const towardY = inside ? Math.sign(dy) : -Math.sign(dy)
+    touches(
+      1,
+      sideY,
+      towardY,
+      Math.abs(dy),
+      inside ? -Math.sign(dy) * radius : Math.sign(dy) * radius
+    )
+    line(`G53 G0 Z${f3(sz)}`, (machine) =>
+      at(machine, undefined, undefined, sz)
+    )
+    line(
+      "G90 G0 X0.0Y0.0",
+      (machine) => at(machine, machine.offset[0], machine.offset[1]),
+      ms * 3
+    )
+    return steps
+  }
+  // A pocket's walls, or a boss's sides, either side of the start in X, then in Y.
+  for (const [axis, reach, half] of [
+    [
+      0,
+      dx,
+      subcode === 9 ? POCKET.halfX : Math.max(3, Math.abs(dx) - BOSS_INSET),
+    ],
+    [
+      1,
+      dy,
+      subcode === 9 ? POCKET.halfY : Math.max(3, Math.abs(dy) - BOSS_INSET),
+    ],
+  ] as const) {
+    if (!reach) continue
+    const middle = start[axis]
+    const letter = axis ? "Y" : "X"
+    const distance = Math.abs(reach)
+    if (subcode === 10) {
+      line(`G91 G0 ${letter}${f3(-reach)}`, (machine) => {
+        machine.mpos[axis] = middle - reach
+        return []
+      })
+      descend()
+    }
+    const minus = touches(
+      axis,
+      middle - half,
+      subcode === 9 ? -1 : 1,
+      distance,
+      null
+    )
+    if (subcode === 10) {
+      line(`G53 G0 Z${f3(sz)}`, (machine) =>
+        at(machine, undefined, undefined, sz)
+      )
+      descend((machine) => {
+        machine.mpos[axis] = middle + half + radius + 4
+      })
+    }
+    const plus = touches(
+      axis,
+      middle + half,
+      subcode === 9 ? 1 : -1,
+      distance,
+      null
+    )
+    if (subcode === 10)
+      line(`G53 G0 Z${f3(sz)}`, (machine) =>
+        at(machine, undefined, undefined, sz)
+      )
+    const centre = (minus + plus) / 2
+    line(`G53 G0 ${letter}${f3(centre)}`, (machine) => {
+      machine.mpos[axis] = centre
+      return []
+    })
+    line(`G10 L20 P0 ${letter}0`, (machine) => {
+      machine.offset[axis] = centre
+      return []
+    })
+  }
+  return steps
 }

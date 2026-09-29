@@ -148,7 +148,6 @@ export function JobSummary({
         <h2 className="truncate">
           {subject ? plateLabel(subject.plate, index) : "No plate"}
         </h2>
-        <FieldDescription>Selected plate</FieldDescription>
       </div>
     )
   return (

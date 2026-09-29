@@ -4,7 +4,6 @@ import type { DeepKeys, DeepValue } from "@tanstack/react-form"
 import {
   Field,
   FieldContent,
-  FieldDescription,
   FieldError,
   FieldGroup,
   FieldLabel,
@@ -16,6 +15,7 @@ import { OptionSelect } from "@/components/option-select"
 import { Switch } from "@/components/ui/switch"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { MeasurementInput } from "@/components/workspace/measurement-input"
+import { Hint } from "@/components/workspace/hint"
 import { ReasonButton } from "@/components/workspace/reason-button"
 import { AUTO_LEVEL_COORDINATE_LIMIT } from "@/domain/auto-level/params"
 import type {
@@ -61,7 +61,7 @@ export function probingField<
   )
 }
 
-/** A labelled measurement with its description and errors, on one row of a probing form. */
+/** A labelled measurement, explained on its label, with its errors, on one row of a probing form. */
 export function MeasurementField({
   id,
   label,
@@ -103,10 +103,13 @@ export function MeasurementField({
       data-invalid={invalid}
       data-disabled={disabled}
     >
-      <FieldLabel htmlFor={id}>{label}</FieldLabel>
+      <FieldLabel htmlFor={id}>
+        <Hint text={description}>{label}</Hint>
+      </FieldLabel>
       <MeasurementInput
         id={id}
         type="number"
+        aria-description={description}
         axis={axis}
         unit={unit}
         placeholder={placeholder}
@@ -123,16 +126,17 @@ export function MeasurementField({
           )
         }
       />
-      {description && (
-        <FieldDescription className={FULL_ROW}>{description}</FieldDescription>
-      )}
       <FieldError className={FULL_ROW} errors={errors} />
     </Field>
   )
 }
 
-/** A probing form's row that places the operation over the plate's work area. */
+/**
+ * A probing form's row that places the operation over the plate's work area, or from what
+ * `title` names, such as its work origin.
+ */
 export function WorkAreaField({
+  title = "Work area",
   description,
   action,
   icon,
@@ -140,6 +144,7 @@ export function WorkAreaField({
   disabled,
   onApply,
 }: {
+  title?: string
   description: string
   action: string
   icon: ReactNode
@@ -151,8 +156,9 @@ export function WorkAreaField({
   return (
     <Field orientation="horizontal" data-disabled={disabled}>
       <FieldContent>
-        <FieldTitle>Work area</FieldTitle>
-        <FieldDescription>{description}</FieldDescription>
+        <FieldTitle>
+          <Hint text={description}>{title}</Hint>
+        </FieldTitle>
       </FieldContent>
       <ReasonButton
         label={action}
@@ -160,6 +166,7 @@ export function WorkAreaField({
         variant="outline"
         size="sm"
         disabled={disabled}
+        aria-description={description}
         onClick={onApply}
       >
         {icon}
@@ -188,11 +195,13 @@ export function SwitchField({
   return (
     <Field orientation="horizontal" data-disabled={disabled}>
       <FieldContent>
-        <FieldLabel htmlFor={id}>{label}</FieldLabel>
-        <FieldDescription>{description}</FieldDescription>
+        <FieldLabel htmlFor={id}>
+          <Hint text={description}>{label}</Hint>
+        </FieldLabel>
       </FieldContent>
       <Switch
         id={id}
+        aria-description={description}
         checked={checked}
         disabled={disabled}
         onCheckedChange={onCheckedChange}
@@ -244,10 +253,10 @@ export function NumericFields({
 
 /**
  * Where a probing operation places itself: a stored anchor plus an offset, or the probe
- * position. Shared by auto-level's grid and auto Z-height's touch point: the anchor items,
- * `canUseAnchor`, `choose`, the anchor Select and the offsets are identical; only the "Relative
- * to" wording and, through `action`, what fits the placement to the work area (Fit grid or
- * Center) differ.
+ * position. Shared by auto-level's grid, auto Z-height's touch point and 3D probing's start: the
+ * anchor items, `canUseAnchor`, `choose`, the anchor Select and the offsets are identical; only
+ * the "Relative to" wording and, through `action`, what fits the placement to the work area (Fit
+ * grid or Center) differ.
  */
 export function PlacementFields({
   id,
@@ -273,9 +282,9 @@ export function PlacementFields({
   lastAnchor: AnchorPlacement | null
   setLastAnchor: (anchor: AnchorPlacement | null) => void
   disabled: boolean
-  /** What "Probe position" does, shown under the toggle. */
+  /** What "Probe position" does, explained on "Relative to" while it is chosen. */
   probeDescription: string
-  /** What "Stored anchor" does, shown under the toggle. */
+  /** What "Stored anchor" does, explained on "Relative to" while it is chosen. */
   anchorDescription: string
   /** Fit grid or Center, above "Relative to"; left out where it sits beside other fields instead. */
   action?: (
@@ -296,6 +305,8 @@ export function PlacementFields({
       placementValue.kind === "anchor" ||
       lastAnchor !== null ||
       anchors.length > 0
+    const relativeToDescription =
+      placementValue.kind === "anchor" ? anchorDescription : probeDescription
     const choose = (kind: string | undefined) => {
       if (kind === "probe-position" && placementValue.kind === "anchor") {
         setLastAnchor(placementValue)
@@ -309,15 +320,18 @@ export function PlacementFields({
     }
     return (
       <FieldSet>
-        <FieldLegend variant="label">Placement</FieldLegend>
+        <FieldLegend>Placement</FieldLegend>
         <FieldGroup className="gap-3">
           {action?.(placementValue, setPlacement)}
           <Field data-disabled={disabled}>
-            <FieldLabel id={`${id}-relative-to`}>Relative to</FieldLabel>
+            <FieldLabel id={`${id}-relative-to`}>
+              <Hint text={relativeToDescription}>Relative to</Hint>
+            </FieldLabel>
             <ToggleGroup
               variant="outline"
               className="w-full"
               aria-labelledby={`${id}-relative-to`}
+              aria-description={relativeToDescription}
               value={[placementValue.kind]}
               disabled={disabled}
               onValueChange={(values) => choose(values[0])}
@@ -333,11 +347,6 @@ export function PlacementFields({
                 Stored anchor
               </ToggleGroupItem>
             </ToggleGroup>
-            <FieldDescription>
-              {placementValue.kind === "anchor"
-                ? anchorDescription
-                : probeDescription}
-            </FieldDescription>
           </Field>
           {placementValue.kind === "anchor" && (
             <>

@@ -34,6 +34,6 @@ The check does not model material already removed: a move into a pocket that an 
 
 ## Results
 
-The results stay over the 3D view until closed. They name the plate and count the errors and warnings, then list each rule that an operation breaks: its worst value against the limit, how many of the operation's lines break it, and the line of the worst one (the first, for the spindle), numbered as in the operation's own NC. **Show** selects the operation and highlights those lines in the 3D view; selecting program sections in the plate list highlights them instead.
+The results stay over the 3D view until closed. They name the plate and count the errors and warnings, then list each rule that an operation breaks: its worst value against the limit, how many of the operation's lines break it, and the line of the worst one (the first, for the spindle), numbered as in the operation's own NC. **Show** selects the operation, highlights those lines in the 3D view and marks where the worst move ends, panning to it when it is out of view; selecting program sections in the plate list highlights them instead.
 
 When the plate or the rules change after a check, the results are marked **Out of date** and Show is unavailable: **Check again** (the arrow) checks the plate again. Removing the plate closes its results.

@@ -1,4 +1,6 @@
 import { bedAnchors } from "@/domain/anchors/stored-anchors"
+import { issueOf } from "@/domain/diagnostics"
+import type { Issue } from "@/domain/diagnostics"
 import type { Point3 } from "@/domain/nc/gcode"
 import type { Stock } from "@/domain/stock/stock"
 import type { AutoLevelPlacement } from "../auto-level/params"
@@ -25,22 +27,10 @@ export type AutoZHeightIssueCode =
   | "before-auto-level"
 
 /** Errors block NC generation or Run; warnings inform without blocking. */
-export type AutoZHeightIssue = {
-  code: AutoZHeightIssueCode
-  /** User-facing explanation, ready to display. */
-  message: string
-  severity: "error" | "warning"
-}
+export type AutoZHeightIssue = Issue<AutoZHeightIssueCode>
 
-const zHeightError = (
-  code: AutoZHeightIssueCode,
-  message: string
-): AutoZHeightIssue => ({ code, message, severity: "error" })
-
-const zHeightWarning = (
-  code: AutoZHeightIssueCode,
-  message: string
-): AutoZHeightIssue => ({ code, message, severity: "warning" })
+const zHeightError = issueOf<AutoZHeightIssueCode>("error")
+const zHeightWarning = issueOf<AutoZHeightIssueCode>("warning")
 
 /** The plate an auto Z-height operation belongs to. */
 export type AutoZHeightPlateContext = AutoLevelPlacementContext & {
@@ -190,7 +180,7 @@ function stockIssues(
     anchor.position[0] + start.target[0] - start.anchor.machinePosition[0]
   const y =
     anchor.position[1] + start.target[1] - start.anchor.machinePosition[1]
-  const [stockX, stockY] = plate.stockAnchor
+  const [stockX, stockY, stockZ] = plate.stockAnchor
   if (
     x >= stockX - EPSILON &&
     y >= stockY - EPSILON &&
@@ -201,7 +191,9 @@ function stockIssues(
   return [
     zHeightWarning(
       "point-outside-stock",
-      "The anchored probe point is off the stock as placed on the bed, so the probe would set work Z on another surface."
+      "The anchored probe point is off the stock as placed on the bed, so the probe would set work Z on another surface.",
+      // Beside the stock, at the height of what it stands on.
+      { places: [{ kind: "point", at: [x, y, stockZ] }] }
     ),
   ]
 }

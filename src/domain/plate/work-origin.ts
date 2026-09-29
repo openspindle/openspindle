@@ -5,7 +5,7 @@ import type {
   StoredAnchor,
   StoredAnchorSetup,
 } from "@/domain/anchors/stored-anchors"
-import { error } from "../diagnostics"
+import { WORK_ORIGIN_SUBJECT, error } from "../diagnostics"
 import type { Diagnostic } from "../diagnostics"
 import type { FixtureKit } from "../fixtures/fixture-kit"
 import type { RunContext } from "../operations/kinds"
@@ -195,7 +195,10 @@ export function workOriginNc(
 }
 
 const readAnchors = (code: string, message: string): Diagnostic[] => [
-  error(`work-origin/${code}`, message, { fix: { kind: "read-anchors" } }),
+  error(`work-origin/${code}`, message, {
+    subject: WORK_ORIGIN_SUBJECT,
+    fix: { kind: "read-anchors" },
+  }),
 ]
 
 /**

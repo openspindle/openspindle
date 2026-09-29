@@ -1,11 +1,7 @@
 import { useId, useState } from "react"
 import { LocateFixed } from "lucide-react"
-import {
-  FieldDescription,
-  FieldGroup,
-  FieldLegend,
-  FieldSet,
-} from "@/components/ui/field"
+import { FieldGroup, FieldLegend, FieldSet } from "@/components/ui/field"
+import { Hint } from "@/components/workspace/hint"
 import type { AnchorPlacement } from "@/domain/auto-level/params"
 import { centerAutoZHeight, workAreaMiddle } from "@/domain/auto-z-height/fit"
 import {
@@ -109,11 +105,11 @@ function AutoZHeightForm({
   return (
     <FieldGroup>
       <FieldSet>
-        <FieldLegend variant="label">Touch-off</FieldLegend>
-        <FieldDescription>
-          The probed surface becomes work Z0, and the plate's work origin stays
-          on the stock top.
-        </FieldDescription>
+        <FieldLegend>
+          <Hint text="The probed surface becomes work Z0, and the plate's work origin stays on the stock top.">
+            Touch-off
+          </Hint>
+        </FieldLegend>
         <FieldGroup className="gap-3">
           <NumericFields
             id={id}

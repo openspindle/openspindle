@@ -1,6 +1,7 @@
 import * as THREE from "three"
 import type { ToolShape } from "@/domain/tools/tool-shape"
-import type { GCodeProgram, Point3 } from "@/domain/nc/gcode"
+import type { GCodeProgram, GCodeSegment, Point3 } from "@/domain/nc/gcode"
+import type { Playhead } from "@/domain/nc/move-times"
 import type { ViewerToolRun } from "@/components/workspace/viewer/viewer-input"
 import { disposeObjects } from "@/lib/three-assets"
 import { TOOL_MARKER_LENGTH } from "../bed-viewer-layout"
@@ -11,6 +12,7 @@ import { disposeToolModel, toolMaterials, toolModel } from "./tool-model"
 import type { ToolMaterials } from "./tool-model"
 import {
   MOTIONS,
+  motionOf,
   motionSegmentsBefore,
   segmentWindows,
   toolpathBuffers,
@@ -63,8 +65,18 @@ export type ToolModels = {
   invalidate: () => void
 }
 
-/** The run whose lines hold `line`; runs are in program order. */
-function runOnLine(runs: readonly ViewerToolRun[], line: number) {
+/** The point `fraction` of the way along a move. */
+const along = ({ start, end }: GCodeSegment, fraction: number): Point3 => [
+  start[0] + (end[0] - start[0]) * fraction,
+  start[1] + (end[1] - start[1]) * fraction,
+  start[2] + (end[2] - start[2]) * fraction,
+]
+
+/**
+ * The run of the tool in the spindle at `line`: the run whose lines hold it, else the last before
+ * it, as a tool stays in until the next change; -1 before the first. Runs are in program order.
+ */
+function runIndexAt(runs: readonly ViewerToolRun[], line: number) {
   let low = 0
   let high = runs.length
   while (low < high) {
@@ -72,8 +84,7 @@ function runOnLine(runs: readonly ViewerToolRun[], line: number) {
     if (runs[middle].lineEnd < line) low = middle + 1
     else high = middle
   }
-  const run = runs.at(low)
-  return run && run.lineStart <= line ? run : undefined
+  return low < runs.length && runs[low].lineStart <= line ? low : low - 1
 }
 
 /**
@@ -103,6 +114,11 @@ export class ToolpathView {
   private readonly meshModels = new Map<string, THREE.Object3D | null>()
   /** Stands in for a tool whose record describes no shape. */
   private readonly marker: THREE.Mesh
+  /** The move under way while playback simulates it, up to where the tool is. */
+  private readonly move: THREE.Line<
+    THREE.BufferGeometry,
+    THREE.LineBasicMaterial
+  >
   private shownTool: THREE.Object3D | null = null
   /** What `showTool` was last asked to show, to show again once a model arrives. */
   private shown: Parameters<ToolpathView["showTool"]> = [null]
@@ -159,7 +175,17 @@ export class ToolpathView {
     )
     this.marker.rotation.x = Math.PI / 2
     this.marker.visible = false
-    this.path.add(this.marker)
+    this.move = new THREE.Line(
+      new THREE.BufferGeometry().setAttribute(
+        "position",
+        new THREE.Float32BufferAttribute(new Float32Array(6), 3)
+      ),
+      this.materials.cut
+    )
+    this.move.renderOrder = 3
+    this.move.frustumCulled = false
+    this.move.visible = false
+    this.path.add(this.marker, this.move)
     this.group.add(this.path)
     this.place(origin)
   }
@@ -279,22 +305,56 @@ export class ToolpathView {
     this.materials.rapid.opacity = dimmed ? 0.12 : 0.55
   }
 
+  /** Draws the move under way up to where simulated playback has the tool; null hides it. */
+  showMove(playhead: Playhead | null, showRapids: boolean) {
+    const segment = playhead && this.program.segments.at(playhead.segment)
+    const motion = segment ? motionOf(segment) : null
+    if (!playhead || !segment || (motion === "rapid" && !showRapids)) {
+      this.move.visible = false
+      return
+    }
+    const position = this.move.geometry.getAttribute("position")
+    position.setXYZ(0, ...segment.start)
+    position.setXYZ(1, ...along(segment, playhead.fraction))
+    position.needsUpdate = true
+    this.move.material = this.materials[motion ?? "cut"]
+    this.move.visible = true
+  }
+
   /**
    * Shows the tool in the spindle at `line` (without one, on the line of the last of the first
-   * `count` segments) with its tip at that segment's end; a null count hides it.
+   * `count` segments) with its tip at that segment's end, or, while playback simulates the
+   * moves, along the move under way; a null count hides it.
    */
-  showTool(count: number | null, line: number | null = null) {
-    this.shown = [count, line]
+  showTool(
+    count: number | null,
+    line: number | null = null,
+    playhead: Playhead | null = null
+  ) {
+    this.shown = [count, line, playhead]
     if (this.shownTool) this.shownTool.visible = false
     this.shownTool = null
     if (count === null) return
-    const current = this.program.segments.at(Math.max(0, count - 1))
+    const current = this.program.segments.at(
+      playhead?.segment ?? Math.max(0, count - 1)
+    )
     if (!current) return
-    const position = count > 0 ? current.end : current.start
-    // Runs are in lines: the program's segments are not the ones drawn.
-    const run = runOnLine(this.tools, line ?? current.line)
-    const model = run?.model ? this.meshModel(run.model) : null
-    const tool = model ?? (run?.shape ? this.toolModel(run.shape) : this.marker)
+    let position = count > 0 ? current.end : current.start
+    if (playhead) position = along(current, playhead.fraction)
+    // Runs are in lines: the program's segments are not the ones drawn. Before the first line
+    // there is none, and the tool is the one that makes the first move.
+    let index = runIndexAt(
+      this.tools,
+      line !== null && line > 0 ? line : current.line
+    )
+    // A change's run starts on its line, where the firmware first moves the tool it changes.
+    const named = index >= 0 ? this.tools[index].tool : null
+    if (named !== null && named !== current.tool) index--
+    const run = index >= 0 ? this.tools[index] : null
+    // Before a tool change the spindle holds a tool the program does not know: none shows.
+    if (!run || (run.tool === null && !run.shape && !run.model)) return
+    const model = run.model ? this.meshModel(run.model) : null
+    const tool = model ?? (run.shape ? this.toolModel(run.shape) : this.marker)
     const [x, y, z] = position
     // The marker is a centred cylinder; a model's origin is its tip.
     tool.position.set(

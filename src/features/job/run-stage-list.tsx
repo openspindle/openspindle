@@ -19,9 +19,17 @@ import {
 import { Spinner } from "@/components/ui/spinner"
 import { formatMillimetres } from "@/domain/auto-level/params"
 import type { Operation } from "@/domain/operations/operation"
-import { PROBE_TOOL } from "@/domain/tools/tool-table"
+import { PROBE_3D_CORNER_LABELS, findsCorner } from "@/domain/probe-3d/params"
+import type { Probe3dParams } from "@/domain/probe-3d/params"
+import { probe3dResult } from "@/domain/probe-3d/result"
+import { PROBE_3D_TOOL, PROBE_TOOL } from "@/domain/tools/tool-table"
 import { programParts } from "@/machine/contract"
-import type { GridMeasurement, HeightMap, JobState } from "@/machine/contract"
+import type {
+  ContactsMeasurement,
+  GridMeasurement,
+  HeightMap,
+  JobState,
+} from "@/machine/contract"
 import type { Tool } from "@/domain/tools/tool"
 import { cn } from "@/lib/utils"
 import {
@@ -121,6 +129,14 @@ function operationSummary(
       const { columns, rows, width, depth } = source.params
       return `Probes ${columns} × ${rows} points over ${mm(width)} × ${mm(depth)} mm.`
     }
+    case "probe-3d": {
+      const { placement } = source.params
+      const where =
+        placement.kind === "anchor"
+          ? `from ${anchorName(subject, placement.anchorId)} + X${mm(placement.offset.x)} Y${mm(placement.offset.y)}`
+          : "from the probe position"
+      return `Finds ${probe3dTarget(source.params)} ${where} and sets the work origin there.`
+    }
     default: {
       const names = toolNames(operation, subject, tools)
       return names.length
@@ -188,9 +204,73 @@ function gridText(grid: GridMeasurement): string {
   }
 }
 
+/** What a 3D probing operation finds, in words. */
+function probe3dTarget({ routine, corner, axes }: Probe3dParams): string {
+  const at = PROBE_3D_CORNER_LABELS[corner].toLowerCase()
+  const across = axes === "xy" ? "X and Y" : axes.toUpperCase()
+  switch (routine) {
+    case "outside-corner":
+      return `the ${at} corner`
+    case "inside-corner":
+      return `the ${at} inside corner`
+    case "pocket-center":
+      return `the pocket's center in ${across}`
+    case "boss-center":
+      return `the boss's center in ${across}`
+  }
+}
+
+/** What a 3D probing routine that has not found what it probes did, by its stage's status. */
+function probe3dUnfinished(params: Probe3dParams, status: StageStatus) {
+  const target = probe3dTarget(params)
+  switch (status) {
+    case "failed":
+    case "stopped":
+      return `The machine stopped probing ${target} before it found it.`
+    case "done":
+      return `The machine did not report every contact of the routine, so where it found ${target} is unknown.`
+    default:
+      return `The machine is probing ${target}.`
+  }
+}
+
+/** Where a 3D probing routine set the work origin, from the contacts it reported. */
+function probe3dFacts(
+  params: Probe3dParams,
+  { contacts }: ContactsMeasurement,
+  status: StageStatus
+): { description: string; facts: { label: string; value: string }[] } {
+  const result = probe3dResult(params, contacts)
+  const set = (["X", "Y"] as const).flatMap((axis, index) => {
+    const value = result.origin[index]
+    return value === null ? [] : [{ axis, value }]
+  })
+  const facts: { label: string; value: string }[] = []
+  if (result.top !== null)
+    facts.push({ label: "Top", value: `Z ${mm(result.top)}` })
+  const size = result.size.filter((value) => value !== null)
+  if (size.length)
+    facts.push({
+      label: params.routine === "pocket-center" ? "Pocket" : "Boss",
+      value: `${size.map(mm).join(" × ")} mm`,
+    })
+  facts.push({ label: "Contacts", value: String(contacts.length) })
+  if (!result.complete || !set.length)
+    return { description: probe3dUnfinished(params, status), facts }
+  const zero = set.map(({ axis }) => `${axis}0`).join(" ")
+  const at = set.map(({ axis, value }) => `${axis} ${mm(value)}`).join(" ")
+  const top = result.top === null ? "" : " and Z0 on the top it touched"
+  const found = findsCorner(params.routine) ? "corner" : "center"
+  return {
+    description: `Found the ${found} and set work ${zero} there, at machine ${at}${top}.`,
+    facts,
+  }
+}
+
 /** A tool measured at the tool sensor, by what it is. */
 function sensorLabel(tool: number | null): string {
   if (tool === PROBE_TOOL) return "Probe at sensor"
+  if (tool === PROBE_3D_TOOL) return "3D probe at sensor"
   if (tool === null) return "Tool at sensor"
   return `T${tool} at sensor`
 }
@@ -202,9 +282,14 @@ function operationResults(
   tools: readonly Tool[],
   plugins: readonly PluginSummary[] | undefined
 ): { description: string; details: ReactNode } {
-  const { operation, surface, grid, status } = stage
+  const { operation, surface, grid, contacts, status } = stage
   const facts: { label: string; value: string }[] = []
   let description: string | null = null
+  if (contacts && operation.source.kind === "probe-3d") {
+    const probed = probe3dFacts(operation.source.params, contacts, status)
+    description = probed.description
+    facts.push(...probed.facts)
+  }
   if (surface) {
     const [x, y, z] = surface.machine
     description = `Touched the stock top at machine X ${mm(x)} Y ${mm(y)} and set work Z0 there.`

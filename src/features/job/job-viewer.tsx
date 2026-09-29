@@ -27,6 +27,7 @@ export function JobViewer({
         onSelectPlate={(plateId) => dispatch({ type: "plate.select", plateId })}
         previewLine={preview.line}
         previewProbePoint={preview.probePoint}
+        playhead={preview.playhead}
         progress={preview.segmentProgress}
         showRapids={false}
         showStock

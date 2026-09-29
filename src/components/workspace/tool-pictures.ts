@@ -2,15 +2,11 @@ import * as THREE from "three"
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js"
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js"
 import { log } from "@/app/errors/log"
-import { viewerPalette } from "@/components/workspace/viewer/palette"
-import {
-  disposeToolModel,
-  toolMaterials,
-  toolModel,
-} from "@/components/workspace/viewer/tool-model"
-import type { ToolMaterials } from "@/components/workspace/viewer/tool-model"
 import type { ProfilePoint, ToolShape } from "@/domain/tools/tool-shape"
 import { disposeObjects, glbInBedSpace } from "@/lib/three-assets"
+import { viewerPalette } from "./viewer/palette"
+import { disposeToolModel, toolMaterials, toolModel } from "./viewer/tool-model"
+import type { ToolMaterials } from "./viewer/tool-model"
 
 /** "tool": the whole tool; "tip": its cutting end, as wide as the tool. */
 export type ToolFraming = "tool" | "tip"

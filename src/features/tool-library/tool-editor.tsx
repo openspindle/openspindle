@@ -28,6 +28,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { FilePicker } from "@/components/file-picker"
 import { ToolImage } from "@/components/workspace/tool-image"
+import { PORTRAIT, ToolPicture } from "@/components/workspace/tool-picture"
 import { createHolder, createPreset } from "@/domain/tools/tool"
 import type { ToolSegment, ToolSource } from "@/domain/tools/tool"
 import { OptionSelect } from "@/components/option-select"
@@ -35,7 +36,6 @@ import { toolKindLabel } from "./tool-format"
 import type { Choice, ToolForm } from "./tool-form"
 import { modelDataUrl } from "./tool-model-file"
 import { photoDataUrl } from "./tool-photo"
-import { PORTRAIT, ToolPicture } from "./tool-picture"
 
 export const EDITOR_TABS = [
   "General",

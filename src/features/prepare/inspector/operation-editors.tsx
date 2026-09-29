@@ -25,6 +25,7 @@ import { localTools } from "@/domain/tools/tool-table"
 import { AutoLevelSettings } from "@/features/auto-level/auto-level-settings"
 import { AutoScanSettings } from "@/features/auto-scan/auto-scan-settings"
 import { AutoZHeightSettings } from "@/features/auto-z-height/auto-z-height-settings"
+import { Probe3dSettings } from "@/features/probe-3d/probe-3d-settings"
 import type { WorkAreaFit } from "@/features/probing/probing-form"
 import { PluginFrame } from "@/features/plugins/plugin-frame"
 import { TemplateForm } from "@/features/plugins/template-form"
@@ -278,6 +279,23 @@ function AutoScanEditor({ plate, operation }: EditorProps<"auto-scan">) {
   )
 }
 
+/** 3D probing's settings: the routine, and where it starts. */
+function Probe3dEditor({ plate, operation }: EditorProps<"probe-3d">) {
+  const update = useSourceUpdate(plate, operation.id, operation.revision)
+  const probing = kitForPlate(plate).probe?.probe3d
+  // Without a 3D probe the operation has no settings; its diagnostic above says why.
+  if (!probing) return null
+  return (
+    <Probe3dSettings
+      key={operation.id}
+      value={operation.source.params}
+      parameters={probing.parameters}
+      anchors={anchorOptions(plate)}
+      onChange={(params) => update({ kind: "probe-3d", params })}
+    />
+  )
+}
+
 /** The editor for an operation's source, by kind. */
 export function OperationEditor({
   plate,
@@ -307,6 +325,10 @@ export function OperationEditor({
     case "auto-scan":
       return (
         <AutoScanEditor plate={plate} operation={{ ...operation, source }} />
+      )
+    case "probe-3d":
+      return (
+        <Probe3dEditor plate={plate} operation={{ ...operation, source }} />
       )
   }
 }

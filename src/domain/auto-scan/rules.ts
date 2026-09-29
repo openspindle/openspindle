@@ -1,3 +1,5 @@
+import { issueOf } from "../diagnostics"
+import type { Issue } from "../diagnostics"
 import type {
   ToolpathBounds,
   ToolpathBoundsResult,
@@ -13,12 +15,10 @@ export type AutoScanIssueCode =
   | "after-machining"
 
 /** Errors block NC generation or Run; warnings inform without blocking. */
-export type AutoScanIssue = {
-  code: AutoScanIssueCode
-  /** User-facing explanation, ready to display. */
-  message: string
-  severity: "error" | "warning"
-}
+export type AutoScanIssue = Issue<AutoScanIssueCode>
+
+const scanError = issueOf<AutoScanIssueCode>("error")
+const scanWarning = issueOf<AutoScanIssueCode>("warning")
 
 const EPSILON = 1e-6
 
@@ -40,21 +40,15 @@ export function planAutoScan(
   if (!parsed.success)
     return {
       ok: false,
-      issues: parsed.error.issues.map((issue) => ({
-        code: "invalid-parameters",
-        message: issue.message,
-        severity: "error",
-      })),
+      issues: parsed.error.issues.map((issue) =>
+        scanError("invalid-parameters", issue.message)
+      ),
     }
   if (!toolpath.ok)
     return {
       ok: false,
       issues: [
-        {
-          code: "nothing-to-trace",
-          message: `Nothing to trace: ${toolpath.reason}`,
-          severity: "error",
-        },
+        scanError("nothing-to-trace", `Nothing to trace: ${toolpath.reason}`),
       ],
     }
   return { ok: true, params: parsed.data, outline: toolpath.bounds }
@@ -77,13 +71,23 @@ export function outlineStockIssues(
     )
   })
   if (inside) return []
+  // The outline the scan traces, at the stock top.
+  const top = stockAnchor[2] + stock.height
+  const [x, y] = workOrigin
   return [
-    {
-      code: "outline-off-stock",
-      message:
-        "The cuts reach beyond the stock as placed; the scan traces where they go.",
-      severity: "warning",
-    },
+    scanWarning(
+      "outline-off-stock",
+      "The cuts reach beyond the stock as placed; the scan traces where they go.",
+      {
+        places: [
+          {
+            kind: "area",
+            min: [x + outline.min[0], y + outline.min[1], top],
+            max: [x + outline.max[0], y + outline.max[1], top],
+          },
+        ],
+      }
+    ),
   ]
 }
 
@@ -91,11 +95,9 @@ export function outlineStockIssues(
 export function scanOrderIssues(machiningBefore: boolean): AutoScanIssue[] {
   if (!machiningBefore) return []
   return [
-    {
-      code: "after-machining",
-      message:
-        "Auto-scan runs after machining operations. Move it before them to check the outline first.",
-      severity: "warning",
-    },
+    scanWarning(
+      "after-machining",
+      "Auto-scan runs after machining operations. Move it before them to check the outline first."
+    ),
   ]
 }

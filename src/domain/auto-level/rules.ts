@@ -8,6 +8,7 @@ import type {
   StoredAnchor,
   StoredAnchorSetup,
 } from "@/domain/anchors/stored-anchors"
+import type { Area } from "@/domain/diagnostics"
 import type { Point3 } from "@/domain/nc/gcode"
 import type { Stock } from "@/domain/stock/stock"
 import { isAnchorConfiguration } from "@/machine/contract"
@@ -39,7 +40,7 @@ export type AutoLevelPlacementContext = {
 
 /** The plate an auto-level operation belongs to. `Plate` satisfies it. */
 export type AutoLevelPlateContext = AutoLevelPlacementContext & {
-  stock: Pick<Stock, "width" | "depth"> | null
+  stock: Pick<Stock, "width" | "depth" | "height"> | null
   /** Bed position of the stock's minimum corner. */
   stockAnchor: Point3
 }
@@ -255,6 +256,33 @@ function resolveStart(
   return resolveAnchorStart(params.placement, params, plate)
 }
 
+/**
+ * Where an anchored grid is on the bed, at the stock top it probes; null from the probe
+ * position, which the plate does not know.
+ */
+function gridArea(
+  params: AutoLevelParams,
+  plate: AutoLevelPlateContext,
+  top: number,
+  start: ProbeStart | null
+): Area | null {
+  if (start?.kind !== "machine") return null
+  // Machine XY reaches the bed through the snapshot's registration, as the viewer places it.
+  const anchor = bedAnchors(plate.anchorSetup).find(
+    (item) => item.id === start.anchor.id
+  )
+  if (!anchor) return null
+  const x =
+    anchor.position[0] + start.target[0] - start.anchor.machinePosition[0]
+  const y =
+    anchor.position[1] + start.target[1] - start.anchor.machinePosition[1]
+  return {
+    kind: "area",
+    min: [x, y, top],
+    max: [x + params.width, y + params.depth, top],
+  }
+}
+
 function stockIssues(
   params: AutoLevelParams,
   plate: AutoLevelPlateContext,
@@ -268,6 +296,9 @@ function stockIssues(
         "The stock size is unspecified, so the probe grid cannot be checked against it."
       ),
     ]
+  const [stockX, stockY, stockZ] = plate.stockAnchor
+  const grid = gridArea(params, plate, stockZ + stock.height, start)
+  const places = grid ? { places: [grid] } : {}
   if (
     params.width > stock.width + EPSILON ||
     params.depth > stock.depth + EPSILON
@@ -275,31 +306,23 @@ function stockIssues(
     return [
       autoLevelError(
         "grid-exceeds-stock",
-        `The ${formatMillimetres(params.width)} × ${formatMillimetres(params.depth)} mm probe grid is larger than the ${formatMillimetres(stock.width)} × ${formatMillimetres(stock.depth)} mm stock.`
+        `The ${formatMillimetres(params.width)} × ${formatMillimetres(params.depth)} mm probe grid is larger than the ${formatMillimetres(stock.width)} × ${formatMillimetres(stock.depth)} mm stock.`,
+        places
       ),
     ]
-  if (start?.kind !== "machine") return []
-  // Machine XY reaches the bed through the snapshot's registration, as the viewer places it.
-  const anchor = bedAnchors(plate.anchorSetup).find(
-    (item) => item.id === start.anchor.id
-  )
-  if (!anchor) return []
-  const x =
-    anchor.position[0] + start.target[0] - start.anchor.machinePosition[0]
-  const y =
-    anchor.position[1] + start.target[1] - start.anchor.machinePosition[1]
-  const [stockX, stockY] = plate.stockAnchor
   if (
-    x >= stockX - EPSILON &&
-    y >= stockY - EPSILON &&
-    x + params.width <= stockX + stock.width + EPSILON &&
-    y + params.depth <= stockY + stock.depth + EPSILON
+    !grid ||
+    (grid.min[0] >= stockX - EPSILON &&
+      grid.min[1] >= stockY - EPSILON &&
+      grid.max[0] <= stockX + stock.width + EPSILON &&
+      grid.max[1] <= stockY + stock.depth + EPSILON)
   )
     return []
   return [
     autoLevelWarning(
       "grid-outside-stock",
-      "The anchored probe grid extends beyond the stock as placed on the bed."
+      "The anchored probe grid extends beyond the stock as placed on the bed.",
+      places
     ),
   ]
 }

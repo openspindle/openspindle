@@ -6,7 +6,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useWorkspaceStore } from "@/app/workspace/workspace-context"
 import type { Plate } from "@/domain/plate/plate"
 import type { PrepareSearch } from "@/routes/_workspace/prepare"
-import { usePlateDiagnostics } from "@/app/workspace/use-plate-diagnostics"
+import { useKeyedDiagnostics } from "@/app/workspace/use-plate-diagnostics"
+import { diagnosticOperation } from "@/domain/diagnostics"
 import { DiagnosticsList } from "./diagnostics-list"
 import { PlateFixturesPanel } from "./plate-fixtures-panel"
 import { PlateSetupPanel } from "./plate-setup-panel"
@@ -57,8 +58,8 @@ export function PlateInspector({
   panel: PrepareSearch["panel"]
   onPanel: (panel: Panel) => void
 }) {
-  const diagnostics = usePlateDiagnostics(plate).filter(
-    (diagnostic) => diagnostic.operationId === undefined
+  const diagnostics = useKeyedDiagnostics(plate).filter(
+    ({ diagnostic }) => diagnosticOperation(diagnostic) === null
   )
   const attention = plate.notices.length > 0 || diagnostics.length > 0
   return (

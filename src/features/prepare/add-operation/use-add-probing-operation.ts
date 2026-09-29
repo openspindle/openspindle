@@ -4,7 +4,11 @@ import { OPERATION_KINDS, probingOf } from "@/domain/operations/kinds"
 import type { ProbingSourceKind } from "@/domain/operations/kinds"
 import { createOperation } from "@/domain/operations/operation"
 import type { OperationSource } from "@/domain/operations/operation"
-import { PROBE_TOOL, libraryPreferences } from "@/domain/tools/tool-table"
+import {
+  PROBE_3D_TOOL,
+  PROBE_TOOL,
+  libraryPreferences,
+} from "@/domain/tools/tool-table"
 import { useAddOperation } from "./use-add-operation"
 
 /**
@@ -19,14 +23,15 @@ export function useProbeForAdding() {
 }
 
 /**
- * Adds a built-in probing operation (auto-level, auto Z-height or auto-scan) with the registry's
- * defaults (`probingOf`, `OPERATION_KINDS`), fitted to the plate it is added to and probing or
- * tracing with the library's probe; false when the machine's probe does not offer this kind.
+ * Adds a built-in probing operation (auto-level, auto Z-height, auto-scan or 3D probing) with the
+ * registry's defaults (`probingOf`, `OPERATION_KINDS`), fitted to the plate it is added to and
+ * probing or tracing with the library's probes; false when the machine's probe does not offer
+ * this kind.
  */
 export function useAddProbingOperation(kind: ProbingSourceKind) {
   const library = useWorkspace((state) => state.tools)
   const probe = useProbeForAdding()
-  const add = useAddOperation()
+  const add = useAddOperation({ stock: false })
   const registration = probingOf(kind)
   return () => {
     if (!probe || !registration.available(probe)) return false
@@ -35,7 +40,7 @@ export function useAddProbingOperation(kind: ProbingSourceKind) {
         kind,
         params: registration.defaults(plate, probe),
       } as OperationSource),
-      preferredTools: libraryPreferences([PROBE_TOOL], library),
+      preferredTools: libraryPreferences([PROBE_TOOL, PROBE_3D_TOOL], library),
     }))
   }
 }

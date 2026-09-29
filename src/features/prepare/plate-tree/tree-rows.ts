@@ -1,6 +1,7 @@
 import { isProgramFileName } from "@/app/workspace/import-files"
 import { compilePlate } from "@/domain/compile/compile"
 import type { CompiledSection } from "@/domain/compile/compile"
+import { diagnosticOperation } from "@/domain/diagnostics"
 import type { Diagnostic } from "@/domain/diagnostics"
 import { operationPhase } from "@/domain/operations/kinds"
 import type { Operation, Phase } from "@/domain/operations/operation"
@@ -48,7 +49,8 @@ const errorsOf = (diagnostics: readonly Diagnostic[], operationId?: string) =>
   diagnostics.filter(
     (diagnostic) =>
       diagnostic.severity === "error" &&
-      (operationId === undefined || diagnostic.operationId === operationId)
+      (operationId === undefined ||
+        diagnosticOperation(diagnostic) === operationId)
   ).length
 
 function sectionRow(

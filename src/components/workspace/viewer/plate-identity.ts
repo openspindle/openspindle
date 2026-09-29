@@ -2,6 +2,7 @@ import type { Point3 } from "@/domain/nc/gcode"
 import type {
   StoredAnchor,
   ViewerPlate,
+  ViewerProblem,
   ViewerToolRun,
 } from "@/components/workspace/viewer/viewer-input"
 import type { LineRange } from "../bed-viewer-layout"
@@ -44,6 +45,17 @@ function sameBounds(
 
 export const sameRanges = sameList<LineRange>(
   (a, b) => a.start === b.start && a.end === b.end
+)
+
+/** A problem's places come from its plate's cached diagnostics: unchanged, they are the same. */
+export const sameProblems = sameList<ViewerProblem>(
+  (a, b) =>
+    a === b ||
+    (a.plateId === b.plateId &&
+      a.key === b.key &&
+      a.severity === b.severity &&
+      a.message === b.message &&
+      a.places === b.places)
 )
 
 /** Shapes are cached per library tool, so an unchanged tool keeps its shape. */

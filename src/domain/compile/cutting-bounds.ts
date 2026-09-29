@@ -2,7 +2,7 @@ import { parseGCode } from "@/domain/nc/gcode"
 import type { GCodeSegment } from "@/domain/nc/gcode"
 import type { PlateSetup } from "../plate/plate"
 import type { Point3 } from "../primitives"
-import { PROBE_TOOL } from "../tools/tool-table"
+import { isProbeSlot } from "../tools/tool-table"
 
 /** Where a design cuts: the extent of its cutting moves, in work coordinates (from the work origin). */
 export type ToolpathBounds = { readonly min: Point3; readonly max: Point3 }
@@ -25,12 +25,12 @@ export type WorkAreaResult =
   | { readonly ok: false; readonly reason: string }
 
 /**
- * Feed moves cut, except the probe's (T0 is always the probe) and probing, such as a tool's
+ * Feed moves cut, except the probes' (T0, and the 3D probe's slot) and probing, such as a tool's
  * touches on a tool setter: rapids and probe moves travel.
  */
 export const cuts = (
   segment: Pick<GCodeSegment, "rapid" | "tool" | "probing">
-) => !segment.rapid && segment.tool !== PROBE_TOOL && !segment.probing
+) => !segment.rapid && !isProbeSlot(segment.tool) && !segment.probing
 
 function unite(a: ToolpathBounds, b: ToolpathBounds): ToolpathBounds {
   const axes = [0, 1, 2] as const

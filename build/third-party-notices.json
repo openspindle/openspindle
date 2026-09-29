@@ -20,6 +20,7 @@
       "react@19.3.0",
       "react-dom@19.3.0",
       "scheduler@0.28.0",
+      "three@0.186.1",
       "use-sync-external-store@1.7.0",
       "zod@4.6.5"
     ],

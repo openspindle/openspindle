@@ -1,6 +1,5 @@
 import { formatMillimetres } from "../../../auto-level/params"
 import type { ProbeGrid, ProbePoint } from "../../../auto-level/probe-grid"
-import type { MachineStart } from "../../../auto-level/rules"
 import type {
   AutoZHeightParameters,
   AutoZHeightParams,
@@ -12,7 +11,7 @@ import { MAX_PROGRAM_LINES } from "@/domain/nc/gcode"
 import type { GCodeProgram } from "@/domain/nc/gcode"
 import { isAnchorXY } from "@/domain/anchors/stored-anchors"
 import { FIRMWARE_ROUTINE, GRID, TOUCH_CODES } from "./blocks"
-import { CLEARANCE_Z } from "./travel"
+import { anchorTravel } from "./travel"
 
 /**
  * Application limits, not a clearance check. The default travel is the one the firmware's own
@@ -85,20 +84,6 @@ const FIRMWARE_PRECAUTIONS = [
   "; The probe searches down as far as the firmware's tool rack Z; no contact alarms the machine.",
   "; Replaces work Z of the active coordinate system; the firmware saves G54.",
 ]
-
-/** Ordinary queued moves to the anchored touch point: up to the clearance, then over it. */
-function anchorTravel({ anchor, source, target }: MachineStart): string[] {
-  const provenance =
-    source === "factory"
-      ? "FACTORY DEFAULT coordinates - verify against the device before Run"
-      : "firmware configuration snapshot"
-  return [
-    `; Probe placement: stored anchor ${JSON.stringify(anchor.id)}; ${provenance}.`,
-    "; Rises to the machine's clearance before moving in X and Y; verify homing.",
-    `G53 G0 Z${formatMillimetres(CLEARANCE_Z)}`,
-    `G53 G0 X${formatMillimetres(target[0])} Y${formatMillimetres(target[1])}`,
-  ]
-}
 
 /**
  * The firmware's own Z probe (ATCHandler::fill_zprobe_scripts): a fast touch, a back-off, a slow

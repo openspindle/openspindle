@@ -1,5 +1,6 @@
 import * as THREE from "three"
 import type { Point3 } from "@/domain/nc/gcode"
+import type { Playhead } from "@/domain/nc/move-times"
 import type { ViewerPlate } from "@/components/workspace/viewer/viewer-input"
 import {
   PATH_DISPLAY_LIFT,
@@ -18,7 +19,11 @@ import type { ToolModels } from "./toolpath-view"
 import { WorkAreaView } from "./work-area-view"
 
 /** What one plate's drawing shows; inactive plates show their whole program. */
-export type PathPresentation = ProbePresentation & { showRapids: boolean }
+export type PathPresentation = ProbePresentation & {
+  showRapids: boolean
+  /** Where simulated playback is: the moves before it drawn, the one under way up to the tool. */
+  playhead?: Playhead | null
+}
 
 /** Where outlines lie: the stock top, or the work origin's height without stock. */
 const surfaceZ = (plate: ViewerPlate) =>
@@ -128,14 +133,18 @@ export class PlatePath {
   }
 
   present(state: PathPresentation) {
-    const count = revealedSegments(
-      this.plate.machineProgram,
-      state.progress,
-      state.previewLine,
-      state.previewProbePoint
-    )
+    const playhead = state.playhead ?? null
+    const count =
+      playhead?.segment ??
+      revealedSegments(
+        this.plate.machineProgram,
+        state.progress,
+        state.previewLine,
+        state.previewProbePoint
+      )
     this.toolpath.select(state.ranges)
     const selectionShown = this.toolpath.reveal(count, state.showRapids)
+    this.toolpath.showMove(playhead, state.showRapids)
     this.toolpath.emphasize(
       state.active,
       selectionShown || (state.active && this.probes.intersects(state.ranges))
@@ -144,7 +153,8 @@ export class PlatePath {
     this.probes.present(state)
     this.toolpath.showTool(
       state.active && state.progress < 100 ? count : null,
-      state.previewLine ?? null
+      state.previewLine ?? null,
+      playhead
     )
   }
 

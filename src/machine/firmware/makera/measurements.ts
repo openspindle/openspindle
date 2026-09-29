@@ -1,5 +1,6 @@
-import { COORDINATE_LIMIT } from "../../contract/index.ts"
+import { COORDINATE_LIMIT, MAX_ROUTINE_CONTACTS } from "../../contract/index.ts"
 import type {
+  ContactsMeasurement,
   GridMeasurement,
   JobMeasurement,
   Telemetry,
@@ -13,6 +14,8 @@ const ROUTINE_STATE = /^M497\.(\d)$/
 const CONTACT = new RegExp(
   String.raw`^\[PRB:(${NUMBER}),(${NUMBER}),(${NUMBER}):1\]$`
 )
+/** A routine's echoed search across X or Y: its sides, where the Z probe only goes down. */
+const SIDE_SEARCH = /^G38\.2\s*[XY]/i
 const GRID_START = new RegExp(
   String.raw`^Probe start ht: ${NUMBER} mm, start MCS x,y: (${NUMBER}),(${NUMBER}), rectangular bed width,height in mm: (${NUMBER}),(${NUMBER}), grid size: (\d+)x(\d+)$`
 )
@@ -49,14 +52,28 @@ const axis = (size: number, count: number) =>
 /**
  * What the Z1 reports while its own routines run (ATCHandler's scripts reply to every
  * connection, even from a played file): the tool sensor's and the Z probe's contacts
- * ([PRB:x,y,z:1], the slow touch last) and CartGridStrategy's rectangular probe, point by point
- * (DEBUG: X Y Z) and then as the height map it prints. Lines from a played file itself go to the
- * firmware's null stream, so a G32 or G38.2 written in the program reports nothing.
+ * ([PRB:x,y,z:1], the slow touch last), the 3D probing routines' contacts (M480), and
+ * CartGridStrategy's rectangular probe, point by point (DEBUG: X Y Z) and then as the height map
+ * it prints. Lines from a played file itself go to the firmware's null stream, so a G32 or G38.2
+ * written in the program reports nothing.
+ *
+ * The corner routines outside a pocket queue their lines, echoed after M497.5 like the Z probe's,
+ * and search across X and Y after touching the top; the others run theirs at once, unechoed, so
+ * their contacts come without a routine state. Either way a routine's contacts, until Done ATC,
+ * are one measurement.
  */
 export class MakeraMeasurements {
   private state: number | null = null
-  /** The routine run whose contact the next one refines: fast touch, then slow. */
+  /** The measurement the next contact refines: a tool's fast touch, or a routine's contacts. */
   private touchIndex: number | null = null
+  /**
+   * The contacts of the routine running, and whether it has searched across X or Y. A Z probe's
+   * are held until it ends, as a corner routine touches the top the same way before its sides.
+   */
+  private contacts: [number, number, number][] = []
+  private sides = false
+  /** Where and when the routine's first contact came. */
+  private started: { line: number | null; at: number } | null = null
   private table: string[] | null = null
   private items: JobMeasurement[] = []
 
@@ -68,13 +85,17 @@ export class MakeraMeasurements {
   read(text: string, telemetry: Telemetry | null, now: number): boolean {
     const state = ROUTINE_STATE.exec(text)
     if (state) {
+      const changed = this.endRoutine()
       this.state = Number(state[1])
-      this.touchIndex = null
-      return false
+      return changed
     }
     if (/^done atc\b/i.test(text)) {
+      const changed = this.endRoutine()
       this.state = null
-      this.touchIndex = null
+      return changed
+    }
+    if (SIDE_SEARCH.test(text)) {
+      this.sides = true
       return false
     }
     const contact = CONTACT.exec(text)
@@ -97,21 +118,75 @@ export class MakeraMeasurements {
     return false
   }
 
+  /**
+   * The end of a routine: a Z probe that searched no side touched the stock top where its last
+   * (slow) contact was. True when that added a measurement.
+   */
+  private endRoutine(): boolean {
+    const last = this.contacts.at(-1)
+    const surface =
+      this.state === Z_PROBING && !this.sides && last && this.started
+        ? this.add({
+            kind: "touch",
+            target: "surface",
+            tool: null,
+            machine: last,
+            ...this.started,
+          })
+        : false
+    this.touchIndex = null
+    this.contacts = []
+    this.sides = false
+    this.started = null
+    return surface
+  }
+
   private touch(
     [, x, y, z]: RegExpExecArray,
     telemetry: Telemetry | null,
     now: number
   ): boolean {
-    if (this.state !== CALIBRATING && this.state !== Z_PROBING) return false
     const [machineX, machineY, machineZ] = [x, y, z].map(reported)
     if (machineX === null || machineY === null || machineZ === null)
       return false
+    const contact: [number, number, number] = [machineX, machineY, machineZ]
+    const line = telemetry?.job?.line ?? null
+    if (this.state === CALIBRATING)
+      return this.sensorTouch(contact, telemetry, now)
+    if (this.state !== null && this.state !== Z_PROBING) return false
+    if (this.contacts.length >= MAX_ROUTINE_CONTACTS) return false
+    this.started ??= { line, at: now }
+    this.contacts.push(contact)
+    // A Z probe's contacts wait for its end; a 3D probing routine's show as they come.
+    if (this.state === Z_PROBING && !this.sides) return false
+    const measurement: ContactsMeasurement = {
+      kind: "contacts",
+      contacts: [...this.contacts],
+      ...this.started,
+    }
+    const current = this.touchIndex
+    if (current !== null) {
+      this.items = this.items.map((item, index) =>
+        index === current ? measurement : item
+      )
+      return true
+    }
+    if (!this.add(measurement)) return false
+    this.touchIndex = this.items.length - 1
+    return true
+  }
+
+  /** A tool's contact on the tool sensor as it is changed to; the slow touch refines the fast. */
+  private sensorTouch(
+    contact: [number, number, number],
+    telemetry: Telemetry | null,
+    now: number
+  ): boolean {
     const measurement: JobMeasurement = {
       kind: "touch",
-      target: this.state === Z_PROBING ? "surface" : "tool-sensor",
-      tool:
-        this.state === CALIBRATING ? (telemetry?.requestedTool ?? null) : null,
-      machine: [machineX, machineY, machineZ],
+      target: "tool-sensor",
+      tool: telemetry?.requestedTool ?? null,
+      machine: contact,
       line: telemetry?.job?.line ?? null,
       at: now,
     }

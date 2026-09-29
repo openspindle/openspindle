@@ -1,6 +1,6 @@
 import { compilePlate } from "@/domain/compile/compile"
 import { stockDepthWarnings } from "@/domain/compile/stock-depth"
-import { error, warning } from "@/domain/diagnostics"
+import { error, operationSubject, warning } from "@/domain/diagnostics"
 import type { Diagnostic } from "@/domain/diagnostics"
 import { validateOperations } from "@/domain/operations/kinds"
 import { operationPluginId } from "@/domain/operations/operation"
@@ -45,7 +45,7 @@ function pluginDiagnostics(
           "plugin-missing",
           `"${operation.name}" comes from ${source.pluginId}, which is not installed.`,
           {
-            operationId: operation.id,
+            subject: operationSubject(operation.id),
             fix: { kind: "install-plugin", pluginId: source.pluginId },
           }
         ),
@@ -60,7 +60,7 @@ function pluginDiagnostics(
           "operation-stale",
           `Update "${operation.name}": ${plugin.manifest.name} changed.`,
           {
-            operationId: operation.id,
+            subject: operationSubject(operation.id),
             fix: { kind: "update-operation", operationId: operation.id },
           }
         ),

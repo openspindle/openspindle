@@ -1,6 +1,7 @@
 import type { OperationSpan } from "@/domain/compile/compile"
 import type { Operation } from "@/domain/operations/operation"
 import type {
+  ContactsMeasurement,
   GridMeasurement,
   JobMeasurement,
   TouchMeasurement,
@@ -23,6 +24,8 @@ export type OperationStage = {
   readonly surface: TouchMeasurement | null
   /** The grid the machine probed. */
   readonly grid: GridMeasurement | null
+  /** The contacts the machine's 3D probing routine made. */
+  readonly contacts: ContactsMeasurement | null
   /** Tools measured at the tool sensor on changing to them. */
   readonly tools: readonly TouchMeasurement[]
 }
@@ -54,6 +57,7 @@ function operationStage(
     status,
     surface: null,
     grid: null,
+    contacts: null,
     tools: [],
   }
 }
@@ -106,6 +110,8 @@ function reachedOperations(view: Exclude<JobView, { kind: "idle" }>) {
     let index = -1
     if (measurement.kind === "grid")
       index = place("grid", (at) => kindAt(at) === "auto-level")
+    else if (measurement.kind === "contacts")
+      index = place("contacts", (at) => kindAt(at) === "probe-3d")
     else if (measurement.target === "surface")
       index = place("surface", (at) => kindAt(at) === "auto-z-height")
     else if (measurement.tool !== null) {
@@ -142,6 +148,10 @@ function reachedOperations(view: Exclude<JobView, { kind: "idle" }>) {
       grid:
         latest.find((item): item is GridMeasurement => item.kind === "grid") ??
         null,
+      contacts:
+        latest.find(
+          (item): item is ContactsMeasurement => item.kind === "contacts"
+        ) ?? null,
       tools: latest
         .filter(
           (item): item is TouchMeasurement =>

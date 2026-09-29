@@ -1,7 +1,7 @@
 import { readNcBlock } from "@/machine/contract"
 import type { NcBlock } from "@/machine/contract"
 import type { CompiledPlate } from "@/domain/compile/compile"
-import type { GCodeProgram } from "@/domain/nc/gcode"
+import type { GCodeProgram, GCodeSegment } from "@/domain/nc/gcode"
 import type { FixtureKit } from "@/domain/fixtures/fixture-kit"
 import type { Operation } from "@/domain/operations/operation"
 import type { Probe } from "@/domain/probing/probe"
@@ -204,4 +204,20 @@ export function stepForLine(timeline: PreviewTimeline, line: number) {
     else high = middle
   }
   return Math.min(low + 1, timeline.steps.length)
+}
+
+/** The step that shows a move: its line's, or on a probe grid's line, its sample's. */
+export function stepForMove(
+  timeline: PreviewTimeline,
+  { line, probePoint = 0 }: Pick<GCodeSegment, "line" | "probePoint">
+) {
+  let step = stepForLine(timeline, line)
+  // A grid's line has a step for each sample, in the order they are probed.
+  while (
+    step < timeline.steps.length &&
+    timeline.steps[step].line === line &&
+    (timeline.steps[step].probePoint ?? 0) <= probePoint
+  )
+    step++
+  return step
 }

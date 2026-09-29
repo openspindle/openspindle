@@ -8,7 +8,8 @@ import { Slider } from "@/components/ui/slider"
 import { OptionSelect } from "@/components/option-select"
 import type { PreviewStep, PreviewTimeline } from "./preview-timeline"
 
-const PLAYBACK_SPEEDS = [0.25, 0.5, 1, 2, 4].map((value) => ({
+/** Playback runs the moves at their feeds: real time, or faster for long programs. */
+const PLAYBACK_SPEEDS = [0.25, 0.5, 1, 2, 5, 10, 20, 50, 100].map((value) => ({
   value,
   label: `${value}×`,
 }))

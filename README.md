@@ -14,8 +14,9 @@ OpenSpindle is a desktop app for preparing, checking and running jobs on a Maker
 - Placement relative to the machine's stored anchors, with move, snap and lock in the 3D view
 - Import of `.nc`, `.cnc`, `.gcode`, `.tap` and `.ngc` programs from your CAM
 - Auto-level, auto Z-height and auto-scan with the Makera wired probe
-- Design-rule checks
-- Playback of the program as the firmware runs it, with depth and width of cut
+- 3D probing with the Makera 3D Probe: the work origin at an outside or inside corner, or the center of a pocket or boss, on the stock or on a bracket or anything else on the bed
+- Design-rule checks, and problems marked where they are in the 3D view
+- Playback of the program as the firmware runs it, at its feeds, with depth and width of cut
 - The G-code exactly as the machine receives it
 - A run checklist, upload read-back and large programs sent in parts
 - Machine controls, the machine's camera and its height map
@@ -48,7 +49,7 @@ Machine behaviour follows the source of [Makera's Z1 firmware](https://github.co
 - tool changes, including the bare `M6` and `M3` lines pcb2gcode writes
 - Stop ending in Alarm
 - programs sent in parts
-- the auto-level, auto Z-height and auto-scan programs
+- the auto-level, auto Z-height, auto-scan and 3D probing programs
 
 Importing, previewing and saving never send anything to the machine, and Run lives only on the Job tab. Controls the machine's state does not allow are refused, and a command whose outcome is unknown is never retried. No plugin can move the machine or run a program. Stop does not replace the machine's emergency stop.
 
@@ -56,7 +57,7 @@ If something behaves differently, **Help › Export Protocol Trace…** saves th
 
 ## Documentation
 
-- [Auto-level](docs/auto-level.md), [auto Z-height](docs/auto-z-height.md) and [auto-scan](docs/auto-scan.md)
+- [Auto-level](docs/auto-level.md), [auto Z-height](docs/auto-z-height.md), [auto-scan](docs/auto-scan.md) and [3D probing](docs/3d-probing.md)
 - [PCB operations](docs/pcb.md) from KiCad Gerber and Excellon files, and setting up pcb2gcode
 - [Stored anchors](docs/stored-anchors.md), [models](docs/models.md) and [design rules](docs/design-rules.md)
 - [Device controls](docs/device-controls.md), [running programs](docs/device-jobs.md) and [the height map](docs/device-height-map.md)
