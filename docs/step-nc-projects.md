@@ -6,7 +6,9 @@ This is an archive and round-trip profile. It does **not** convert arbitrary G-c
 
 ## Usage
 
-Choose **File › New Project** (⌘N) to start a new project, **File › Save Project…** (⌘S) to save the current workspace, or **File › Open Project…** (⌘O) to reopen it; dropping a single `.stpnc` file onto the window opens it too. **File › Import Program…** (⇧⌘O) imports NC files into the current project instead.
+Choose **File › New Project** (⌘N) to start a new project, **File › Save Project…** (⌘S) to save the current workspace, or **File › Open Project…** (⌘O) to reopen it; dropping a single `.stpnc` file onto the window opens it too.
+
+**File › Import…** (⇧⌘O) opens the native file window for NC programs. Plain NC is added to the selected plate, or creates a new plate if none is selected. An OpenSpindle NC export creates a new plate with its embedded setup. Dropping NC files onto the workspace creates a new plate for each file. **File › Import from Fusion 360** opens the connected program picker ([Fusion 360](fusion360.md)).
 
 OpenSpindle starts with a new, empty project every time it opens; a project is kept only by saving it. The tool and stock libraries are the app's own: a saved project carries a copy of them, and opening one keeps yours, adding the tools its plates use that yours lacks (a tool you have stays as you have it). Before replacing a project with unsaved changes, or closing the window with them, choose **Save**, **Don't save**, or **Cancel**. OpenSpindle validates the incoming project before replacing the workspace; an invalid file leaves the current project intact. Opening restores saved workspace data without connecting to a device or executing a program.
 

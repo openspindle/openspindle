@@ -1,4 +1,8 @@
 import { DevicePicker } from "@/features/device/device-picker"
+import { FusionSource } from "@/features/fusion360/fusion-source"
+import { FusionPairingDialog } from "@/features/fusion360/fusion-pairing-dialog"
+import { useFusionPairing } from "@/features/fusion360/use-fusion-pairing"
+import { useFusionSync } from "@/platform/fusion"
 import { HeightMapDialog } from "@/features/device/height-map-dialog"
 import { ModelsDialog } from "@/features/models/models-dialog"
 import { PluginRequestHost } from "@/features/plugins/plugin-request-host"
@@ -16,11 +20,24 @@ import { WorkspaceSettingsDialog } from "@/features/workspace-settings/workspace
 import { AppDialog } from "./app-dialog"
 import { closeDialog, useOpenDialog } from "./dialogs"
 import type { WorkspaceDialog } from "./dialogs"
-import { ImportTargetDialog } from "./import-target-dialog"
 
 /** The open workspace dialog; opening another replaces it. */
 function OpenDialog({ dialog }: { dialog: WorkspaceDialog }) {
   switch (dialog.kind) {
+    case "fusion":
+      return (
+        <AppDialog title="Fusion 360" width="wide" onClose={closeDialog}>
+          <FusionSource onDone={closeDialog} />
+        </AppDialog>
+      )
+    case "fusion-pairing":
+      return (
+        <FusionPairingDialog
+          key={dialog.requestId}
+          requestId={dialog.requestId}
+          returnToFusion={dialog.returnToFusion}
+        />
+      )
     case "device":
       return (
         <AppDialog title="Connect device" onClose={closeDialog}>
@@ -49,8 +66,6 @@ function OpenDialog({ dialog }: { dialog: WorkspaceDialog }) {
       )
     case "add-operation":
       return <AddOperationDialog preset={dialog.preset} onClose={closeDialog} />
-    case "import-target":
-      return <ImportTargetDialog files={dialog.files} />
     case "new-project":
       return <NewProjectDialog />
     case "open-project":
@@ -67,6 +82,8 @@ function OpenDialog({ dialog }: { dialog: WorkspaceDialog }) {
  * (tools.choose, ui.confirm), so a view inside a dialog keeps running while it waits.
  */
 export function DialogHost() {
+  useFusionSync()
+  useFusionPairing()
   const dialog = useOpenDialog()
   return (
     <>

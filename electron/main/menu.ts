@@ -167,9 +167,13 @@ export function buildApplicationMenu(
           click: () => bus.emit("project.open"),
         },
         {
-          label: "Import Program…",
+          label: "Import…",
           accelerator: "Shift+CmdOrCtrl+O",
           click: () => bus.emit("program.import"),
+        },
+        {
+          label: "Import from Fusion 360",
+          click: () => bus.emit("fusion.import"),
         },
         { type: "separator" },
         {

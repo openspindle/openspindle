@@ -9,21 +9,16 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty"
-import { useWorkspaceStore } from "@/app/workspace/workspace-context"
 import { useOpenProject } from "@/features/project/use-project"
 import { isProjectFileName } from "@/features/project/project-file"
-import { openDialog, useOpenDialog } from "./dialogs"
+import { useOpenDialog } from "./dialogs"
 import { useImportPlates } from "./use-import"
 
 const carriesFiles = (event: DragEvent) =>
   event.dataTransfer.types.includes("Files")
 
-/**
- * Files dropped anywhere in the workspace: NC programs become plates, or with several plates go
- * where the user chooses; a project opens.
- */
+/** Files dropped anywhere in the workspace: NC programs become plates; a project opens. */
 export function FileDropZone({ children }: { children: ReactNode }) {
-  const workspace = useWorkspaceStore()
   const dialog = useOpenDialog()
   const importPlates = useImportPlates()
   const openProject = useOpenProject()
@@ -43,9 +38,7 @@ export function FileDropZone({ children }: { children: ReactNode }) {
     }
     // Every dropped file goes on, program or not: readPlates reports one that cannot be used
     // instead of it being silently left out.
-    if (workspace.state.plates.length > 1)
-      openDialog({ kind: "import-target", files })
-    else importPlates.mutate(files)
+    importPlates.mutate(files)
   }
   return (
     <div

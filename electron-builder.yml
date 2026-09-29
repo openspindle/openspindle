@@ -18,6 +18,12 @@ extraResources:
   # folder each, as tools/vite/bundled-plugins.ts builds them.
   - from: out/plugins
     to: plugins
+  # Fusion loads the Python add-in from a folder outside app.asar.
+  - from: integrations/fusion360/OpenSpindleBridge
+    to: fusion360/OpenSpindleBridge
+    filter:
+      - "**/*.py"
+      - "**/*.manifest"
 # Writes LICENSES.chromium.txt: Electron's LICENSES.chromium.html (20 MB) with each text it repeats
 # printed once, about 1.5 MB.
 afterPack: ./tools/packaging/chromium-licenses.ts

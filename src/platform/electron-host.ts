@@ -75,6 +75,20 @@ export async function connectElectronHost(
       open: (kind) => peer.call("files.open", { kind }),
       save: (request) => peer.call("files.save", request),
     },
+    fusion: {
+      snapshot: () => peer.call("fusion.snapshot", undefined),
+      subscribe: (listener) =>
+        peer.subscribe("fusion.changed", undefined, listener),
+      pair: (requestId, code, signal) =>
+        peer.call("fusion.pair", { requestId, code }, signal ? { signal } : {}),
+      dismissPairing: (requestId) =>
+        peer.call("fusion.dismissPairing", { requestId }),
+      list: (signal) =>
+        peer.call("fusion.list", undefined, signal ? { signal } : {}),
+      read: (id, signal) =>
+        peer.call("fusion.read", { id }, signal ? { signal } : {}),
+      disconnect: () => peer.call("fusion.disconnect", undefined),
+    },
     storage: {
       read: (key) => peer.call("storage.read", { key }),
       write: (key, value) => peer.call("storage.write", { key, value }),

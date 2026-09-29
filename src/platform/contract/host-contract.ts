@@ -13,6 +13,7 @@ import { MenuCommandSchema } from "./menu"
 import { modelMethods } from "./models"
 import { storageMethods } from "./storage"
 import { windowMethods } from "./window"
+import { fusionEvents, fusionMethods } from "./fusion"
 
 /** Everything the Electron main process serves to the renderer. */
 export const hostContract = defineContract({
@@ -33,11 +34,13 @@ export const hostContract = defineContract({
     ...modelMethods,
     ...windowMethods,
     ...diagnosticsMethods,
+    ...fusionMethods,
   },
   events: {
     ...machineEvents,
     ...pluginEvents,
     ...diagnosticsEvents,
+    ...fusionEvents,
     "menu.command": { params: z.undefined(), data: MenuCommandSchema },
   },
 })

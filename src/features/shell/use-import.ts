@@ -3,11 +3,7 @@ import { toast } from "sonner"
 import { useFixtureLibraryStore } from "@/app/fixtures/fixture-context"
 import { profilePlacement } from "@/app/fixtures/fixture-library-store"
 import { isEmptyPlaceholder, keptSetup } from "@/app/workspace/defaults"
-import {
-  describeProblems,
-  readOperations,
-  readPlates,
-} from "@/app/workspace/import-files"
+import { describeProblems, readPlates } from "@/app/workspace/import-files"
 import type { TransferableOperation } from "@/app/workspace/import-files"
 import type {
   ImportContext,
@@ -103,37 +99,4 @@ export function addOperations(
     })),
   })
   return result.ok ? null : result.error
-}
-
-/** Imports NC files as operations of a plate, all at once: a refusal adds none of them. */
-export function useImportOperations() {
-  const workspace = useWorkspaceStore()
-  const context = useImportContext()
-  return useMutation({
-    mutationKey: [...WORKSPACE_MUTATION, "import"],
-    scope: workspaceScope,
-    mutationFn: async ({
-      plateId,
-      files,
-    }: {
-      plateId: string
-      files: readonly File[]
-    }) => {
-      const { operations, problems } = await readOperations(files, context())
-      const refused = addOperations(workspace.dispatch, plateId, operations)
-      if (refused)
-        throw new Error(
-          problems.length ? `${refused} ${describeProblems(problems)}` : refused
-        )
-      return { operations, problems }
-    },
-    onSuccess: ({ operations, problems }) => {
-      if (operations.length)
-        toast.success(`Added ${plural(operations.length, "operation")}.`, {
-          description: problems.length ? describeProblems(problems) : undefined,
-        })
-      else if (problems.length) toast.error(describeProblems(problems))
-    },
-    onError: (error) => toast.error(error.message),
-  })
 }

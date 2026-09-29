@@ -8,6 +8,12 @@ export type WorkspaceDialog =
   | { readonly kind: "plugins" }
   | { readonly kind: "models" }
   | { readonly kind: "height-map" }
+  | { readonly kind: "fusion" }
+  | {
+      readonly kind: "fusion-pairing"
+      readonly requestId: string
+      readonly returnToFusion: boolean
+    }
   | { readonly kind: "stock"; readonly plateId: string }
   | {
       readonly kind: "tools"
@@ -27,8 +33,6 @@ export type WorkspaceDialog =
       /** Opens a plugin's template form or importer view directly. */
       readonly preset?: PluginSourceRef
     }
-  /** NC files dropped while there are several plates: the plate they go to, or new plates. */
-  | { readonly kind: "import-target"; readonly files: readonly File[] }
   /** Starting a new project over unsaved changes: save them, discard them, or cancel. */
   | { readonly kind: "new-project" }
   /** Opening a project over unsaved changes: save them, discard them, or cancel. */

@@ -14,6 +14,7 @@ import {
 } from "@/app/workspace/project-session"
 import { useWorkspaceStore } from "@/app/workspace/workspace-context"
 import { currentDialog, openDialog } from "./dialogs"
+import { useNativeImport } from "./use-native-import"
 
 /** Input types that take typing, which Undo and Redo step through as in any text field. */
 const TEXT_INPUTS = new Set([
@@ -68,6 +69,7 @@ export function useWorkspaceMenu() {
   const newProject = useNewProject()
   const openProject = useOpenProject()
   const saveProject = useSaveProject()
+  const importProgram = useNativeImport()
   const persistence = usePersistence()
   const host = useHost()
   const stepHistory = useSectionHistory()
@@ -113,7 +115,11 @@ export function useWorkspaceMenu() {
         return
       case "program.import":
         void navigate({ to: "/prepare" })
-        openDialog({ kind: "add-operation" })
+        importProgram.mutate()
+        return
+      case "fusion.import":
+        void navigate({ to: "/prepare" })
+        openDialog({ kind: "fusion" })
         return
       case "project.new":
         newProject()

@@ -1,18 +1,9 @@
 import { useState } from "react"
 import type { ReactNode } from "react"
-import { ArrowLeft, FileCode2, Puzzle, Upload } from "lucide-react"
+import { ArrowLeft, Puzzle } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
-import {
-  Empty,
-  EmptyContent,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from "@/components/ui/empty"
 import { FieldDescription, FieldLegend, FieldSet } from "@/components/ui/field"
-import { FilePicker } from "@/components/file-picker"
 import {
   Item,
   ItemContent,
@@ -20,15 +11,8 @@ import {
   ItemMedia,
   ItemTitle,
 } from "@/components/ui/item"
-import { NC_FILE_ACCEPT, NC_FILE_TYPES } from "@/app/workspace/import-files"
 import { templateOperation } from "@/app/workspace/templates"
-import {
-  selectedPlate,
-  usePlateIndex,
-  useWorkspace,
-  useWorkspaceStore,
-} from "@/app/workspace/workspace-context"
-import { plateLabel } from "@/domain/plate/plate"
+import { selectedPlate, useWorkspace } from "@/app/workspace/workspace-context"
 import {
   findSource,
   pluginSources,
@@ -44,10 +28,6 @@ import { PluginFrame } from "@/features/plugins/plugin-frame"
 import { TemplateForm } from "@/features/plugins/template-form"
 import { AppDialog } from "@/features/shell/app-dialog"
 import { openDialog } from "@/features/shell/dialogs"
-import {
-  useImportOperations,
-  useImportPlates,
-} from "@/features/shell/use-import"
 import { useHost } from "@/platform/host-context"
 import { useInstalledPlugins } from "@/platform/plugins"
 import { usePrepareSelection } from "../plate-tree/use-prepare-selection"
@@ -83,73 +63,6 @@ function SourceItem({
         <ItemDescription>{description}</ItemDescription>
       </ItemContent>
     </Item>
-  )
-}
-
-/** NC files dropped or browsed: into the selected plate, or as new plates. */
-function FileImport({ onDone }: { onDone: () => void }) {
-  const workspace = useWorkspaceStore()
-  const plate = useWorkspace(selectedPlate)
-  const index = usePlateIndex(plate?.id)
-  const importPlates = useImportPlates()
-  const importOperations = useImportOperations()
-  const [dragging, setDragging] = useState(false)
-  const into = plate && !plate.example ? plate : null
-  const busy = importPlates.isPending || importOperations.isPending
-  const importFiles = (files: File[]) => {
-    if (!files.length) return
-    const target = selectedPlate(workspace.state)
-    if (target && !target.example)
-      importOperations.mutate(
-        { plateId: target.id, files },
-        { onSuccess: onDone }
-      )
-    else importPlates.mutate(files, { onSuccess: onDone })
-  }
-  return (
-    <Empty
-      className="border border-dashed"
-      data-dragging={dragging}
-      onDragOver={(event) => {
-        event.preventDefault()
-        event.stopPropagation()
-        setDragging(true)
-      }}
-      onDragLeave={() => setDragging(false)}
-      onDrop={(event) => {
-        event.preventDefault()
-        event.stopPropagation()
-        setDragging(false)
-        importFiles(Array.from(event.dataTransfer.files))
-      }}
-    >
-      <EmptyHeader>
-        <EmptyMedia variant="icon">
-          <Upload />
-        </EmptyMedia>
-        <EmptyTitle>Import NC files</EmptyTitle>
-        <EmptyDescription>
-          {into
-            ? `Drop ${NC_FILE_TYPES} files to add them to ${plateLabel(into, index)}.`
-            : `Drop ${NC_FILE_TYPES} files to start new plates.`}
-        </EmptyDescription>
-      </EmptyHeader>
-      <EmptyContent>
-        <FilePicker
-          accept={NC_FILE_ACCEPT}
-          multiple
-          aria-label="NC files"
-          onSelect={importFiles}
-        >
-          {(open) => (
-            <Button disabled={busy} onClick={open}>
-              <FileCode2 />
-              {busy ? "Importing…" : "Browse…"}
-            </Button>
-          )}
-        </FilePicker>
-      </EmptyContent>
-    </Empty>
   )
 }
 
@@ -219,7 +132,7 @@ function ImporterSource({
 const sourceTitle = (source: PluginSource) =>
   source.kind === "program" ? source.program.name : source.view.title
 
-/** Everything an operation can come from: NC files, built-in probing and plugins. */
+/** Built-in probing and plugin sources for adding an operation. */
 export function AddOperationDialog({
   preset,
   onClose,
@@ -255,7 +168,6 @@ export function AddOperationDialog({
   return (
     <AppDialog title="Add operation" width="wide" onClose={onClose}>
       <div className="flex flex-col gap-6">
-        <FileImport onDone={onClose} />
         {builtIns.length > 0 && (
           <FieldSet>
             <FieldLegend>Built in</FieldLegend>

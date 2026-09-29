@@ -16,6 +16,7 @@ import { handleAppProtocol, registerAppScheme } from "./protocol"
 import { createHostHandlers } from "./rpc/host-handlers"
 import { serveHostConnections } from "./rpc/host-server"
 import { FileService } from "./services/file-service"
+import { FusionService } from "./services/fusion-service"
 import { KeptWorkspace } from "./services/kept-workspace"
 import { MenuBus } from "./services/menu-bus"
 import { UnsavedChanges } from "./services/unsaved-changes"
@@ -108,6 +109,8 @@ function start(diagnostics: Diagnostics) {
   const storage = new StorageService(app.getPath("userData"))
   const models = createModelLibrary(app.getPath("userData"))
   const files = new FileService(currentWindow)
+  const fusion = new FusionService()
+  fusion.start()
   const machine = new MachineHost(
     (snapshot) => {
       const stop =
@@ -128,6 +131,7 @@ function start(diagnostics: Diagnostics) {
   serveHostConnections({
     handlers: createHostHandlers({
       files,
+      fusion,
       menu,
       machine: machine.app,
       storage,
@@ -165,6 +169,7 @@ function start(diagnostics: Diagnostics) {
   let storageSettled = false
   app.on("will-quit", (event) => {
     if (storageSettled) {
+      fusion.dispose()
       machine.dispose()
       pluginPlatform.dispose()
       log.info("OpenSpindle quit")

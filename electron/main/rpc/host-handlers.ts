@@ -2,6 +2,7 @@ import type { Handlers } from "@openspindle/rpc"
 import type { MachineGateway } from "../../../src/machine/core/gateway.ts"
 import type { HostContract } from "../../../src/platform/contract/host-contract"
 import type { FileService } from "../services/file-service"
+import type { FusionService } from "../services/fusion-service"
 import type { MenuBus } from "../services/menu-bus"
 import type { ModelStore } from "../../../src/persistence/models/model-library"
 import type { KeptWorkspace } from "../services/kept-workspace"
@@ -14,6 +15,7 @@ import { createPluginHandlers } from "./plugin-handlers"
 
 export type HostServices = {
   readonly files: FileService
+  readonly fusion: FusionService
   readonly menu: MenuBus
   readonly machine: MachineGateway
   readonly storage: StorageService
@@ -28,13 +30,22 @@ export type HostServices = {
 export function createHostHandlers(
   services: HostServices
 ): Handlers<HostContract> {
-  const { files, menu, storage, models, unsaved, diagnostics } = services
+  const { files, fusion, menu, storage, models, unsaved, diagnostics } =
+    services
   const gateway = services.machine
   const platform = createPluginHandlers(services.pluginPlatform)
   return {
     methods: {
       "files.open": ({ kind }) => files.open(kind),
       "files.save": (request) => files.save(request),
+      "fusion.snapshot": () => fusion.snapshot(),
+      "fusion.pair": ({ requestId, code }, { signal }) =>
+        fusion.pair(requestId, code, signal),
+      "fusion.dismissPairing": ({ requestId }) =>
+        fusion.dismissPairing(requestId),
+      "fusion.list": (_params, { signal }) => fusion.list(signal),
+      "fusion.read": ({ id }, { signal }) => fusion.read(id, signal),
+      "fusion.disconnect": () => fusion.disconnect(),
       "machine.snapshot": () => machine(() => gateway.snapshot()),
       "machine.discover": () => machine(() => gateway.discover()),
       "machine.connect": (request) => machine(() => gateway.connect(request)),
@@ -76,6 +87,7 @@ export function createHostHandlers(
       ...platform.methods,
     },
     events: {
+      "fusion.changed": (_params, emit) => fusion.subscribe(emit),
       "machine.changed": (_params, emit) => gateway.subscribe(emit),
       "machine.camera": (_params, emit) => gateway.watchCamera(emit),
       "machine.console": (_params, emit) => gateway.watchConsole(emit),

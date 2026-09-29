@@ -13,6 +13,7 @@ OpenSpindle is a desktop app for preparing, checking and running jobs on a Maker
 - Fixtures: the MDF bed, L-brackets, top clamps, dowel pins and 4th axis, or your own STEP and GLB models
 - Placement relative to the machine's stored anchors, with move, snap and lock in the 3D view
 - Import of `.nc`, `.cnc`, `.gcode`, `.tap` and `.ngc` programs from your CAM
+- Discover NC programs in Fusion 360 and import them directly through the installable Python add-in
 - Auto-level, auto Z-height and auto-scan with the Makera wired probe
 - 3D probing with the Makera 3D Probe: the work origin at an outside or inside corner, or the center of a pocket or boss, on the stock or on a bracket or anything else on the bed
 - Design-rule checks, and problems marked where they are in the 3D view
@@ -35,7 +36,7 @@ Download `OpenSpindle-<version>-universal.dmg` from the [latest release](../../r
 ## Quick start
 
 1. **Connect:** click the device card in **Prepare** and choose your Z1, or enter its IP address.
-2. **Import:** drop your CAM's NC file anywhere in the window. It becomes a plate.
+2. **Import:** choose **File › Import…** to select your CAM's NC file in the native file window, or **File › Import from Fusion 360** to discover and import an NC program from Fusion. Dropping NC files anywhere in the workspace creates new plates.
 3. **Set up:** place the stock, set the work origin and assign tools in the plate's settings.
 4. **Check:** play the program back on the **Job** tab.
 5. **Run:** once the run checklist passes. **Machine › Stop** (⌘.) stops at any time.
@@ -59,6 +60,7 @@ If something behaves differently, **Help › Export Protocol Trace…** saves th
 
 - [Auto-level](docs/auto-level.md), [auto Z-height](docs/auto-z-height.md), [auto-scan](docs/auto-scan.md) and [3D probing](docs/3d-probing.md)
 - [PCB operations](docs/pcb.md) from KiCad Gerber and Excellon files, and setting up pcb2gcode
+- [Fusion 360](docs/fusion360.md): install the add-in, connect and import NC programs
 - [Stored anchors](docs/stored-anchors.md), [models](docs/models.md) and [design rules](docs/design-rules.md)
 - [Device controls](docs/device-controls.md), [running programs](docs/device-jobs.md) and [the height map](docs/device-height-map.md)
 - [Project files](docs/step-nc-projects.md) and [exported NC](docs/plate-definition.md)
@@ -77,6 +79,8 @@ npm ci
 npm run dev      # the app, with the renderer's dev server
 npm run sim:z1   # a simulated Z1 to connect to on 127.0.0.1
 ```
+
+The renderer updates while developing. Changes to Electron main, preload or the host RPC contract require a full app restart: save your project, quit normally, and run `npm run dev` again. Reloading the window alone keeps the old host and can cause an `Unknown method` error when the renderer calls a newly added method.
 
 Before you open a pull request, `npm run typecheck`, `npm run lint`, `npm run check` (`npm run format` fixes it) and `npm run build` must pass. Say in the pull request how you checked your change, and for anything sent to the machine whether that was against the simulator, with a protocol trace or on a real machine.
 

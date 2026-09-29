@@ -1,0 +1,359 @@
+"""Discover open Fusion NC programs and post them when OpenSpindle imports."""
+
+from pathlib import Path
+import re
+import tempfile
+import uuid
+
+import adsk.cam
+import adsk.core
+
+from .bridge_server import (
+    BridgeError, MAX_PROGRAM_BYTES, MAX_PROGRAMS, NC_EXTENSIONS, SnapshotBridge,
+)
+
+
+_TAB_ID = "OpenSpindleBridgeTab"
+_PANEL_ID = "OpenSpindleBridgePanel"
+_CONNECTION_ID = "OpenSpindleBridgeConnection"
+_EVENT_ID = "OpenSpindleBridgeMainThreadRequest"
+_bridge = None
+_handlers = []
+_catalog = {}
+_custom_event = None
+_custom_handler = None
+
+
+def _application():
+    return adsk.core.Application.get()
+
+
+def _show_error(message):
+    _application().userInterface.messageBox(message, "OpenSpindle")
+
+
+def _display_name(value, fallback):
+    return re.sub(r"[\x00-\x1f\x7f-\x9f\ud800-\udfff]", " ", str(value)).strip()[:200] or fallback
+
+
+def _refresh_catalog(ensure_live):
+    # All Autodesk object references stay on Fusion's main thread. Read only:
+    # listing never activates documents or posts/generates any toolpaths.
+    global _catalog
+    found = {}
+    documents = _application().documents
+    for document_index in range(documents.count):
+        ensure_live()
+        document = documents.item(document_index)
+        if document is None or not document.isValid:
+            continue
+        # Fusion also includes design-only/reference documents in this list.
+        # itemByProductType throws when CAM is absent, so inspect existing
+        # products without requesting creation of a missing CAM product.
+        cam = None
+        for product in document.products:
+            cam = adsk.cam.CAM.cast(product)
+            if cam is not None:
+                break
+        if cam is None:
+            continue
+        programs = cam.ncPrograms
+        for program_index in range(programs.count):
+            ensure_live()
+            program = programs.item(program_index)
+            if program is None or not program.isValid:
+                continue
+            if len(found) >= MAX_PROGRAMS:
+                raise ValueError("More than 100 NC programs are open in Fusion. Close some documents and refresh.")
+            program_id = next((
+                key for key, (previous_document, previous_program) in _catalog.items()
+                if previous_document.isValid and previous_program.isValid
+                and previous_document == document and previous_program == program
+            ), None)
+            if program_id is None:
+                program_id = str(uuid.uuid4())
+            found[program_id] = (document, program)
+    # Dropping absent references makes closed/deleted programs unavailable. A
+    # replacement with the same display name cannot inherit a stale identity.
+    _catalog = found
+    return [{
+        "id": program_id,
+        "name": _display_name(program.name, "NC program"),
+        "documentName": _display_name(document.name, "Untitled"),
+    } for program_id, (document, program) in found.items()]
+
+
+def _post_snapshot(document, program, program_id, ensure_live):
+    if not program.isValid:
+        raise ValueError("The NC program is no longer available. Refresh the program list in OpenSpindle.")
+    if program.postConfiguration is None:
+        raise ValueError("Choose a machine post processor in the NC program first.")
+    setup_ids = set()
+    for entry in program.operations:
+        setup = adsk.cam.Setup.cast(entry)
+        if setup is None:
+            setup = entry.parentSetup
+        if setup is None:
+            raise ValueError("Every NC program operation must belong to one setup.")
+        setup_ids.add(setup.operationId)
+    if len(setup_ids) != 1:
+        raise ValueError("Import an NC program containing exactly one setup, using G54.")
+
+    parameters = program.parameters
+    file_parameter = parameters.itemByName("nc_program_filename")
+    folder_parameter = parameters.itemByName("nc_program_output_folder")
+    editor_parameter = parameters.itemByName("nc_program_openInEditor")
+    if not file_parameter or not folder_parameter or not editor_parameter:
+        raise ValueError("This NC program does not expose the required posting parameters.")
+
+    extension_parameter = parameters.itemByName("nc_program_nc_extension")
+    extension = extension_parameter.value.value if extension_parameter else ""
+    if not extension:
+        extension = program.postConfiguration.extension
+    extension = "." + str(extension).lstrip(".").lower()
+    if extension not in NC_EXTENSIONS:
+        raise ValueError("Choose a post that outputs .nc, .cnc, .gcode, .tap, or .ngc files.")
+
+    original_name = str(file_parameter.value.value)
+    stem = re.sub(r"[^A-Za-z0-9 ._-]", "_", original_name).strip(" ._")
+    if not stem or not stem[0].isalnum():
+        stem = "program_" + stem
+    stem = stem[:180]
+    program_name = _display_name(program.name, "NC program")
+    document_name = _display_name(document.name, "Untitled")
+    overrides = []
+
+    with tempfile.TemporaryDirectory(prefix="openspindle-fusion-") as directory:
+        values = [
+            (folder_parameter, directory.replace("\\", "/")),
+            (file_parameter, stem),
+            (editor_parameter, False),
+        ]
+        # Keep the export local and preserve a saved NC program after posting.
+        # Older Fusion releases may not expose these optional parameters.
+        for name, value in (
+            ("nc_program_postToFusionTeam", False),
+            ("nc_program_createInBrowser", True),
+        ):
+            parameter = parameters.itemByName(name)
+            if parameter:
+                values.append((parameter, value))
+        try:
+            ensure_live()
+            if _application().activeDocument != document or not program.isValid:
+                raise BridgeError(410, "The selected Fusion document or NC program changed. Refresh and try again.")
+            for parameter, value in values:
+                overrides.append((parameter, parameter.value.value))
+                parameter.value.value = value
+            options = adsk.cam.NCProgramPostProcessOptions.create()
+            options.postProcessExecutionBehavior = (
+                adsk.cam.PostProcessExecutionBehaviors.PostProcessExecutionBehavior_Fail
+            )
+            options.isFailOnToolNumberDuplication = True
+            ensure_live()
+            if not program.postProcess(options):
+                raise ValueError("Fusion could not post this NC program.")
+        finally:
+            restore_errors = []
+            for parameter, value in reversed(overrides):
+                try:
+                    parameter.value.value = value
+                except Exception:
+                    restore_errors.append(parameter.name)
+            if restore_errors:
+                raise RuntimeError(
+                    "Could not restore NC program settings: " + ", ".join(restore_errors)
+                    + ". Review the NC program settings in Fusion before posting again."
+                )
+
+        files = [
+            path for path in Path(directory).rglob("*")
+            if path.is_file() and path.suffix.lower() != ".log"
+        ]
+        if len(files) != 1 or files[0].suffix.lower() not in NC_EXTENSIONS:
+            raise ValueError(
+                "The post must produce exactly one NC file. "
+                "Posts with separate subprogram files are not supported."
+            )
+        path = files[0]
+        if path.is_symlink() or not path.resolve().is_relative_to(Path(directory).resolve()):
+            raise ValueError("The posted NC file must be inside the temporary export folder.")
+        with path.open("rb") as output:
+            encoded = output.read(MAX_PROGRAM_BYTES + 1)
+        if len(encoded) > MAX_PROGRAM_BYTES:
+            raise ValueError("The posted NC program exceeds 10 MiB.")
+        try:
+            contents = encoded.decode("utf-8", errors="strict")
+        except UnicodeDecodeError as error:
+            raise ValueError("The post must produce UTF-8 or ASCII NC text.") from error
+        if not contents.strip() or "\x00" in contents:
+            raise ValueError("The posted NC program is empty or contains NUL bytes.")
+        return {
+            "id": program_id,
+            "name": program_name,
+            "documentName": document_name,
+            "fileName": stem + path.suffix.lower(),
+            "contents": contents,
+        }
+
+
+def _handle_request(action, program_id, ensure_live):
+    if action == "list":
+        return {"programs": _refresh_catalog(ensure_live)}
+    app = _application()
+    ui = app.userInterface
+    # The connection-code command has no model edits and may still be open
+    # after pairing. Never cancel a user's unrelated Fusion command.
+    if ui.activeCommand == _CONNECTION_ID:
+        ui.commandDefinitions.itemById("SelectCommand").execute()
+    if ui.activeCommand != "SelectCommand":
+        raise BridgeError(409, "Finish or cancel the active command in Fusion, then import again.")
+    _refresh_catalog(ensure_live)
+    entry = _catalog.get(program_id)
+    if entry is None:
+        raise BridgeError(410, "This NC program was deleted or its document was closed. Refresh the program list.")
+    document, program = entry
+    previous_document = app.activeDocument
+    try:
+        ensure_live()
+        if previous_document != document and not document.activate():
+            raise BridgeError(409, "Fusion could not activate the selected NC program's document.")
+        ensure_live()
+        if app.activeDocument != document or not document.isValid or not program.isValid:
+            raise BridgeError(410, "The selected Fusion document or NC program is no longer available.")
+        if ui.activeCommand != "SelectCommand":
+            raise BridgeError(409, "Finish or cancel the active command in Fusion, then import again.")
+        return _post_snapshot(document, program, program_id, ensure_live)
+    finally:
+        # Even a cancelled/timed-out HTTP caller cannot bypass restoration after
+        # Fusion's synchronous native postProcess call returns.
+        if (
+            previous_document is not None and previous_document.isValid
+            and previous_document != document and app.activeDocument == document
+        ):
+            if not previous_document.activate():
+                raise BridgeError(500, "The NC program was posted, but Fusion could not restore the previously active document.")
+
+
+class _MainThreadHandler(adsk.core.CustomEventHandler):
+    def __init__(self, requests):
+        super().__init__()
+        self.requests = requests
+
+    def notify(self, args):
+        self.requests.execute(args.additionalInfo, _handle_request)
+
+
+class _ConnectionCreatedHandler(adsk.core.CommandCreatedEventHandler):
+    def notify(self, args):
+        command = args.command
+        command.okButtonText = "Close"
+        command.isCancelButtonVisible = False
+        command.commandInputs.addTextBoxCommandInput(
+            "pairingCode", "Connection code", _bridge.begin_pairing(), 1, True
+        )
+        command.commandInputs.addTextBoxCommandInput(
+            "pairingInstructions", "",
+            "Enter this code in the OpenSpindle connection dialog. "
+            "Keep OpenSpindle open on this computer. The code expires in two minutes.",
+            3, True,
+        )
+
+
+def _remove_ui(ui):
+    errors = []
+    # Panel IDs are global. Deleting a tab alone can leave its panel behind,
+    # so also find panels orphaned by an interrupted or older add-in session.
+    for collection_name, item_id, label in (
+        ("allToolbarPanels", _PANEL_ID, "toolbar panel"),
+        ("allToolbarTabs", _TAB_ID, "toolbar tab"),
+        ("commandDefinitions", _CONNECTION_ID, "connection command"),
+    ):
+        try:
+            item = getattr(ui, collection_name).itemById(item_id)
+            if item is not None and not item.deleteMe():
+                raise ValueError("Fusion refused to delete the " + label + ".")
+        except Exception as error:
+            errors.append(label + ": " + str(error))
+    return errors
+
+
+def _cleanup():
+    global _bridge, _custom_event, _custom_handler
+    errors = []
+    if _bridge is not None:
+        # Wake workers before unregistering their main-thread event.
+        try:
+            _bridge.stop()
+        except Exception as error:
+            errors.append("local connection: " + str(error))
+        finally:
+            _bridge = None
+    app = _application()
+    if _custom_event is not None:
+        try:
+            if _custom_handler is not None:
+                _custom_event.remove(_custom_handler)
+        except Exception as error:
+            errors.append("request handler: " + str(error))
+        try:
+            if not app.unregisterCustomEvent(_EVENT_ID):
+                raise ValueError("Fusion refused to unregister the request event.")
+        except Exception as error:
+            errors.append("request event: " + str(error))
+        finally:
+            _custom_event = None
+            _custom_handler = None
+    # A transport or event error must not skip UI cleanup.
+    errors.extend(_remove_ui(app.userInterface))
+    _handlers.clear()
+    _catalog.clear()
+    return errors
+
+
+def run(_context):
+    global _bridge, _custom_event, _custom_handler
+    if _bridge is not None:
+        return
+    try:
+        app = _application()
+        _custom_event = app.registerCustomEvent(_EVENT_ID)
+        if _custom_event is None:
+            raise ValueError("Fusion could not register the OpenSpindle request event.")
+        # Capture the one documented thread-safe API method on the main thread.
+        fire_event = app.fireCustomEvent
+        _bridge = SnapshotBridge(lambda request_id: fire_event(_EVENT_ID, request_id))
+        _custom_handler = _MainThreadHandler(_bridge.requests)
+        if not _custom_event.add(_custom_handler):
+            raise ValueError("Fusion could not attach the OpenSpindle request handler.")
+        ui = app.userInterface
+        cleanup_errors = _remove_ui(ui)
+        if cleanup_errors:
+            raise ValueError("Could not remove the previous OpenSpindle toolbar.\n" + "\n".join(cleanup_errors))
+        workspace = ui.workspaces.itemById("CAMEnvironment")
+        tab = workspace.toolbarTabs.add(_TAB_ID, "OpenSpindle")
+        panel = tab.toolbarPanels.add(_PANEL_ID, "OpenSpindle")
+        handler = _ConnectionCreatedHandler()
+        definition = ui.commandDefinitions.addButtonDefinition(
+            _CONNECTION_ID, "Connect to OpenSpindle",
+            "Request a connection and show its one-time code.",
+        )
+        if not definition.commandCreated.add(handler):
+            raise ValueError("Fusion could not attach the OpenSpindle connection command.")
+        _handlers.append(handler)
+        control = panel.controls.addCommand(definition)
+        control.isPromoted = True
+        # Only accept requests once the event handler and UI are ready.
+        _bridge.start()
+    except Exception as error:
+        cleanup_errors = _cleanup()
+        message = "OpenSpindle Bridge could not start.\n\n" + str(error)
+        if cleanup_errors:
+            message += "\n\nCleanup also reported:\n" + "\n".join(cleanup_errors)
+        _show_error(message)
+
+
+def stop(_context):
+    errors = _cleanup()
+    if errors:
+        _show_error("OpenSpindle Bridge cleanup could not finish.\n\n" + "\n".join(errors))

@@ -8,6 +8,7 @@ export const MenuCommandSchema = z.enum([
   /** Closing with unsaved changes, the user chose Save: save, then close the window. */
   "project.saveAndClose",
   "program.import",
+  "fusion.import",
   "plugins.manage",
   "models.manage",
   "tools.manage",

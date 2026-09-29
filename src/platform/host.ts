@@ -38,6 +38,11 @@ import type {
 import type { BackupResult, StorageKey } from "./contract/storage"
 import type { MenuCommand } from "./contract/menu"
 import type {
+  FusionConnectionSnapshot,
+  FusionProgram,
+  FusionProgramSummary,
+} from "./contract/fusion"
+import type {
   DiagnosticsSettings,
   DiagnosticsStatus,
   LogRecord,
@@ -77,6 +82,19 @@ export interface StoragePort {
 export interface FileHost {
   open: (kind: FileKind) => Promise<OpenFileResult>
   save: (request: SaveFileRequest) => Promise<SaveFileResult>
+}
+
+/** Discover live NC programs in Fusion; reading posts the selected program for import. */
+export interface FusionHost {
+  snapshot: () => Promise<FusionConnectionSnapshot>
+  subscribe: (
+    listener: (snapshot: FusionConnectionSnapshot) => void
+  ) => () => void
+  pair: (requestId: string, code: string, signal?: AbortSignal) => Promise<void>
+  dismissPairing: (requestId: string) => Promise<void>
+  list: (signal?: AbortSignal) => Promise<FusionProgramSummary[]>
+  read: (id: string, signal?: AbortSignal) => Promise<FusionProgram>
+  disconnect: () => Promise<void>
 }
 
 export interface MenuHost {
@@ -209,6 +227,7 @@ export interface PluginHost {
 export interface Host {
   readonly machine: MachineHost
   readonly files: FileHost
+  readonly fusion: FusionHost
   readonly storage: StoragePort
   readonly models: ModelStore
   readonly menu: MenuHost
