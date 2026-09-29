@@ -153,7 +153,7 @@ export class PlatePath {
     this.probes.present(state)
     this.toolpath.showTool(
       state.active && state.progress < 100 ? count : null,
-      state.previewLine ?? null,
+      playhead ? null : (state.previewLine ?? null),
       playhead
     )
   }

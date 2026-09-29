@@ -34,8 +34,6 @@ export type ViewerPresentation = {
   selectedLineRanges?: readonly LineRange[]
   previewLine?: number | null
   previewProbePoint?: number | null
-  /** Where simulated playback is along the selected plate's moves. */
-  playhead?: Playhead | null
   progress: number
   showRapids: boolean
   showStock: boolean
@@ -96,6 +94,7 @@ export class BedScene {
   private readonly views = new Map<string, PlateView>()
   private plates: readonly ViewerPlate[] = []
   private layout = layoutPlates([], this.emptyBed)
+  private playhead: Playhead | null = null
   private presentation: ViewerPresentation = {
     selectedPlateId: null,
     progress: 100,
@@ -276,6 +275,15 @@ export class BedScene {
     this.arranger?.set(view)
   }
 
+  /**
+   * Where simulated playback is along the selected plate's moves: it moves every frame, and only
+   * that plate's path follows.
+   */
+  setPlayhead(playhead: Playhead | null) {
+    this.playhead = playhead
+    this.present(this.presentation)
+  }
+
   /** Only plates whose presentation changed update; playback touches the selected plate alone. */
   present(presentation: ViewerPresentation) {
     this.presentation = presentation
@@ -372,8 +380,8 @@ export class BedScene {
         progress: 100,
         ...marked,
       }
-    const { progress, previewLine, previewProbePoint, playhead } =
-      this.presentation
+    const { progress, previewLine, previewProbePoint } = this.presentation
+    const { playhead } = this
     return {
       active: true,
       showRapids,

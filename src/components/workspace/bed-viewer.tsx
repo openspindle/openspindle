@@ -10,19 +10,20 @@ import { useEffect, useRef, useState } from "react"
 import { useHost } from "@/platform/host-context"
 import { plateLabel } from "@/domain/plate/plate"
 import type {
+  PlayheadSource,
   ViewerPlate,
   ViewerProblem,
   ViewerProblemRef,
 } from "@/components/workspace/viewer/viewer-input"
 import { problemMarkerId } from "./bed-viewer-layout"
 import type { LineRange } from "./bed-viewer-layout"
-import type { Playhead } from "@/domain/nc/move-times"
 import { BedScene } from "./viewer/bed-scene"
 import type { ViewMode } from "./viewer/bed-scene"
 import type { ArrangeEvents, ArrangeView } from "./viewer/setup-arranger"
 
 export type { Stock } from "@/domain/stock/stock"
 export type {
+  PlayheadSource,
   ViewerPlate,
   ViewerProblem,
   ViewerProblemRef,
@@ -43,8 +44,11 @@ type Props = {
   selectedLineRanges?: LineRange[]
   previewLine?: number | null
   previewProbePoint?: number | null
-  /** Where simulated playback is along the selected plate's moves; null shows up to the line. */
-  playhead?: Playhead | null
+  /**
+   * Where simulated playback is along the selected plate's moves, which the scene follows every
+   * frame on its own; without one, it shows up to the line.
+   */
+  playhead?: PlayheadSource
   progress: number
   showRapids: boolean
   showStock: boolean
@@ -144,7 +148,6 @@ export function BedViewer({
       selectedLineRanges,
       previewLine,
       previewProbePoint,
-      playhead,
       progress,
       showRapids,
       showStock,
@@ -156,13 +159,23 @@ export function BedViewer({
     selectedLineRanges,
     previewLine,
     previewProbePoint,
-    playhead,
     progress,
     showRapids,
     showStock,
     problems,
     shownProblem,
   ])
+  // Playback moves the playhead every frame: the scene follows it without a render here.
+  useEffect(() => {
+    if (!playhead) return
+    const follow = () => sceneRef.current?.setPlayhead(playhead.get())
+    follow()
+    const unsubscribe = playhead.subscribe(follow)
+    return () => {
+      unsubscribe()
+      sceneRef.current?.setPlayhead(null)
+    }
+  }, [playhead])
   // Unchanged plates keep their objects; the scene renders only when something changed.
   useEffect(() => {
     sceneRef.current?.setPlates(plates)

@@ -1,3 +1,4 @@
+import type { Playhead } from "@/domain/nc/move-times"
 import type { ToolpathBounds } from "@/domain/compile/toolpath-bounds"
 import type { Place, Severity } from "@/domain/diagnostics"
 import type { FixtureInstance } from "@/domain/fixtures/definitions"
@@ -76,3 +77,12 @@ export type ViewerProblem = {
 
 /** Which problem: its plate and its key there. */
 export type ViewerProblemRef = Pick<ViewerProblem, "plateId" | "key">
+
+/**
+ * Where simulated playback is along the selected plate's moves, which the view follows every
+ * frame without its owner rendering again.
+ */
+export type PlayheadSource = {
+  readonly get: () => Playhead | null
+  readonly subscribe: (listener: () => void) => () => void
+}

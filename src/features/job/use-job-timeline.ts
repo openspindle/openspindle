@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { machineProgram } from "@/app/workspace/machine-program"
+import type { PlayheadSource } from "@/components/workspace/bed-viewer"
+import { revealedSegments } from "@/components/workspace/viewer/toolpath-buffers"
 import { kitForPlate } from "@/domain/fixtures/catalog"
 import type { GCodeProgram } from "@/domain/nc/gcode"
-import { revealedSegments } from "@/components/workspace/viewer/toolpath-buffers"
 import { moveTimes, playheadAt, timeAfterMoves } from "@/domain/nc/move-times"
 import type { Playhead } from "@/domain/nc/move-times"
 import {
@@ -16,16 +17,19 @@ import type { FollowTarget, JobSubject } from "./job-view"
 
 const EMPTY_TIMELINE: PreviewTimeline = { steps: [], ticks: [], probePoints: 0 }
 
+/**
+ * How often, at most, the step on show follows simulated playback: the timeline, the G-code and
+ * the cut facts, which render with the Job tab. The 3D view follows every frame on its own.
+ */
+const STEP_INTERVAL_MS = 100
+
 type Playback = {
   /** The program the position belongs to; another program starts over, fully shown. */
   readonly program: GCodeProgram | null
-  /** Fractional timeline step; null shows the whole program. */
+  /** Fractional timeline step; null shows the whole program. While simulating, the move's. */
   readonly position: number | null
-  /**
-   * Seconds into the machine's moves while playback simulates them, at their feeds; null while
-   * the cursor is on a step.
-   */
-  readonly time: number | null
+  /** Playback simulates the machine's moves, playing or paused; its time is not state. */
+  readonly simulating: boolean
   readonly playing: boolean
   /** The job the user scrubbed away from; any other job is followed again. */
   readonly detachedFrom: string | null
@@ -34,7 +38,7 @@ type Playback = {
 const initialPlayback = (program: GCodeProgram | null): Playback => ({
   program,
   position: null,
-  time: null,
+  simulating: false,
   playing: false,
   detachedFrom: null,
 })
@@ -42,13 +46,26 @@ const initialPlayback = (program: GCodeProgram | null): Playback => ({
 const clampStep = (step: number, count: number) =>
   Math.max(0, Math.min(count, Number.isNaN(step) ? 0 : step))
 
-/**
- * What the 3D viewer draws at the cursor: the program up to a line, or, while playback simulates
- * it, up to the tool along the move under way (`playhead`, in the machine's moves).
- */
-export type TimelinePreview = ReturnType<typeof previewAt> & {
-  readonly playhead: Playhead | null
+/** Where simulated playback is, which the 3D view follows every frame (`PlayheadSource`). */
+class PlayheadStore implements PlayheadSource {
+  private playhead: Playhead | null = null
+  private readonly listeners = new Set<() => void>()
+  readonly get = () => this.playhead
+  readonly subscribe = (listener: () => void) => {
+    this.listeners.add(listener)
+    return () => {
+      this.listeners.delete(listener)
+    }
+  }
+
+  set(playhead: Playhead | null) {
+    this.playhead = playhead
+    for (const listener of this.listeners) listener()
+  }
 }
+
+/** What the 3D viewer draws at the cursor: the program up to a line. */
+export type TimelinePreview = ReturnType<typeof previewAt>
 
 export type JobTimeline = {
   readonly timeline: PreviewTimeline
@@ -57,6 +74,8 @@ export type JobTimeline = {
   /** The program line on show: the machine's own line while following, 0 for none. */
   readonly line: number
   readonly preview: TimelinePreview
+  /** Where simulated playback is along the machine's moves, which the 3D view follows. */
+  readonly playhead: PlayheadSource
   readonly playing: boolean
   readonly speed: number
   /** This window's job position, while it has one. */
@@ -74,8 +93,9 @@ export type JobTimeline = {
 /**
  * The preview cursor of the Job tab over the subject's program. Without a job it scrubs by line
  * and plays the program as the machine moves it, each move at its feed (`moveTimes`), times the
- * playback speed; while this window's job reports progress it follows the machine's line until
- * the user scrubs.
+ * playback speed: the 3D view follows the moves every frame (`playhead`), while the step on show
+ * follows a few times a second, so the tab does not render every frame. While this window's job
+ * reports progress it follows the machine's line until the user scrubs.
  */
 export function useJobTimeline(
   subject: Pick<JobSubject, "plate" | "compiled"> | null,
@@ -98,77 +118,102 @@ export function useJobTimeline(
   const count = timeline.steps.length
   const [speed, setSpeed] = useState(1)
   const [stored, setPlayback] = useState(() => initialPlayback(program))
+  // Simulated time and the playhead move every frame, apart from the Job tab's state.
+  const [playhead] = useState(() => new PlayheadStore())
+  const time = useRef<number | null>(null)
   const playback =
     stored.program === program ? stored : initialPlayback(program)
   const following = target !== null && playback.detachedFrom !== target.jobId
   // Following the machine ends preview playback, so it cannot resume on its own afterwards.
-  if (following && stored.playing) setPlayback({ ...stored, playing: false })
-  const playhead =
-    !following && playback.time !== null && timed
-      ? playheadAt(timed, playback.time)
-      : null
-  const moving = playhead && machine?.segments.at(playhead.segment)
+  if (following && (stored.playing || stored.simulating))
+    setPlayback({ ...stored, playing: false, simulating: false })
+  const simulating = playback.simulating && !following
+  const playing = playback.playing && simulating
   let cursor = Math.floor(clampStep(playback.position ?? count, count))
   if (following) cursor = stepForLine(timeline, target.line)
-  else if (moving) cursor = stepForMove(timeline, moving)
-  let preview: TimelinePreview = {
-    ...(program
-      ? previewAt(timeline, cursor, program)
-      : { line: 0, probePoint: undefined, segmentProgress: 0 }),
-    playhead: null,
-  }
-  if (moving && machine)
-    preview = {
-      line: moving.line,
-      probePoint: moving.probePoint,
-      segmentProgress: (100 * playhead.segment) / machine.segments.length,
-      playhead,
-    }
-  const playing = playback.playing && !following
+  const preview: TimelinePreview = program
+    ? previewAt(timeline, cursor, program)
+    : { line: 0, probePoint: undefined, segmentProgress: 0 }
   // The whole program on show has no line of its own until the user moves the cursor.
   let line = preview.line
   if (following) line = target.line
-  else if (playback.position === null && playback.time === null) line = 0
+  else if (playback.position === null && !simulating) line = 0
 
+  // A simulation that ended, or of another program, shows no playhead.
+  useEffect(() => {
+    if (simulating) return
+    time.current = null
+    playhead.set(null)
+  }, [simulating, program, playhead])
+
+  /** The step that shows the move under way `seconds` into the machine's moves. */
+  const stepAt = (seconds: number) => {
+    if (!timed || !machine) return 0
+    const { segment } = playheadAt(timed, seconds)
+    return stepForMove(timeline, machine.segments[segment])
+  }
   const update = (patch: Partial<Omit<Playback, "program">>) =>
     setPlayback((current) => ({
       ...(current.program === program ? current : initialPlayback(program)),
       ...patch,
     }))
-  const seek = (step: number) =>
+  const stop = () => {
+    time.current = null
+    playhead.set(null)
+  }
+  const seek = (step: number) => {
+    stop()
     update({
       position: clampStep(step, count),
-      time: null,
+      simulating: false,
       playing: false,
       detachedFrom: target?.jobId ?? null,
     })
+  }
 
   useEffect(() => {
-    if (!playing || !timed) return
+    if (!playing || !timed || !machine) return
     let last = performance.now()
+    let shown = -Infinity
     let frame = 0
     const tick = (now: number) => {
-      const elapsed = ((now - last) / 1000) * speed
+      const next = (time.current ?? 0) + ((now - last) / 1000) * speed
       last = now
-      setPlayback((current) => {
-        if (current.program !== program || !current.playing) return current
-        const time = (current.time ?? 0) + elapsed
-        // At the end the whole program shows again.
-        if (time >= timed.duration)
-          return { ...current, time: null, position: count, playing: false }
-        return { ...current, time }
-      })
+      // At the end the whole program shows again.
+      if (next >= timed.duration) {
+        time.current = null
+        playhead.set(null)
+        setPlayback((current) =>
+          current.program === program
+            ? { ...current, position: count, simulating: false, playing: false }
+            : current
+        )
+        return
+      }
+      time.current = next
+      const at = playheadAt(timed, next)
+      playhead.set(at)
+      if (now - shown >= STEP_INTERVAL_MS) {
+        shown = now
+        const step = stepForMove(timeline, machine.segments[at.segment])
+        setPlayback((current) =>
+          current.program !== program || current.position === step
+            ? current
+            : { ...current, position: step }
+        )
+      }
       frame = requestAnimationFrame(tick)
     }
     frame = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(frame)
-  }, [playing, program, timed, count, speed])
+  }, [playing, program, timed, machine, timeline, count, speed, playhead])
 
   return {
     timeline,
     cursor,
     line,
     preview,
+    playhead,
     playing,
     speed,
     target,
@@ -177,26 +222,38 @@ export function useJobTimeline(
     seekLine: (programLine) => seek(stepForLine(timeline, programLine)),
     togglePlay: () => {
       if (playing) {
-        update({ playing: false })
+        const paused = time.current
+        update({
+          playing: false,
+          ...(paused === null ? {} : { position: stepAt(paused) }),
+        })
         return
       }
       if (!timed || !machine || !count) return
       // A paused simulation resumes; otherwise it starts after the moves on show, as the 3D
       // view reveals them for the step (a grid's sample, on its line), or over.
-      const paused =
-        !following && playback.time !== null && playback.time < timed.duration
-      const step =
-        cursor > 0 && cursor < count ? timeline.steps[cursor - 1] : null
-      const shown = step
-        ? revealedSegments(machine, 100, step.line, step.probePoint)
-        : 0
+      let start = simulating ? time.current : null
+      if (start === null) {
+        const step =
+          cursor > 0 && cursor < count ? timeline.steps[cursor - 1] : null
+        const shown = step
+          ? revealedSegments(machine, 100, step.line, step.probePoint)
+          : 0
+        start = timeAfterMoves(timed, shown)
+      }
+      time.current = start
+      playhead.set(playheadAt(timed, start))
       update({
-        time: paused ? playback.time : timeAfterMoves(timed, shown),
+        position: stepAt(start),
+        simulating: true,
         playing: true,
         detachedFrom: target?.jobId ?? null,
       })
     },
     setSpeed,
-    follow: () => update({ playing: false, time: null, detachedFrom: null }),
+    follow: () => {
+      stop()
+      update({ playing: false, simulating: false, detachedFrom: null })
+    },
   }
 }

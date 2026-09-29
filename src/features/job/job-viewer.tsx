@@ -6,15 +6,19 @@ import {
 } from "@/features/viewer/viewer-toolbar"
 import { useWorkspaceViewerPlates } from "@/features/viewer/workspace-viewer-plates"
 import type { JobSubject } from "./job-view"
+import type { PlayheadSource } from "@/components/workspace/bed-viewer"
 import type { TimelinePreview } from "./use-job-timeline"
 
 /** The 3D bed with every plate; the shown plate is highlighted and drawn up to the preview. */
 export function JobViewer({
   shown,
   preview,
+  playhead,
 }: {
   shown: JobSubject | null
   preview: TimelinePreview
+  /** Where simulated playback is, which the view follows every frame. */
+  playhead: PlayheadSource
 }) {
   const plates = useWorkspaceViewerPlates(shown)
   const dispatch = useDispatch()
@@ -27,7 +31,7 @@ export function JobViewer({
         onSelectPlate={(plateId) => dispatch({ type: "plate.select", plateId })}
         previewLine={preview.line}
         previewProbePoint={preview.probePoint}
-        playhead={preview.playhead}
+        playhead={playhead}
         progress={preview.segmentProgress}
         showRapids={false}
         showStock

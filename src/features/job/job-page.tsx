@@ -215,7 +215,11 @@ export function JobPage({
           className="relative flex h-full min-h-0 min-w-0 flex-col"
           aria-label="Job preview"
         >
-          <JobViewer shown={subject} preview={timeline.preview} />
+          <JobViewer
+            shown={subject}
+            preview={timeline.preview}
+            playhead={timeline.playhead}
+          />
           <JobTimelineBar
             timeline={timeline}
             details={
