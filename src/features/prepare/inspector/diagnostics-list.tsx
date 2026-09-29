@@ -42,7 +42,6 @@ export function DiagnosticsList({
               <AlertAction className="flex items-center gap-1">
                 {placed && (
                   <Toggle
-                    variant="outline"
                     size="sm"
                     aria-label="Show in the 3D view"
                     pressed={isFocused(focus, plate.id, key)}

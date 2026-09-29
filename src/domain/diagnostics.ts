@@ -10,6 +10,13 @@ export type QuickFix =
   | { readonly kind: "install-plugin"; readonly pluginId: string }
   | { readonly kind: "read-anchors" }
   | { readonly kind: "edit-operation"; readonly operationId: string }
+  /** Changes an operation's NC as one of its machine's program rules suggests (`ProgramRule`). */
+  | {
+      readonly kind: "resolve-rule"
+      readonly operationId: string
+      readonly rule: string
+      readonly resolution: "drop" | "replace"
+    }
 
 /** The plate as a whole: its program, rather than one of its operations. */
 export type PlateSubject = { readonly kind: "plate" }

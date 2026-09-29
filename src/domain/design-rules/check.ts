@@ -1,5 +1,6 @@
 import { readNcBlock } from "@/machine/contract"
 import type { GCodeSegment, Point3 } from "@/domain/nc/gcode"
+import { linesText, programLines } from "@/domain/nc/program-lines"
 import type { Tool } from "@/domain/tools/tool"
 import type { CompiledPlate, OperationSpan } from "../compile/compile"
 import { machineRetract } from "../compile/sections"
@@ -10,16 +11,38 @@ import {
   operationSubject,
   warning,
 } from "../diagnostics"
-import type { Diagnostic, ProgramLines } from "../diagnostics"
+import type { Diagnostic, Place, ProgramLines, QuickFix } from "../diagnostics"
+import { kitForPlate } from "../fixtures/catalog"
+import type { FixtureKit } from "../fixtures/fixture-kit"
+import { kindOf } from "../operations/kinds"
+import type { Operation } from "../operations/operation"
 import type { Plate } from "../plate/plate"
-import { toMicrometre } from "../primitives"
+import { capitalize, toMicrometre } from "../primitives"
 import { isProbeSlot } from "../tools/tool-table"
-import { CHECK_RULES, LIMIT_RULES, LIMIT_RULE_INFO } from "./rules"
+import { programRulesFor } from "./common-rules"
+import {
+  FRESH_START,
+  findIssues,
+  programEnd,
+  programRuleSeverity,
+  suggestedChoice,
+  suggestionOf,
+} from "./program-rules"
+import type { ProgramIssue, ProgramStart } from "./program-rules"
+import { CHECK_RULES, LIMIT_RULES, LIMIT_RULE_INFO, ruleInfo } from "./rules"
 import type { DesignRuleId, DesignRules } from "./rules"
 
-/** A rule that moves of one operation break, with where they do. */
+/**
+ * A rule that one operation breaks, with where it does: its moves break one of the project's
+ * limits, or its lines one of the machine's program rules. The message says what is wrong.
+ */
 export type DesignRuleViolation = Diagnostic & {
-  readonly rule: DesignRuleId
+  /** A limit or check rule's id (`DesignRuleId`), or a program rule's (`ProgramRule`). */
+  readonly rule: string
+  /** The rule as the design rules name it: "Max cutting feed", "Spindle reverse (M4)". */
+  readonly label: string
+  /** What resolves it: "Cut at 2,000 mm/min or slower.", "Replace with M3". */
+  readonly suggestion: string
   /** How many program lines break the rule. */
   readonly lineCount: number
   /** Those lines in the compiled program, merged into a few ranges to show them by. */
@@ -207,11 +230,31 @@ function breach(group: Group, rules: DesignRules, region: Region): string {
     case "maxDepthUnderStock":
       return `cuts ${mm(group.worst)} mm under the stock, over the ${mm(rules.maxDepthUnderStock.value)} mm limit`
     case "spindleStoppedWhileCutting":
-      return "cuts with the spindle stopped"
+      return "cuts with the spindle stopped or without a speed"
     case "rapidIntoStock":
       return region.bottom === null
         ? `moves rapidly ${mm(group.worst)} mm below Z0 where it cuts`
         : `moves rapidly ${mm(group.worst)} mm into the stock`
+  }
+}
+
+/** What keeps the moves within the rule: "Cut at 2,000 mm/min or slower." */
+function advice(group: Group, rules: DesignRules, region: Region): string {
+  switch (group.rule) {
+    case "maxCuttingFeed":
+      return `Cut at ${feed(rules.maxCuttingFeed.value)} mm/min or slower.`
+    case "maxPlungeRate":
+      return `Plunge at ${feed(rules.maxPlungeRate.value)} mm/min or slower, or ramp in.`
+    case "maxCutDepth": {
+      const top = region.bottom === null ? "Z0" : "the stock top"
+      return `Cut no deeper than ${mm(rules.maxCutDepth.value)} mm below ${top}.`
+    }
+    case "maxDepthUnderStock":
+      return `Cut no deeper than ${mm(rules.maxDepthUnderStock.value)} mm under the stock.`
+    case "spindleStoppedWhileCutting":
+      return "Start the spindle with M3 and a speed before the cut."
+    case "rapidIntoStock":
+      return "Move into the stock with G1 rather than G0."
   }
 }
 
@@ -221,18 +264,203 @@ function where(group: Group, line: number) {
   return `${count(group.lineCount)} lines, the ${SUPERLATIVE[group.rule]} at line ${count(line)}.`
 }
 
-const ruleCode = (rule: DesignRuleId) =>
+/** A rule's diagnostic code: "design-rule/max-cutting-feed", "design-rule/spindle-reverse". */
+const ruleCode = (rule: string) =>
   `design-rule/${rule.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`)}`
+
+/** Consecutive lines as ranges, in their order. */
+function lineRanges(lines: readonly number[]): ProgramLines[] {
+  const ranges: { start: number; end: number }[] = []
+  for (const line of lines) {
+    const last = ranges.at(-1)
+    if (last && line === last.end + 1) last.end = line
+    else ranges.push({ start: line, end: line })
+  }
+  return ranges
+}
+
+/**
+ * An operation's own NC: NC it keeps, from a file or a plugin, rather than NC generated for the
+ * machine, which its rules need not check and which sets no spindle speed. Null for generated NC
+ * and for NC that does not resolve, which its own diagnostic reports.
+ */
+function ownNc(operation: Operation, plate: Plate, kit: FixtureKit) {
+  const kind = kindOf(operation)
+  if (kind.generated) return null
+  const resolved = kind.resolve(operation, plate, kit)
+  return resolved.ok ? resolved.value.nc : null
+}
+
+/** What an operation's own NC leaves set, from a fresh start, by the kit it was read with. */
+const operationEnds = new WeakMap<
+  Operation,
+  { readonly kit: FixtureKit; readonly end: ProgramStart }
+>()
+
+function operationEnd(
+  operation: Operation,
+  plate: Plate,
+  kit: FixtureKit
+): ProgramStart {
+  const saved = operationEnds.get(operation)
+  if (saved?.kit === kit) return saved.end
+  const nc = ownNc(operation, plate, kit)
+  const end =
+    nc === null ? FRESH_START : programEnd(programLines(nc), FRESH_START)
+  operationEnds.set(operation, { kit, end })
+  return end
+}
+
+/** What each of a plate's operations starts with: what the operations before it leave set. */
+function operationStarts(plate: Plate, kit: FixtureKit): ProgramStart[] {
+  let start = FRESH_START
+  return plate.operations.map((operation) => {
+    const own = start
+    const { spindleSpeed } = operationEnd(operation, plate, kit)
+    start = { spindleSpeed: spindleSpeed ?? start.spindleSpeed }
+    return own
+  })
+}
+
+/** What an operation of a plate starts with: what the operations before it leave set. */
+export function operationStart(
+  plate: Plate,
+  operationId: string,
+  kit: FixtureKit = kitForPlate(plate)
+): ProgramStart {
+  const index = plate.operations.findIndex((item) => item.id === operationId)
+  return index < 0 ? FRESH_START : operationStarts(plate, kit)[index]
+}
+
+/** What an operation's NC breaks of its machine's program rules, by the kit and start it was read with. */
+const operationFindings = new WeakMap<
+  Operation,
+  {
+    readonly kit: FixtureKit
+    readonly start: ProgramStart
+    readonly issues: readonly ProgramIssue[]
+  }
+>()
+
+/** What the machine's program rules find in an operation's own NC (`ownNc`), from its start. */
+function operationIssues(
+  operation: Operation,
+  plate: Plate,
+  kit: FixtureKit,
+  start: ProgramStart
+): readonly ProgramIssue[] {
+  const saved = operationFindings.get(operation)
+  if (saved?.kit === kit && saved.start.spindleSpeed === start.spindleSpeed)
+    return saved.issues
+  const nc = ownNc(operation, plate, kit)
+  const issues = nc === null ? [] : findIssues(nc, programRulesFor(kit), start)
+  operationFindings.set(operation, { kit, start, issues })
+  return issues
+}
+
+/** Where the tool is when the program reaches a line: where the last move before it ends. */
+function positionAt(
+  segments: readonly GCodeSegment[],
+  line: number
+): Point3 | null {
+  let low = 0
+  let high = segments.length
+  while (low < high) {
+    const middle = (low + high) >>> 1
+    if (segments[middle].line <= line) low = middle + 1
+    else high = middle
+  }
+  return low ? segments[low - 1].end : null
+}
+
+/**
+ * What the plate's operations break of their machine's program rules, as the project reports
+ * them: each issue with the lines it is on, and the fix its rule suggests for an NC file's
+ * operation, whose NC is its own to change.
+ */
+function programViolations(
+  plate: Plate,
+  compiled: CompiledPlate,
+  rules: DesignRules
+): DesignRuleViolation[] {
+  const kit = kitForPlate(plate)
+  const programRules = programRulesFor(kit)
+  const starts = operationStarts(plate, kit)
+  const [ox, oy, oz] = plate.setup.workOrigin
+  return plate.operations.flatMap((operation, index) =>
+    operationIssues(operation, plate, kit, starts[index]).flatMap(
+      (issue): DesignRuleViolation[] => {
+        const rule = programRules.find((item) => item.id === issue.rule)
+        const severity = rule ? programRuleSeverity(rules, rule) : "ignore"
+        if (!rule || severity === "ignore") return []
+        const span = compiled.spans.find(
+          (item) => item.operationId === operation.id
+        )
+        // Lines of an operation the program leaves out are nowhere in it.
+        const offset =
+          span && span.bodyStartLine <= span.endLine
+            ? span.bodyStartLine - 1
+            : null
+        const at =
+          offset === null
+            ? null
+            : positionAt(compiled.program.segments, offset + issue.lines[0])
+        const places: Place[] = at
+          ? [{ kind: "point", at: [ox + at[0], oy + at[1], oz + at[2]] }]
+          : []
+        const choice = suggestedChoice(issue)
+        const fix: QuickFix | undefined =
+          operation.source.kind === "file" &&
+          choice &&
+          choice.resolution !== "ignore"
+            ? {
+                kind: "resolve-rule",
+                operationId: operation.id,
+                rule: rule.id,
+                resolution: choice.resolution,
+              }
+            : undefined
+        const report = severity === "error" ? error : warning
+        return [
+          {
+            ...report(
+              ruleCode(rule.id),
+              `${issue.problem} ${capitalize(linesText(issue.lines))} of ${operation.name}.`,
+              {
+                subject: operationSubject(operation.id),
+                line: issue.lines[0],
+                places,
+                fix,
+              }
+            ),
+            rule: rule.id,
+            label: rule.label,
+            suggestion: suggestionOf(issue),
+            lineCount: issue.lines.length,
+            lines:
+              offset === null
+                ? []
+                : coarsen(
+                    lineRanges(issue.lines.map((line) => offset + line)),
+                    SHOWN_RANGES
+                  ),
+          },
+        ]
+      }
+    )
+  )
+}
 
 /**
  * Checks a plate's compiled program against a project's design rules: each rule its moves break,
- * per operation, with how often and where. Heights are measured over the stock's footprint
- * (widened by the tool's radius, where its side reaches), so moves beside the stock, such as a
- * tool change's, do not count; without stock, below Z0 over the extent of the cutting moves.
- * The probe's feed moves and moves straight up (retracts) cut nothing. After a
- * lift to the machine's clearance (a `G53` move of Z alone, which compiling adds between
- * operations) and at the start, the tool travels above everything until a move sets Z. Pure;
- * it reports and never blocks.
+ * per operation, with how often and where, and each of its machine's program rules the
+ * operations' own NC breaks, even an operation the program leaves out. Heights are measured
+ * over the stock's footprint (widened by the tool's radius, where its side reaches), so moves
+ * beside the stock, such as a tool change's, do not count; without stock, below Z0 over the
+ * extent of the cutting moves. The probe's feed moves and moves straight up (retracts) cut
+ * nothing. After a lift to the machine's clearance (a `G53` move of Z alone, which compiling
+ * adds between operations) and at the start, the tool travels above everything until a move
+ * sets Z. Pure; it reports, and the Job tab's checks let errors block Run.
  */
 export function checkDesignRules(
   plate: Plate,
@@ -242,6 +470,24 @@ export function checkDesignRules(
 ): DesignRuleCheck {
   const notes: string[] = []
   const { segments } = compiled.program
+  const kit = kitForPlate(plate)
+  const order = new Map<string | null, number>(
+    plate.operations.map((operation, index) => [operation.id, index])
+  )
+  const ruleOrder: readonly string[] = [
+    ...LIMIT_RULES,
+    ...CHECK_RULES,
+    ...programRulesFor(kit).map((rule) => rule.id),
+  ]
+  const sorted = (violations: DesignRuleViolation[]) =>
+    violations.sort(
+      (a, b) =>
+        Number(a.severity !== "error") - Number(b.severity !== "error") ||
+        (order.get(diagnosticOperation(a)) ?? -1) -
+          (order.get(diagnosticOperation(b)) ?? -1) ||
+        ruleOrder.indexOf(a.rule) - ruleOrder.indexOf(b.rule)
+    )
+  const programs = programViolations(plate, compiled, rules)
   const checked = new Set(
     compiled.spans
       .filter((span) => span.bodyStartLine <= span.endLine)
@@ -250,16 +496,16 @@ export function checkDesignRules(
   for (const operation of plate.operations)
     if (!checked.has(operation.id))
       notes.push(
-        `${operation.name} is not checked: its problems keep it out of the program.`
+        `${operation.name}'s moves are not checked: its problems keep it out of the program.`
       )
   if (compiled.mode === "empty") {
-    notes.push("The plate has no program to check.")
-    return { violations: [], notes }
+    notes.push("No moves are checked: the plate has no program.")
+    return { violations: sorted(programs), notes }
   }
   const region = stockRegion(plate, segments)
   if (!region) {
-    notes.push("Nothing is checked: the plate has no stock and nothing cuts.")
-    return { violations: [], notes }
+    notes.push("No moves are checked: the plate has no stock and nothing cuts.")
+    return { violations: sorted(programs), notes }
   }
   if (region.bottom === null && rules.maxDepthUnderStock.severity !== "ignore")
     notes.push(
@@ -368,42 +614,32 @@ export function checkDesignRules(
   const spans = new Map<string, OperationSpan>(
     compiled.spans.map((span) => [span.operationId, span])
   )
-  const order = new Map<string | null, number>(
-    plate.operations.map((operation, index) => [operation.id, index])
-  )
-  const ruleOrder: readonly DesignRuleId[] = [...LIMIT_RULES, ...CHECK_RULES]
-  const violations = [...groups.values()]
-    .map((group): DesignRuleViolation => {
-      const operation = plate.operations.find(
-        (item) => item.id === group.operationId
-      )
-      const span = group.operationId ? spans.get(group.operationId) : undefined
-      // Lines are the operation's own, as its NC numbers them.
-      const line = span
-        ? group.worstLine - span.bodyStartLine + 1
-        : group.worstLine
-      const subject = operation?.name ?? "The program"
-      const message = `${subject} ${breach(group, rules, region)}. ${where(group, line)}`
-      const report = rules[group.rule].severity === "error" ? error : warning
-      const [x, y, z] = group.worstAt
-      const [ox, oy, oz] = plate.setup.workOrigin
-      return {
-        ...report(ruleCode(group.rule), message, {
-          subject: operation ? operationSubject(operation.id) : PLATE_SUBJECT,
-          line,
-          places: [{ kind: "point", at: [ox + x, oy + y, oz + z] }],
-        }),
-        rule: group.rule,
-        lineCount: group.lineCount,
-        lines: coarsen(group.ranges, SHOWN_RANGES),
-      }
-    })
-    .sort(
-      (a, b) =>
-        Number(a.severity !== "error") - Number(b.severity !== "error") ||
-        (order.get(diagnosticOperation(a)) ?? -1) -
-          (order.get(diagnosticOperation(b)) ?? -1) ||
-        ruleOrder.indexOf(a.rule) - ruleOrder.indexOf(b.rule)
+  const moves = [...groups.values()].map((group): DesignRuleViolation => {
+    const operation = plate.operations.find(
+      (item) => item.id === group.operationId
     )
-  return { violations, notes }
+    const span = group.operationId ? spans.get(group.operationId) : undefined
+    // Lines are the operation's own, as its NC numbers them.
+    const line = span
+      ? group.worstLine - span.bodyStartLine + 1
+      : group.worstLine
+    const subject = operation?.name ?? "The program"
+    const message = `${subject} ${breach(group, rules, region)}. ${where(group, line)}`
+    const report = rules[group.rule].severity === "error" ? error : warning
+    const [x, y, z] = group.worstAt
+    const [ox, oy, oz] = plate.setup.workOrigin
+    return {
+      ...report(ruleCode(group.rule), message, {
+        subject: operation ? operationSubject(operation.id) : PLATE_SUBJECT,
+        line,
+        places: [{ kind: "point", at: [ox + x, oy + y, oz + z] }],
+      }),
+      rule: group.rule,
+      label: ruleInfo(group.rule).label,
+      suggestion: advice(group, rules, region),
+      lineCount: group.lineCount,
+      lines: coarsen(group.ranges, SHOWN_RANGES),
+    }
+  })
+  return { violations: sorted([...moves, ...programs]), notes }
 }

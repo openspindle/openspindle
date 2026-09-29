@@ -1,9 +1,10 @@
 # Fusion 360 bridge
 
-The OpenSpindle Bridge is a Python add-in installed in Autodesk Fusion. OpenSpindle
-discovers NC programs in open Fusion documents and requests their posted output
-when you import them. Fusion keeps responsibility for CAM generation and the
-machine post processor; OpenSpindle imports the resulting G-code into the workspace.
+The OpenSpindle Bridge is a Python add-in installed in Autodesk Fusion.
+OpenSpindle discovers NC programs in open Fusion documents and requests their
+posted output when you import them or update an operation imported from them.
+Fusion keeps responsibility for CAM generation and the machine post processor;
+OpenSpindle imports the resulting G-code into the workspace.
 
 ## Install
 
@@ -27,9 +28,9 @@ third-party packages are required. Use a current Fusion release on Windows or ma
 3. OpenSpindle automatically opens **Fusion 360 wants to connect**. Enter the
    six-digit code to connect. The program picker lists NC programs from your open
    Fusion documents; it is also available from **File > Import from Fusion 360**.
-4. Choose an NC program and click **Import as new plate**. The bridge posts the
-   current program to a temporary folder using its existing post settings and
-   returns the NC directly to OpenSpindle.
+4. Choose an NC program and click **Import**. The bridge posts the current
+   program to a temporary folder using its post settings, with **Split file** set
+   to **No splitting**, and returns the NC directly to OpenSpindle.
 
 The code can be used once and expires after two minutes. If it expires or five
 incorrect codes are entered, choose **Connect to OpenSpindle** again in Fusion.
@@ -38,13 +39,14 @@ code dialog after entering its code; closing it does not end the connection.
 
 The picker reads live program metadata without posting. Click **Refresh** after
 adding or renaming programs, or opening or closing documents. After changing
-toolpaths, generate them in Fusion and import the program again in OpenSpindle.
-Each import posts the current program and creates an independent plate; imported
-plates do not update automatically. Importing does not run a machine program.
+toolpaths, generate them in Fusion and choose **Update from Fusion 360** on the
+operation in OpenSpindle, which posts the program again. Nothing updates
+automatically. Importing does not run a machine program.
 
-The NC output must be one UTF-8 or ASCII text file with an `.nc`, `.cnc`, `.gcode`,
-`.tap`, or `.ngc` extension, at most 10 MiB. Posts that produce multiple output files
-(apart from the post log), including separate subprogram files, are rejected.
+The NC output must be UTF-8 or ASCII text with an `.nc`, `.cnc`, `.gcode`, `.tap`,
+or `.ngc` extension, at most 10 MiB. When a post writes several files (apart from
+the post log), the bridge takes the one named after the NC program if it holds the
+whole program; posts with separate subprogram files are rejected.
 NC programs containing multiple setups are rejected. The catalog supports up to
 100 NC programs across open documents. Closing a document removes its programs
 from the catalog. Closing Fusion or stopping the add-in invalidates the connection;
@@ -57,8 +59,9 @@ previous one afterward. It never cancels an unrelated command to start a post.
 The bridge rejects toolpath errors, out-of-date toolpaths, and duplicate tool
 numbers during posting instead of silently omitting affected operations. The
 program's output folder, filename, editor preference, Fusion Hub posting flag,
-and create-in-browser flag are restored after posting. Fusion may mark the
-document as modified because the API temporarily changes these parameters.
+create-in-browser flag and the post's Split file property are restored after
+posting. Fusion may mark the document as modified because the API temporarily
+changes these parameters.
 
 ## Connection details
 
@@ -103,10 +106,13 @@ requestId, expiresAt }`, where `requestId` is a UUID and `expiresAt` is Unix
   `{ token }` and consumes the request. A wrong code returns 401; the fifth wrong
   attempt locks the request and returns 429. An expired, consumed, or replaced
   request returns 410. A locked request also returns 429 until expiry.
-- `GET /v2/programs` returns `{ programs: [{ id, name, documentName }] }` from open
-  Fusion documents without posting or changing their settings.
+- `GET /v2/programs` returns `{ programs: [{ id, name, documentName, documentId,
+operationId }] }` from open Fusion documents without posting or changing their
+  settings. `documentId` is the saved document's lineage id (null before its first
+  save) and `operationId` the NC program's id in it.
 - `POST /v2/programs/{id}/post` with an `application/json` body of `{}` posts the
-  selected NC program and returns `{ id, name, documentName, fileName, contents }`.
+  selected NC program and returns `{ id, name, documentName, documentId,
+operationId, fileName, contents }`.
 - Program requests require `Authorization: Bearer <token>`. All HTTP requests
   require exactly `Host: 127.0.0.1:38764`. Requests with an `Origin` header are
   rejected, and the server does not enable CORS.

@@ -2,6 +2,8 @@ import type { NcWord } from "@/machine/contract"
 import type { FixtureDefinition } from "@/domain/fixtures/definitions"
 import type { CamMarkers } from "@/domain/nc/cam-markers"
 import type { Point3 } from "@/domain/nc/gcode"
+import type { NcGlossaryEntry } from "@/domain/nc/glossary"
+import type { ProgramRule } from "@/domain/design-rules/program-rules"
 import type { StoredAnchorSetup } from "@/domain/anchors/stored-anchors"
 import type { NcBlockEffect, NcUnitState } from "../compile/nc-unit"
 import type { FirmwareModel } from "../firmware/firmware-model"
@@ -67,6 +69,13 @@ export abstract class FixtureKit {
   abstract readonly clearanceRetract: string
   /** The markers the CAM made for the machine writes in its programs; null for none. */
   abstract readonly camMarkers: CamMarkers | null
+  /** The codes of the machine's NC, as the G-code glossary lists them. */
+  abstract readonly glossary: readonly NcGlossaryEntry[]
+  /**
+   * What the machine does not run as written: its design rules for programs, which importing a
+   * program asks to resolve and the design rule check reports.
+   */
+  abstract readonly programRules: readonly ProgramRule[]
 
   /**
    * The NC that puts the machine's work X and Y on a work origin kept relative to one of its

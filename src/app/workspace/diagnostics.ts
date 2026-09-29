@@ -7,6 +7,7 @@ import { operationPluginId } from "@/domain/operations/operation"
 import type { Plate } from "@/domain/plate/plate"
 import { toolDiagnostics } from "@/domain/tools/tool-table"
 import type { Tool } from "@/domain/tools/tool"
+import { isPluginUsable } from "@/platform/contract/plugin-rpc"
 import type { PluginSummary } from "@/platform/contract/plugin-rpc"
 
 export type DiagnosticContext = {
@@ -30,7 +31,11 @@ export function missingPluginIds(
   return [...missing]
 }
 
-/** Template operations whose plugin changed or disappeared must be updated or reinstalled. */
+/**
+ * Template operations whose plugin changed or disappeared must be updated or reinstalled; a
+ * plugin that cannot run in this OpenSpindle leaves its operations as they are until it is
+ * updated.
+ */
 function pluginDiagnostics(
   plate: Plate,
   plugins: readonly PluginSummary[]
@@ -50,9 +55,20 @@ function pluginDiagnostics(
           }
         ),
       ]
+    if (plugin.incompatible)
+      return [
+        warning(
+          "plugin-incompatible",
+          `"${operation.name}" comes from ${plugin.manifest.name}, which does not work with this version of OpenSpindle.`,
+          {
+            subject: operationSubject(operation.id),
+            fix: { kind: "install-plugin", pluginId: source.pluginId },
+          }
+        ),
+      ]
     if (
       source.kind === "template" &&
-      plugin.enabled &&
+      isPluginUsable(plugin) &&
       plugin.version !== source.version
     )
       return [

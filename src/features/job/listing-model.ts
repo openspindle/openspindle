@@ -12,6 +12,8 @@ export type ListingHeader = {
   readonly line: number
   readonly label: string
   readonly sectionKind?: SectionKind
+  /** The operation an operation header starts. */
+  readonly operationId?: string
 }
 
 export type ListingRow =
@@ -110,6 +112,7 @@ export function buildListingModel({
       kind: "operation",
       line: span.startLine,
       label: names.get(span.operationId) ?? "Operation",
+      operationId: span.operationId,
     })),
     ...compiled.pausePoints
       .filter((point) => !leftOut.has(point.line))

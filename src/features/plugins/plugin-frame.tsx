@@ -27,6 +27,7 @@ import {
   useImportContext,
 } from "@/features/shell/use-import"
 import { isJobActive } from "@/machine/contract"
+import { isPluginUsable } from "@/platform/contract/plugin-rpc"
 import type {
   PluginBundle,
   PluginSummary,
@@ -70,11 +71,11 @@ const sameContext = (a: ViewContext, b: ViewContext) =>
   a.theme === b.theme &&
   a.disabled === b.disabled
 
-/** The installed plugin while it is enabled; operations record the version that wrote them. */
+/** The installed plugin while it can serve; operations record the version that wrote them. */
 function enabledPlugin(client: QueryClient, pluginId: string) {
   const plugin = client
     .getQueryData<PluginSummary[]>(pluginKeys.installed)
-    ?.find((item) => item.id === pluginId && item.enabled)
+    ?.find((item) => item.id === pluginId && isPluginUsable(item))
   return plugin ? { name: plugin.manifest.name, version: plugin.version } : null
 }
 

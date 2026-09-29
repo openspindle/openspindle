@@ -6,6 +6,8 @@ import {
   ArrowUp,
   ChevronDown,
   ChevronRight,
+  Eye,
+  EyeOff,
   FileCode2,
   Folder,
   FolderOpen,
@@ -45,14 +47,20 @@ import {
 import type { StepId } from "@/app/workspace/history"
 import type { WorkspaceStore } from "@/app/workspace/store"
 import type { SectionKind } from "@/domain/compile/sections"
+import type { Operation } from "@/domain/operations/operation"
 import { plateLabel } from "@/domain/plate/plate"
 import type { Plate } from "@/domain/plate/plate"
 import { TEXT_LIMIT } from "@/domain/primitives"
 import { boundTools } from "@/domain/tools/tool-table"
 import type { WorkspaceCommand } from "@/domain/workspace/workspace"
+import { useFusionUpdate } from "@/features/fusion360/use-fusion-update"
+import { useOperationIcon } from "@/features/plugins/operation-icon"
 import { openDialog } from "@/features/shell/dialogs"
+import { isPluginUsable } from "@/platform/contract/plugin-rpc"
+import { useInstalledPlugins } from "@/platform/plugins"
+import { useQuickFix } from "../quick-fix"
 import { selectSections } from "../selection"
-import { PHASE_LABELS } from "./tree-rows"
+import { toggleOperationHidden, useHiddenOperations } from "../visibility"
 import type { TreeRow } from "./tree-rows"
 import type { TreeTableRow } from "./plate-tree"
 
@@ -312,31 +320,99 @@ function transferCommand(
   }
 }
 
-/** An operation's context menu: move it to another plate, or remove it. */
+/**
+ * Brings an operation up to date from where it came from: a Fusion 360 NC program posted
+ * again, or a plugin program generated again by the newer version of its plugin installed.
+ * Nothing for an operation with nowhere to update from.
+ */
+function UpdateItems({
+  plate,
+  operation,
+}: {
+  plate: Plate
+  operation: Operation
+}) {
+  const fusionUpdate = useFusionUpdate()
+  const quickFix = useQuickFix()
+  const plugins = useInstalledPlugins().data ?? []
+  const { source } = operation
+  const fromFusion = source.kind === "file" && source.origin !== undefined
+  const plugin =
+    source.kind === "template"
+      ? plugins.find((item) => item.id === source.pluginId)
+      : undefined
+  const newer =
+    source.kind === "template" &&
+    plugin &&
+    isPluginUsable(plugin) &&
+    plugin.version !== source.version
+      ? plugin
+      : null
+  if (!fromFusion && !newer) return null
+  return (
+    <>
+      {fromFusion && (
+        <ContextMenuItem
+          disabled={fusionUpdate.isPending}
+          onClick={() =>
+            fusionUpdate.mutate({
+              plateId: plate.id,
+              operationId: operation.id,
+            })
+          }
+        >
+          Update from Fusion 360
+        </ContextMenuItem>
+      )}
+      {newer && (
+        <ContextMenuItem
+          onClick={() =>
+            quickFix(plate, {
+              kind: "update-operation",
+              operationId: operation.id,
+            })
+          }
+        >
+          Update to {newer.manifest.name} {newer.version}
+        </ContextMenuItem>
+      )}
+      <ContextMenuSeparator />
+    </>
+  )
+}
+
+/**
+ * An operation's context menu: update it from where it came from, move it to another plate, or
+ * remove it.
+ */
 function OperationMenu({
-  plateId,
+  plate,
+  operation,
   onMove,
   onRemove,
 }: {
-  plateId: string
+  plate: Plate
+  operation: Operation
   onMove: (plateId: string) => void
   onRemove: () => void
 }) {
   const plates = useWorkspace((state) => state.plates)
+  const plateId = plate.id
   return (
     <>
+      <UpdateItems plate={plate} operation={operation} />
       <ContextMenuSub>
         <ContextMenuSubTrigger disabled={plates.length < 2}>
           Move to
         </ContextMenuSubTrigger>
         <ContextMenuSubContent>
-          {plates.map((plate, index) => (
+          {plates.map((target, index) => (
             <ContextMenuItem
-              key={plate.id}
-              disabled={plate.id === plateId}
-              onClick={() => onMove(plate.id)}
+              key={target.id}
+              disabled={target.id === plateId}
+              onClick={() => onMove(target.id)}
             >
-              {plateLabel(plate, index)}
+              {plateLabel(target, index)}
             </ContextMenuItem>
           ))}
         </ContextMenuSubContent>
@@ -353,6 +429,9 @@ function OperationRow(
   const workspace = useWorkspaceStore()
   const { node, row } = props
   const { plate, operation } = node
+  const iconOf = useOperationIcon()
+  const Icon = iconOf(operation)
+  const hidden = useHiddenOperations().has(operation.id)
   const active = props.selectedOperationId === operation.id
   const move = (index: number) =>
     workspace.dispatch({
@@ -401,20 +480,20 @@ function OperationRow(
         render={<RowFrame row={row} selected={active} />}
       >
         <ExpandButton row={row} onToggle={props.onToggle} />
+        <IconAction
+          label={`${hidden ? "Show" : "Hide"} ${node.label} in the 3D view`}
+          onClick={() => toggleOperationHidden(operation.id)}
+        >
+          {hidden ? <EyeOff /> : <Eye />}
+        </IconAction>
         <RowButton
           active={active}
           title={operation.name}
           onClick={() => props.onSelectOperation(plate.id, operation.id)}
         >
-          <FileCode2 />
+          <Icon />
           <span className="truncate">{node.label}</span>
         </RowButton>
-        <Badge
-          variant="outline"
-          title={`${PHASE_LABELS[node.phase]} operation`}
-        >
-          {PHASE_LABELS[node.phase]}
-        </Badge>
         <ErrorCount count={node.errors} />
         <IconAction
           label={`Move ${node.label} up`}
@@ -447,7 +526,12 @@ function OperationRow(
         </IconAction>
       </ContextMenuTrigger>
       <ContextMenuContent>
-        <OperationMenu plateId={plate.id} onMove={moveTo} onRemove={remove} />
+        <OperationMenu
+          plate={plate}
+          operation={operation}
+          onMove={moveTo}
+          onRemove={remove}
+        />
       </ContextMenuContent>
     </ContextMenu>
   )

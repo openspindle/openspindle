@@ -15,6 +15,7 @@ import type {
   MachineErrorCode,
   MachineSnapshot,
   RunRequest,
+  WriteAnchorsRequest,
 } from "@/machine/contract"
 import { useHost } from "./host-context"
 import type { MachineHost } from "./host"
@@ -133,6 +134,10 @@ export const useDismissJob = () =>
   useMachineMutation("dismissJob", (machine, _: void) => machine.dismissJob())
 export const useReadAnchors = () =>
   useMachineMutation("readAnchors", (machine, _: void) => machine.readAnchors())
+export const useWriteAnchors = () =>
+  useMachineMutation("writeAnchors", (machine, request: WriteAnchorsRequest) =>
+    machine.writeAnchors(request)
+  )
 export const useReadHeightMap = () =>
   useMachineMutation("readHeightMap", (machine, _: void) =>
     machine.readHeightMap()

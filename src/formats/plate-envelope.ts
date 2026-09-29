@@ -16,6 +16,10 @@ const BEGIN =
 const DATA = ";@OPENSPINDLE|DATA|"
 const END = ";@OPENSPINDLE|END"
 
+/** Whether NC text begins as an exported plate does, with its setup in leading comments. */
+export const carriesPlate = (source: string) =>
+  source.startsWith(";@OPENSPINDLE|")
+
 /**
  * The envelope version exports write: version 3 fixtures name their model's source, since
  * version 4 the wasteboard is one of them, and since version 5 anchored probing travels at the
@@ -49,8 +53,7 @@ export type EnvelopeRead =
 
 /** Reads our exact leading comment block; any other text is the body, byte for byte. */
 export function readEnvelope(source: string): EnvelopeRead {
-  if (!source.startsWith(";@OPENSPINDLE|"))
-    return { version: null, body: source }
+  if (!carriesPlate(source)) return { version: null, body: source }
   const firstEnd = source.indexOf("\n")
   const header = (firstEnd < 0 ? source : source.slice(0, firstEnd)).replace(
     /\r$/,

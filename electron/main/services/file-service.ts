@@ -20,6 +20,31 @@ import type {
 } from "../../../src/platform/contract/files"
 import { writeFileAtomic } from "./atomic-write"
 
+/**
+ * Reads a file of a kind as the app opens it: a file within the kind's size limit, of UTF-8
+ * text the kind accepts. Throws, saying why, otherwise.
+ */
+export async function readKindFile(
+  kind: FileKind,
+  filePath: string
+): Promise<{ fileName: string; contents: string }> {
+  const spec = FILE_KINDS[kind]
+  const fileName = path.basename(filePath)
+  const info = await stat(filePath)
+  if (!info.isFile()) throw new Error(`${fileName} is not a file.`)
+  if (info.size > spec.maxBytes)
+    throw new Error(`${fileName} exceeds the file size limit.`)
+  let contents: string
+  try {
+    contents = new TextDecoder("utf-8", { fatal: true }).decode(
+      await readFile(filePath)
+    )
+  } catch {
+    throw new Error(`${fileName} is not valid UTF-8 text.`)
+  }
+  return validateOpenedFile(kind, fileName, contents)
+}
+
 /** Native open/save dialogs for every file kind; one dialog at a time. */
 export class FileService {
   private dialogOpen = false
@@ -40,23 +65,7 @@ export class FileService {
         : await dialog.showOpenDialog(options)
       const filePath = result.filePaths[0]
       if (result.canceled || !filePath) return { status: "canceled" }
-      const fileName = path.basename(filePath)
-      const info = await stat(filePath)
-      if (!info.isFile()) throw new Error(`${fileName} is not a file.`)
-      if (info.size > spec.maxBytes)
-        throw new Error(`${fileName} exceeds the file size limit.`)
-      let contents: string
-      try {
-        contents = new TextDecoder("utf-8", { fatal: true }).decode(
-          await readFile(filePath)
-        )
-      } catch {
-        throw new Error(`${fileName} is not valid UTF-8 text.`)
-      }
-      return {
-        status: "opened",
-        ...validateOpenedFile(kind, fileName, contents),
-      }
+      return { status: "opened", ...(await readKindFile(kind, filePath)) }
     })
   }
 

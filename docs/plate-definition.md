@@ -20,7 +20,7 @@ The payload (`PlateEnvelopeSchema`, `src/formats/plate-envelope.ts`) holds the p
 - `schemaVersion: 5` and the plate's `name` (empty for a plate without one);
 - `setup`: stock, stock anchor, the single work origin, assists, fixtures (with their definition snapshots; a wasteboard is one), device id and the device's anchor snapshot ([stored-anchors.md](stored-anchors.md));
 - `tools`: the plate's tool table (T number → library tool id);
-- `operations`: every operation with its source (NC, template values, plugin data, or auto-level, auto Z-height, auto-scan or 3D probing parameters), its tool bindings and Pause before;
+- `operations`: every operation with its source (NC, with where it came from for a Fusion 360 import; template values, plugin data, or auto-level, auto Z-height, auto-scan or 3D probing parameters), its tool bindings and Pause before;
 - `groups`: named selections of program sections, by stable section id;
 - `bodyChecksum`: the Adler-32 of the NC body.
 

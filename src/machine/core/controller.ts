@@ -6,6 +6,7 @@ import {
   MachineCommandSchema,
   RUN_LIMITS,
   RunRequestSchema,
+  WriteAnchorsRequestSchema,
   disconnectedSnapshot,
   isJobActive,
   isTerminalJobPhase,
@@ -26,6 +27,7 @@ import type {
   PrepareResult,
   RunRequest,
   Telemetry,
+  WriteAnchorsResult,
 } from "../contract/index.ts"
 import { ProgramError } from "../firmware/adapter.ts"
 import type {
@@ -55,6 +57,7 @@ import {
 } from "./operations/job-runner.ts"
 import type { JobRunnerHooks } from "./operations/job-runner.ts"
 import { readAnchorConfiguration, readHeightMap } from "./operations/reads.ts"
+import { writeAnchorConfiguration } from "./operations/writes.ts"
 import type { MachinePorts } from "./ports.ts"
 import { ProtocolTrace } from "./protocol-trace.ts"
 import type { TraceEntry } from "./protocol-trace.ts"
@@ -651,6 +654,41 @@ export class MachineController {
     )
   }
 
+  // ── Settings ───────────────────────────────────────────────────────────
+
+  /**
+   * Stores anchor positions in the machine's configuration and reads them back: never while a
+   * program runs, and never retried. Once a setting was sent, a failure leaves the stored
+   * anchors unknown until they are read again. The machine's own moves use them after it
+   * restarts.
+   */
+  async writeAnchors(input: unknown): Promise<WriteAnchorsResult> {
+    const request = parse(WriteAnchorsRequestSchema, input)
+    // The chain refuses the write outright while a program runs; it never waits.
+    this.admitNow({ key: "writeAnchors" })
+    return this.operate("anchors", "Writing anchors", async (context) => {
+      const progress = { sent: false }
+      try {
+        const value = await writeAnchorConfiguration(context, request, () => {
+          progress.sent = true
+        })
+        this.anchors = { value, reading: false, error: null }
+        return {
+          anchors: value,
+          afterRestart: this.adapter.anchors?.write?.afterRestart ?? false,
+        }
+      } catch (error) {
+        if (progress.sent)
+          this.anchors = {
+            value: null,
+            reading: false,
+            error: `${message(error, "The anchors were not written.")} Read the anchors to see what the device stores.`,
+          }
+        throw error
+      }
+    })
+  }
+
   dispose() {
     this.session?.close(null)
     this.discovery.dispose()
@@ -823,6 +861,9 @@ export class MachineController {
       job: this.job,
       rules: this.adapter.rules,
       readAnchors: this.adapter.anchors?.admit ?? null,
+      writeAnchors: this.adapter.anchors?.write
+        ? this.adapter.anchors.admit
+        : null,
       limits: this.adapter.limits,
     }
   }

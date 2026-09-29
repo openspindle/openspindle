@@ -4,6 +4,7 @@ import type { HostContract } from "../../../src/platform/contract/host-contract"
 import type { FileService } from "../services/file-service"
 import type { FusionService } from "../services/fusion-service"
 import type { MenuBus } from "../services/menu-bus"
+import type { OpenedFileBus } from "../services/opened-files"
 import type { ModelStore } from "../../../src/persistence/models/model-library"
 import type { KeptWorkspace } from "../services/kept-workspace"
 import type { StorageService } from "../services/storage-service"
@@ -17,6 +18,7 @@ export type HostServices = {
   readonly files: FileService
   readonly fusion: FusionService
   readonly menu: MenuBus
+  readonly openedFiles: OpenedFileBus
   readonly machine: MachineGateway
   readonly storage: StorageService
   readonly models: ModelStore
@@ -30,8 +32,16 @@ export type HostServices = {
 export function createHostHandlers(
   services: HostServices
 ): Handlers<HostContract> {
-  const { files, fusion, menu, storage, models, unsaved, diagnostics } =
-    services
+  const {
+    files,
+    fusion,
+    menu,
+    openedFiles,
+    storage,
+    models,
+    unsaved,
+    diagnostics,
+  } = services
   const gateway = services.machine
   const platform = createPluginHandlers(services.pluginPlatform)
   return {
@@ -59,6 +69,8 @@ export function createHostHandlers(
       "machine.dismissJob": () => machine(() => gateway.dismissJob()),
       "machine.readAnchors": (_params, { signal }) =>
         machine(() => gateway.readAnchors(signal)),
+      "machine.writeAnchors": (request) =>
+        machine(() => gateway.writeAnchors(request)),
       "machine.readHeightMap": (_params, { signal }) =>
         machine(() => gateway.readHeightMap(signal)),
       "storage.read": ({ key }) => storage.read(key),
@@ -92,6 +104,7 @@ export function createHostHandlers(
       "machine.camera": (_params, emit) => gateway.watchCamera(emit),
       "machine.console": (_params, emit) => gateway.watchConsole(emit),
       "menu.command": (_params, emit) => menu.subscribe(emit),
+      "files.opened": (_params, emit) => openedFiles.subscribe(emit),
       "diagnostics.mainError": (_params, emit) =>
         diagnostics.reports.subscribe(emit),
       ...platform.events,

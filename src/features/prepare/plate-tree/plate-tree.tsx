@@ -143,9 +143,23 @@ export function PlateTree({ className }: { className?: string }) {
     >
       <header className="flex shrink-0 items-center gap-2 px-4 py-3">
         <Layers3 className="size-4" />
-        <CardTitle className="flex-1" role="heading" aria-level={2}>
+        <CardTitle role="heading" aria-level={2}>
           Plates
         </CardTitle>
+        <InputGroup className="flex-1">
+          <InputGroupAddon>
+            <Search />
+          </InputGroupAddon>
+          <InputGroupInput
+            aria-label="Search plates, operations and sections"
+            placeholder="Search"
+            value={query}
+            onChange={(event) => {
+              setQuery(event.target.value)
+              setSearchExpanded({})
+            }}
+          />
+        </InputGroup>
         <Badge
           variant="secondary"
           className="font-numeric"
@@ -163,22 +177,6 @@ export function PlateTree({ className }: { className?: string }) {
           <Plus />
         </Button>
       </header>
-      <div className="shrink-0 px-3 pb-3">
-        <InputGroup>
-          <InputGroupAddon>
-            <Search />
-          </InputGroupAddon>
-          <InputGroupInput
-            aria-label="Search plates and operations"
-            placeholder="Search plates, operations and sections"
-            value={query}
-            onChange={(event) => {
-              setQuery(event.target.value)
-              setSearchExpanded({})
-            }}
-          />
-        </InputGroup>
-      </div>
       <div
         ref={scroller}
         className="min-h-0 flex-1 overflow-y-auto px-2 pb-3"

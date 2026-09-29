@@ -10,6 +10,7 @@ import { runChecks } from "@/domain/operations/kinds"
 import { plateLabel } from "@/domain/plate/plate"
 import type { Plate } from "@/domain/plate/plate"
 import { workOriginRunChecks } from "@/domain/plate/work-origin"
+import { usePlateDesignRuleCheck } from "@/features/design-rules/design-rule-check"
 import { machineId, toDisplayName } from "@/machine/contract"
 import type { Availability } from "@/machine/contract"
 import type { Tool } from "@/domain/tools/tool"
@@ -34,6 +35,7 @@ export function useRunChecklist(
 ): RunChecklist {
   const snapshot = useMachineSnapshot()
   const diagnostics = usePlateDiagnostics(plate)
+  const designRules = usePlateDesignRuleCheck(plate)
   const device = snapshot.connection.device
   const connectedDeviceId = device ? machineId(device) : null
   const anchors = snapshot.anchors.value
@@ -50,6 +52,7 @@ export function useRunChecklist(
     compiled,
     diagnostics,
     machineDiagnostics,
+    designRules,
     snapshot,
     check,
   })

@@ -17,13 +17,14 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { Toggle } from "@/components/ui/toggle"
+import { ProblemText } from "@/components/workspace/problem-text"
 import {
   useWorkspace,
   useWorkspaceStore,
 } from "@/app/workspace/workspace-context"
 import type { DesignRuleViolation } from "@/domain/design-rules/check"
-import { ruleInfo } from "@/domain/design-rules/rules"
 import { plateLabel } from "@/domain/plate/plate"
+import { QUICK_FIX_LABELS, useQuickFix } from "@/features/prepare/quick-fix"
 import { useShowProblem } from "@/features/prepare/show-problem"
 import {
   focusProblem,
@@ -60,8 +61,9 @@ function Summary({
 
 /**
  * What the last design rule check found on a plate, over the 3D view's top right: each broken
- * rule per operation, which Show selects and highlights in the view. It stays until closed, and
- * says when the plate or the rules changed since.
+ * rule per operation, with the problem and what resolves it. Show selects it and highlights it
+ * in the view; Apply makes the change a machine's program rule suggests, and checks again. It
+ * stays until closed, and says when the plate or the rules changed since.
  */
 export function DesignRuleResults() {
   const workspace = useWorkspaceStore()
@@ -78,6 +80,7 @@ export function DesignRuleResults() {
     result ? isOutOfDate(result, state) : false
   )
   const showProblem = useShowProblem()
+  const quickFix = useQuickFix()
   if (!result || label === null) return null
   const plateId = result.plate.id
   const { violations, notes } = result.check
@@ -127,18 +130,42 @@ export function DesignRuleResults() {
           const error = violation.severity === "error"
           const Icon = error ? CircleAlert : TriangleAlert
           const shown = isFocused(focus, plateId, key)
+          const { fix } = violation
           return (
             <Alert key={key} variant={error ? "warning" : "default"}>
               <Icon />
-              <AlertTitle>{ruleInfo(violation.rule).label}</AlertTitle>
-              <AlertDescription>{violation.message}</AlertDescription>
+              <AlertTitle>{violation.label}</AlertTitle>
+              <AlertDescription>
+                <ProblemText
+                  problem={violation.message}
+                  suggestion={violation.suggestion}
+                  action={
+                    fix?.kind === "resolve-rule" && (
+                      <Button
+                        variant={error ? "warning" : "outline"}
+                        size="xs"
+                        disabled={outOfDate}
+                        aria-label={`Apply: ${violation.suggestion}`}
+                        onClick={() => {
+                          quickFix(result.plate, fix)
+                          checkPlateDesignRules(workspace.state, plateId)
+                        }}
+                      >
+                        {QUICK_FIX_LABELS[fix.kind]}
+                      </Button>
+                    )
+                  }
+                />
+              </AlertDescription>
               <AlertAction>
                 <Toggle
-                  variant="outline"
                   size="sm"
-                  aria-label={`Show ${ruleInfo(violation.rule).label} in the 3D view`}
+                  aria-label={`Show ${violation.label} in the 3D view`}
                   pressed={shown}
-                  disabled={outOfDate}
+                  disabled={
+                    outOfDate ||
+                    (!violation.lines.length && !violation.places?.length)
+                  }
                   onPressedChange={(pressed) => {
                     if (pressed) showProblem({ plateId, key }, violation)
                     else focusProblem(null)

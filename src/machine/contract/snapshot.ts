@@ -67,6 +67,7 @@ export const AVAILABILITY_KEYS = [
   ...COMMAND_KINDS,
   "run",
   "readAnchors",
+  "writeAnchors",
   "readHeightMap",
   "stop",
   "reset",

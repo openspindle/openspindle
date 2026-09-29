@@ -17,9 +17,10 @@ import {
 
 /**
  * The plugin API this host implements. Plugins declare what they target, and only this
- * version and revision are accepted.
+ * version and revision are accepted: installed plugins that target another stay installed
+ * but serve nothing until they are updated (`apiIncompatibility`).
  */
-export const PLUGIN_API = { version: 2, revision: 3 } as const
+export const PLUGIN_API = { version: 2, revision: 4 } as const
 
 export const MANIFEST_FILE = "openspindle-plugin.json"
 
@@ -212,7 +213,7 @@ export const SettingSchema = strictSchema("Setting", {
 })
 export type SettingDeclaration = z.infer<typeof SettingSchema>
 
-export const ManifestSchema = strictSchema(
+const ManifestShape = strictSchema(
   "Plugin manifest",
   {
     manifestVersion: z.literal(2, {
@@ -268,22 +269,27 @@ export const ManifestSchema = strictSchema(
       .optional(),
   },
   "Manifest contains an unsupported field."
-).superRefine((manifest, context) => {
+)
+type ManifestFields = z.infer<typeof ManifestShape>
+
+/**
+ * Why this host cannot run a plugin built for the API its manifest targets; null when it can.
+ * Only the exact version and revision this host implements are accepted (`PLUGIN_API`).
+ */
+export function apiIncompatibility(
+  manifest: Pick<ManifestFields, "apiVersion" | "apiRevision">
+): string | null {
   if (manifest.apiVersion !== PLUGIN_API.version)
-    context.addIssue({
-      code: "custom",
-      message: `This plugin targets plugin API ${manifest.apiVersion}; this OpenSpindle supports API ${PLUGIN_API.version}.`,
-    })
-  else if (manifest.apiRevision > PLUGIN_API.revision)
-    context.addIssue({
-      code: "custom",
-      message: "This plugin needs a newer version of OpenSpindle.",
-    })
-  else if (manifest.apiRevision < PLUGIN_API.revision)
-    context.addIssue({
-      code: "custom",
-      message: "This plugin was built for an earlier version of OpenSpindle.",
-    })
+    return `This plugin targets plugin API ${manifest.apiVersion}; this OpenSpindle supports API ${PLUGIN_API.version}.`
+  if (manifest.apiRevision > PLUGIN_API.revision)
+    return "This plugin needs a newer version of OpenSpindle."
+  if (manifest.apiRevision < PLUGIN_API.revision)
+    return "This plugin was built for an earlier version of OpenSpindle."
+  return null
+}
+
+/** How a manifest's fields fit together, whatever API it targets. */
+function checkConsistency(manifest: ManifestFields, context: z.RefinementCtx) {
   if (!manifest.programs.length && !manifest.ui)
     context.addIssue({
       code: "custom",
@@ -321,8 +327,22 @@ export const ManifestSchema = strictSchema(
     context
   )
   checkSize(manifest, context)
+}
+
+/** A manifest this host installs: well formed, and built for the API it implements. */
+export const ManifestSchema = ManifestShape.superRefine((manifest, context) => {
+  const incompatible = apiIncompatibility(manifest)
+  if (incompatible) context.addIssue({ code: "custom", message: incompatible })
+  checkConsistency(manifest, context)
 })
 export type Manifest = z.infer<typeof ManifestSchema>
+
+/**
+ * A manifest as an installed plugin's record keeps it: well formed, whatever API it targets.
+ * An update of the host that changes the API leaves the plugin installed, with its settings,
+ * until it is updated too; meanwhile it serves nothing (`apiIncompatibility`).
+ */
+export const StoredManifestSchema = ManifestShape.superRefine(checkConsistency)
 
 /** Reads a plugin manifest, refusing anything this host does not implement. */
 export function parseManifest(value: unknown): Manifest {

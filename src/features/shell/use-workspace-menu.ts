@@ -113,6 +113,9 @@ export function useWorkspaceMenu() {
       case "tools.manage":
         openDialog({ kind: "tools" })
         return
+      case "glossary.open":
+        openDialog({ kind: "gcode-glossary" })
+        return
       case "program.import":
         void navigate({ to: "/prepare" })
         importProgram.mutate()

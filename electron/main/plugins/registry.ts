@@ -14,6 +14,7 @@ import { log } from "../diagnostics/log"
 import { RpcError } from "@openspindle/rpc"
 import {
   InstalledPluginRecordSchema,
+  apiIncompatibility,
   inventoryEntry,
   isPackagePath,
 } from "@openspindle/plugin-core"
@@ -78,9 +79,18 @@ export class PluginRegistry {
     return record
   }
 
-  /** Enabled plugins only: disabled ones keep their files but serve nothing. */
+  /**
+   * Enabled plugins built for this host's plugin API only: disabled ones, and ones an update
+   * of the host left behind, keep their files and settings but serve nothing.
+   */
   requireEnabled(id: string): InstalledPluginRecord {
     const record = this.require(id)
+    const incompatible = apiIncompatibility(record.manifest)
+    if (incompatible)
+      throw new RpcError(
+        "UNAVAILABLE",
+        `${record.manifest.name} cannot run: ${incompatible}`
+      )
     if (!record.enabled)
       throw new RpcError("UNAVAILABLE", `${record.manifest.name} is disabled.`)
     return record
@@ -298,7 +308,10 @@ export class PluginRegistry {
     return target
   }
 
-  /** Reads the index, dropping unreadable records, and clears leftovers of interrupted work. */
+  /**
+   * Reads the index, dropping unreadable records, and clears leftovers of interrupted work. A
+   * record of a plugin built for another plugin API is readable: it stays, with its package.
+   */
   private async load() {
     let raw: string | null = null
     try {

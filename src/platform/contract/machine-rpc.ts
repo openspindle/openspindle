@@ -10,6 +10,8 @@ import {
   NetworkDeviceSchema,
   PrepareResultSchema,
   RunRequestSchema,
+  WriteAnchorsRequestSchema,
+  WriteAnchorsResultSchema,
 } from "../../machine/contract/index.ts"
 
 export const CameraEventSchema = z.discriminatedUnion("kind", [
@@ -94,6 +96,12 @@ export const machineMethods = {
     params: none,
     result: HeightMapSchema,
     timeoutMs: 0,
+  },
+  // Each setting, then each read back, within the controller's own deadlines.
+  "machine.writeAnchors": {
+    params: WriteAnchorsRequestSchema,
+    result: WriteAnchorsResultSchema,
+    timeoutMs: 120_000,
   },
 } as const
 

@@ -202,7 +202,7 @@ export function DevicePanel({
           <AlertDescription>{failure.message}</AlertDescription>
           <AlertAction>
             <Button
-              variant="ghost"
+              variant="secondary"
               size="icon-sm"
               aria-label="Dismiss command error"
               onClick={() => {

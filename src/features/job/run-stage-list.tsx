@@ -400,11 +400,13 @@ function CurrentStage({
   stage,
   subject,
   tools,
+  actions,
 }: {
   view: JobView
   stage: OperationStage | null
   subject: JobSubject | null
   tools: readonly Tool[]
+  actions: JobActions
 }) {
   switch (view.kind) {
     case "running":
@@ -417,7 +419,13 @@ function CurrentStage({
         />
       )
     case "waiting-tool":
-      return <ToolChangePrompt view={view} />
+      return (
+        <ToolChangePrompt
+          view={view}
+          operation={stage?.operation ?? null}
+          confirm={actions.confirmToolChange}
+        />
+      )
     case "waiting-review":
       return <HeightMapReviewStep view={view} />
     case "paused-before-operation":
@@ -491,6 +499,7 @@ export function RunStageList({
       stage={current >= 0 ? operations![current] : null}
       subject={subject}
       tools={tools}
+      actions={actions}
     />
   ) : null
   return (

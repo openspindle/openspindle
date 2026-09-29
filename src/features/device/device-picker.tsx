@@ -1,4 +1,5 @@
 import { useId, useState } from "react"
+import type { ReactNode } from "react"
 import { useForm } from "@tanstack/react-form"
 import { useQuery } from "@tanstack/react-query"
 import { Cpu, LoaderCircle, RefreshCw } from "lucide-react"
@@ -15,9 +16,8 @@ import {
 } from "@/components/ui/alert-dialog"
 import {
   Card,
-  CardAction,
+  CardContent,
   CardDescription,
-  CardHeader,
   CardTitle,
 } from "@/components/ui/card"
 import {
@@ -31,6 +31,8 @@ import {
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
+import { EmptyMedia } from "@/components/ui/empty"
+import { DEFAULT_KIT, kitForDevice } from "@/domain/fixtures/catalog"
 import { isLocalIPv4 } from "@/machine/contract"
 import type { ConnectTarget } from "@/machine/contract"
 import { useHost } from "@/platform/host-context"
@@ -73,6 +75,49 @@ type LeavingJob = {
   readonly reason: string
   readonly action: string
   readonly confirm: () => void
+}
+
+/**
+ * A device's machine as its kit pictures it, by the model it reports once connected. A device
+ * found on the network announces no model, so it shows the machine a new workspace starts from.
+ */
+function DevicePicture({ model }: { model: string | null }) {
+  const kit = model === null ? DEFAULT_KIT : kitForDevice(model)
+  return (
+    <EmptyMedia variant="icon" className="mb-0 size-12">
+      {kit ? (
+        <img src={kit.imageUrl} alt="" className="size-full object-contain" />
+      ) : (
+        <Cpu className="size-7" />
+      )}
+    </EmptyMedia>
+  )
+}
+
+/** A device in the picker: its picture, name and where it is, and what to do with it. */
+function DeviceItem({
+  model,
+  name,
+  description,
+  children,
+}: {
+  model: string | null
+  name: string
+  description: string
+  children: ReactNode
+}) {
+  return (
+    <Card size="sm">
+      <CardContent className="flex items-center gap-3">
+        <DevicePicture model={model} />
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
+          <CardTitle className="truncate">{name}</CardTitle>
+          <CardDescription>{description}</CardDescription>
+        </div>
+        {children}
+      </CardContent>
+    </Card>
+  )
 }
 
 /** Asks before leaving a running job, as quitting does. */
@@ -175,24 +220,19 @@ export function DevicePicker({ close }: { close: () => void }) {
   return (
     <FieldGroup>
       {device && (
-        <Card size="sm">
-          <CardHeader>
-            <CardTitle className="flex min-w-0 items-center gap-2">
-              <Cpu aria-hidden="true" />
-              <span className="truncate">{device.name}</span>
-            </CardTitle>
-            <CardDescription>{device.host} · Connected</CardDescription>
-            <CardAction>
-              <Button
-                variant="outline"
-                disabled={busy}
-                onClick={() => disconnectFrom(device.name)}
-              >
-                {disconnect.isPending ? "Disconnecting…" : "Disconnect"}
-              </Button>
-            </CardAction>
-          </CardHeader>
-        </Card>
+        <DeviceItem
+          model={device.model}
+          name={device.name}
+          description={`${device.host} · Connected`}
+        >
+          <Button
+            variant="outline"
+            disabled={busy}
+            onClick={() => disconnectFrom(device.name)}
+          >
+            {disconnect.isPending ? "Disconnecting…" : "Disconnect"}
+          </Button>
+        </DeviceItem>
       )}
       <FieldSet>
         <FieldLegend
@@ -230,33 +270,26 @@ export function DevicePicker({ close }: { close: () => void }) {
             if (connected) label = "Connected"
             if (pendingId === id) label = "Connecting…"
             return (
-              <Card key={id} size="sm">
-                <CardHeader>
-                  <CardTitle className="flex min-w-0 items-center gap-2">
-                    <Cpu aria-hidden="true" />
-                    <span className="truncate">{found.name}</span>
-                  </CardTitle>
-                  <CardDescription>
-                    {id}
-                    {found.busy && !connected ? " · In use" : ""}
-                  </CardDescription>
-                  <CardAction>
-                    <Button
-                      variant="outline"
-                      disabled={busy || found.busy || connected}
-                      onClick={() =>
-                        connectTo({
-                          host: found.host,
-                          port: found.port,
-                          name: found.name,
-                        })
-                      }
-                    >
-                      {label}
-                    </Button>
-                  </CardAction>
-                </CardHeader>
-              </Card>
+              <DeviceItem
+                key={id}
+                model={connected ? device.model : null}
+                name={found.name}
+                description={found.busy && !connected ? `${id} · In use` : id}
+              >
+                <Button
+                  variant="outline"
+                  disabled={busy || found.busy || connected}
+                  onClick={() =>
+                    connectTo({
+                      host: found.host,
+                      port: found.port,
+                      name: found.name,
+                    })
+                  }
+                >
+                  {label}
+                </Button>
+              </DeviceItem>
             )
           })}
         </div>

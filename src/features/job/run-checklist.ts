@@ -1,7 +1,13 @@
 import type { CompiledPlate } from "@/domain/compile/compile"
-import { blocking, diagnosticOperation } from "@/domain/diagnostics"
-import type { Diagnostic, QuickFix } from "@/domain/diagnostics"
+import type { DesignRuleCheck } from "@/domain/design-rules/check"
+import {
+  blocking,
+  diagnosticOperation,
+  keyDiagnostics,
+} from "@/domain/diagnostics"
+import type { Diagnostic, QuickFix, Severity } from "@/domain/diagnostics"
 import type { Plate } from "@/domain/plate/plate"
+import { plural } from "@/domain/primitives"
 import { QUICK_FIX_LABELS } from "@/features/prepare/quick-fix"
 import type { MachineSnapshot } from "@/machine/contract"
 import type { PrepareSearch } from "@/routes/_workspace/prepare"
@@ -16,8 +22,22 @@ export type RunFix =
     }
   | { readonly kind: "device"; readonly label: string }
   | { readonly kind: "read-anchors"; readonly label: string }
+  /** Checks the plate's design rules in Prepare, which shows what the check finds. */
+  | {
+      readonly kind: "design-rules"
+      readonly label: string
+      readonly plateId: string
+    }
 
 export type RunCheckStatus = "pass" | "fail" | "pending"
+
+/** A problem a check lists, and what resolves it. */
+export type RunIssue = {
+  readonly key: string
+  readonly severity: Severity
+  readonly problem: string
+  readonly suggestion: string
+}
 
 export type RunCheckResult = {
   readonly status: RunCheckStatus
@@ -26,6 +46,8 @@ export type RunCheckResult = {
   readonly fix?: RunFix
   /** A pass whose note is a warning: Run is allowed, but it is worth a look first. */
   readonly warning?: boolean
+  /** The first problems behind the reason, each with what resolves it. */
+  readonly issues?: readonly RunIssue[]
 }
 
 /** Everything the checks read: the plate to run and the machine that would run it. */
@@ -36,6 +58,8 @@ export type RunContext = {
   readonly diagnostics: readonly Diagnostic[]
   /** What the plate's operations need from the connected machine (e.g. anchors read from it). */
   readonly machineDiagnostics: readonly Diagnostic[]
+  /** What the plate breaks of the project's design rules; null without a plate. */
+  readonly designRules: DesignRuleCheck | null
   readonly snapshot: MachineSnapshot
   readonly check: ProgramCheck
 }
@@ -90,6 +114,12 @@ export function fixFor(diagnostic: Diagnostic): RunFix {
       return { kind: "prepare", label, search: operation ? { operation } : {} }
     case "read-anchors":
       return { kind: "read-anchors", label }
+    case "resolve-rule":
+      return {
+        kind: "prepare",
+        label: "Open operation",
+        search: { operation: fix.operationId },
+      }
   }
 }
 
@@ -173,6 +203,53 @@ export const operationsCurrent: RunSpec = {
       : pending("Waits for a plate."),
 }
 
+/** Problems a check lists at most; its reason counts them all. */
+const LISTED_ISSUES = 3
+
+/** "2 errors, 1 warning". */
+function counts(diagnostics: readonly Diagnostic[]) {
+  const errors = blocking(diagnostics).length
+  const warnings = diagnostics.length - errors
+  return [
+    errors ? plural(errors, "error") : null,
+    warnings ? plural(warnings, "warning") : null,
+  ]
+    .filter((count) => count !== null)
+    .join(", ")
+}
+
+/**
+ * The project's design rules, which the plate's moves and its operations' NC must keep: errors
+ * fail, warnings pass with a note. The first problems are listed with what resolves them; Prepare
+ * shows them all, with Show and Apply.
+ */
+export const designRulesMet: RunSpec = {
+  id: "design-rules",
+  label: "Design rules met",
+  evaluate: ({ plate, designRules }) => {
+    if (!plate || !designRules) return pending("Waits for a plate.")
+    const { violations } = designRules
+    if (!violations.length) return pass()
+    const reason = `${counts(violations)}.`
+    const fix: RunFix = {
+      kind: "design-rules",
+      label: "Show in Prepare",
+      plateId: plate.id,
+    }
+    const issues = keyDiagnostics(violations)
+      .slice(0, LISTED_ISSUES)
+      .map(({ key, diagnostic }) => ({
+        key,
+        severity: diagnostic.severity,
+        problem: diagnostic.message,
+        suggestion: diagnostic.suggestion,
+      }))
+    return blocking(violations).length
+      ? { status: "fail", reason, fix, issues }
+      : { status: "pass", warning: true, reason, fix, issues }
+  },
+}
+
 export const matchesMachine: RunSpec = {
   id: "setup",
   label: "Plate matches the machine",
@@ -234,6 +311,7 @@ export const RUN_SPECS: readonly RunSpec[] = [
   plateCompiles,
   toolsAssigned,
   operationsCurrent,
+  designRulesMet,
   matchesMachine,
   programTransfers,
   machineReady,

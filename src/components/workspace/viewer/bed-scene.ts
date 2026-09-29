@@ -32,6 +32,8 @@ export type ViewMode = "perspective" | "top" | "front"
 export type ViewerPresentation = {
   selectedPlateId: string | null
   selectedLineRanges?: readonly LineRange[]
+  /** Program lines each plate leaves out of the view, by plate id. */
+  hiddenLineRanges?: Readonly<Record<string, readonly LineRange[]>>
   previewLine?: number | null
   previewProbePoint?: number | null
   progress: number
@@ -367,6 +369,7 @@ export class BedScene {
     const { selectedPlateId, selectedLineRanges, showRapids, showStock } =
       this.presentation
     const { problems = NO_PROBLEMS, shownProblem } = this.presentation
+    const hidden = this.presentation.hiddenLineRanges?.[id] ?? NO_RANGES
     const marked = {
       problems: problems.filter((problem) => problem.plateId === id),
       shownProblem: shownProblem?.plateId === id ? shownProblem.key : null,
@@ -377,6 +380,7 @@ export class BedScene {
         showRapids,
         showStock,
         ranges: NO_RANGES,
+        hidden,
         progress: 100,
         ...marked,
       }
@@ -387,6 +391,7 @@ export class BedScene {
       showRapids,
       showStock,
       ranges: selectedLineRanges ?? NO_RANGES,
+      hidden,
       progress,
       previewLine,
       previewProbePoint,

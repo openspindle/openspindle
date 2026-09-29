@@ -36,23 +36,36 @@ export type TransferableOperation = {
 const message = (error: unknown) =>
   error instanceof Error ? error.message : String(error)
 
-/** One NC file as a plate; everything a plate must satisfy is checked before it is used. */
-async function readPlate(
-  file: File,
-  context: ImportContext
-): Promise<Result<Plate>> {
-  let text: string
+/** A dropped or chosen NC file's text, read as the host reads a file it opens. */
+export async function readProgramText(file: File): Promise<Result<string>> {
   try {
-    text = (await readTextFile("program", file)).contents
+    return ok((await readTextFile("program", file)).contents)
   } catch (error) {
     return fail(message(error))
   }
-  const imported = importProgram(file.name, text, context)
+}
+
+/** An NC program as a plate; everything a plate must satisfy is checked before it is used. */
+export function programPlate(
+  name: string,
+  text: string,
+  context: ImportContext
+): Result<Plate> {
+  const imported = importProgram(name, text, context)
   if (!imported.ok) return imported
   const checked = PlateSchema.safeParse(imported.value)
   if (!checked.success)
     return fail(checked.error.issues.at(0)?.message ?? "It cannot be used.")
   return ok(checked.data)
+}
+
+/** One NC file as a plate. */
+async function readPlate(
+  file: File,
+  context: ImportContext
+): Promise<Result<Plate>> {
+  const text = await readProgramText(file)
+  return text.ok ? programPlate(file.name, text.value, context) : text
 }
 
 /** Reads NC files as new plates. A file that cannot be used is reported, never skipped silently. */
@@ -63,12 +76,19 @@ export async function readPlates(
   const plates: Plate[] = []
   const problems: FileProblem[] = []
   for (const file of files) {
-    const plate = await readPlate(file, context)
-    if (plate.ok) plates.push(plate.value)
-    else problems.push({ fileName: file.name, message: plate.error })
+    const read = await readPlate(file, context)
+    if (read.ok) plates.push(read.value)
+    else problems.push({ fileName: file.name, message: read.error })
   }
   return { plates, problems }
 }
+
+/** A plate's operations, to add to another plate with the library tools they had on it. */
+export const transferable = (plate: Plate): TransferableOperation[] =>
+  plate.operations.map((operation) => ({
+    operation: { ...operation, id: newId(), tools: [] },
+    preferredTools: boundTools(plate, operation),
+  }))
 
 /** Reads NC files as operations for an existing plate, keeping the tools each file selects. */
 export async function readOperations(
@@ -76,13 +96,7 @@ export async function readOperations(
   context: ImportContext
 ): Promise<{ operations: TransferableOperation[]; problems: FileProblem[] }> {
   const { plates, problems } = await readPlates(files, context)
-  const operations = plates.flatMap((plate) =>
-    plate.operations.map((operation) => ({
-      operation: { ...operation, id: newId(), tools: [] },
-      preferredTools: boundTools(plate, operation),
-    }))
-  )
-  return { operations, problems }
+  return { operations: plates.flatMap(transferable), problems }
 }
 
 /** A problem's message on its own, or after its file name when it does not already name it. */

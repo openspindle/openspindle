@@ -1,5 +1,6 @@
 import type {
   AnchorConfiguration,
+  AnchorPosition,
   AssistKey,
   CommandKind,
   ConnectedDevice,
@@ -260,10 +261,30 @@ export interface FirmwareAdapter {
     query: (key: string) => OutboundFrame
     /** The value for `key`, null when unset or invalid, undefined for unrelated text. */
     parse: (text: string, key: string) => number | null | undefined
-    /** A keyed reply from any anchor read (delayed replies are swallowed). */
+    /** A keyed reply from any anchor read or write (delayed replies are swallowed). */
     isReply: (text: string) => boolean
     /** The anchors from the values of `keys`, in order, with ids that never change. */
     build: (values: readonly number[], fetchedAt: number) => AnchorConfiguration
+    /**
+     * Stores anchors in the machine's configuration, one value per key; absent when they cannot
+     * be changed. Reading the keys again verifies what it stores.
+     */
+    readonly write?: {
+      /**
+       * The values of `keys`, in order, that store these positions, as the configuration keeps
+       * them; throws for positions of other anchors than the machine's own.
+       */
+      values: (anchors: readonly AnchorPosition[]) => readonly number[]
+      command: (key: string, value: number) => OutboundFrame
+      /** True when `text` confirms `key` holds `value`, why not when it refuses, undefined for unrelated text. */
+      confirm: (
+        text: string,
+        key: string,
+        value: number
+      ) => true | string | undefined
+      /** The machine's own moves use stored anchors as it loaded them when it started. */
+      readonly afterRestart: boolean
+    }
   }
   readonly heightMap: {
     readonly query: OutboundFrame

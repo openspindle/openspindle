@@ -158,6 +158,35 @@ export const OpenFileResultSchema = z.discriminatedUnion("status", [
 ])
 export type OpenFileResult = z.infer<typeof OpenFileResultSchema>
 
+/** At most this many files the system hands the app at once are opened. */
+export const MAX_OPENED_FILES = 100
+
+/**
+ * Files the system asked the app to open (Finder's Open With, a double-click, a drop on the
+ * Dock icon), read: NC programs and projects, which the workspace takes as it takes dropped
+ * files, and those that could not be read, with why.
+ */
+export const OpenedFilesSchema = z.strictObject({
+  files: z
+    .array(
+      z.strictObject({
+        kind: z.enum(["program", "project"]),
+        fileName: z.string().min(1).max(1024),
+        contents: z.string(),
+      })
+    )
+    .max(MAX_OPENED_FILES),
+  problems: z
+    .array(
+      z.strictObject({
+        fileName: z.string().min(1).max(1024),
+        message: z.string(),
+      })
+    )
+    .max(MAX_OPENED_FILES),
+})
+export type OpenedFiles = z.infer<typeof OpenedFilesSchema>
+
 /** A binary file's contents cross the port as a structured clone, never as base64 text. */
 const FileBytesSchema = z.custom<Uint8Array>(
   (value) => value instanceof Uint8Array,

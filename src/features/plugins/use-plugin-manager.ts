@@ -1,6 +1,7 @@
 import { useEffect } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
+import { isPluginUsable } from "@/platform/contract/plugin-rpc"
 import type {
   InstallRequest,
   PluginSummary,
@@ -152,7 +153,7 @@ export function useCompanionSetup() {
  */
 export function useHoldCompanion(plugin: PluginSummary) {
   const services = useHost().plugins.services
-  const holds = plugin.enabled && plugin.companion !== null
+  const holds = isPluginUsable(plugin) && plugin.companion !== null
   useEffect(() => {
     if (!holds) return
     return services.subscribeCompanion(plugin.id, () => undefined)

@@ -19,6 +19,7 @@ import { FileService } from "./services/file-service"
 import { FusionService } from "./services/fusion-service"
 import { KeptWorkspace } from "./services/kept-workspace"
 import { MenuBus } from "./services/menu-bus"
+import { OpenedFileBus } from "./services/opened-files"
 import { UnsavedChanges } from "./services/unsaved-changes"
 import { createModelLibrary } from "./services/model-service"
 import { StorageService } from "./services/storage-service"
@@ -57,15 +58,24 @@ const currentWindow = () =>
 if (!app.requestSingleInstanceLock()) app.quit()
 else {
   const diagnostics = startDiagnostics()
+  const openedFiles = new OpenedFileBus()
   app.on("second-instance", () => {
     const window = currentWindow()
     if (!window) return
     if (window.isMinimized()) window.restore()
     window.focus()
   })
+  // Files macOS asks the app to open (Finder's Open With, a double-click, the Dock icon). Those
+  // that launch the app arrive before it is ready, so this listens from the start; the window
+  // takes them once it listens.
+  app.on("open-file", (event, filePath) => {
+    event.preventDefault()
+    openedFiles.open(filePath)
+    currentWindow()?.focus()
+  })
   void app
     .whenReady()
-    .then(() => start(diagnostics))
+    .then(() => start(diagnostics, openedFiles))
     .catch((error: unknown) => {
       log.error("OpenSpindle failed to start", error)
       dialog.showErrorBox(
@@ -97,7 +107,7 @@ function startDiagnostics(): Diagnostics {
   return new Diagnostics(settings, reports)
 }
 
-function start(diagnostics: Diagnostics) {
+function start(diagnostics: Diagnostics, openedFiles: OpenedFileBus) {
   hardenSessions()
   handleAppProtocol(RENDERER_ROOT)
   if (DEV_ICON) app.dock?.setIcon(DEV_ICON)
@@ -133,6 +143,7 @@ function start(diagnostics: Diagnostics) {
       files,
       fusion,
       menu,
+      openedFiles,
       machine: machine.app,
       storage,
       models,

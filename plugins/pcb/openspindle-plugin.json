@@ -5,7 +5,7 @@
   "version": "0.3.0",
   "description": "KiCad Gerber and Excellon operations, generated on this computer by pcb2gcode.",
   "apiVersion": 2,
-  "apiRevision": 3,
+  "apiRevision": 4,
   "permissions": ["workspace:read", "operations:write", "tools:read"],
   "ui": {
     "entry": "dist/view.js",

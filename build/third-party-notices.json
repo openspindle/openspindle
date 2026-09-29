@@ -79,6 +79,7 @@
       "@sentry/core@10.75.0",
       "@sentry/electron@7.20.0",
       "@sentry/react@10.75.0",
+      "@shadcn/react@0.3.1",
       "@tanstack/devtools-event-client@0.4.4",
       "@tanstack/devtools-event-client@0.5.0",
       "@tanstack/form-core@1.33.5",
@@ -303,6 +304,14 @@
         "Copyright (c) 2019 Functional Software, Inc. dba Sentry"
       ],
       "text": "1773edc8f3bc5483"
+    },
+    "@shadcn/react@0.3.1": {
+      "license": "MIT",
+      "source": "https://github.com/shadcn-ui/ui",
+      "attribution": [
+        "Copyright (c) 2023 shadcn"
+      ],
+      "text": "b60dd36942df3b42"
     },
     "@tanstack/devtools-event-client@0.4.4": {
       "license": "MIT",

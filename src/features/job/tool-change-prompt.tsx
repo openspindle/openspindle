@@ -1,10 +1,22 @@
+import { createAtom, useSelector } from "@tanstack/react-store"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { ToolCard } from "@/components/workspace/tool-card"
-import { ToolImage } from "@/components/workspace/tool-image"
+import type { Operation } from "@/domain/operations/operation"
 import type { Tool } from "@/domain/tools/tool"
 import { useMachineSnapshot } from "@/platform/machine"
+import type { MachineAction } from "./job-hooks"
+import { pauseKey } from "./job-view"
 import type { JobViewOf, ToolRequest } from "./job-view"
-import { StageCard } from "./stage-card"
+import { MachineActionButton, StageCard } from "./stage-card"
 
 /** Product details worth checking against the tool in hand. */
 function ToolDetails({ tool }: { tool: Tool }) {
@@ -45,11 +57,79 @@ function missingToolNote(
   return null
 }
 
-/** A manual tool change: which tool to install, confirmed in the job's toolbar. */
-export function ToolChangePrompt({
+/** The tool change whose dialog was dismissed, by `pauseKey`: it stays closed while the job waits there. */
+const dismissedAtom = createAtom<string | null>(null)
+
+/**
+ * Asks to confirm a manual tool change once the machine waits for it: the tool to install and
+ * the operation the job goes on with. Dismiss leaves the job waiting for Tool installed.
+ */
+function ToolChangeDialog({
   view,
+  slot,
+  note,
+  operation,
+  confirm,
 }: {
   view: JobViewOf<"waiting-tool">
+  slot: string | null
+  note: string | null
+  operation: Operation | null
+  confirm: MachineAction
+}) {
+  const key = pauseKey(view.job, view.wait)
+  const dismissed = useSelector(dismissedAtom) === key
+  const { tool } = view.request
+  return (
+    <AlertDialog
+      open={!dismissed}
+      onOpenChange={(open) => {
+        if (!open) dismissedAtom.set(() => key)
+      }}
+    >
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Change tool</AlertDialogTitle>
+        </AlertDialogHeader>
+        {tool && <ToolCard tool={tool} slotLabel={slot ?? undefined} />}
+        {note && (
+          <Alert>
+            <AlertDescription>{note}</AlertDescription>
+          </Alert>
+        )}
+        <AlertDialogDescription>
+          {operation
+            ? `Job resumes with ${operation.name} after confirmation.`
+            : "Job resumes after confirmation."}
+        </AlertDialogDescription>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Dismiss</AlertDialogCancel>
+          <MachineActionButton
+            action={confirm}
+            label="Confirm"
+            pendingLabel="Confirming…"
+            variant="default"
+            icon={null}
+          />
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  )
+}
+
+/**
+ * A manual tool change: which tool to install, confirmed in a dialog as the machine starts
+ * waiting, or later in the job's toolbar.
+ */
+export function ToolChangePrompt({
+  view,
+  operation,
+  confirm,
+}: {
+  view: JobViewOf<"waiting-tool">
+  /** The operation the job goes on with after the change; null when unknown. */
+  operation: Operation | null
+  confirm: MachineAction
 }) {
   const { features } = useMachineSnapshot()
   const atc = features?.atc === true
@@ -57,26 +137,37 @@ export function ToolChangePrompt({
   const slot = request.number === null ? null : `T${request.number}`
   const note = missingToolNote(request, view.session !== null)
   return (
-    <StageCard
-      title={slot ? `Install ${slot}` : "Change the tool"}
-      description={
-        atc
-          ? "The machine waits for its tool changer."
-          : "The machine waits with the spindle stopped. Install the tool, then choose Tool installed."
-      }
-    >
-      {request.tool && (
-        <>
-          <ToolCard tool={request.tool} slotLabel={slot ?? undefined} />
-          <ToolImage tool={request.tool} />
-          <ToolDetails tool={request.tool} />
-        </>
+    <>
+      <StageCard
+        title={slot ? `Install ${slot}` : "Change the tool"}
+        description={
+          atc
+            ? "The machine waits for its tool changer."
+            : "The machine waits with the spindle stopped. Install the tool, then choose Tool installed."
+        }
+      >
+        {request.tool && (
+          <>
+            <ToolCard tool={request.tool} slotLabel={slot ?? undefined} />
+            <ToolDetails tool={request.tool} />
+          </>
+        )}
+        {note && (
+          <Alert>
+            <AlertDescription>{note}</AlertDescription>
+          </Alert>
+        )}
+      </StageCard>
+      {/* On tool-changer machines, confirming would loosen the tool instead. */}
+      {!atc && (
+        <ToolChangeDialog
+          view={view}
+          slot={slot}
+          note={note}
+          operation={operation}
+          confirm={confirm}
+        />
       )}
-      {note && (
-        <Alert>
-          <AlertDescription>{note}</AlertDescription>
-        </Alert>
-      )}
-    </StageCard>
+    </>
   )
 }

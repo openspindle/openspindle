@@ -63,6 +63,36 @@ export const BindingSchema = z.object({
 })
 export type Binding = z.infer<typeof BindingSchema>
 
+/**
+ * Where an operation's NC came from, so that it can be brought up to date from there: an NC
+ * program in a Fusion 360 document, found again by the document's lineage id and the program's
+ * id in it (their names while an id is unknown), and how importing made the operation of it.
+ */
+export const NcOriginSchema = z.strictObject({
+  kind: z.literal("fusion"),
+  /** The same for all versions of the document; null while it was never saved. */
+  documentId: z.string().min(1).max(500).nullable(),
+  documentName: TextSchema,
+  /** The NC program's id in its document, which saving and reloading keep. */
+  programId: z.int().nonnegative().nullable(),
+  programName: TextSchema,
+  /** The part of the program the operation is, by the way importing split it; null for all of it. */
+  part: z
+    .strictObject({ mode: z.enum(["tool", "toolpath"]), name: TextSchema })
+    .nullable(),
+  /** How each design rule's issue was resolved, by rule, which an update resolves alike. */
+  resolutions: z
+    .record(
+      z.string().regex(/^[a-z0-9-]{1,64}$/),
+      z.enum(["ignore", "drop", "replace"])
+    )
+    .refine(
+      (resolutions) => Object.keys(resolutions).length <= 100,
+      "Too many resolutions."
+    ),
+})
+export type NcOrigin = z.infer<typeof NcOriginSchema>
+
 export const FileSourceSchema = z.object({
   kind: z.literal("file"),
   nc: NcSchema,
@@ -72,6 +102,8 @@ export const FileSourceSchema = z.object({
    * theirs.
    */
   park: z.boolean().default(true),
+  /** Where the NC came from, for NC that can be updated from there; absent for a file. */
+  origin: NcOriginSchema.optional(),
 })
 
 /** A declarative plugin template; `nc` is the last generated program. */

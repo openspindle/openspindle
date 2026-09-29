@@ -42,9 +42,17 @@ const FusionFileNameSchema = z
   )
 
 export const FusionProgramSummarySchema = z.strictObject({
+  /** For this Fusion session only; `documentId` and `operationId` find the program again later. */
   id: FusionProgramIdSchema,
   name: TextSchema,
   documentName: TextSchema,
+  /**
+   * The document's lineage id, the same for all its versions; null for a document never saved.
+   * Absent from add-ins older than this app.
+   */
+  documentId: z.string().min(1).max(500).nullable().optional(),
+  /** The NC program's id in its document, which saving and reloading keep; absent as above. */
+  operationId: z.int().nonnegative().nullable().optional(),
 })
 export type FusionProgramSummary = z.infer<typeof FusionProgramSummarySchema>
 

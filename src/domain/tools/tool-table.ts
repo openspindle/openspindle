@@ -1,4 +1,5 @@
 import { readNcBlock } from "@/machine/contract"
+import type { ProgramTool } from "@/domain/nc/cam-markers"
 import { toolKindKey } from "@/domain/tools/tool"
 import type { Tool } from "@/domain/tools/tool"
 import { error, toolSubject } from "../diagnostics"
@@ -92,6 +93,98 @@ export function libraryPreferences(
     if (local === null) continue
     const tool = preferredTool(local, library)
     if (tool) preferred.set(local, tool.id)
+  }
+  return preferred
+}
+
+/** A name's words, lower case: "Spiral O Metal 3.175*12mm" is spiral, o, metal, 3.175, 12mm. */
+const nameWords = (name: string) =>
+  new Set(name.toLowerCase().match(/[a-z0-9.]+/g) ?? [])
+
+/** Diameters and flute lengths within this many millimetres are the same. */
+const SIZE_TOLERANCE = 0.01
+
+const sameSize = (a: number | null, b: number | null) =>
+  a !== null && b !== null && Math.abs(a - b) <= SIZE_TOLERANCE
+
+/**
+ * How well a library tool fits a program's description of one of its tools, the better the
+ * higher, compared in order: its name, the vendor's or its product ID is the one the CAM
+ * wrote, its flute length
+ * is the one described, how many words of the names the two share, and its post-processor
+ * number is the program's. Null for a tool the description rules out: another kind, or another
+ * diameter.
+ */
+function fit(
+  tool: Tool,
+  described: ProgramTool
+): readonly [number, number, number, number] | null {
+  if (
+    described.diameter !== null &&
+    !sameSize(tool.diameter, described.diameter)
+  )
+    return null
+  if (
+    described.kind !== null &&
+    toolKindKey(tool.kind) !== toolKindKey(described.kind)
+  )
+    return null
+  const written = described.name?.toLowerCase().replace(/\s+/g, " ") ?? ""
+  const names = [tool.vendorDescription, tool.productId, tool.name]
+    .filter((name): name is string => !!name)
+    .map((name) => name.toLowerCase().replace(/\s+/g, " "))
+  const words = nameWords(written)
+  return [
+    Number(!!written && names.some((name) => written.startsWith(name))),
+    Number(sameSize(tool.geometry.fluteLength, described.fluteLength)),
+    Math.max(
+      0,
+      ...names.map(
+        (name) => [...nameWords(name)].filter((word) => words.has(word)).length
+      )
+    ),
+    Number(tool.postProcess.number === described.number),
+  ]
+}
+
+const better = (a: readonly number[], b: readonly number[]): boolean => {
+  for (const [index, value] of a.entries())
+    if (value !== b[index]) return value > b[index]
+  return false
+}
+
+/**
+ * Library tools meant for an NC program's own tool numbers, by what the program says of them
+ * (`ProgramTool`): for a number it describes, the library tool the description fits best, or
+ * none when no tool fits, rather than one of another size or kind; for any other number, as
+ * `libraryPreferences` has it, unless `numbered` is off: then only a probe's slot. A post-processor number alone says little: a vendor's library
+ * may give all its tools the same one.
+ */
+export function describedPreferences(
+  locals: readonly (number | null)[],
+  library: readonly Tool[],
+  described: ReadonlyMap<number, ProgramTool>,
+  numbered = true
+): Map<number | null, string> {
+  // Numbers it does not describe: a probe's slot always, others when numbers pick tools.
+  const preferred = libraryPreferences(
+    locals.filter(
+      (local) =>
+        local !== null &&
+        (isProbeSlot(local) || (numbered && !described.has(local)))
+    ),
+    library
+  )
+  for (const local of locals) {
+    const description =
+      local === null || isProbeSlot(local) ? undefined : described.get(local)
+    if (!description) continue
+    let best: { tool: Tool; score: readonly number[] } | null = null
+    for (const tool of library) {
+      const score = fit(tool, description)
+      if (score && (!best || better(score, best.score))) best = { tool, score }
+    }
+    if (best) preferred.set(local, best.tool.id)
   }
   return preferred
 }

@@ -3,6 +3,7 @@ import { z } from "zod"
 import {
   OpenFileRequestSchema,
   OpenFileResultSchema,
+  OpenedFilesSchema,
   SaveFileRequestSchema,
   SaveFileResultSchema,
 } from "./files"
@@ -42,6 +43,8 @@ export const hostContract = defineContract({
     ...diagnosticsEvents,
     ...fusionEvents,
     "menu.command": { params: z.undefined(), data: MenuCommandSchema },
+    /** Files the system asked the app to open, as it opened them. */
+    "files.opened": { params: z.undefined(), data: OpenedFilesSchema },
   },
 })
 export type HostContract = typeof hostContract

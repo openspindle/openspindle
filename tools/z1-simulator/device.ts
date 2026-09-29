@@ -92,6 +92,10 @@ export class SimulatedZ1 {
   private readonly send: Send
   private readonly log: (message: string) => void
   private readonly transfer: TransferEndpoint
+  /** The saved configuration's settings as text, as `config-get sd` and `config-set sd` see it. */
+  private readonly config: Map<string, string>
+  /** Anchor 1 as the firmware loaded it when it started; `config-set` takes effect at a reboot. */
+  private anchor1: [number, number]
   private mpos: Xyz = [-200, -150, -5]
   private offset: Xyz = [-100, -100, -20]
   private spindleOn = false
@@ -135,6 +139,10 @@ export class SimulatedZ1 {
     this.homed = options.homed
     this.tool = options.tool
     this.bedClean = options.bedClean
+    this.config = new Map(
+      ANCHOR_KEYS.map((key, index) => [key, String(options.anchors[index])])
+    )
+    this.anchor1 = [options.anchors[0], options.anchors[1]]
     this.transfer = new TransferEndpoint(send, options.transfer, log)
     this.timer = setInterval(() => this.tick(), options.lineMs)
   }
@@ -297,11 +305,26 @@ export class SimulatedZ1 {
     switch (command) {
       case "config-get": {
         const [source, key = ""] = argument.split(/\s+/)
+        const value = this.config.get(key)
         this.lines(
-          (ANCHOR_KEYS as readonly string[]).includes(key)
-            ? `${source}: ${key} is set to ${this.options.anchors[ANCHOR_KEYS.indexOf(key as (typeof ANCHOR_KEYS)[number])]}`
-            : `${source}: ${key} is not in config`
+          value === undefined
+            ? `${source}: ${key} is not in config`
+            : `${source}: ${key} is set to ${value}`
         )
+        return
+      }
+      case "config-set": {
+        // Configurator::config_set_command: the value is stored as it was sent.
+        const [source = "", key = "", value = ""] = argument.split(/\s+/)
+        if (!source || !key || !value)
+          return this.lines(
+            "Usage: config-set source setting value # where source is sd, setting is the key and value is the new value"
+          )
+        if (source !== "sd")
+          return this.lines(`${source} source does not exist`)
+        this.config.set(key, value)
+        this.log(`config-set ${key} ${value} (loaded at the next reboot)`)
+        this.lines(`${source}: ${key} has been set to ${value}`)
         return
       }
       case "play": {
@@ -677,7 +700,7 @@ export class SimulatedZ1 {
 
   /** Where the tool sensor is: 181 mm from anchor 1 in X and Y, as on a Z1. */
   private get sensor(): [number, number] {
-    return [this.options.anchors[0] + 181, this.options.anchors[1] + 181]
+    return [this.anchor1[0] + 181, this.anchor1[1] + 181]
   }
 
   private get stepMs() {
@@ -794,6 +817,11 @@ export class SimulatedZ1 {
     this.abortSnapshot = null
     this.spindleOn = false
     this.targetRpm = 0
+    // The firmware loads its saved configuration as it starts.
+    this.anchor1 = [
+      Number(this.config.get(ANCHOR_KEYS[0])),
+      Number(this.config.get(ANCHOR_KEYS[1])),
+    ]
     this.log("rebooted")
     this.onReboot()
   }

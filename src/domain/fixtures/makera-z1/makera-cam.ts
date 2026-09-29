@@ -1,5 +1,5 @@
 import { camLabel } from "@/domain/nc/cam-markers"
-import type { CamMarkers } from "@/domain/nc/cam-markers"
+import type { CamMarkers, ProgramTool } from "@/domain/nc/cam-markers"
 import { isStock } from "@/domain/stock/stock"
 import type { Stock } from "@/domain/stock/stock"
 
@@ -96,5 +96,52 @@ function toolpaths(
   )
 }
 
+/** Makera CAM's tool types as tool libraries name them; others are left to the size and name. */
+const TOOL_KINDS: ReadonlyMap<string, string> = new Map([
+  ["flat end", "flat end mill"],
+  ["ball end", "ball end mill"],
+  ["ball nose", "ball end mill"],
+  ["drill", "drill"],
+])
+
+/**
+ * The tools Makera CAM's header describes (`;@MKR|TOOL|number=…|name=…|type=…|diameter=…|
+ * flutelength=…`), in millimetres; null without them.
+ */
+function tools(
+  lines: readonly string[]
+): ReadonlyMap<number, ProgramTool> | null {
+  const unit = metadata(lines, "UNIT").value
+  const scale = unit === "in" || unit === "inch" ? 25.4 : 1
+  const described = new Map<number, ProgramTool>()
+  for (const line of lines) {
+    const entry = marker(line)
+    if (entry?.type !== "TOOL") continue
+    const number = Number(entry.values.number)
+    if (!Number.isInteger(number) || number < 0 || described.has(number))
+      continue
+    const measure = (key: string) => {
+      const value = Number(entry.values[key])
+      return Number.isFinite(value) && value > 0 ? value * scale : null
+    }
+    const tool: ProgramTool = {
+      number,
+      name: camLabel(entry.values.name),
+      diameter: measure("diameter"),
+      fluteLength: measure("flutelength"),
+      kind:
+        TOOL_KINDS.get(String(entry.values.type).trim().toLowerCase()) ?? null,
+    }
+    // A name alone would fit any tool: without a size or kind, the number picks it.
+    if (tool.diameter !== null || tool.kind !== null)
+      described.set(number, tool)
+  }
+  return described.size ? described : null
+}
+
 /** The markers Makera CAM writes in its programs. */
-export const MAKERA_CAM: CamMarkers = { toolpaths, stock: stockFromMetadata }
+export const MAKERA_CAM: CamMarkers = {
+  toolpaths,
+  stock: stockFromMetadata,
+  tools,
+}

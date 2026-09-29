@@ -1,4 +1,5 @@
 import { createAtom, useSelector } from "@tanstack/react-store"
+import type { ImportPlan } from "@/app/workspace/import-plan"
 import type { PluginSourceRef } from "@/features/plugins/plugin-sources"
 import type { ProjectCandidate } from "@/features/project/use-project"
 
@@ -41,6 +42,10 @@ export type WorkspaceDialog =
   | { readonly kind: "project-report"; readonly report: ProjectCandidate }
   /** The project's settings, such as its design rules. */
   | { readonly kind: "workspace-settings" }
+  /** The machine's G-code, code by code; closing it goes back to the dialog it opened from. */
+  | { readonly kind: "gcode-glossary"; readonly back?: WorkspaceDialog }
+  /** Files read for importing, and what to ask first: their plate, splits and issues. */
+  | { readonly kind: "import"; readonly plan: ImportPlan }
 
 const dialogAtom = createAtom<WorkspaceDialog | null>(null)
 

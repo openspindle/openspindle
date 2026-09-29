@@ -142,6 +142,7 @@ export class PlatePath {
         state.previewLine,
         state.previewProbePoint
       )
+    this.toolpath.hide(state.hidden)
     this.toolpath.select(state.ranges)
     const selectionShown = this.toolpath.reveal(count, state.showRapids)
     this.toolpath.showMove(playhead, state.showRapids)

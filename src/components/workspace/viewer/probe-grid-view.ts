@@ -27,6 +27,8 @@ export type ProbeTouchShape = {
 export type ProbePresentation = {
   active: boolean
   ranges: readonly LineRange[]
+  /** Program lines left out of the view, such as a hidden operation's. */
+  hidden: readonly LineRange[]
   progress: number
   previewLine?: number | null
   previewProbePoint?: number | null
@@ -37,13 +39,15 @@ type Faded = Array<{ material: THREE.Material; opacity: number }>
 
 type GridView = {
   shape: ProbeGridShape
+  /** Everything the grid draws, which a hidden operation hides. */
+  root: THREE.Group
   faded: Faded
   /** The revealed samples' markers, over the faint ones of all samples. */
   samples: THREE.InstancedMesh[]
   marker: THREE.Mesh
 }
 
-type TouchView = { shape: ProbeTouchShape; faded: Faded }
+type TouchView = { shape: ProbeTouchShape; root: THREE.Group; faded: Faded }
 
 /** A marker's unit discs: its half-opaque border, and the dot inside it. */
 type MarkerDiscs = Record<"border" | "dot", THREE.CircleGeometry>
@@ -178,17 +182,17 @@ export class ProbeGridView {
       const faded: Faded = []
       const fade = fader(faded)
       const { points } = shape
+      const root = new THREE.Group()
+      this.group.add(root)
       if (shape.lines.length) {
         const lines = new THREE.LineSegments(
           positions(shape.lines),
           fade(lineMaterial(color), 0.16)
         )
         lines.renderOrder = 3
-        this.group.add(lines)
+        root.add(lines)
       }
-      this.group.add(
-        dashedLine(shape.outline, fade(dashedMaterial(color), 0.5))
-      )
+      root.add(dashedLine(shape.outline, fade(dashedMaterial(color), 0.5)))
       const radius = sampleRadius(shape.grid)
       const sampleMarkers = (opacity: number) =>
         markers(
@@ -205,13 +209,15 @@ export class ProbeGridView {
       )
       marker.scale.setScalar(radius)
       marker.renderOrder = 7
-      this.group.add(...sampleMarkers(0.24), ...samples, marker)
-      return { shape, faded, samples, marker }
+      root.add(...sampleMarkers(0.24), ...samples, marker)
+      return { shape, root, faded, samples, marker }
     })
     this.touches = touches.map((shape) => {
       const faded: Faded = []
       const fade = fader(faded)
-      this.group.add(
+      const root = new THREE.Group()
+      this.group.add(root)
+      root.add(
         ...markers(
           markerDiscs(),
           [shape.point],
@@ -220,7 +226,7 @@ export class ProbeGridView {
           8
         )
       )
-      return { shape, faded }
+      return { shape, root, faded }
     })
   }
 
@@ -247,6 +253,7 @@ export class ProbeGridView {
         : 0.5
     for (const view of this.grids) {
       const { grid, points } = view.shape
+      view.root.visible = !lineInRanges(grid.sourceLine, state.hidden)
       const cursor = probeGridProgress(
         grid,
         state.previewLine,
@@ -266,7 +273,8 @@ export class ProbeGridView {
       view.marker.visible = active !== undefined
       if (active) view.marker.position.set(...active)
     }
-    for (const { shape, faded } of this.touches) {
+    for (const { shape, root, faded } of this.touches) {
+      root.visible = !lineInRanges(shape.touch.sourceLine, state.hidden)
       const emphasis = strength(shape.touch.sourceLine)
       for (const { material, opacity } of faded)
         material.opacity = opacity * emphasis

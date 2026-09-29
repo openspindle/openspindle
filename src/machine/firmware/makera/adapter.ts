@@ -6,6 +6,7 @@ import {
   isLocalIPv4,
 } from "../../contract/index.ts"
 import type {
+  AnchorPosition,
   AssistKey,
   NetworkDevice,
   PlateAssists,
@@ -112,6 +113,33 @@ const ANCHOR_KEYS = [
 ] as const
 const ANCHOR_REPLY =
   /^(sd|cached): (coordinate\.anchor(?:1_[xy]|2_offset_[xy])) is (?:set to (.*)|not in config)$/
+/** Configurator.cpp's answers to `config-set sd`: the value it wrote, or no room on its line. */
+const ANCHOR_SET_REPLY =
+  /^sd: (coordinate\.anchor(?:1_[xy]|2_offset_[xy])) (?:has been set to (.*)|not enough space to overwrite existing key\/value)$/
+/** An anchor setting as it is written: to three decimals, a micrometre. */
+const settingText = (value: number) => value.toFixed(3)
+const toSetting = (value: number) => Number(settingText(value))
+
+/** Anchor 1's position, then Anchor 2's offset from it, as the configuration keeps them. */
+function anchorValues(anchors: readonly AnchorPosition[]): number[] {
+  const first = anchors.find((anchor) => anchor.id === "anchor-1")
+  const second = anchors.find((anchor) => anchor.id === "anchor-2")
+  if (!first || !second || anchors.length !== 2)
+    throw new Error(
+      "A Makera machine stores two anchors: Anchor 1 and Anchor 2."
+    )
+  const x = toSetting(first.x)
+  const y = toSetting(first.y)
+  const offsets = [
+    toSetting(toSetting(second.x) - x),
+    toSetting(toSetting(second.y) - y),
+  ]
+  if (offsets.some((offset) => Math.abs(offset) > COORDINATE_LIMIT))
+    throw new Error(
+      `Anchor 2 must be within ${COORDINATE_LIMIT} mm of Anchor 1 in X and Y.`
+    )
+  return [x, y, ...offsets]
+}
 
 /** Passive discovery format from the Z1-supporting community controller: name,ip,port,busy[,version]. */
 function parseAnnouncement(
@@ -201,7 +229,8 @@ export const makeraAdapter: FirmwareAdapter = {
         ? number
         : null
     },
-    isReply: (text) => ANCHOR_REPLY.test(text.trim()),
+    isReply: (text) =>
+      ANCHOR_REPLY.test(text.trim()) || ANCHOR_SET_REPLY.test(text.trim()),
     // Plates keep positions relative to these ids, and so does the Z1 fixture kit's defaults.
     build: ([x, y, offsetX, offsetY], fetchedAt) =>
       AnchorConfigurationSchema.parse({
@@ -212,6 +241,31 @@ export const makeraAdapter: FirmwareAdapter = {
         ],
         fetchedAt,
       }),
+    // Into the saved SD configuration, which reads verify; the firmware's own moves (tool
+    // changes, the tool setter) load it when the machine starts.
+    write: {
+      values: anchorValues,
+      command: (key, value) =>
+        command(`config-set sd ${key} ${settingText(value)}`),
+      confirm(text, key, value) {
+        if (text.length > 256) return undefined
+        const reply = text.trim()
+        if (reply === "sd source does not exist")
+          return "The device has no saved configuration to store anchors in."
+        if (reply.startsWith("Usage: config-set"))
+          return "The device did not take the anchor setting."
+        const match = ANCHOR_SET_REPLY.exec(reply)
+        if (!match || match[1] !== key) return undefined
+        // Group 2 is absent when the setting's line has no room for the value.
+        const stored = match.at(2)?.trim()
+        if (stored === undefined)
+          return `The device has no room to store ${key}.`
+        return stored === settingText(value)
+          ? true
+          : `The device stored ${key} as ${stored}.`
+      },
+      afterRestart: true,
+    },
   },
   heightMap: {
     // M375 without .1 would load the grid and enable compensation.

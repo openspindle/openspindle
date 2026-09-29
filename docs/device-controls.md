@@ -1,6 +1,6 @@
 # Device controls
 
-One module owns the machine: `MachineController` in `src/machine/core`, hosted in the Electron main process. The renderer, the native menu and plugins reach it only through a `MachineGateway` for their principal. There is no free-form command console: requests are the closed `MachineCommand` union (Zod-validated at the RPC boundary and again in the controller), plus Run, reads and Stop.
+One module owns the machine: `MachineController` in `src/machine/core`, hosted in the Electron main process. The renderer, the native menu and plugins reach it only through a `MachineGateway` for their principal. There is no free-form command console: requests are the closed `MachineCommand` union (Zod-validated at the RPC boundary and again in the controller), plus Run, reads, writing the stored anchors and Stop.
 
 ## Admission and availability
 
@@ -9,7 +9,7 @@ Every request passes one admission chain (`core/admission.ts`) before anything i
 1. a verified connection, and no lockout (an earlier outcome that is unknown);
 2. fresh status (at most 5 s old);
 3. no other operation in progress (the controller runs one at a time; nothing queues);
-4. while a program streams, only light, beep, overrides, pause, resume and tool confirmation are admitted, and reads are **deferred** until the program ends;
+4. while a program streams, only light, beep, overrides, pause, resume and tool confirmation are admitted, reads are **deferred** until the program ends, and writing the anchors is refused;
 5. the capability is reported by the machine (for example, no tool confirmation on ATC machines);
 6. the firmware's machine-state rules (`firmware/makera/commands.ts`).
 
@@ -21,22 +21,23 @@ Reads are shared by kind (anchors, height map). A read asked for while one of it
 
 A written command is not a successful command. Without a program stream, success needs the firmware acknowledgement **and** a telemetry post-condition. While a program streams, acknowledgements may belong to its played lines, so they are never trusted and only telemetry counts.
 
-| Control                 | Firmware request                                 | Proof                                                                                              |
-| ----------------------- | ------------------------------------------------ | -------------------------------------------------------------------------------------------------- |
-| Jog                     | `$J X1 F0.1` (one axis; converted for inch mode) | Idle at start + distance (±0.005 mm)                                                               |
-| Home all                | `$H`                                             | `ok`, then Idle (Alarm before the acknowledgement is expected)                                     |
-| Unlock (Alarm only)     | `$X`                                             | `[Caution: Unlocked]` and `ok`, then status leaves Alarm. Homing is advised afterwards.            |
-| Work zero               | `G10 L20 P0 X0` (selected axes)                  | `ok`, WPos of those axes ≈ 0. Z also clears the tool-length offset; the UI asks first.             |
-| Spindle start / speed   | `M3 S10000`                                      | `ok`, spindle on at that target. A running spindle without motion accepts a new speed (**Apply**). |
-| Spindle stop            | `M5`                                             | `ok`, spindle off                                                                                  |
-| Work light              | `M821` / `M822`                                  | `ok`, diagnose G light flag                                                                        |
-| Beep                    | `M861` / `M862`                                  | `ok`, diagnose G beep flag                                                                         |
-| Vacuum                  | `M851 S100` / `M852`                             | `ok`, diagnose G external-output flag                                                              |
-| Follow spindle          | `M331` / `M332`                                  | `ok`, status S vacuum mode                                                                         |
-| Feed / spindle override | `M220 S…` / `M223 S…`                            | `ok`, status F / S override                                                                        |
-| Pause / resume          | `suspend` / `resume`                             | status Pause / Run or Idle                                                                         |
-| Tool installed          | `M490.2` (manual tool change only)               | status leaves Tool. On ATC machines M490.2 loosens the tool, so it is never offered there.         |
-| Stop                    | realtime `0x18` in an `0xa1` frame               | Alarm                                                                                              |
+| Control                 | Firmware request                                 | Proof                                                                                                                    |
+| ----------------------- | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
+| Jog                     | `$J X1 F0.1` (one axis; converted for inch mode) | Idle at start + distance (±0.005 mm)                                                                                     |
+| Home all                | `$H`                                             | `ok`, then Idle (Alarm before the acknowledgement is expected)                                                           |
+| Unlock (Alarm only)     | `$X`                                             | `[Caution: Unlocked]` and `ok`, then status leaves Alarm. Homing is advised afterwards.                                  |
+| Work zero               | `G10 L20 P0 X0` (selected axes)                  | `ok`, WPos of those axes ≈ 0. Z also clears the tool-length offset; the UI asks first.                                   |
+| Spindle start / speed   | `M3 S10000`                                      | `ok`, spindle on at that target. A running spindle without motion accepts a new speed (**Apply**).                       |
+| Spindle stop            | `M5`                                             | `ok`, spindle off                                                                                                        |
+| Work light              | `M821` / `M822`                                  | `ok`, diagnose G light flag                                                                                              |
+| Beep                    | `M861` / `M862`                                  | `ok`, diagnose G beep flag                                                                                               |
+| Vacuum                  | `M851 S100` / `M852`                             | `ok`, diagnose G external-output flag                                                                                    |
+| Follow spindle          | `M331` / `M332`                                  | `ok`, status S vacuum mode                                                                                               |
+| Feed / spindle override | `M220 S…` / `M223 S…`                            | `ok`, status F / S override                                                                                              |
+| Pause / resume          | `suspend` / `resume`                             | status Pause / Run or Idle                                                                                               |
+| Tool installed          | `M490.2` (manual tool change only)               | status leaves Tool. On ATC machines M490.2 loosens the tool, so it is never offered there.                               |
+| Stop                    | realtime `0x18` in an `0xa1` frame               | Alarm                                                                                                                    |
+| Write anchors           | `config-set sd <key> <value>` for each key       | `sd: <key> has been set to <value>`, then every key read back ([stored anchors](stored-anchors.md#changing-the-anchors)) |
 
 A rejection line fails the command. An unverified command reports that its outcome is unknown and never retries; unverified motion (jog, home, spindle) also closes the connection so the machine can be checked. A late acknowledgement of an unverified command is swallowed for two seconds.
 

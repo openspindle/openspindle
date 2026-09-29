@@ -3,6 +3,8 @@ import type { Tool } from "@/domain/tools/tool"
 import type { Stock } from "@/domain/stock/stock"
 import { createOperation } from "@/domain/operations/operation"
 import { kitForSetup } from "@/domain/fixtures/catalog"
+import type { ProgramTool } from "@/domain/nc/cam-markers"
+import { programTools } from "@/domain/nc/tool-comments"
 import { fitsWorkArea } from "@/domain/plate/placement"
 import { createPlate, createPlateSetup, notice } from "@/domain/plate/plate"
 import type { Plate, PlateSetup } from "@/domain/plate/plate"
@@ -10,7 +12,7 @@ import { fail, newId, ok, plural } from "@/domain/primitives"
 import type { Result } from "@/domain/primitives"
 import {
   bindTools,
-  libraryPreferences,
+  describedPreferences,
   localTools,
 } from "@/domain/tools/tool-table"
 import {
@@ -33,6 +35,17 @@ export type PlatePlacement = Pick<
 
 export type ImportContext = {
   readonly tools: readonly Tool[]
+  /**
+   * Whether a tool number the program does not describe takes the library tool with that
+   * post-processor number; tools it describes take the one the description fits either way.
+   * Fusion 360's numbers do not identify cutters in the library.
+   */
+  readonly numberedTools?: boolean
+  /**
+   * What the whole program says of its tools, for a part split off it: the header of a post
+   * describes the tools its later parts use.
+   */
+  readonly describedTools?: ReadonlyMap<number, ProgramTool>
   /** Base for stock described by CAM markers; files without markers get none. */
   readonly stock: Stock
   readonly placement?: PlatePlacement
@@ -72,18 +85,24 @@ export function newPlate(
   )
 }
 
-/** A plate holding one file operation, named after the file, bound to the plate's tool table. */
+/**
+ * A plate holding one file operation, named after the file, bound to the plate's tool table:
+ * each of the program's tool numbers holds the library tool the program describes for it
+ * (`describedPreferences`), as its CAM wrote it.
+ */
 function filePlate(
   name: string,
   nc: string,
   setup: PlateSetup,
-  library: readonly Tool[]
+  library: readonly Tool[],
+  numbered = true,
+  described = programTools(nc, kitForSetup(setup).camMarkers)
 ): Plate {
   const operation = createOperation(name, { kind: "file", nc, park: true })
   const plate = createPlate(setup, [operation])
   const locals = localTools(nc)
   return bindTools(plate, operation, locals, {
-    preferred: libraryPreferences(locals, library),
+    preferred: describedPreferences(locals, library, described, numbered),
     library,
   }).plate
 }
@@ -110,7 +129,14 @@ export function importProgram(
     // What was set up on the empty plate wins over the stock the program describes.
     if (context.setup)
       return ok(
-        filePlate(fileName, text, structuredClone(context.setup), context.tools)
+        filePlate(
+          fileName,
+          text,
+          structuredClone(context.setup),
+          context.tools,
+          context.numberedTools,
+          context.describedTools
+        )
       )
     // The stock its CAM's markers describe; one its machine's work area cannot hold stays
     // unspecified.
@@ -128,7 +154,16 @@ export function importProgram(
       stockSource: stock ? "source" : "unspecified",
       ...context.placement,
     })
-    return ok(filePlate(fileName, text, setup, context.tools))
+    return ok(
+      filePlate(
+        fileName,
+        text,
+        setup,
+        context.tools,
+        context.numberedTools,
+        context.describedTools
+      )
+    )
   }
   if (envelope.version > PLATE_ENVELOPE_VERSION)
     return fail("It was exported by a newer version of OpenSpindle.")

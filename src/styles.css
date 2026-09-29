@@ -25,6 +25,7 @@
     @apply bg-background text-foreground;
   }
   html {
-    @apply font-sans;
+    /* Grayscale smoothing, as macOS draws text: Chromium's default draws it heavier. */
+    @apply font-sans antialiased;
   }
 }

@@ -160,7 +160,6 @@ export function AssistFields({ setup, disabled, onChange }: SetupFieldsProps) {
     <FieldSet aria-label="Plate assists">
       <FieldLegend className="flex w-full items-baseline justify-between">
         <span>Assists</span>
-        <span>On Run</span>
       </FieldLegend>
       <FieldGroup className="gap-3">
         {ASSIST_KEYS.map((key) => (

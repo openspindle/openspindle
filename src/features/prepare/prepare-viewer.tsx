@@ -6,11 +6,14 @@ import type {
   ArrangeView,
 } from "@/components/workspace/bed-viewer"
 import { problemMarkerId } from "@/components/workspace/bed-viewer-layout"
+import type { LineRange } from "@/components/workspace/bed-viewer-layout"
 import { useKeyedDiagnostics } from "@/app/workspace/use-plate-diagnostics"
 import {
   useCompiledPlate,
   useSelectedPlate,
+  useWorkspace,
 } from "@/app/workspace/workspace-context"
+import { compilePlate } from "@/domain/compile/compile"
 import { diagnosticOperation } from "@/domain/diagnostics"
 import type { Diagnostic, KeyedDiagnostic } from "@/domain/diagnostics"
 import {
@@ -36,6 +39,7 @@ import { useArrangeEvents } from "./arrange/use-arrange-events"
 import { useArrangeShortcuts } from "./arrange/use-arrange-shortcuts"
 import { usePrepareSelection } from "./plate-tree/use-prepare-selection"
 import { selectedSections, useSectionSelection } from "./selection"
+import { useHiddenOperations } from "./visibility"
 import { PrepareToolbar } from "./prepare-toolbar"
 import { useShowProblem } from "./show-problem"
 
@@ -78,6 +82,24 @@ function useHighlightedLines(shown: Diagnostic | null) {
   }, [plate, compiled, selection, operationId, shown])
 }
 
+/** The program lines of hidden operations, by plate: what the Prepare view leaves out. */
+function useHiddenLines(): Readonly<Record<string, LineRange[]>> {
+  const hidden = useHiddenOperations()
+  const plates = useWorkspace((state) => state.plates)
+  return useMemo(
+    () =>
+      Object.fromEntries(
+        plates.map((plate) => [
+          plate.id,
+          compilePlate(plate)
+            .spans.filter((span) => hidden.has(span.operationId))
+            .map((span) => ({ start: span.startLine, end: span.endLine })),
+        ])
+      ),
+    [hidden, plates]
+  )
+}
+
 /**
  * Every plate on the bed; the selected plate's operation or sections are highlighted. Its
  * setup items can be selected, and moved with the move tool. Problems with a place on a bed are
@@ -91,6 +113,7 @@ export function PrepareViewer() {
   const focus = useProblemFocus()
   const shown = useShownProblem()
   const highlighted = useHighlightedLines(shown?.diagnostic ?? null)
+  const hidden = useHiddenLines()
   const marked = useWorkspaceProblems()
   const results = useDesignRuleResults()
   const showProblem = useShowProblem()
@@ -134,6 +157,7 @@ export function PrepareViewer() {
         selectedPlateId={plate?.id ?? null}
         onSelectPlate={selection.selectPlate}
         selectedLineRanges={highlighted}
+        hiddenLineRanges={hidden}
         progress={100}
         showRapids={false}
         showStock

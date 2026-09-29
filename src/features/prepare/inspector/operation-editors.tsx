@@ -1,5 +1,5 @@
 import { useId, useMemo } from "react"
-import { FileCode2, Puzzle } from "lucide-react"
+import { FileCode2, Puzzle, RefreshCw } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import {
@@ -19,12 +19,13 @@ import {
   plateWorkArea,
 } from "@/domain/compile/toolpath-bounds"
 import type { OperationOf } from "@/domain/operations/kinds"
-import type { OperationSource } from "@/domain/operations/operation"
+import type { NcOrigin, OperationSource } from "@/domain/operations/operation"
 import type { Plate } from "@/domain/plate/plate"
 import { localTools } from "@/domain/tools/tool-table"
 import { AutoLevelSettings } from "@/features/auto-level/auto-level-settings"
 import { AutoScanSettings } from "@/features/auto-scan/auto-scan-settings"
 import { AutoZHeightSettings } from "@/features/auto-z-height/auto-z-height-settings"
+import { useFusionUpdate } from "@/features/fusion360/use-fusion-update"
 import { Probe3dSettings } from "@/features/probe-3d/probe-3d-settings"
 import type { WorkAreaFit } from "@/features/probing/probing-form"
 import { PluginFrame } from "@/features/plugins/plugin-frame"
@@ -32,6 +33,7 @@ import { TemplateForm } from "@/features/plugins/template-form"
 import { useTemplateUpdate } from "@/features/plugins/use-template-update"
 import { openDialog } from "@/features/shell/dialogs"
 import { anchorDisplayName, bedAnchors } from "@/domain/anchors/stored-anchors"
+import { isPluginUsable } from "@/platform/contract/plugin-rpc"
 import type { PluginSummary } from "@/platform/contract/plugin-rpc"
 import { useInstalledPlugins } from "@/platform/plugins"
 import { usePrepareSelection } from "../plate-tree/use-prepare-selection"
@@ -56,8 +58,35 @@ function useSourceUpdate(plate: Plate, operationId: string, revision: number) {
   }
 }
 
+/** Where a Fusion 360 operation came from: "Bracket v3 › NCProgram1 › Face1". */
+const originText = ({ documentName, programName, part }: NcOrigin) =>
+  [documentName, programName, part?.name]
+    .filter((name) => name !== undefined)
+    .join(" › ")
+
+/** Posts the operation's Fusion 360 NC program again and updates the operation from it. */
+function UpdateFromFusion({
+  plate,
+  operationId,
+}: {
+  plate: Plate
+  operationId: string
+}) {
+  const update = useFusionUpdate()
+  return (
+    <Button
+      variant="outline"
+      disabled={update.isPending}
+      onClick={() => update.mutate({ plateId: plate.id, operationId })}
+    >
+      <RefreshCw />
+      {update.isPending ? "Updating…" : "Update from Fusion 360"}
+    </Button>
+  )
+}
+
 function FileEditor({ plate, operation }: EditorProps<"file">) {
-  const { nc, park } = operation.source
+  const { nc, park, origin } = operation.source
   const id = useId()
   const update = useSourceUpdate(plate, operation.id, operation.revision)
   const lines = useMemo(() => nc.split(/\r\n?|\n/).length, [nc])
@@ -74,20 +103,29 @@ function FileEditor({ plate, operation }: EditorProps<"file">) {
         <FieldDescription className="font-numeric">
           {lines} lines · {tools} tools
         </FieldDescription>
-        <Button
-          variant="outline"
-          className="self-start"
-          onClick={() =>
-            openDialog({
-              kind: "source",
-              plateId: plate.id,
-              operationId: operation.id,
-            })
-          }
-        >
-          <FileCode2 />
-          View source
-        </Button>
+        {origin && (
+          <FieldDescription>
+            From Fusion 360: {originText(origin)}
+          </FieldDescription>
+        )}
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            onClick={() =>
+              openDialog({
+                kind: "source",
+                plateId: plate.id,
+                operationId: operation.id,
+              })
+            }
+          >
+            <FileCode2 />
+            View source
+          </Button>
+          {origin && (
+            <UpdateFromFusion plate={plate} operationId={operation.id} />
+          )}
+        </div>
       </div>
       {parkCodes !== null && (
         <Field orientation="horizontal">
@@ -111,6 +149,14 @@ function FileEditor({ plate, operation }: EditorProps<"file">) {
   )
 }
 
+/** What the editor says of the plugin, beside the version that generated the operation. */
+function templateNote(plugin: PluginSummary, version: string): string | null {
+  if (plugin.incompatible) return plugin.incompatible
+  if (plugin.version !== version)
+    return `version ${plugin.version} is installed; apply to update.`
+  return null
+}
+
 function TemplateEditor({ plate, operation }: EditorProps<"template">) {
   const { pluginId, programId, values, version } = operation.source
   const plugins = useInstalledPlugins().data
@@ -125,12 +171,12 @@ function TemplateEditor({ plate, operation }: EditorProps<"template">) {
         kept and still runs.
       </FieldDescription>
     )
+  const note = templateNote(plugin, version)
   return (
     <div className="flex flex-col gap-3">
       <FieldDescription>
         {plugin.manifest.name} {version}
-        {plugin.version !== version &&
-          ` · version ${plugin.version} is installed; apply to update.`}
+        {note && ` · ${note}`}
       </FieldDescription>
       <TemplateForm
         // Reset only when the saved values change (Apply, an update, undo): a rename or
@@ -139,7 +185,7 @@ function TemplateEditor({ plate, operation }: EditorProps<"template">) {
         program={program}
         values={values}
         submitLabel="Apply"
-        disabled={!plugin.enabled}
+        disabled={!isPluginUsable(plugin)}
         onSubmit={(next) =>
           // The mutation reports failures itself.
           update
@@ -158,6 +204,8 @@ function unavailableEditor(
 ): string {
   if (!plugin)
     return `${pluginId} is not installed. The operation keeps its data and NC; install the plugin to edit it.`
+  if (plugin.incompatible)
+    return `${plugin.manifest.name} cannot run: ${plugin.incompatible} The operation keeps its data and NC.`
   if (!plugin.enabled)
     return `${plugin.manifest.name} is disabled. Enable it to edit this operation.`
   return `${plugin.manifest.name} has no editor for its operations.`
@@ -173,7 +221,7 @@ function PluginEditor({ plate, operation }: EditorProps<"plugin">) {
   const editor = plugin?.manifest.ui?.views.find(
     (view) => view.slot === "operation.editor"
   )
-  if (!plugin?.enabled || !editor)
+  if (!plugin || !isPluginUsable(plugin) || !editor)
     return (
       <div className="flex flex-col gap-3">
         <FieldDescription>

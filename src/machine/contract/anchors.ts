@@ -39,6 +39,34 @@ export const AnchorConfigurationSchema = z.object({
 })
 export type AnchorConfiguration = z.infer<typeof AnchorConfigurationSchema>
 
+/**
+ * Where the machine's anchors are to be stored: every anchor it stores, by id, in machine XY
+ * millimetres.
+ */
+export const WriteAnchorsRequestSchema = z.strictObject({
+  anchors: z
+    .array(MachineAnchorSchema.pick({ id: true, x: true, y: true }).strict())
+    .min(1)
+    .max(32)
+    .refine(
+      (anchors) =>
+        new Set(anchors.map((anchor) => anchor.id)).size === anchors.length,
+      "Each anchor needs its own id."
+    ),
+})
+export type WriteAnchorsRequest = z.infer<typeof WriteAnchorsRequestSchema>
+export type AnchorPosition = WriteAnchorsRequest["anchors"][number]
+
+/**
+ * The anchors a write stored, as the machine reads them back, and whether its own moves use
+ * them only once it restarts.
+ */
+export const WriteAnchorsResultSchema = z.object({
+  anchors: AnchorConfigurationSchema,
+  afterRestart: z.boolean(),
+})
+export type WriteAnchorsResult = z.infer<typeof WriteAnchorsResultSchema>
+
 export const isAnchorConfiguration = (
   value: unknown
 ): value is AnchorConfiguration =>

@@ -41,7 +41,7 @@ const validBlock = (block: NcBlock) => !block.problem
 const toolChangeName = (tool: number | null) =>
   tool === null ? "Tool change" : `Change to T${tool}`
 
-const AXIS_LETTERS = ["X", "Y", "Z", "A", "B", "C", "I", "J", "R"]
+const AXIS_LETTERS = ["X", "Y", "Z", "A", "B", "C", "I", "J", "K", "R"]
 
 /**
  * A machine-coordinate move of Z alone (`G53 G0 Z…`), such as the clearance retract compiling
@@ -56,20 +56,21 @@ export const machineRetract = (block: Pick<NcBlock, "words">) =>
 /** What sections read of a machine's NC through its kit: its probing and its CAM's markers. */
 export type SectionMachine = Pick<FixtureKit, "probe" | "camMarkers">
 
+/** What a comment on a line of its own says; null for a line that is not one. */
+const commentText = (line: string) =>
+  /^\s*;\s*(.*?)\s*$/.exec(line)?.[1] ??
+  /^\s*\(\s*(.*?)\s*\)\s*$/.exec(line)?.[1] ??
+  null
+
+/** Comments about the program or its tools rather than headings of its toolpaths. */
+const NOT_HEADINGS =
+  /(?:thumbnail|preview|verified|warning|stock|created|material setup|manual nc|tool change|collet|paused|feedrate|diameter)/i
+
 /** Conservative CAM headings, not arbitrary comments, tool descriptions or thumbnails. */
 function commentHeading(line: string): Heading | null {
   if (line.length > 200) return null
-  const text = camLabel(
-    /^\s*;\s*(.*?)\s*$/.exec(line)?.[1] ??
-      /^\s*\(\s*(.*?)\s*\)\s*$/.exec(line)?.[1]
-  )
-  if (
-    !text ||
-    /(?:thumbnail|preview|verified|warning|stock|created|material setup|manual nc|tool change|collet|paused|feedrate|diameter)/i.test(
-      text
-    )
-  )
-    return null
+  const text = camLabel(commentText(line) ?? undefined)
+  if (!text || NOT_HEADINGS.test(text)) return null
   const explicit =
     /^(?:begin\s+)?(?:operation|toolpath|strategy)\s*[:=]\s*(.+)$/i.exec(text)
   if (explicit) return { name: explicit[1].trim() }
@@ -82,10 +83,52 @@ function commentHeading(line: string): Heading | null {
   return null
 }
 
+/** A tool's description in a comment: "T1  Spiral O Metal 3.175*12mm". */
+const describesTool = (line: string) => /^T\d/i.test(commentText(line) ?? "")
+
+/**
+ * A heading by where it stands, as Fusion 360's posts start each operation with its name,
+ * whatever the name is: a comment on a line of its own, not among other comments, with the
+ * operation's code after it (or the description of the tool it changes to first). After a
+ * blank line; after other code only when the operation's tool change follows, as a comment
+ * between two blocks is more often an instruction, such as a tool to remove. It names
+ * something: not a tool's description, a marker, a separator or the program itself, which the
+ * first line names.
+ */
+function standingHeading(
+  lines: readonly string[],
+  blocks: readonly NcBlock[],
+  index: number
+): Heading | null {
+  if (index === 0 || lines[index].length > 200) return null
+  const text = camLabel(commentText(lines[index]) ?? undefined)
+  if (
+    !text ||
+    text.length > 80 ||
+    !/[a-z]/i.test(text) ||
+    /^(?:T\d|@)/i.test(text) ||
+    NOT_HEADINGS.test(text)
+  )
+    return null
+  const previous = lines[index - 1]
+  if (commentText(previous) !== null) return null
+  let next = index + 1
+  while (
+    next < lines.length &&
+    (!lines[next].trim() || describesTool(lines[next]))
+  )
+    next++
+  if (next >= lines.length || commentText(lines[next]) !== null) return null
+  const changesTool = blocks[next].words.some(
+    (word) => word.letter === "M" && word.value === 6
+  )
+  return previous.trim() && !changesTool ? null : { name: text }
+}
+
 /**
  * Ordered sections of a program (or of one line range of it). The toolpath markers of the
- * machine's CAM have priority; named CAM comments and actual M6 blocks provide fallback
- * boundaries. The machine's probe names its grids and touch-offs. Rapids stay with their path
+ * machine's CAM have priority; named CAM comments, headings standing as Fusion 360's posts
+ * write them, and actual M6 blocks provide fallback boundaries. The machine's probe names its grids and touch-offs. Rapids stay with their path
  * except preparation moves immediately before a tool change. No section is inferred from
  * individual retracts, layers or feed changes.
  *
@@ -246,7 +289,7 @@ export function buildProgramSections(
     if (toolpaths) {
       const name = toolpaths.get(index)
       if (name !== undefined) named = { name }
-    } else named = commentHeading(text)
+    } else named = commentHeading(text) ?? standingHeading(lines, blocks, index)
     if (named) {
       closeTouchOff()
       flush(line - 1)

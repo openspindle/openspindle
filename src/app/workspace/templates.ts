@@ -3,6 +3,7 @@ import type {
   ProcessProgram,
 } from "@openspindle/plugin-core"
 import type { Tool } from "@/domain/tools/tool"
+import { isPluginUsable } from "@/platform/contract/plugin-rpc"
 import type { PluginSummary } from "@/platform/contract/plugin-rpc"
 import type { PluginHost } from "@/platform/host"
 import { createOperation } from "@/domain/operations/operation"
@@ -25,12 +26,12 @@ export type TemplateEntry = {
   readonly program: ProcessProgram
 }
 
-/** Template programs of enabled plugins. */
+/** Template programs of enabled plugins that can run. */
 export function templatePrograms(
   plugins: readonly PluginSummary[]
 ): TemplateEntry[] {
   return plugins
-    .filter((plugin) => plugin.enabled)
+    .filter(isPluginUsable)
     .flatMap((plugin) =>
       plugin.manifest.programs.map((program) => ({ plugin, program }))
     )

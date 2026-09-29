@@ -83,9 +83,10 @@ export type NcParking = {
 
 class UnitError extends Error {}
 
-// Deliberately limited to straight-line, three-axis NC supported by the preview.
-// Offsets, compensation, canned cycles, macros and subprograms need a real postprocessor.
-const G_CODES = new Set([0, 1, 2, 3, 4, 17, 20, 21, 54, 90, 91, 94])
+// Deliberately limited to three-axis lines and arcs, in any plane, as the preview draws them.
+// Offsets, compensation, canned cycles, macros and subprograms need a real postprocessor. Every
+// operation starts in G17 again (`boundary` in compile.ts), so a plane it selects ends with it.
+const G_CODES = new Set([0, 1, 2, 3, 4, 17, 18, 19, 20, 21, 54, 90, 91, 94])
 const M_CODES = new Set([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 30])
 const LETTERS = new Set([
   "G",
@@ -95,6 +96,7 @@ const LETTERS = new Set([
   "Z",
   "I",
   "J",
+  "K",
   "R",
   "F",
   "S",
@@ -103,7 +105,7 @@ const LETTERS = new Set([
   "P",
 ])
 /** Words that move the machine or place it by an axis. */
-const AXIS_LETTERS = ["X", "Y", "Z", "I", "J", "R"]
+const AXIS_LETTERS = ["X", "Y", "Z", "I", "J", "K", "R"]
 /** A plain word: a letter and a number, with nothing but spaces between them. */
 const PLAIN_WORD = /^[A-Z]\s*[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/i
 export const isEndWord = (word: Pick<NcWord, "letter" | "value">) =>
@@ -361,4 +363,25 @@ export function readNcUnit(
     }
     return { original, words, delimiter: null }
   }
+}
+
+/**
+ * Why combining operations refuses a block, as a plain operation would write it once it has
+ * selected its tool, spindle speed and feed; null when it takes the block. The G-code glossary
+ * tells by it which codes combine.
+ */
+export function combineRefusal(
+  block: string,
+  grammar: NcGrammar
+): string | null {
+  const nc = [
+    "G21 G90 G17",
+    "T1 M6",
+    "S10000 M3",
+    "G0 X0 Y0 Z5",
+    "G1 Z5 F500",
+    block,
+  ].join("\n")
+  const unit = readNcUnit(nc, PLAIN_NC, true, grammar)
+  return unit.ok ? null : unit.error.message
 }

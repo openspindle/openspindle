@@ -61,8 +61,8 @@ export function WorkspaceSettingsDialog({ onClose }: { onClose: () => void }) {
             <header className="flex shrink-0 flex-col gap-1 p-4 pr-10">
               <h2 className="font-heading text-sm font-medium">Design rules</h2>
               <DialogDescription>
-                What Check design rules checks a plate&apos;s program against.
-                They are saved with the project.
+                What a plate&apos;s program is checked against, in Prepare and
+                before Run. They are saved with the project.
               </DialogDescription>
             </header>
             <DesignRulesSettings onClose={onClose} />

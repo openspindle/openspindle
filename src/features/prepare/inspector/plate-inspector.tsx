@@ -28,7 +28,7 @@ function PlateNotices({ plate }: { plate: Plate }) {
           <AlertDescription>{notice.message}</AlertDescription>
           <AlertAction>
             <Button
-              variant="ghost"
+              variant="secondary"
               size="icon-xs"
               aria-label="Dismiss notice"
               onClick={() =>

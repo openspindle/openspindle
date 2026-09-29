@@ -13,6 +13,8 @@ import { Z1LBracketThick, Z1LBracketThin } from "./l-bracket"
 import { MAKERA_CAM } from "./makera-cam"
 import { Z1MdfBed } from "./mdf-bed"
 import { Z1MdfWasteboard } from "./mdf-wasteboard"
+import { Z1_GLOSSARY } from "./nc-glossary"
+import { Z1_PROGRAM_RULES } from "./program-rules"
 import { isZ1Park, readZ1Block } from "./nc-grammar"
 import { Z1TopClamp } from "./top-clamp"
 import { MakeraWiredProbe } from "./wired-probe"
@@ -63,6 +65,8 @@ export class MakeraZ1 extends FixtureKit {
   readonly clearanceRetract = `G53 G0 Z${formatMillimetres(CLEARANCE_Z)}`
   /** Makera CAM's toolpath and stock markers (`;@MKR|…`). */
   readonly camMarkers = MAKERA_CAM
+  readonly glossary = Z1_GLOSSARY
+  readonly programRules = Z1_PROGRAM_RULES
 
   /**
    * The firmware reads `G10 L2`'s X and Y in the current units, and its `P0` is the current work

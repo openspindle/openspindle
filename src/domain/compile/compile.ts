@@ -368,3 +368,56 @@ export function compilePlate(plate: Plate): CompiledPlate {
   cache.set(plate, compiled)
   return compiled
 }
+
+/**
+ * One operation's own NC as a program of its own, as its source is read: what it contributes,
+ * with its own tool numbers and without what combining adds, sectioned and paused as a compiled
+ * plate is. An operation whose NC does not resolve is an empty program with that diagnostic.
+ */
+export function compileOperation(
+  plate: Plate,
+  operation: Operation
+): CompiledPlate {
+  const kit = kitForPlate(plate)
+  const resolved = kindOf(operation).resolve(operation, plate, kit)
+  if (!resolved.ok)
+    return {
+      mode: "empty",
+      program: parseGCode("", operation.name),
+      spans: [],
+      sections: [],
+      pausePoints: [],
+      diagnostics: [resolved.error],
+    }
+  const { nc, reviewLines } = resolved.value
+  const program = parseGCode(nc, operation.name)
+  const sections = buildProgramSections(program, kit).map(
+    (section): CompiledSection => ({
+      ...section,
+      id: `${operation.id}/${section.key}`,
+      operationId: operation.id,
+    })
+  )
+  const reviews = new Set(reviewLines)
+  return {
+    mode: "verbatim",
+    program,
+    spans: [
+      {
+        operationId: operation.id,
+        startLine: 1,
+        endLine: program.lineCount,
+        bodyStartLine: 1,
+      },
+    ],
+    sections,
+    pausePoints: sections
+      .filter((section) => section.kind === "pause")
+      .map((section) => ({
+        line: section.startLine,
+        operationId: operation.id,
+        reason: reviews.has(section.startLine) ? "review" : "program",
+      })),
+    diagnostics: [],
+  }
+}

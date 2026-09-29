@@ -12,15 +12,15 @@ OpenSpindle is a desktop app for preparing, checking and running jobs on a Maker
 - Plates on a 3D model of the Z1's bed, each with its stock, fixtures, work origin and tool table
 - Fixtures: the MDF bed, L-brackets, top clamps, dowel pins and 4th axis, or your own STEP and GLB models
 - Placement relative to the machine's stored anchors, with move, snap and lock in the 3D view
-- Import of `.nc`, `.cnc`, `.gcode`, `.tap` and `.ngc` programs from your CAM
-- Discover NC programs in Fusion 360 and import them directly through the installable Python add-in
+- Import of `.nc`, `.cnc`, `.gcode`, `.tap` and `.ngc` programs from your CAM or from Finder, split into operations by tool or toolpath
+- Discover NC programs in Fusion 360, import them directly through the installable Python add-in, and update imported operations from them
 - Auto-level, auto Z-height and auto-scan with the Makera wired probe
 - 3D probing with the Makera 3D Probe: the work origin at an outside or inside corner, or the center of a pocket or boss, on the stock or on a bracket or anything else on the bed
-- Design-rule checks, and problems marked where they are in the 3D view
+- Design rules that catch what the Z1 would not run as written, with fixes, checked before Run and marked where they are in the 3D view
 - Playback of the program as the firmware runs it, at its feeds, with depth and width of cut
-- The G-code exactly as the machine receives it
+- The G-code exactly as the machine receives it, and a glossary of the Z1's codes (**Help › G-code Glossary**)
 - A run checklist, upload read-back and large programs sent in parts
-- Machine controls, the machine's camera and its height map
+- Machine controls, the machine's camera, its height map and its stored anchors
 - A tool library with Fusion 360 import and Makera, Genmitsu, SpeTool, Dreanique and FoxAlien catalogs
 - STEP-NC project files, and NC export with the plate's setup
 - Sandboxed plugins, and the PCB plugin for KiCad Gerber and Excellon files, which runs the pcb2gcode you install
@@ -36,8 +36,8 @@ Download `OpenSpindle-<version>-universal.dmg` from the [latest release](../../r
 ## Quick start
 
 1. **Connect:** click the device card in **Prepare** and choose your Z1, or enter its IP address.
-2. **Import:** choose **File › Import…** to select your CAM's NC file in the native file window, or **File › Import from Fusion 360** to discover and import an NC program from Fusion. Dropping NC files anywhere in the workspace creates new plates.
-3. **Set up:** place the stock, set the work origin and assign tools in the plate's settings.
+2. **Import:** drop your CAM's NC files on the window, open them with OpenSpindle from Finder, or choose **File › Import…** or **File › Import from Fusion 360**. When a program splits into operations, or holds what the Z1 would not run as written, OpenSpindle asks first: which plate it goes to, how to split it and how to fix it.
+3. **Set up:** place the stock, set the work origin and assign the tools that were not matched from your library.
 4. **Check:** play the program back on the **Job** tab.
 5. **Run:** once the run checklist passes. **Machine › Stop** (⌘.) stops at any time.
 
@@ -51,8 +51,9 @@ Machine behaviour follows the source of [Makera's Z1 firmware](https://github.co
 - Stop ending in Alarm
 - programs sent in parts
 - the auto-level, auto Z-height, auto-scan and 3D probing programs
+- writing the stored anchors from the Device page
 
-Importing, previewing and saving never send anything to the machine, and Run lives only on the Job tab. Controls the machine's state does not allow are refused, and a command whose outcome is unknown is never retried. No plugin can move the machine or run a program. Stop does not replace the machine's emergency stop.
+Importing, previewing and saving never send anything to the machine, and Run lives only on the Job tab. Controls the machine's state does not allow are refused, and a command whose outcome is unknown is never retried. No plugin can move the machine, change its settings or run a program. Stop does not replace the machine's emergency stop.
 
 If something behaves differently, **Help › Export Protocol Trace…** saves the recent exchange with the machine. Please open an issue with what you saw and the trace.
 
@@ -60,7 +61,7 @@ If something behaves differently, **Help › Export Protocol Trace…** saves th
 
 - [Auto-level](docs/auto-level.md), [auto Z-height](docs/auto-z-height.md), [auto-scan](docs/auto-scan.md) and [3D probing](docs/3d-probing.md)
 - [PCB operations](docs/pcb.md) from KiCad Gerber and Excellon files, and setting up pcb2gcode
-- [Fusion 360](docs/fusion360.md): install the add-in, connect and import NC programs
+- [Fusion 360](docs/fusion360.md): install the add-in, connect, and import and update NC programs
 - [Stored anchors](docs/stored-anchors.md), [models](docs/models.md) and [design rules](docs/design-rules.md)
 - [Device controls](docs/device-controls.md), [running programs](docs/device-jobs.md) and [the height map](docs/device-height-map.md)
 - [Project files](docs/step-nc-projects.md) and [exported NC](docs/plate-definition.md)

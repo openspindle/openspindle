@@ -22,6 +22,19 @@ import {
  */
 const PATH_CONTROL_CODES: readonly number[] = [61, 61.1, 64]
 
+/** M400, which waits until the moves before it are done (Robot.cpp) and changes nothing else. */
+const WAIT_FOR_MOVES = 400
+
+/**
+ * Switches the firmware turns on and off without moving (its switch modules, configZ1.default):
+ * the extend-out port (M851, M852), which runs the external extractor, the work light (M821,
+ * M822) and the beeper (M861, M862). CAM programs switch them, each after an M400.
+ */
+const SWITCH_CODES: readonly number[] = [851, 852, 821, 822, 861, 862]
+
+/** The extend-out port's on code, which may set its PWM duty cycle in percent (S). */
+const EXTEND_OUT_ON = 851
+
 /** G28, which parks the Z1 rather than homing it. */
 const PARK = 28
 
@@ -56,8 +69,9 @@ export const isZ1Park = (words: readonly Pick<NcWord, "letter" | "value">[]) =>
 /**
  * The Z1's own blocks beyond plain three-axis machining, as combining operations reads them: the
  * park its programs may end with, the wired probe's routines, which only its probing operations
- * may run with T0 active, the 3D probe's, which only 3D probing may run with its tool active, and
- * path control, which its firmware ignores. Null for any other block.
+ * may run with T0 active, the 3D probe's, which only 3D probing may run with its tool active,
+ * path control, which its firmware ignores, waiting for moves to finish, and its switches. Null
+ * for any other block.
  */
 export function readZ1Block(
   words: readonly NcWord[],
@@ -82,7 +96,45 @@ export function readZ1Block(
     return probeTravel(words, gCodes, state)
   if (gCodes.some((word) => PATH_CONTROL_CODES.includes(word.value)))
     return pathControl(words, gCodes)
+  if (mCodes.some((word) => word.value === WAIT_FOR_MOVES))
+    return waitForMoves(words)
+  const switched = mCodes.find((word) => SWITCH_CODES.includes(word.value))
+  if (switched) return switchBlock(words, mCodes, switched)
   return null
+}
+
+/**
+ * A switch alone in its block: it moves nothing and changes nothing an operation reads. The
+ * extend-out port's M851 may carry a non-negative S, which the firmware caps at 100 percent.
+ */
+function switchBlock(
+  words: readonly NcWord[],
+  mCodes: readonly NcWord[],
+  code: NcWord
+): Reading {
+  const fields = words.filter(
+    (word) => word.letter !== "N" && word.letter !== "M"
+  )
+  const dutyCycle =
+    code.value === EXTEND_OUT_ON &&
+    fields.length === 1 &&
+    fields[0].letter === "S" &&
+    fields[0].value >= 0
+  if (mCodes.length !== 1 || (fields.length > 0 && !dutyCycle))
+    return fail(
+      code.value === EXTEND_OUT_ON
+        ? "M851 is supported only alone in its block, with an optional non-negative S."
+        : `M${code.value} is supported only alone in its block.`
+    )
+  return ok({})
+}
+
+/** M400 alone in its block: the moves before it finish, and nothing changes. */
+function waitForMoves(words: readonly NcWord[]): Reading {
+  const codes = words.filter((word) => word.letter !== "N")
+  if (codes.length !== 1)
+    return fail("M400 is supported only alone in its block.")
+  return ok({})
 }
 
 /** G28 parks only alone in its block, after the program's last move. */

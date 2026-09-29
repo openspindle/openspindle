@@ -96,7 +96,7 @@ function CatalogStatus({ library }: { library: ToolLibrary }) {
           <AlertDescription>{error}</AlertDescription>
           <AlertAction>
             <Button
-              variant="outline"
+              variant="secondary"
               size="sm"
               disabled={loading}
               onClick={retry}

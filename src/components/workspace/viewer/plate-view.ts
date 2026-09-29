@@ -129,6 +129,7 @@ const PRESENTATION_EQUALITY: FieldEquality<PlatePresentation> = {
   showStock: Object.is,
   showRapids: Object.is,
   ranges: sameRanges,
+  hidden: sameRanges,
   progress: Object.is,
   previewLine: Object.is,
   previewProbePoint: Object.is,

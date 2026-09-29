@@ -25,7 +25,13 @@ export type Admission =
 export type AdmissionRequest =
   | { readonly key: CommandKind; readonly command: MachineCommand }
   | {
-      readonly key: "run" | "readAnchors" | "readHeightMap" | "stop" | "reset"
+      readonly key:
+        | "run"
+        | "readAnchors"
+        | "writeAnchors"
+        | "readHeightMap"
+        | "stop"
+        | "reset"
     }
 
 export type AdmissionContext = {
@@ -41,6 +47,8 @@ export type AdmissionContext = {
   readonly rules: FirmwareRules
   /** Machine-state preconditions for reading stored anchors; null when the machine stores none. */
   readonly readAnchors: ((telemetry: Telemetry) => string | null) | null
+  /** Machine-state preconditions for changing them; null when they cannot be changed. */
+  readonly writeAnchors: ((telemetry: Telemetry) => string | null) | null
   /** The ranges the machine's manual controls accept. */
   readonly limits: ControlLimits
 }
@@ -73,17 +81,17 @@ const RULES: readonly Rule[] = [
   },
   function streaming(request, context, telemetry) {
     if (!context.streaming) return null
+    const running = isJobActive(context.job)
+      ? "Stop the running job before using this control."
+      : "The machine is running a program. Stop it before using this control."
     if (isCommand(request))
-      return JOB_CONCURRENT_COMMANDS.has(request.key)
-        ? null
-        : refuse(
-            isJobActive(context.job)
-              ? "Stop the running job before using this control."
-              : "The machine is running a program. Stop it before using this control."
-          )
+      return JOB_CONCURRENT_COMMANDS.has(request.key) ? null : refuse(running)
     switch (request.key) {
       case "run":
         return refuse("A program is already running.")
+      // A change to the machine's settings is not put off until later.
+      case "writeAnchors":
+        return refuse(running)
       case "readHeightMap":
         // A job waiting at a program pause may read the grid it just probed.
         if (context.rules.readHeightMap(telemetry, context.job) === null)
@@ -112,6 +120,8 @@ const RULES: readonly Rule[] = [
     else if (request.key === "run") reason = context.rules.run(telemetry)
     else if (request.key === "readAnchors")
       reason = context.readAnchors?.(telemetry) ?? null
+    else if (request.key === "writeAnchors")
+      reason = context.writeAnchors?.(telemetry) ?? null
     else reason = context.rules.readHeightMap(telemetry, context.job)
     return reason ? refuse(reason) : null
   },
@@ -124,6 +134,8 @@ export function admit(
   if (!context.connected) return refuse("Connect a device first.")
   if (request.key === "readAnchors" && !context.readAnchors)
     return refuse("This machine does not store anchors.")
+  if (request.key === "writeAnchors" && !context.writeAnchors)
+    return refuse("This machine's anchors cannot be changed.")
   // Stop needs nothing but a connection.
   if (request.key === "stop") return ALLOW
   // An outcome is unknown: nothing but Stop until a Stop is confirmed or the device is connected
@@ -227,6 +239,7 @@ function representative(
       return { key, command: { type: key } }
     case "run":
     case "readAnchors":
+    case "writeAnchors":
     case "readHeightMap":
     case "stop":
     case "reset":

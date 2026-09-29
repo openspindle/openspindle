@@ -7,6 +7,7 @@ import type {
   ViewDeclaration,
 } from "@openspindle/plugin-core"
 import { templatePrograms } from "@/app/workspace/templates"
+import { isPluginUsable } from "@/platform/contract/plugin-rpc"
 import type { PluginSummary } from "@/platform/contract/plugin-rpc"
 
 /** The icons toolbar items may name; plugins cannot bring images of their own. */
@@ -50,15 +51,13 @@ export function pluginSources(
       plugin,
       program,
     })),
-    ...plugins
-      .filter((plugin) => plugin.enabled)
-      .flatMap((plugin) =>
-        importerViews(plugin).map((view): PluginSource => ({
-          kind: "view",
-          plugin,
-          view,
-        }))
-      ),
+    ...plugins.filter(isPluginUsable).flatMap((plugin) =>
+      importerViews(plugin).map((view): PluginSource => ({
+        kind: "view",
+        plugin,
+        view,
+      }))
+    ),
   ]
 }
 

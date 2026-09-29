@@ -203,6 +203,11 @@ export function buildApplicationMenu(
       role: "help",
       submenu: [
         {
+          label: "G-code Glossary",
+          click: () => bus.emit("glossary.open"),
+        },
+        { type: "separator" },
+        {
           label: "Export Protocol Trace…",
           click: () => machine.exportTrace(),
         },

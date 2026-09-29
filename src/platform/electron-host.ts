@@ -64,6 +64,7 @@ export async function connectElectronHost(
       dismissJob: () => peer.call("machine.dismissJob", undefined),
       readAnchors: (signal) =>
         peer.call("machine.readAnchors", undefined, signal ? { signal } : {}),
+      writeAnchors: (request) => peer.call("machine.writeAnchors", request),
       readHeightMap: (signal) =>
         peer.call("machine.readHeightMap", undefined, signal ? { signal } : {}),
       watchCamera: (listener) =>
@@ -74,6 +75,8 @@ export async function connectElectronHost(
     files: {
       open: (kind) => peer.call("files.open", { kind }),
       save: (request) => peer.call("files.save", request),
+      subscribeOpened: (listener) =>
+        peer.subscribe("files.opened", undefined, listener),
     },
     fusion: {
       snapshot: () => peer.call("fusion.snapshot", undefined),

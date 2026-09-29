@@ -36,6 +36,23 @@ def _display_name(value, fallback):
     return re.sub(r"[\x00-\x1f\x7f-\x9f\ud800-\udfff]", " ", str(value)).strip()[:200] or fallback
 
 
+def _program_reference(document, program):
+    # What finds the program again in a later session, when OpenSpindle updates an operation
+    # imported from it: its document's lineage id (the same for all versions; None while the
+    # document was never saved) and the program's id, which saving and reloading keep.
+    document_id = None
+    try:
+        data_file = document.dataFile if document.isSaved else None
+        document_id = str(data_file.id)[:500] if data_file else None
+    except Exception:
+        document_id = None
+    try:
+        operation_id = int(program.operationId)
+    except Exception:
+        operation_id = None
+    return {"documentId": document_id, "operationId": operation_id}
+
+
 def _refresh_catalog(ensure_live):
     # All Autodesk object references stay on Fusion's main thread. Read only:
     # listing never activates documents or posts/generates any toolpaths.
@@ -80,7 +97,52 @@ def _refresh_catalog(ensure_live):
         "id": program_id,
         "name": _display_name(program.name, "NC program"),
         "documentName": _display_name(document.name, "Untitled"),
+        **_program_reference(document, program),
     } for program_id, (document, program) in found.items()]
+
+
+_SPLIT_PROPERTY = "splitFile"
+_SPLIT_OUTPUT = (
+    "The post wrote several files, such as one per tool or toolpath. In Fusion, set the "
+    "NC program's post property Split file to No splitting and try again: OpenSpindle "
+    "splits programs itself. Posts with separate subprogram files are not supported."
+)
+_SUBPROGRAM_CALL = re.compile(r"\b(?:M0*98|M198|G65)(?![\d.])", re.IGNORECASE)
+_MOTION = re.compile(r"(?:^|\s)(?:G0*[0-3](?![\d.])|[XYZ][+-]?[\d.])", re.IGNORECASE)
+
+
+def _without_splitting(program):
+    # Posts that can write a file per tool or toolpath (Makera's "Split file") post one file
+    # for OpenSpindle, which splits programs itself when importing them. Returns what restores
+    # the post's setting, or None when it has no such setting or it is off already.
+    try:
+        parameters = program.postParameters
+        parameter = parameters.itemByName(_SPLIT_PROPERTY) if parameters else None
+        if not parameter or parameter.value.value == "none":
+            return None
+        previous = parameter.value.value
+        parameter.value.value = "none"
+        if not program.updatePostParameters(parameters):
+            return None
+    except Exception:
+        return None
+
+    def restore():
+        again = program.postParameters
+        setting = again.itemByName(_SPLIT_PROPERTY)
+        setting.value.value = previous
+        if not program.updatePostParameters(again):
+            raise RuntimeError("Fusion refused the post setting back.")
+
+    return restore
+
+
+def _whole_program(contents):
+    # A program file of its own: moves in it, and no call to a subprogram in another file.
+    code = [re.sub(r"\([^)]*\)|;.*$", "", line) for line in contents.splitlines()]
+    return any(_MOTION.search(line) for line in code) and not any(
+        _SUBPROGRAM_CALL.search(line) for line in code
+    )
 
 
 def _post_snapshot(document, program, program_id, ensure_live):
@@ -122,6 +184,7 @@ def _post_snapshot(document, program, program_id, ensure_live):
     program_name = _display_name(program.name, "NC program")
     document_name = _display_name(document.name, "Untitled")
     overrides = []
+    restore_splitting = None
 
     with tempfile.TemporaryDirectory(prefix="openspindle-fusion-") as directory:
         values = [
@@ -145,6 +208,7 @@ def _post_snapshot(document, program, program_id, ensure_live):
             for parameter, value in values:
                 overrides.append((parameter, parameter.value.value))
                 parameter.value.value = value
+            restore_splitting = _without_splitting(program)
             options = adsk.cam.NCProgramPostProcessOptions.create()
             options.postProcessExecutionBehavior = (
                 adsk.cam.PostProcessExecutionBehaviors.PostProcessExecutionBehavior_Fail
@@ -155,6 +219,11 @@ def _post_snapshot(document, program, program_id, ensure_live):
                 raise ValueError("Fusion could not post this NC program.")
         finally:
             restore_errors = []
+            if restore_splitting is not None:
+                try:
+                    restore_splitting()
+                except Exception:
+                    restore_errors.append(_SPLIT_PROPERTY)
             for parameter, value in reversed(overrides):
                 try:
                     parameter.value.value = value
@@ -170,12 +239,22 @@ def _post_snapshot(document, program, program_id, ensure_live):
             path for path in Path(directory).rglob("*")
             if path.is_file() and path.suffix.lower() != ".log"
         ]
-        if len(files) != 1 or files[0].suffix.lower() not in NC_EXTENSIONS:
+        programs = [path for path in files if path.suffix.lower() in NC_EXTENSIONS]
+        if not programs:
             raise ValueError(
-                "The post must produce exactly one NC file. "
-                "Posts with separate subprogram files are not supported."
+                "The post wrote no NC file. Choose a post that outputs .nc, .cnc, .gcode, .tap, or .ngc files."
             )
-        path = files[0]
+        path = programs[0]
+        if len(programs) > 1:
+            # Split despite the setting: the whole program, if the post writes it at all, is
+            # the file named after the NC program; the others are its parts.
+            named = [
+                item for item in programs
+                if item.name.lower() == (stem + extension).lower()
+            ]
+            if not named:
+                raise ValueError(_SPLIT_OUTPUT)
+            path = named[0]
         if path.is_symlink() or not path.resolve().is_relative_to(Path(directory).resolve()):
             raise ValueError("The posted NC file must be inside the temporary export folder.")
         with path.open("rb") as output:
@@ -188,10 +267,14 @@ def _post_snapshot(document, program, program_id, ensure_live):
             raise ValueError("The post must produce UTF-8 or ASCII NC text.") from error
         if not contents.strip() or "\x00" in contents:
             raise ValueError("The posted NC program is empty or contains NUL bytes.")
+        # Other files beside it are its parts or subprograms: it must hold the whole program.
+        if len(files) > 1 and not _whole_program(contents):
+            raise ValueError(_SPLIT_OUTPUT)
         return {
             "id": program_id,
             "name": program_name,
             "documentName": document_name,
+            **_program_reference(document, program),
             "fileName": stem + path.suffix.lower(),
             "contents": contents,
         }
@@ -207,7 +290,7 @@ def _handle_request(action, program_id, ensure_live):
     if ui.activeCommand == _CONNECTION_ID:
         ui.commandDefinitions.itemById("SelectCommand").execute()
     if ui.activeCommand != "SelectCommand":
-        raise BridgeError(409, "Finish or cancel the active command in Fusion, then import again.")
+        raise BridgeError(409, "Finish or cancel the active command in Fusion, then try again.")
     _refresh_catalog(ensure_live)
     entry = _catalog.get(program_id)
     if entry is None:
@@ -222,7 +305,7 @@ def _handle_request(action, program_id, ensure_live):
         if app.activeDocument != document or not document.isValid or not program.isValid:
             raise BridgeError(410, "The selected Fusion document or NC program is no longer available.")
         if ui.activeCommand != "SelectCommand":
-            raise BridgeError(409, "Finish or cancel the active command in Fusion, then import again.")
+            raise BridgeError(409, "Finish or cancel the active command in Fusion, then try again.")
         return _post_snapshot(document, program, program_id, ensure_live)
     finally:
         # Even a cancelled/timed-out HTTP caller cannot bypass restoration after

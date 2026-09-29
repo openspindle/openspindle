@@ -144,64 +144,103 @@ function arcSweep(startAngle: number, endAngle: number, clockwise: boolean) {
 }
 
 /**
- * Tessellate an XY arc, with helical Z interpolation. Null for an invalid arc, which is omitted:
- * both R and I/J, neither, a radius its endpoints cannot share, or a full circle by R.
+ * The planes arcs turn in (G17, G18, G19): the two axes an arc turns through, the axis along
+ * its normal, which it moves along as a helix, and the words that offset its centre along the
+ * first two. Turning from the first axis to the second is counterclockwise seen from the normal's
+ * positive end, as RS-274 has it: in G18 that is Z to X, which the Z1 firmware follows by
+ * reversing its X-to-Z arcs.
+ */
+export const ARC_PLANES = {
+  17: { axes: [0, 1, 2], centre: ["I", "J"] },
+  18: { axes: [2, 0, 1], centre: ["K", "I"] },
+  19: { axes: [1, 2, 0], centre: ["J", "K"] },
+} as const
+export type ArcPlane = (typeof ARC_PLANES)[keyof typeof ARC_PLANES]
+
+/**
+ * The centre of an arc given by its radius, in its plane's two axes: of the two circles through
+ * both ends, the one on which the arc turns the short way, or the long way for a negative
+ * radius. Null when the ends are one point or further apart than the diameter.
+ */
+export function radiusArcCentre(
+  start: Point3,
+  end: Point3,
+  signedRadius: number,
+  clockwise: boolean,
+  plane: ArcPlane
+): [number, number] | null {
+  const [u, v] = plane.axes
+  const radius = Math.abs(signedRadius)
+  const du = end[u] - start[u]
+  const dv = end[v] - start[v]
+  const chord = Math.hypot(du, dv)
+  if (chord < EPSILON || radius < chord / 2 - EPSILON) return null
+  const height = Math.sqrt(Math.max(0, radius * radius - (chord * chord) / 4))
+  const midU = (start[u] + end[u]) / 2
+  const midV = (start[v] + end[v]) / 2
+  const candidates = [1, -1].map((side) => {
+    const cu = midU - (side * height * dv) / chord
+    const cv = midV + (side * height * du) / chord
+    const sweep = arcSweep(
+      Math.atan2(start[v] - cv, start[u] - cu),
+      Math.atan2(end[v] - cv, end[u] - cu),
+      clockwise
+    )
+    return { cu, cv, sweep }
+  })
+  const center = candidates.find((candidate) =>
+    signedRadius >= 0
+      ? Math.abs(candidate.sweep) <= Math.PI + EPSILON
+      : Math.abs(candidate.sweep) >= Math.PI - EPSILON
+  )
+  // A chord far below the radius rounds both sweeps to a full turn.
+  return center ? [center.cu, center.cv] : null
+}
+
+/**
+ * Tessellate an arc in its plane, with helical interpolation along the plane's normal. Null for
+ * an invalid arc, which is omitted: both R and centre offsets, neither, a radius its endpoints
+ * cannot share, or a full circle by R.
  */
 function arcPoints(
   start: Point3,
   end: Point3,
   clockwise: boolean,
   words: Map<string, number>,
-  scale: number
+  scale: number,
+  plane: ArcPlane
 ): Point3[] | null {
-  let centerX: number
-  let centerY: number
-  if (words.has("R") && (words.has("I") || words.has("J"))) return null
+  const [u, v, w] = plane.axes
+  const [offsetU, offsetV] = plane.centre
+  let centerU: number
+  let centerV: number
+  if (words.has("R") && (words.has(offsetU) || words.has(offsetV))) return null
   if (words.has("R")) {
-    const signedRadius = words.get("R")! * scale
-    const radius = Math.abs(signedRadius)
-    const dx = end[0] - start[0]
-    const dy = end[1] - start[1]
-    const chord = Math.hypot(dx, dy)
-    if (chord < EPSILON || radius < chord / 2 - EPSILON) return null
-    const height = Math.sqrt(Math.max(0, radius * radius - (chord * chord) / 4))
-    const midX = (start[0] + end[0]) / 2
-    const midY = (start[1] + end[1]) / 2
-    const candidates = [1, -1].map((side) => {
-      const x = midX - (side * height * dy) / chord
-      const y = midY + (side * height * dx) / chord
-      const sweep = arcSweep(
-        Math.atan2(start[1] - y, start[0] - x),
-        Math.atan2(end[1] - y, end[0] - x),
-        clockwise
-      )
-      return { x, y, sweep }
-    })
-    const center = candidates.find((candidate) =>
-      signedRadius >= 0
-        ? Math.abs(candidate.sweep) <= Math.PI + EPSILON
-        : Math.abs(candidate.sweep) >= Math.PI - EPSILON
+    const center = radiusArcCentre(
+      start,
+      end,
+      words.get("R")! * scale,
+      clockwise,
+      plane
     )
-    // A chord far below the radius rounds both sweeps to a full turn.
     if (!center) return null
-    centerX = center.x
-    centerY = center.y
-  } else if (words.has("I") || words.has("J")) {
-    centerX = start[0] + (words.get("I") ?? 0) * scale
-    centerY = start[1] + (words.get("J") ?? 0) * scale
+    ;[centerU, centerV] = center
+  } else if (words.has(offsetU) || words.has(offsetV)) {
+    centerU = start[u] + (words.get(offsetU) ?? 0) * scale
+    centerV = start[v] + (words.get(offsetV) ?? 0) * scale
   } else return null
 
-  const radius = Math.hypot(start[0] - centerX, start[1] - centerY)
-  const endRadius = Math.hypot(end[0] - centerX, end[1] - centerY)
+  const radius = Math.hypot(start[u] - centerU, start[v] - centerV)
+  const endRadius = Math.hypot(end[u] - centerU, end[v] - centerV)
   if (
     radius < EPSILON ||
     Math.abs(radius - endRadius) > Math.max(0.02, radius * 0.001)
   )
     return null
-  const startAngle = Math.atan2(start[1] - centerY, start[0] - centerX)
+  const startAngle = Math.atan2(start[v] - centerV, start[u] - centerU)
   const sweep = arcSweep(
     startAngle,
-    Math.atan2(end[1] - centerY, end[0] - centerX),
+    Math.atan2(end[v] - centerV, end[u] - centerU),
     clockwise
   )
   // At most 3° per segment, also aiming for <0.5mm chords on ordinary toolpaths.
@@ -217,11 +256,11 @@ function arcPoints(
     if (index === steps - 1) return [...end]
     const fraction = (index + 1) / steps
     const angle = startAngle + sweep * fraction
-    return [
-      centerX + Math.cos(angle) * radius,
-      centerY + Math.sin(angle) * radius,
-      start[2] + (end[2] - start[2]) * fraction,
-    ]
+    const point: Point3 = [0, 0, 0]
+    point[u] = centerU + Math.cos(angle) * radius
+    point[v] = centerV + Math.sin(angle) * radius
+    point[w] = start[w] + (end[w] - start[w]) * fraction
+    return point
   })
 }
 
@@ -240,7 +279,7 @@ export function parseGCode(
   let absolute = true
   let incrementalArcCenters = true
   let scale = 1
-  let plane = 17
+  let plane: keyof typeof ARC_PLANES = 17
   let motion: number | null = null
   let feed: number | null = null
   /** G0's rate, where the firmware keeps it apart from the feed. */
@@ -418,6 +457,7 @@ export function parseGCode(
             "Z",
             "I",
             "J",
+            "K",
             "R",
             "F",
             "S",
@@ -442,7 +482,8 @@ export function parseGCode(
     const hasArc = motion === 2 || motion === 3
     if (
       omitMotion ||
-      (!hasAxes && !(hasArc && ["I", "J", "R"].some((axis) => words.has(axis))))
+      (!hasAxes &&
+        !(hasArc && ["I", "J", "K", "R"].some((axis) => words.has(axis))))
     )
       continue
     // Coordinates without a motion mode are left out.
@@ -456,11 +497,17 @@ export function parseGCode(
     })
     if (!target.every(Number.isFinite)) continue
     if (hasArc) {
-      // Only G17 arcs with relative centres are drawn; the tool still ends at the target.
-      const points =
-        plane === 17 && incrementalArcCenters
-          ? arcPoints(position, target, motion === 2, words, scale)
-          : null
+      // Only arcs with relative centres are drawn; the tool still ends at the target.
+      const points = incrementalArcCenters
+        ? arcPoints(
+            position,
+            target,
+            motion === 2,
+            words,
+            scale,
+            ARC_PLANES[plane]
+          )
+        : null
       if (!points) {
         position = target
         continue

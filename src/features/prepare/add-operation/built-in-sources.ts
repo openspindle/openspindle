@@ -1,7 +1,7 @@
-import { ArrowDownToLine, Axis3d, LandPlot, SquareDashed } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 import { OPERATION_KINDS, probingOf } from "@/domain/operations/kinds"
 import type { ProbingSourceKind } from "@/domain/operations/kinds"
+import { PROBING_ICONS } from "@/features/plugins/operation-icon"
 import {
   useAddProbingOperation,
   useProbeForAdding,
@@ -23,13 +23,6 @@ const PROBING_KINDS: readonly ProbingSourceKind[] = [
   "auto-scan",
   "probe-3d",
 ]
-
-const PROBING_ICONS: Record<ProbingSourceKind, LucideIcon> = {
-  "auto-level": LandPlot,
-  "auto-z-height": ArrowDownToLine,
-  "auto-scan": SquareDashed,
-  "probe-3d": Axis3d,
-}
 
 const PROBING_DESCRIPTIONS: Record<ProbingSourceKind, string> = {
   "auto-level":

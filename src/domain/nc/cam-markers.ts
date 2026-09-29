@@ -1,9 +1,24 @@
 import type { Stock } from "@/domain/stock/stock"
 
 /**
+ * How a program describes one of its tools, as its CAM wrote it: what a library tool for its
+ * number must be. Unknown values are null.
+ */
+export type ProgramTool = {
+  readonly number: number
+  /** The CAM's name for the tool: "Spiral O Metal 3.175*12mm". */
+  readonly name: string | null
+  /** Millimetres. */
+  readonly diameter: number | null
+  readonly fluteLength: number | null
+  /** A tool kind as tool libraries name them: "flat end mill". */
+  readonly kind: string | null
+}
+
+/**
  * The markers a CAM writes in the comments of the programs it makes: where its toolpaths start
- * and what they are called, and the stock a program is for. A machine's kit reads those of the
- * CAM made for its machine.
+ * and what they are called, the stock a program is for and the tools it uses. A machine's kit
+ * reads those of the CAM made for its machine.
  */
 export interface CamMarkers {
   /**
@@ -20,6 +35,8 @@ export interface CamMarkers {
     fileName: string,
     fallback: Stock
   ) => Stock | null
+  /** The tools the lines describe, by number; null when they describe none this way. */
+  tools?: (lines: readonly string[]) => ReadonlyMap<number, ProgramTool> | null
 }
 
 /**

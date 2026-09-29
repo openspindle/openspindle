@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react"
 import { useMutation } from "@tanstack/react-query"
-import { Download } from "lucide-react"
+import { BookOpen, Download } from "lucide-react"
 import { toast } from "sonner"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
@@ -9,22 +9,22 @@ import { Textarea } from "@/components/ui/textarea"
 import { exportPlateProgram } from "@/app/workspace/export-program"
 import { usePlateDiagnostics } from "@/app/workspace/use-plate-diagnostics"
 import { usePlateIndex, useWorkspace } from "@/app/workspace/workspace-context"
-import { compilePlate } from "@/domain/compile/compile"
-import { resolveOperation } from "@/domain/operations/kinds"
+import { compileOperation, compilePlate } from "@/domain/compile/compile"
 import { plateLabel } from "@/domain/plate/plate"
 import type { Plate } from "@/domain/plate/plate"
+import { GCodeLines } from "@/features/job/gcode-listing"
+import type { ProgramCheck } from "@/features/job/program-check"
 import { AppDialog } from "@/features/shell/app-dialog"
+import { openDialog } from "@/features/shell/dialogs"
 import { suggestedFileName } from "@/platform/contract/files"
 import { useHost } from "@/platform/host-context"
 
 type View = "nc" | "setup"
 
-/** The NC an operation contributes, or the plate's whole program. */
-function sourceText(plate: Plate, operationId: string | null) {
-  const operation = plate.operations.find((item) => item.id === operationId)
-  if (!operation) return compilePlate(plate).program.source
-  const resolved = resolveOperation(operation, plate)
-  return resolved.ok ? resolved.value.nc : resolved.error.message
+/** The source as it is written: the machine's dialect is not asked what it would change. */
+const AS_WRITTEN: ProgramCheck = {
+  status: "unavailable",
+  reason: "The source is shown as it is written.",
 }
 
 /** The plate's setup as it is embedded in exported NC; models are shortened for reading. */
@@ -60,7 +60,10 @@ function useExportProgram(plate: Plate) {
   })
 }
 
-/** Reads an operation's or plate's NC, and exports the plate with its setup embedded. */
+/**
+ * Reads an operation's or plate's NC as the Job tab lists it, and exports the plate with its
+ * setup embedded.
+ */
 export function ProgramSourceDialog({
   plateId,
   operationId,
@@ -75,18 +78,31 @@ export function ProgramSourceDialog({
   )
   const index = usePlateIndex(plateId)
   const [view, setView] = useState<View>("nc")
-  const text = useMemo(() => {
-    if (!plate) return ""
-    return view === "nc" ? sourceText(plate, operationId) : setupText(plate)
-  }, [plate, view, operationId])
-  if (!plate) return null
-  const operation = plate.operations.find((item) => item.id === operationId)
+  const [line, setLine] = useState(0)
+  const operation = plate?.operations.find((item) => item.id === operationId)
+  // An operation's own NC, or the plate's whole program.
+  const compiled = useMemo(() => {
+    if (!plate) return null
+    return operation ? compileOperation(plate, operation) : compilePlate(plate)
+  }, [plate, operation])
+  const setup = useMemo(() => (plate ? setupText(plate) : ""), [plate])
+  if (!plate || !compiled) return null
   return (
     <AppDialog
       title={operation?.name ?? plateLabel(plate, index)}
       width="wide"
       onClose={onClose}
-      footer={<ExportButton plate={plate} />}
+      footer={
+        <SourceActions
+          plate={plate}
+          onGlossary={() =>
+            openDialog({
+              kind: "gcode-glossary",
+              back: { kind: "source", plateId, operationId },
+            })
+          }
+        />
+      }
     >
       <Tabs
         value={view}
@@ -96,13 +112,34 @@ export function ProgramSourceDialog({
           <TabsTrigger value="nc">NC source</TabsTrigger>
           <TabsTrigger value="setup">Plate setup</TabsTrigger>
         </TabsList>
-        <TabsContent value={view}>
+        <TabsContent value="nc">
+          {compiled.mode === "empty" ? (
+            <Alert>
+              <AlertDescription>
+                {compiled.diagnostics.at(0)?.message ??
+                  "There is no program yet."}
+              </AlertDescription>
+            </Alert>
+          ) : (
+            <GCodeLines
+              compiled={compiled}
+              operations={plate.operations}
+              check={AS_WRITTEN}
+              line={line}
+              onSeekLine={setLine}
+              follow={false}
+              label="NC source"
+              className="h-[50vh] rounded-md border"
+            />
+          )}
+        </TabsContent>
+        <TabsContent value="setup">
           <Textarea
             className="h-[50vh] resize-none"
-            aria-label={view === "nc" ? "NC source" : "Plate setup"}
+            aria-label="Plate setup"
             readOnly
             spellCheck={false}
-            value={text}
+            value={setup}
           />
         </TabsContent>
       </Tabs>
@@ -110,7 +147,13 @@ export function ProgramSourceDialog({
   )
 }
 
-function ExportButton({ plate }: { plate: Plate }) {
+function SourceActions({
+  plate,
+  onGlossary,
+}: {
+  plate: Plate
+  onGlossary: () => void
+}) {
   const exporting = useExportProgram(plate)
   return (
     <div className="flex w-full items-center justify-end gap-2">
@@ -119,6 +162,10 @@ function ExportButton({ plate }: { plate: Plate }) {
           <AlertDescription>{exporting.error.message}</AlertDescription>
         </Alert>
       )}
+      <Button variant="outline" onClick={onGlossary}>
+        <BookOpen />
+        G-code glossary
+      </Button>
       <Button disabled={exporting.isPending} onClick={() => exporting.mutate()}>
         <Download />
         {exporting.isPending ? "Saving…" : "Export NC with setup"}

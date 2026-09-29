@@ -13,6 +13,8 @@ export const MenuCommandSchema = z.enum([
   "models.manage",
   "tools.manage",
   "settings.open",
+  /** Help › G-code Glossary. */
+  "glossary.open",
   /** Edit › Undo and Redo: the focused text field's typing, else the section's edits. */
   "edit.undo",
   "edit.redo",

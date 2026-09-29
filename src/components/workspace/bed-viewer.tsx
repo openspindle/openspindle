@@ -42,6 +42,8 @@ type Props = {
   selectedPlateId: string | null
   onSelectPlate: (id: string) => void
   selectedLineRanges?: LineRange[]
+  /** Program lines each plate leaves out of the view, such as hidden operations', by plate id. */
+  hiddenLineRanges?: Readonly<Record<string, readonly LineRange[]>>
   previewLine?: number | null
   previewProbePoint?: number | null
   /**
@@ -72,6 +74,7 @@ export function BedViewer({
   selectedPlateId,
   onSelectPlate,
   selectedLineRanges,
+  hiddenLineRanges,
   previewLine,
   previewProbePoint,
   playhead,
@@ -146,6 +149,7 @@ export function BedViewer({
     sceneRef.current?.present({
       selectedPlateId,
       selectedLineRanges,
+      hiddenLineRanges,
       previewLine,
       previewProbePoint,
       progress,
@@ -157,6 +161,7 @@ export function BedViewer({
   }, [
     selectedPlateId,
     selectedLineRanges,
+    hiddenLineRanges,
     previewLine,
     previewProbePoint,
     progress,

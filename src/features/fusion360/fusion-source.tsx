@@ -1,7 +1,6 @@
 import { useId, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { toast } from "sonner"
-import { importFusionProgram } from "@/app/workspace/import-fusion-program"
+import { planFusionImport } from "@/app/workspace/import-fusion-program"
 import { useWorkspaceStore } from "@/app/workspace/workspace-context"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
@@ -28,7 +27,9 @@ import {
 } from "@/components/ui/select"
 import {
   WORKSPACE_MUTATION,
+  importKit,
   useImportContext,
+  useImportPlanned,
   workspaceScope,
 } from "@/features/shell/use-import"
 import { useHost } from "@/platform/host-context"
@@ -36,11 +37,16 @@ import { fusionKeys, useFusionConnection } from "@/platform/fusion"
 import { useFusionLifetime } from "./use-fusion-lifetime"
 import { ArrowUpRightIcon, Link2 } from "lucide-react"
 
-/** Discover Fusion NC programs and post the chosen one into a new workspace plate. */
+/**
+ * Discover Fusion NC programs and import the chosen one as a dropped program is: posted, then
+ * into the selected plate, or after the import questionnaire has asked which plate and what to
+ * do about what it found, which takes this dialog's place.
+ */
 export function FusionSource({ onDone }: { onDone: () => void }) {
   const fusion = useHost().fusion
   const workspace = useWorkspaceStore()
   const context = useImportContext()
+  const importPlanned = useImportPlanned()
   const queryClient = useQueryClient()
   const id = useId()
   const lifetime = useFusionLifetime()
@@ -69,20 +75,19 @@ export function FusionSource({ onDone }: { onDone: () => void }) {
       signal.throwIfAborted()
       const program = await fusion.read(programId, signal)
       signal.throwIfAborted()
-      const imported = importFusionProgram(program, context())
-      if (!imported.ok) throw new Error(imported.error)
-      const added = workspace.dispatch({
-        type: "plates.add",
-        plates: [imported.value],
-        select: true,
-      })
-      if (!added.ok) throw new Error(added.error)
-      return program.name
+      const plan = planFusionImport(
+        program,
+        context(),
+        importKit(workspace.state),
+        workspace.state.designRules
+      )
+      if (!plan.ok) throw new Error(plan.error)
+      return plan.value
     },
-    onSuccess: (name) => {
+    onSuccess: (plan) => {
       if (lifetime.current.signal.aborted) return
-      toast.success(`Imported ${name} from Fusion 360.`)
-      onDone()
+      // The questionnaire replaced this dialog when it has something to ask.
+      if (importPlanned(plan)) onDone()
     },
   })
   const options = (programs.data ?? []).map((program) => ({
@@ -176,8 +181,7 @@ export function FusionSource({ onDone }: { onDone: () => void }) {
             </SelectContent>
           </Select>
           <FieldDescription>
-            Import posts the current program using its Fusion post processor and
-            adds it as a new plate.
+            Import posts the program with its Fusion post processor.
           </FieldDescription>
         </Field>
       ) : (
@@ -205,7 +209,7 @@ export function FusionSource({ onDone }: { onDone: () => void }) {
           if (selected) importing.mutate(selected.id)
         }}
       >
-        {importing.isPending ? "Posting and importing…" : "Import as new plate"}
+        {importing.isPending ? "Posting…" : "Import"}
       </Button>
     </FieldGroup>
   )

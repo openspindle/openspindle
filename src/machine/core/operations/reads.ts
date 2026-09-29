@@ -13,17 +13,33 @@ const DRAIN_MS = 200
 /** A cancelled grid read may still be streaming rows. */
 const CANCELLED_READ_DRAIN_MS = 2000
 
-const replyText = (event: ReplyEvent): string | null => {
+/** The machine's stored anchors, as its firmware adapter reads and writes them. */
+export type AnchorSettings = NonNullable<OperationContext["adapter"]["anchors"]>
+
+export const replyText = (event: ReplyEvent): string | null => {
   if (event.kind === "line") return event.line.text
   if (event.kind === "config-line") return event.text
   return null
+}
+
+/** Keeps the anchor settings' replies that arrive late away from later operations. */
+export function drainAnchorReplies(
+  session: OperationContext["session"],
+  anchors: AnchorSettings
+) {
+  session.drainFor(
+    DRAIN_MS,
+    (event) =>
+      event.kind === "config-line" ||
+      (event.kind === "line" && anchors.isReply(event.line.text))
+  )
 }
 
 /** The anchors the machine stores, read one keyed setting at a time. The configurator sends no acknowledgement. */
 export async function readAnchorConfiguration(
   context: OperationContext
 ): Promise<AnchorConfiguration> {
-  const { session, adapter, clock, signal } = context
+  const { adapter, clock } = context
   const { anchors } = adapter
   if (!anchors)
     throw new MachineError("refused", "This machine does not store anchors.")
@@ -32,6 +48,23 @@ export async function readAnchorConfiguration(
     "Timed out waiting for fresh device status. Anchors were not read."
   )
   requireAdmission(context, { key: "readAnchors" }, before)
+  const values = await readAnchorValues(context, anchors)
+  try {
+    return anchors.build(values, clock.now())
+  } catch {
+    throw new MachineError(
+      "rejected",
+      "Firmware anchor coordinates are invalid."
+    )
+  }
+}
+
+/** The values of the anchor settings, in the order of their keys, while the device stays idle. */
+export async function readAnchorValues(
+  context: OperationContext,
+  anchors: AnchorSettings
+): Promise<number[]> {
+  const { session, signal } = context
   const values: number[] = []
   try {
     for (const key of anchors.keys) {
@@ -81,21 +114,9 @@ export async function readAnchorConfiguration(
       values.push(await reply)
     }
   } finally {
-    session.drainFor(
-      DRAIN_MS,
-      (event) =>
-        event.kind === "config-line" ||
-        (event.kind === "line" && anchors.isReply(event.line.text))
-    )
+    drainAnchorReplies(session, anchors)
   }
-  try {
-    return anchors.build(values, clock.now())
-  } catch {
-    throw new MachineError(
-      "rejected",
-      "Firmware anchor coordinates are invalid."
-    )
-  }
+  return values
 }
 
 /** Read-only grid display (M375.1), never the command that loads and enables compensation. */

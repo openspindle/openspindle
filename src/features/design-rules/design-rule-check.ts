@@ -1,5 +1,6 @@
+import { useMemo } from "react"
 import { createAtom, useSelector } from "@tanstack/react-store"
-import { selectedPlate } from "@/app/workspace/workspace-context"
+import { selectedPlate, useWorkspace } from "@/app/workspace/workspace-context"
 import { compilePlate } from "@/domain/compile/compile"
 import { keyDiagnostics } from "@/domain/diagnostics"
 import type { KeyedDiagnostic } from "@/domain/diagnostics"
@@ -10,6 +11,7 @@ import type {
 } from "@/domain/design-rules/check"
 import type { DesignRules } from "@/domain/design-rules/rules"
 import type { Plate } from "@/domain/plate/plate"
+import type { Tool } from "@/domain/tools/tool"
 import type { WorkspaceState } from "@/domain/workspace/workspace"
 import { unfocusProblem } from "@/features/viewer/problem-focus"
 import type { ProblemFocus } from "@/features/viewer/problem-focus"
@@ -21,6 +23,44 @@ export type DesignRuleResult = {
   readonly check: DesignRuleCheck
   /** The check's violations with the keys the 3D view shows them by (`keyDiagnostics`). */
   readonly violations: readonly KeyedDiagnostic<DesignRuleViolation>[]
+}
+
+/** Each plate's latest check, with the rules and tools it was checked with. */
+const checked = new WeakMap<
+  Plate,
+  {
+    readonly rules: DesignRules
+    readonly tools: readonly Tool[]
+    readonly check: DesignRuleCheck
+  }
+>()
+
+/**
+ * A plate's check against the project's design rules (`checkDesignRules`), with the library's
+ * tools; kept per plate object while the rules and the tools stay the same.
+ */
+export function plateDesignRuleCheck(
+  plate: Plate,
+  rules: DesignRules,
+  tools: readonly Tool[]
+): DesignRuleCheck {
+  const saved = checked.get(plate)
+  if (saved?.rules === rules && saved.tools === tools) return saved.check
+  const check = checkDesignRules(plate, compilePlate(plate), rules, tools)
+  checked.set(plate, { rules, tools, check })
+  return check
+}
+
+/** What a plate breaks of the project's design rules as it is now; null without a plate. */
+export function usePlateDesignRuleCheck(
+  plate: Plate | null
+): DesignRuleCheck | null {
+  const rules = useWorkspace((state) => state.designRules)
+  const tools = useWorkspace((state) => state.tools)
+  return useMemo(
+    () => (plate ? plateDesignRuleCheck(plate, rules, tools) : null),
+    [plate, rules, tools]
+  )
 }
 
 type ResultsState = { readonly result: DesignRuleResult | null }
@@ -48,7 +88,7 @@ export function checkPlateDesignRules(state: WorkspaceState, plateId?: string) {
     : selectedPlate(state)
   if (!plate) return
   const rules = state.designRules
-  const check = checkDesignRules(plate, compilePlate(plate), rules, state.tools)
+  const check = plateDesignRuleCheck(plate, rules, state.tools)
   unfocusResults(resultsAtom.get())
   resultsAtom.set(() => ({
     result: {

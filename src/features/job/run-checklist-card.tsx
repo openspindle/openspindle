@@ -1,6 +1,7 @@
-import { Link } from "@tanstack/react-router"
+import { Link, useNavigate } from "@tanstack/react-router"
 import {
   ChevronDown,
+  CircleAlert,
   CircleCheck,
   CircleDashed,
   CircleX,
@@ -19,16 +20,21 @@ import {
   ItemActions,
   ItemContent,
   ItemDescription,
+  ItemFooter,
   ItemGroup,
   ItemMedia,
   ItemTitle,
 } from "@/components/ui/item"
+import { ProblemText } from "@/components/workspace/problem-text"
+import { useWorkspaceStore } from "@/app/workspace/workspace-context"
+import { checkPlateDesignRules } from "@/features/design-rules/design-rule-check"
 import type { MachineAction } from "./job-hooks"
 import type {
   RunCheck,
   RunCheckStatus,
   RunChecklist,
   RunFix,
+  RunIssue,
 } from "./run-checklist"
 import { MachineActionButton, StageCard } from "./stage-card"
 
@@ -38,6 +44,28 @@ const STATUS: Record<RunCheckStatus, { icon: LucideIcon; label: string }> = {
   pending: { icon: CircleDashed, label: "Waiting" },
 }
 const WARNING = { icon: TriangleAlert, label: "Passes with a warning" }
+
+/** Checks the plate's design rules and opens Prepare, whose 3D view shows what they find. */
+function ShowDesignRules({
+  fix,
+}: {
+  fix: Extract<RunFix, { kind: "design-rules" }>
+}) {
+  const workspace = useWorkspaceStore()
+  const navigate = useNavigate()
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      onClick={() => {
+        checkPlateDesignRules(workspace.state, fix.plateId)
+        void navigate({ to: "/prepare" })
+      }}
+    >
+      {fix.label}
+    </Button>
+  )
+}
 
 /** A fix links to where it is made; a machine action runs right here. */
 function RunFixAction({
@@ -71,7 +99,43 @@ function RunFixAction({
           icon={<Crosshair data-icon="inline-start" />}
         />
       )
+    case "design-rules":
+      return <ShowDesignRules fix={fix} />
   }
+}
+
+/** The problems behind a check, each with what resolves it, under its label and reason. */
+function RunIssues({
+  label,
+  issues,
+}: {
+  label: string
+  issues: readonly RunIssue[]
+}) {
+  return (
+    <ul
+      aria-label={`${label}: problems`}
+      className="flex min-w-0 flex-1 flex-col gap-2 text-muted-foreground"
+    >
+      {issues.map((issue) => {
+        const error = issue.severity === "error"
+        const Icon = error ? CircleAlert : TriangleAlert
+        return (
+          <li key={issue.key} className="flex gap-1.5">
+            <Icon
+              role="img"
+              aria-label={error ? "Error" : "Warning"}
+              className="size-3.5 shrink-0 translate-y-0.5"
+            />
+            <ProblemText
+              problem={issue.problem}
+              suggestion={issue.suggestion}
+            />
+          </li>
+        )
+      })}
+    </ul>
+  )
 }
 
 function RunCheckItem({
@@ -81,7 +145,7 @@ function RunCheckItem({
   check: RunCheck
   readAnchors: MachineAction
 }) {
-  const { status, reason, fix, warning } = check.result
+  const { status, reason, fix, warning, issues } = check.result
   const { icon: Icon, label } = warning ? WARNING : STATUS[status]
   return (
     <Item size="xs" role="listitem">
@@ -101,6 +165,12 @@ function RunCheckItem({
         <ItemActions>
           <RunFixAction fix={fix} readAnchors={readAnchors} />
         </ItemActions>
+      )}
+      {issues && issues.length > 0 && (
+        // Lined up with the label, across the width the action leaves free above.
+        <ItemFooter className="pl-6.5">
+          <RunIssues label={check.label} issues={issues} />
+        </ItemFooter>
       )}
     </Item>
   )

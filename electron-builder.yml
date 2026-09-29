@@ -51,6 +51,19 @@ electronFuses:
 # from the git remote; without one, a build leaves both out and cannot update.
 publish:
   provider: github
+# The files OpenSpindle opens (FILE_KINDS in src/platform/contract/files.ts), which macOS then
+# offers it for: Finder lists it under Open With for NC programs without taking them from the
+# CAM or editor that opens them now, and opens its own projects with it. The app imports what it
+# is handed as it imports dropped files (electron/main/services/opened-files.ts).
+fileAssociations:
+  - ext: [nc, cnc, gcode, tap, ngc]
+    name: NC program
+    role: Viewer
+    rank: Alternate
+  - ext: stpnc
+    name: STEP-NC project
+    role: Editor
+    rank: Owner
 mac:
   category: public.app-category.productivity
   # The interface is English, so only Chromium's English resources ship: 50 MB less than its 220

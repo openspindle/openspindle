@@ -56,6 +56,31 @@ export function replacementPlate(
   return createPlate(structuredClone(setup))
 }
 
+/**
+ * The plate an operation goes to: the selected plate, else one in place of the empty plate, or a
+ * new one. One in place of the empty plate keeps the stock set up there, else starts on the
+ * library's default stock, as a new plate does; unless the operation needs no `stock`: then the
+ * empty plate's setup stays as it is, and a new plate has none.
+ */
+export function targetPlate(
+  selected: Plate | null | undefined,
+  context: ImportContext,
+  stock: boolean
+): Plate {
+  if (selected && !selected.example) return selected
+  if (stock)
+    return selected ? replacementPlate(selected, context) : newPlate(context)
+  return createPlate(
+    selected
+      ? structuredClone(selected.setup)
+      : createPlateSetup({
+          stock: null,
+          stockSource: "unspecified",
+          ...context.placement,
+        })
+  )
+}
+
 /** The catalogs' starter tools and the bundled stock library, until the user has their own. */
 export async function loadDefaultLibrary(): Promise<WorkspaceLibrary> {
   // A broken catalog asset must not stop the app; the tool library reports it.

@@ -27,8 +27,8 @@ type PathLines<TMaterial extends THREE.Material | THREE.Material[]> =
 
 type MotionLayer = {
   motion: Motion
-  /** The revealed segments. */
-  base: PathLines<THREE.LineBasicMaterial>
+  /** Groups mark the revealed windows that no hidden range covers. */
+  base: PathLines<THREE.LineBasicMaterial[]>
   /** Groups mark the selected windows; the draw range clips them to the revealed prefix. */
   selected: PathLines<THREE.LineBasicMaterial[]>
 }
@@ -89,8 +89,8 @@ function runIndexAt(runs: readonly ViewerToolRun[], line: number) {
 
 /**
  * One plate's toolpath, drawn from the plate's work origin. Each motion's vertices upload
- * once and stay on the GPU: playback only moves draw ranges, a selection change only
- * regroups the overlay, and a new work origin only moves the group. Playback shows the
+ * once and stay on the GPU: playback and hidden ranges only regroup what is drawn, a
+ * selection change only regroups the overlay, and a new work origin only moves the group. Playback shows the
  * tool that makes the revealed segment: its 3D model once that has loaded, else as its
  * shape describes it.
  */
@@ -124,7 +124,10 @@ export class ToolpathView {
   private shown: Parameters<ToolpathView["showTool"]> = [null]
   private disposed = false
   private ranges: readonly LineRange[] = []
+  /** The selected windows that no hidden range covers. */
   private selection: SegmentWindow[] = []
+  private hiddenRanges: readonly LineRange[] = []
+  private hidden: SegmentWindow[] = []
 
   constructor(
     program: GCodeProgram,
@@ -152,10 +155,9 @@ export class ToolpathView {
       const bounds = this.buffers.bounds[motion].getBoundingSphere(
         new THREE.Sphere()
       )
-      const base = new THREE.LineSegments(
-        bufferView(attribute, bounds),
-        this.materials[motion]
-      )
+      const base = new THREE.LineSegments(bufferView(attribute, bounds), [
+        this.materials[motion],
+      ])
       base.renderOrder = 3
       const selected = new THREE.LineSegments(bufferView(attribute, bounds), [
         this.materials[motion === "probe" ? "selectedProbe" : "selected"],
@@ -254,11 +256,39 @@ export class ToolpathView {
     this.path.position.set(...origin)
   }
 
+  /** Segment windows within [first, last) that no hidden range covers. */
+  private shownWindows(first: number, last: number): SegmentWindow[] {
+    const shown: SegmentWindow[] = []
+    let from = first
+    for (const part of this.hidden) {
+      if (part.last <= from) continue
+      if (part.first >= last) break
+      if (part.first > from) shown.push({ first: from, last: part.first })
+      from = part.last
+    }
+    if (from < last) shown.push({ first: from, last })
+    return shown
+  }
+
+  /** Leaves source ranges out of the drawing, as a hidden operation's. */
+  hide(ranges: readonly LineRange[]) {
+    if (sameRanges(ranges, this.hiddenRanges)) return
+    this.hiddenRanges = ranges
+    this.hidden = segmentWindows(this.program, ranges)
+    this.regroupSelection()
+  }
+
   /** Regroups the selection overlay when the selected source ranges change. */
   select(ranges: readonly LineRange[]) {
     if (sameRanges(ranges, this.ranges)) return
     this.ranges = ranges
-    this.selection = segmentWindows(this.program, ranges)
+    this.regroupSelection()
+  }
+
+  private regroupSelection() {
+    this.selection = segmentWindows(this.program, this.ranges).flatMap((part) =>
+      this.shownWindows(part.first, part.last)
+    )
     for (const layer of this.layers) {
       const geometry = layer.selected.geometry
       geometry.clearGroups()
@@ -279,10 +309,19 @@ export class ToolpathView {
    */
   reveal(count: number, showRapids: boolean) {
     const drawn = (motion: Motion) => motion !== "rapid" || showRapids
+    const shown = this.shownWindows(0, count)
     for (const { motion, base, selected } of this.layers) {
       const revealed = this.vertexRange(motion, 0, count).count
-      base.geometry.setDrawRange(0, revealed)
-      base.visible = drawn(motion) && revealed > 0
+      base.geometry.clearGroups()
+      for (const part of shown) {
+        const { start, count: vertices } = this.vertexRange(
+          motion,
+          part.first,
+          part.last
+        )
+        if (vertices > 0) base.geometry.addGroup(start, vertices)
+      }
+      base.visible = drawn(motion) && base.geometry.groups.length > 0
       selected.geometry.setDrawRange(0, revealed)
       selected.visible =
         drawn(motion) &&

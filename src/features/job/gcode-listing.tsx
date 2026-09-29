@@ -15,8 +15,8 @@ import {
   Wrench,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
+import { cn } from "cn"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Field, FieldLabel } from "@/components/ui/field"
 import { Separator } from "@/components/ui/separator"
@@ -24,6 +24,7 @@ import { Switch } from "@/components/ui/switch"
 import type { CompiledPlate } from "@/domain/compile/compile"
 import type { SectionKind } from "@/domain/compile/sections"
 import type { Operation } from "@/domain/operations/operation"
+import { useOperationIcon } from "@/features/plugins/operation-icon"
 import type { ProgramChange } from "@/machine/contract"
 import { CHANGE_LABELS, buildListingModel } from "./listing-model"
 import type { ListingHeader, ListingHeaderKind } from "./listing-model"
@@ -45,14 +46,11 @@ const SECTION_ICONS: Partial<Record<SectionKind, LucideIcon>> = {
   message: MessageSquare,
 }
 
-const HEADER_BADGES: Record<
-  ListingHeaderKind,
-  { variant: "secondary" | "outline" | "ghost"; icon: LucideIcon }
-> = {
-  part: { variant: "outline", icon: Split },
-  operation: { variant: "secondary", icon: Layers3 },
-  pause: { variant: "outline", icon: Pause },
-  section: { variant: "ghost", icon: Route },
+const HEADER_ICONS: Record<ListingHeaderKind, LucideIcon> = {
+  part: Split,
+  operation: Layers3,
+  pause: Pause,
+  section: Route,
 }
 
 const changeText = (change: ProgramChange) =>
@@ -88,41 +86,42 @@ function LineContent({
   )
 }
 
-function HeaderRow({ header }: { header: ListingHeader }) {
-  const badge = HEADER_BADGES[header.kind]
-  const Icon =
-    (header.sectionKind && SECTION_ICONS[header.sectionKind]) ?? badge.icon
+/** A full-width row naming what starts below it: a part, an operation, a pause or a section. */
+function HeaderRow({ label, icon: Icon }: { label: string; icon: LucideIcon }) {
   return (
-    <div className="flex h-full items-end gap-2 px-2 pb-0.5">
-      {header.kind !== "operation" && header.kind !== "part" && (
-        <span className="w-20 shrink-0" aria-hidden />
-      )}
-      <Badge variant={badge.variant} className="max-w-full">
-        <Icon data-icon="inline-start" />
-        <span className="truncate">{header.label}</span>
-      </Badge>
+    <div className="flex h-full items-center gap-2 bg-muted px-2 text-xs/relaxed">
+      <Icon className="size-3 shrink-0" aria-hidden />
+      <span className="truncate">{label}</span>
     </div>
   )
 }
 
 /**
- * The program as the machine executes it, virtualized: operation, section and pause headers,
- * lines the dialect changes, the line on show, and click-to-seek.
+ * A program's lines, virtualized: operation, section and pause headers, the lines the dialect
+ * changes, the line on show, and click-to-seek. With `follow`, the line on show is kept in
+ * view as it moves.
  */
-export function GCodeListing({
+export function GCodeLines({
   compiled,
   operations,
   check,
   line,
   onSeekLine,
+  follow,
+  label,
+  className,
 }: {
   compiled: CompiledPlate
   /** The plate's operations, for the operation headers. */
   operations: readonly Operation[]
   check: ProgramCheck
-  /** The line on show: highlighted, and kept in view while Follow is on. */
+  /** The line on show: highlighted, and kept in view while `follow` is on. */
   line: number
   onSeekLine: (line: number) => void
+  follow: boolean
+  /** The list's accessible name. */
+  label: string
+  className?: string
 }) {
   const id = useId()
   const prepared = preparedProgram(check)
@@ -148,7 +147,15 @@ export function GCodeListing({
       ),
     [lines]
   )
-  const [follow, setFollow] = useState(true)
+  const operationIcon = useOperationIcon()
+  const headerIcon = (header: ListingHeader): LucideIcon => {
+    const operation = operations.find((item) => item.id === header.operationId)
+    if (operation) return operationIcon(operation)
+    return (
+      (header.sectionKind && SECTION_ICONS[header.sectionKind]) ??
+      HEADER_ICONS[header.kind]
+    )
+  }
   const viewport = useRef<HTMLDivElement>(null)
   // A new model re-measures its rows: header rows move when the program changes.
   const getItemKey = useCallback(
@@ -198,6 +205,106 @@ export function GCodeListing({
   }
 
   return (
+    <div
+      ref={viewport}
+      className={cn("min-h-0 flex-1 overflow-auto", className)}
+      role="listbox"
+      aria-label={label}
+      aria-activedescendant={shown ? rowId(line) : undefined}
+      tabIndex={0}
+      onKeyDown={seekFromKeyboard}
+    >
+      <div
+        className="relative w-max min-w-full"
+        style={{ height: virtualizer.getTotalSize() }}
+      >
+        {/* Sizes the list to its widest line, so rows scroll sideways together. */}
+        <div aria-hidden className="invisible flex h-0 gap-2 pr-4 pl-2">
+          <LineContent line={lines.length} text={widest} changed={false} />
+        </div>
+        {items.map((item) => {
+          const row = model.row(item.index)
+          if (row.kind === "header")
+            return (
+              <div
+                key={item.key}
+                role="presentation"
+                className="absolute top-0 left-0 w-full"
+                style={{
+                  height: item.size,
+                  transform: `translateY(${item.start}px)`,
+                }}
+              >
+                <HeaderRow
+                  label={row.header.label}
+                  icon={headerIcon(row.header)}
+                />
+              </div>
+            )
+          const text = lines[row.line - 1]
+          // Comments stay in the source; the machine receives an empty line.
+          const note = prepared
+            ? compiled.program.lines[row.line - 1].trim()
+            : ""
+          const change = model.changes.get(row.line)
+          const current = row.line === line
+          return (
+            <Button
+              key={item.key}
+              id={rowId(row.line)}
+              role="option"
+              aria-selected={current}
+              tabIndex={-1}
+              variant={current ? "secondary" : "ghost"}
+              size="sm"
+              className="absolute top-0 left-0 w-full justify-start gap-2 px-2"
+              style={{
+                height: item.size,
+                transform: `translateY(${item.start}px)`,
+              }}
+              title={change ? changeText(change) : undefined}
+              aria-label={`Line ${row.line}: ${text}${change ? ` (${CHANGE_LABELS[change.reason]})` : ""}`}
+              onClick={() => {
+                onSeekLine(row.line)
+                viewport.current?.focus({ preventScroll: true })
+              }}
+            >
+              <LineContent
+                line={row.line}
+                text={text}
+                note={note}
+                changed={!!change}
+              />
+            </Button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+/**
+ * The Job tab's program as the machine executes it (`GCodeLines`), with Follow keeping the line
+ * on show in view.
+ */
+export function GCodeListing({
+  compiled,
+  operations,
+  check,
+  line,
+  onSeekLine,
+}: {
+  compiled: CompiledPlate
+  /** The plate's operations, for the operation headers. */
+  operations: readonly Operation[]
+  check: ProgramCheck
+  /** The line on show: highlighted, and kept in view while Follow is on. */
+  line: number
+  onSeekLine: (line: number) => void
+}) {
+  const id = useId()
+  const [follow, setFollow] = useState(true)
+  return (
     <section className="flex h-full min-h-0 flex-col" aria-label="G-code">
       <header className="flex items-center justify-between gap-3 px-3 py-2">
         <div className="flex min-w-0 flex-col">
@@ -221,78 +328,15 @@ export function GCodeListing({
         </div>
       )}
       <Separator />
-      <div
-        ref={viewport}
-        className="min-h-0 flex-1 overflow-auto"
-        role="listbox"
-        aria-label="G-code to run"
-        aria-activedescendant={shown ? rowId(line) : undefined}
-        tabIndex={0}
-        onKeyDown={seekFromKeyboard}
-      >
-        <div
-          className="relative w-max min-w-full"
-          style={{ height: virtualizer.getTotalSize() }}
-        >
-          {/* Sizes the list to its widest line, so rows scroll sideways together. */}
-          <div aria-hidden className="invisible flex h-0 gap-2 pr-4 pl-2">
-            <LineContent line={lines.length} text={widest} changed={false} />
-          </div>
-          {items.map((item) => {
-            const row = model.row(item.index)
-            if (row.kind === "header")
-              return (
-                <div
-                  key={item.key}
-                  role="presentation"
-                  className="absolute top-0 left-0 w-full"
-                  style={{
-                    height: item.size,
-                    transform: `translateY(${item.start}px)`,
-                  }}
-                >
-                  <HeaderRow header={row.header} />
-                </div>
-              )
-            const text = lines[row.line - 1]
-            // Comments stay in the source; the machine receives an empty line.
-            const note = prepared
-              ? compiled.program.lines[row.line - 1].trim()
-              : ""
-            const change = model.changes.get(row.line)
-            const current = row.line === line
-            return (
-              <Button
-                key={item.key}
-                id={rowId(row.line)}
-                role="option"
-                aria-selected={current}
-                tabIndex={-1}
-                variant={current ? "secondary" : "ghost"}
-                size="sm"
-                className="absolute top-0 left-0 w-full justify-start gap-2 px-2"
-                style={{
-                  height: item.size,
-                  transform: `translateY(${item.start}px)`,
-                }}
-                title={change ? changeText(change) : undefined}
-                aria-label={`Line ${row.line}: ${text}${change ? ` (${CHANGE_LABELS[change.reason]})` : ""}`}
-                onClick={() => {
-                  onSeekLine(row.line)
-                  viewport.current?.focus({ preventScroll: true })
-                }}
-              >
-                <LineContent
-                  line={row.line}
-                  text={text}
-                  note={note}
-                  changed={!!change}
-                />
-              </Button>
-            )
-          })}
-        </div>
-      </div>
+      <GCodeLines
+        compiled={compiled}
+        operations={operations}
+        check={check}
+        line={line}
+        onSeekLine={onSeekLine}
+        follow={follow}
+        label="G-code to run"
+      />
     </section>
   )
 }

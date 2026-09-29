@@ -7,6 +7,7 @@ import type {
   MachineSnapshot,
   NetworkDevice,
   PrepareResult,
+  WriteAnchorsResult,
 } from "../contract/index.ts"
 import type { CameraEvent } from "./camera.ts"
 import type { MachineController } from "./controller.ts"
@@ -126,6 +127,12 @@ export class MachineGateway {
   readAnchors(signal?: AbortSignal): Promise<AnchorConfiguration> {
     this.require("machine:read")
     return this.controller.readAnchors(signal)
+  }
+
+  /** Only the app changes the machine's settings. */
+  writeAnchors(input: unknown): Promise<WriteAnchorsResult> {
+    this.requireApp()
+    return this.controller.writeAnchors(input)
   }
 
   readHeightMap(signal?: AbortSignal): Promise<HeightMap> {

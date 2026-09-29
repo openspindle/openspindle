@@ -5,13 +5,14 @@ import { Button } from "@/components/ui/button"
 import { DialogFooter } from "@/components/ui/dialog"
 import {
   Field,
-  FieldContent,
-  FieldDescription,
   FieldError,
   FieldGroup,
   FieldLabel,
+  FieldLegend,
+  FieldSet,
 } from "@/components/ui/field"
 import { OptionSelect } from "@/components/option-select"
+import { Hint } from "@/components/workspace/hint"
 import { MeasurementInput } from "@/components/workspace/measurement-input"
 import {
   useWorkspace,
@@ -26,7 +27,10 @@ import {
   defaultDesignRules,
   limitValueSchema,
 } from "@/domain/design-rules/rules"
-import type { DesignRuleId, RuleSeverity } from "@/domain/design-rules/rules"
+import type { DesignRules, RuleSeverity } from "@/domain/design-rules/rules"
+import { COMMON_PROGRAM_RULES } from "@/domain/design-rules/common-rules"
+import type { ProgramRule } from "@/domain/design-rules/program-rules"
+import { FIXTURE_KITS } from "@/domain/fixtures/catalog"
 import { visibleErrors } from "@/features/auto-level/auto-level-settings"
 
 const SEVERITY_OPTIONS: ReadonlyArray<{ value: RuleSeverity; label: string }> =
@@ -40,11 +44,13 @@ const SEVERITY_OPTIONS: ReadonlyArray<{ value: RuleSeverity; label: string }> =
 function SeveritySelect({
   id,
   label,
+  description,
   value,
   onChange,
 }: {
   id: string
   label: string
+  description?: string
   value: RuleSeverity
   onChange: (value: RuleSeverity) => void
 }) {
@@ -52,6 +58,7 @@ function SeveritySelect({
     <OptionSelect
       id={id}
       aria-label={label}
+      aria-description={description}
       className="w-28 shrink-0"
       options={SEVERITY_OPTIONS}
       value={value}
@@ -63,9 +70,31 @@ function SeveritySelect({
   )
 }
 
+/** A limit's row: its label, the limit, and how breaking it is reported; an error under them. */
+const LIMIT_ROW = "grid grid-cols-[minmax(0,1fr)_8rem_7rem] items-center"
+
 /**
- * The project's design rules: each rule's limit and how a broken one is reported. Changes apply
- * on Save; Reset to defaults only fills in the defaults.
+ * The program rules' severities as saved: only those set otherwise than the rule says, so a
+ * project follows the rules' defaults where it sets nothing. Rules of machines this app does
+ * not know stay as they are.
+ */
+function savedProgramRules(
+  rules: DesignRules["programRules"]
+): DesignRules["programRules"] {
+  const saved = { ...rules }
+  const known = [
+    ...COMMON_PROGRAM_RULES,
+    ...FIXTURE_KITS.flatMap((kit) => kit.programRules),
+  ]
+  for (const rule of known)
+    if (saved[rule.id]?.severity === rule.severity) delete saved[rule.id]
+  return saved
+}
+
+/**
+ * The project's design rules: each rule's limit and how a broken one is reported, then each
+ * machine's rules for the programs it runs. Changes apply on Save; Reset to defaults only fills
+ * in the defaults.
  */
 export function DesignRulesSettings({ onClose }: { onClose: () => void }) {
   const id = useId()
@@ -76,7 +105,10 @@ export function DesignRulesSettings({ onClose }: { onClose: () => void }) {
     onSubmit: ({ value }) => {
       const result = workspace.dispatch({
         type: "designRules.set",
-        rules: value,
+        rules: {
+          ...value,
+          programRules: savedProgramRules(value.programRules),
+        },
       })
       if (!result.ok) {
         toast.error(result.error)
@@ -85,7 +117,7 @@ export function DesignRulesSettings({ onClose }: { onClose: () => void }) {
       onClose()
     },
   })
-  const fieldId = (rule: DesignRuleId, part: string) => `${id}-${rule}-${part}`
+  const fieldId = (rule: string, part: string) => `${id}-${rule}-${part}`
   return (
     <form
       // The rules' schemas check the limits and say why; the browser's own check would stop Save
@@ -112,44 +144,45 @@ export function DesignRulesSettings({ onClose }: { onClose: () => void }) {
                   const invalid = !!errors?.length
                   const value = field.state.value
                   return (
-                    <Field orientation="horizontal" data-invalid={invalid}>
-                      <FieldContent>
-                        <FieldLabel htmlFor={fieldId(rule, "value")}>
-                          {info.label}
-                        </FieldLabel>
-                        <FieldDescription>{info.description}</FieldDescription>
-                        <FieldError errors={errors} />
-                      </FieldContent>
-                      <div className="w-32 shrink-0">
-                        <MeasurementInput
-                          id={fieldId(rule, "value")}
-                          type="number"
-                          unit={info.unit}
-                          min={info.min}
-                          max={info.max}
-                          step="any"
-                          value={Number.isNaN(value) ? "" : value}
-                          aria-invalid={invalid}
-                          onBlur={field.handleBlur}
-                          onChange={(event) =>
-                            field.handleChange(
-                              event.target.value.trim()
-                                ? Number(event.target.value)
-                                : Number.NaN
-                            )
-                          }
-                        />
-                      </div>
+                    <Field
+                      orientation="horizontal"
+                      className={LIMIT_ROW}
+                      data-invalid={invalid}
+                    >
+                      <FieldLabel htmlFor={fieldId(rule, "value")}>
+                        <Hint text={info.description}>{info.label}</Hint>
+                      </FieldLabel>
+                      <MeasurementInput
+                        id={fieldId(rule, "value")}
+                        aria-description={info.description}
+                        type="number"
+                        unit={info.unit}
+                        min={info.min}
+                        max={info.max}
+                        step="any"
+                        value={Number.isNaN(value) ? "" : value}
+                        aria-invalid={invalid}
+                        onBlur={field.handleBlur}
+                        onChange={(event) =>
+                          field.handleChange(
+                            event.target.value.trim()
+                              ? Number(event.target.value)
+                              : Number.NaN
+                          )
+                        }
+                      />
                       <form.Field name={`${rule}.severity`}>
                         {(severity) => (
                           <SeveritySelect
                             id={fieldId(rule, "severity")}
                             label={`${info.label} severity`}
+                            description={info.description}
                             value={severity.state.value}
                             onChange={severity.handleChange}
                           />
                         )}
                       </form.Field>
+                      <FieldError className="col-span-3" errors={errors} />
                     </Field>
                   )
                 }}
@@ -162,15 +195,13 @@ export function DesignRulesSettings({ onClose }: { onClose: () => void }) {
               <form.Field key={rule} name={`${rule}.severity`}>
                 {(field) => (
                   <Field orientation="horizontal">
-                    <FieldContent>
-                      <FieldLabel htmlFor={fieldId(rule, "severity")}>
-                        {info.label}
-                      </FieldLabel>
-                      <FieldDescription>{info.description}</FieldDescription>
-                    </FieldContent>
+                    <FieldLabel htmlFor={fieldId(rule, "severity")}>
+                      <Hint text={info.description}>{info.label}</Hint>
+                    </FieldLabel>
                     <SeveritySelect
                       id={fieldId(rule, "severity")}
                       label={`${info.label} severity`}
+                      description={info.description}
                       value={field.state.value}
                       onChange={field.handleChange}
                     />
@@ -179,6 +210,45 @@ export function DesignRulesSettings({ onClose }: { onClose: () => void }) {
               </form.Field>
             )
           })}
+          <form.Field name="programRules">
+            {(field) => {
+              // A program rule's row: how breaking it is reported, as the project sets it.
+              const row = (rule: ProgramRule) => (
+                <Field key={rule.id} orientation="horizontal">
+                  <FieldLabel htmlFor={fieldId(rule.id, "severity")}>
+                    <Hint text={rule.description}>{rule.label}</Hint>
+                  </FieldLabel>
+                  <SeveritySelect
+                    id={fieldId(rule.id, "severity")}
+                    label={`${rule.label} severity`}
+                    description={rule.description}
+                    value={
+                      field.state.value[rule.id]?.severity ?? rule.severity
+                    }
+                    onChange={(severity) =>
+                      field.handleChange({
+                        ...field.state.value,
+                        [rule.id]: { severity },
+                      })
+                    }
+                  />
+                </Field>
+              )
+              return (
+                <>
+                  {COMMON_PROGRAM_RULES.map(row)}
+                  {FIXTURE_KITS.filter((kit) => kit.programRules.length).map(
+                    (kit) => (
+                      <FieldSet key={kit.name}>
+                        <FieldLegend>{kit.name}</FieldLegend>
+                        <FieldGroup>{kit.programRules.map(row)}</FieldGroup>
+                      </FieldSet>
+                    )
+                  )}
+                </>
+              )
+            }}
+          </form.Field>
         </FieldGroup>
       </div>
       <DialogFooter className="shrink-0 border-t p-4">

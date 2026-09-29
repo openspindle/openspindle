@@ -9,8 +9,8 @@ import { SettingValuesSchema } from "../dto.ts"
 import type { SettingValues } from "../dto.ts"
 import { fail } from "../errors.ts"
 import {
-  ManifestSchema,
   PluginIdSchema,
+  StoredManifestSchema,
   VersionSchema,
   ViewDeclarationSchema,
 } from "../manifest.ts"
@@ -20,13 +20,17 @@ import type { ValidatedPackage } from "./package.ts"
 import { PackageOriginSchema, originIdentity } from "./source.ts"
 import type { PackageOrigin } from "./source.ts"
 
-/** One installed package as the host's registry stores it. */
+/**
+ * One installed package as the host's registry stores it. Its manifest may target a plugin
+ * API this host no longer implements, after an update of the host: the plugin stays installed
+ * and keeps its settings, but serves nothing until it is updated (`apiIncompatibility`).
+ */
 export const InstalledPluginRecordSchema = z
   .strictObject({
     id: PluginIdSchema,
     version: VersionSchema,
     source: PackageOriginSchema,
-    manifest: ManifestSchema,
+    manifest: StoredManifestSchema,
     inventory: InventorySchema,
     digest: Sha256Schema,
     enabled: z.boolean(),

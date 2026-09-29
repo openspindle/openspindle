@@ -9,6 +9,8 @@ import type {
   NetworkDevice,
   PrepareResult,
   RunRequest,
+  WriteAnchorsRequest,
+  WriteAnchorsResult,
 } from "@/machine/contract"
 import type { ParamsOut } from "@openspindle/rpc"
 import type {
@@ -22,6 +24,7 @@ import type { ModelStore } from "@/persistence/models/model-library"
 import type {
   FileKind,
   OpenFileResult,
+  OpenedFiles,
   SaveFileRequest,
   SaveFileResult,
 } from "./contract/files"
@@ -64,6 +67,8 @@ export interface MachineHost {
   run: (request: RunRequest) => Promise<MachineSnapshot>
   dismissJob: () => Promise<MachineSnapshot>
   readAnchors: (signal?: AbortSignal) => Promise<AnchorConfiguration>
+  /** Stores the anchors in the machine's configuration; what it reads back afterwards. */
+  writeAnchors: (request: WriteAnchorsRequest) => Promise<WriteAnchorsResult>
   readHeightMap: (signal?: AbortSignal) => Promise<HeightMap>
   watchCamera: (listener: (event: CameraEvent) => void) => () => void
   /** The machine console: its backlog at once, then new entries in batches. */
@@ -82,6 +87,8 @@ export interface StoragePort {
 export interface FileHost {
   open: (kind: FileKind) => Promise<OpenFileResult>
   save: (request: SaveFileRequest) => Promise<SaveFileResult>
+  /** Files the system asks the app to open, such as with Finder's Open With. */
+  subscribeOpened: (listener: (files: OpenedFiles) => void) => () => void
 }
 
 /** Discover live NC programs in Fusion; reading posts the selected program for import. */

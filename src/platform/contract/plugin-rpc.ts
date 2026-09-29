@@ -7,7 +7,6 @@ import {
   CompanionStatusSchema,
   InstallReviewSchema,
   JsonSchema,
-  ManifestSchema,
   PackageOriginSchema,
   PluginAccessorySchema,
   PluginIdSchema,
@@ -15,8 +14,10 @@ import {
   ProgressSchema,
   SettingValuesSchema,
   Sha256Schema,
+  StoredManifestSchema,
   VersionSchema,
   ViewDeclarationSchema,
+  apiIncompatibility,
 } from "@openspindle/plugin-core"
 import type {
   CompanionStatus,
@@ -36,7 +37,12 @@ const PluginRef = z.strictObject({ pluginId: PluginIdSchema })
 export const PluginSummarySchema = z.object({
   id: PluginIdSchema,
   version: VersionSchema,
-  manifest: ManifestSchema,
+  manifest: StoredManifestSchema,
+  /**
+   * Why the plugin cannot run: it was built for a plugin API this OpenSpindle does not
+   * implement. It serves nothing until it is updated; null when it can run.
+   */
+  incompatible: z.string().nullable(),
   source: PackageOriginSchema,
   enabled: z.boolean(),
   installedAt: z.string(),
@@ -60,6 +66,7 @@ export function pluginSummary(
     id: record.id,
     version: record.version,
     manifest: record.manifest,
+    incompatible: apiIncompatibility(record.manifest),
     source: record.source,
     enabled: record.enabled,
     installedAt: record.installedAt,
@@ -71,6 +78,11 @@ export function pluginSummary(
     companion,
   }
 }
+
+/** Whether a plugin serves its views, programs and companion: enabled, and able to run. */
+export const isPluginUsable = (
+  plugin: Pick<PluginSummary, "enabled" | "incompatible">
+) => plugin.enabled && plugin.incompatible === null
 
 export const InstallRequestSchema = z.discriminatedUnion("kind", [
   z.strictObject({

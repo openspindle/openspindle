@@ -1,5 +1,12 @@
 import { useId, useState } from "react"
-import { RefreshCw, RotateCw, ScrollText, Trash2, Wrench } from "lucide-react"
+import {
+  RefreshCw,
+  RotateCw,
+  ScrollText,
+  Trash2,
+  TriangleAlert,
+  Wrench,
+} from "lucide-react"
 import type { CompanionStatus, InstallReview } from "@openspindle/plugin-core"
 import {
   AlertDialog,
@@ -11,6 +18,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -202,7 +210,8 @@ function RemoveButton({ plugin }: { plugin: PluginSummary }) {
  * One installed plugin: what it is and may do, its settings, and enable, update and remove.
  * A companion's controls sit beside the switch, and what it reports under the settings (on
  * its own for a plugin without any). A plugin that comes with the app updates with it and
- * can only be disabled.
+ * can only be disabled. One built for another plugin API says why it cannot run, and keeps
+ * its switch and settings as they were until it is updated.
  */
 export function InstalledPluginCard({
   plugin,
@@ -229,7 +238,7 @@ export function InstalledPluginCard({
           <span className="font-numeric">{contents(plugin)}</span>
         </CardDescription>
         <CardAction className="flex items-center gap-2">
-          {plugin.companion && (
+          {plugin.companion && !plugin.incompatible && (
             <CompanionControls
               plugin={plugin}
               status={plugin.companion}
@@ -242,7 +251,7 @@ export function InstalledPluginCard({
             <Switch
               id={`${id}-enabled`}
               checked={plugin.enabled}
-              disabled={setEnabled.isPending}
+              disabled={setEnabled.isPending || !!plugin.incompatible}
               onCheckedChange={(enabled) =>
                 setEnabled.mutate({ pluginId: plugin.id, enabled })
               }
@@ -252,6 +261,13 @@ export function InstalledPluginCard({
         </CardAction>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
+        {plugin.incompatible && (
+          <Alert variant="warning">
+            <TriangleAlert />
+            <AlertTitle>Cannot run</AlertTitle>
+            <AlertDescription>{plugin.incompatible}</AlertDescription>
+          </Alert>
+        )}
         <FieldDescription className="break-words">
           {plugin.manifest.description} <PluginSource source={plugin.source} />
         </FieldDescription>
