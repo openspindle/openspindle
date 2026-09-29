@@ -90,7 +90,7 @@ function startText(params: Probe3dParams) {
     case "inside-corner":
       return `over the top X ${x} Y ${y} out from the corner, beyond both walls`
     case "pocket-center":
-      return "inside the pocket, near its middle, at the height to touch its walls,"
+      return "over the pocket, near its middle,"
     case "boss-center":
       return "over the boss's middle"
   }
@@ -250,8 +250,21 @@ function Probe3dForm({
             lastAnchor={lastAnchor}
             setLastAnchor={setLastAnchor}
             disabled={disabled}
-            probeDescription={`Starts where the probe is when the job starts: position it ${startText(values)} before Run. A probe change returns above it at the firmware's clearance height.`}
-            anchorDescription="The machine rises to its clearance height, travels to the anchor plus the offset, then runs the routine from there."
+            probeDescription={`Starts where the probe is when the job starts: position it ${startText(values)} before Run. A probe change returns above it at the firmware's clearance height, and it comes down to Machine Z.`}
+            anchorDescription="The machine rises to its clearance height, travels to the anchor plus the offset and comes down to Machine Z, then runs the routine from there."
+            height={
+              <NumericFields
+                id={id}
+                disabled={disabled}
+                fields={[
+                  {
+                    name: "startZ",
+                    parameter: parameters.startZ,
+                    field: probingField(form, "startZ"),
+                  },
+                ]}
+              />
+            }
           />
         )}
       </form.Subscribe>

@@ -130,12 +130,12 @@ function operationSummary(
       return `Probes ${columns} × ${rows} points over ${mm(width)} × ${mm(depth)} mm.`
     }
     case "probe-3d": {
-      const { placement } = source.params
+      const { placement, startZ } = source.params
       const where =
         placement.kind === "anchor"
           ? `from ${anchorName(subject, placement.anchorId)} + X${mm(placement.offset.x)} Y${mm(placement.offset.y)}`
           : "from the probe position"
-      return `Finds ${probe3dTarget(source.params)} ${where} and sets the work origin there.`
+      return `Finds ${probe3dTarget(source.params)} ${where} at machine Z ${mm(startZ)} and sets the work origin there.`
     }
     default: {
       const names = toolNames(operation, subject, tools)

@@ -255,8 +255,8 @@ export function NumericFields({
  * Where a probing operation places itself: a stored anchor plus an offset, or the probe
  * position. Shared by auto-level's grid, auto Z-height's touch point and 3D probing's start: the
  * anchor items, `canUseAnchor`, `choose`, the anchor Select and the offsets are identical; only
- * the "Relative to" wording and, through `action`, what fits the placement to the work area (Fit
- * grid or Center) differ.
+ * the "Relative to" wording, through `action` what fits the placement to the work area (Fit
+ * grid or Center), and through `height` the Z 3D probing starts at differ.
  */
 export function PlacementFields({
   id,
@@ -271,6 +271,7 @@ export function PlacementFields({
   probeDescription,
   anchorDescription,
   action,
+  height,
 }: {
   id: string
   placement: ProbingField<AutoLevelPlacement>
@@ -291,6 +292,8 @@ export function PlacementFields({
     placement: AutoLevelPlacement,
     setPlacement: (next: AutoLevelPlacement) => void
   ) => ReactNode
+  /** The height the operation starts at, under the offsets, from either placement. */
+  height?: ReactNode
 }) {
   return placement(({ value: placementValue, onChange: setPlacement }) => {
     const anchorId =
@@ -402,6 +405,7 @@ export function PlacementFields({
               ))}
             </>
           )}
+          {height}
         </FieldGroup>
       </FieldSet>
     )

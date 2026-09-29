@@ -417,7 +417,6 @@ const PROBE_3D_BLOCKERS: ReadonlySet<Probe3dIssueCode> = new Set([
   "anchor-snapshot-missing",
   "anchor-unavailable",
   "anchor-point-out-of-range",
-  "pocket-needs-probe-position",
 ])
 
 const probe3dKind: OperationKind<"probe-3d"> = {

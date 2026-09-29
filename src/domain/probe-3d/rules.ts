@@ -12,7 +12,6 @@ import type { Probe3dParameters, Probe3dParams } from "./params"
 export type Probe3dIssueCode =
   // Parameters
   | "invalid-parameters"
-  | "pocket-needs-probe-position"
   // Anchor placement against the plate's anchor snapshot
   | "anchor-snapshot-missing"
   | "anchor-unavailable"
@@ -37,8 +36,7 @@ export type Probe3dPlan = Checked<{
 
 /**
  * Everything that prevents generating NC: the parameters, within the ranges of the machine's
- * 3D probe (`parameters`), then the anchored start. A pocket's centring runs where the probe is,
- * inside the pocket, as the firmware's routine does not come down into it.
+ * 3D probe (`parameters`), then the anchored start.
  */
 export function planProbe3d(
   params: Probe3dParams,
@@ -53,19 +51,9 @@ export function planProbe3d(
         probeError("invalid-parameters", issue.message)
       ),
     }
-  const { placement, routine } = parsed.data
+  const { placement } = parsed.data
   if (placement.kind === "probe-position")
     return { ok: true, params: parsed.data, start: { kind: "probe-position" } }
-  if (routine === "pocket-center")
-    return {
-      ok: false,
-      issues: [
-        probeError(
-          "pocket-needs-probe-position",
-          "A pocket's centring starts inside the pocket, where the probe is: use the probe position."
-        ),
-      ],
-    }
   // A start is a grid without extent; only the range message speaks of a grid.
   const resolved = resolveAnchorStart(placement, { width: 0, depth: 0 }, plate)
   if (!resolved.ok)

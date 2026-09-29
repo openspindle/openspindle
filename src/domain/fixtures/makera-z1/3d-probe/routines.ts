@@ -11,7 +11,7 @@ import type { Probe3dParameters, Probe3dParams } from "../../../probe-3d/params"
 import { probe3dStartOffset } from "../../../probe-3d/rules"
 import type { OriginProbing } from "../../../probing/probe"
 import { PROBE_3D_TOOL } from "../../../tools/tool-table"
-import { anchorTravel } from "../wired-probe/travel"
+import { CLEARANCE_Z, MACHINE_Z, anchorTravel } from "../wired-probe/travel"
 import { ORIGIN_ROUTINE, routineSubcode } from "./blocks"
 
 /**
@@ -61,6 +61,17 @@ const PROBE_3D_PARAMETERS: Probe3dParameters = {
     step: 0.5,
     description:
       "How far below the top, which the probe touches first, it touches the sides.",
+  },
+  startZ: {
+    label: "Machine Z",
+    axis: "Z",
+    unit: "mm",
+    default: CLEARANCE_Z,
+    min: MACHINE_Z.min,
+    max: MACHINE_Z.max,
+    step: 0.1,
+    description:
+      "The machine Z (G53) the probe comes down to over its start: in a pocket at the height to touch its walls, or above the top a corner or boss routine touches first. At the clearance, -3 mm, it stays where the probe change or the travel leaves it.",
   },
 }
 
@@ -119,8 +130,7 @@ function positioning(params: Probe3dParams): string[] {
   const where = {
     "outside-corner": `about X${x} Y${y} in from the corner, over its top,`,
     "inside-corner": `over the top outside the corner, about X${x} Y${y} beyond both walls`,
-    "pocket-center":
-      "inside the pocket or bore, near its middle, at the height to touch its walls,",
+    "pocket-center": "over the pocket or bore, near its middle,",
     "boss-center": "over the middle of the boss",
   }[params.routine]
   return [
@@ -177,6 +187,8 @@ export const THREE_D_PROBE: OriginProbing = {
       "G21 G90",
       `M6 T${PROBE_3D_TOOL}`,
       ...(start.kind === "machine" ? anchorTravel(start) : []),
+      "; Down to the start's machine Z.",
+      `G53 G0 Z${formatMillimetres(params.startZ)}`,
       ...routineBlocks(params, subcode),
       "M2",
     ]
