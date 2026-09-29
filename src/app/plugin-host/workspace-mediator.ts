@@ -425,6 +425,15 @@ export function createWorkspaceMediator(
       })
       const target = { plateId: plate.id, operationId: operation.id }
       const commands: WorkspaceCommand[] = []
+      // The program goes first: its revision check is against changes made since the plugin
+      // read the operation, and a rename earlier in this batch would count as one.
+      if (regenerated)
+        commands.push({
+          type: "operation.source",
+          ...target,
+          source,
+          expectedRevision: operation.revision,
+        })
       if (next.name !== expected.name)
         commands.push({ type: "operation.rename", ...target, name: next.name })
       if (next.stopBefore !== expected.stopBefore)
@@ -432,13 +441,6 @@ export function createWorkspaceMediator(
           type: "operation.stopBefore",
           ...target,
           value: next.stopBefore,
-        })
-      if (regenerated)
-        commands.push({
-          type: "operation.source",
-          ...target,
-          source,
-          expectedRevision: operation.revision,
         })
       // Assigning is idempotent, so a regenerated program's new tool numbers get theirs too.
       const tools = assignedTools(next.toolAssignments, next.nc)

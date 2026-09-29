@@ -162,11 +162,19 @@ export async function runProcess(
     })
     child.once("close", (code, termination) => {
       cleanup()
+      const output = (stderr || stdout).trim().slice(-4000)
       if (failure) reject(failure)
+      // What a crashed program printed last is often an unrelated warning, not the reason.
+      else if (termination)
+        reject(
+          new Error(
+            `${name} crashed (${termination}).${output ? ` Its last output: ${output}` : ""}`
+          )
+        )
       else if (code !== 0)
         reject(
           new Error(
-            `${name} failed (${termination ?? `exit ${code}`}): ${(stderr || stdout || "No diagnostic output.").trim().slice(-4000)}`
+            `${name} failed (exit ${code}): ${output || "No diagnostic output."}`
           )
         )
       else resolve({ stdout, stderr })

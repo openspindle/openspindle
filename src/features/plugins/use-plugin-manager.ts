@@ -1,6 +1,10 @@
+import { useEffect } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
-import type { InstallRequest } from "@/platform/contract/plugin-rpc"
+import type {
+  InstallRequest,
+  PluginSummary,
+} from "@/platform/contract/plugin-rpc"
 import { useHost } from "@/platform/host-context"
 import { pluginKeys } from "@/platform/plugins"
 
@@ -139,6 +143,20 @@ export function useCompanionSetup() {
     },
     onError: (error) => toast.error(error.message),
   })
+}
+
+/**
+ * Holds an enabled plugin's companion while its card shows, as an open view does: an on-view
+ * companion starts, so the card shows what it reports. Its status arrives with the plugin
+ * list.
+ */
+export function useHoldCompanion(plugin: PluginSummary) {
+  const services = useHost().plugins.services
+  const holds = plugin.enabled && plugin.companion !== null
+  useEffect(() => {
+    if (!holds) return
+    return services.subscribeCompanion(plugin.id, () => undefined)
+  }, [services, plugin.id, holds])
 }
 
 /** The companion's recent log lines (lifecycle, its own logs, stderr). */

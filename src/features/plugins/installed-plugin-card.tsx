@@ -1,6 +1,5 @@
 import { useId, useState } from "react"
 import { RefreshCw, RotateCw, ScrollText, Trash2, Wrench } from "lucide-react"
-import { CAPABILITY_INFO } from "@openspindle/plugin-core"
 import type { CompanionStatus, InstallReview } from "@openspindle/plugin-core"
 import {
   AlertDialog,
@@ -24,11 +23,6 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible"
-import {
   Field,
   FieldDescription,
   FieldError,
@@ -40,153 +34,125 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Switch } from "@/components/ui/switch"
 import type { PluginSummary } from "@/platform/contract/plugin-rpc"
 import { formatBytes, plural } from "@/domain/primitives"
-import { PluginSource } from "./install-review"
+import { CompanionNote, companionNote } from "./companion-note"
+import { Permissions, PluginSource } from "./install-review"
 import { PluginSettings } from "./plugin-settings"
 import {
   useCompanionLogs,
   useCompanionSetup,
+  useHoldCompanion,
   usePrepareUpdate,
   useRemovePlugin,
   useRestartCompanion,
   useSetPluginEnabled,
 } from "./use-plugin-manager"
 
-const COMPANION_STATES: Record<CompanionStatus["state"], string> = {
-  stopped: "Stopped",
-  starting: "Starting",
-  running: "Running",
-  stopping: "Stopping",
-  backoff: "Restarting soon",
-  failed: "Stopped after repeated failures",
-}
-
-const HEALTH: Record<NonNullable<CompanionStatus["health"]>["status"], string> =
-  {
-    ready: "Ready",
-    "needs-setup": "Needs setup",
-    degraded: "Degraded",
-  }
-
 function contents(plugin: PluginSummary): string {
-  const { manifest } = plugin
+  const { programs } = plugin.manifest
   const parts: string[] = []
-  if (manifest.programs.length)
-    parts.push(plural(manifest.programs.length, "program"))
-  const views = manifest.ui?.views.length ?? 0
-  if (views) parts.push(plural(views, "view"))
+  if (programs.length) parts.push(plural(programs.length, "program"))
   parts.push(formatBytes(plugin.bytes))
   return parts.join(" · ")
 }
 
-function CompanionLogs({ pluginId }: { pluginId: string }) {
-  const [open, setOpen] = useState(false)
-  const logs = useCompanionLogs(pluginId, open)
+/** The companion's recent log lines, while the card shows them. */
+function CompanionLog({ id, pluginId }: { id: string; pluginId: string }) {
+  const logs = useCompanionLogs(pluginId, true)
   return (
-    <Collapsible open={open} onOpenChange={setOpen}>
-      <CollapsibleTrigger
-        render={<Button variant="ghost" size="sm" className="self-start" />}
+    <FieldSet id={id}>
+      <FieldLegend variant="label">Log</FieldLegend>
+      <Button
+        variant="outline"
+        size="sm"
+        className="self-start"
+        disabled={logs.isFetching}
+        onClick={() => void logs.refetch()}
       >
-        <ScrollText data-icon="inline-start" />
-        {open ? "Hide log" : "Show log"}
-      </CollapsibleTrigger>
-      <CollapsibleContent className="flex flex-col gap-2 pt-2">
-        <Button
-          variant="outline"
-          size="sm"
-          className="self-start"
-          disabled={logs.isFetching}
-          onClick={() => void logs.refetch()}
-        >
-          <RefreshCw data-icon="inline-start" />
-          Refresh
-        </Button>
-        {logs.error && <FieldError>{logs.error.message}</FieldError>}
-        {logs.data && !logs.data.length && (
-          <FieldDescription>Nothing logged yet.</FieldDescription>
-        )}
-        {logs.data && logs.data.length > 0 && (
-          <ScrollArea className="max-h-60">
-            <ol className="flex flex-col gap-1 p-2" aria-label="Companion log">
-              {logs.data.map((entry, index) => (
-                <li key={index} className="flex items-start gap-2">
-                  <Badge
-                    variant={
-                      entry.level === "error" ? "destructive" : "secondary"
-                    }
-                    className="font-numeric"
-                  >
-                    {new Date(entry.at).toLocaleTimeString()}
-                  </Badge>
-                  <span className="min-w-0 break-words">
-                    {entry.source}: {entry.message}
-                  </span>
-                </li>
-              ))}
-            </ol>
-          </ScrollArea>
-        )}
-      </CollapsibleContent>
-    </Collapsible>
+        <RefreshCw data-icon="inline-start" />
+        Refresh
+      </Button>
+      {logs.error && <FieldError>{logs.error.message}</FieldError>}
+      {logs.data && !logs.data.length && (
+        <FieldDescription>Nothing logged yet.</FieldDescription>
+      )}
+      {logs.data && logs.data.length > 0 && (
+        <ScrollArea className="max-h-60">
+          <ol className="flex flex-col gap-1 p-2" aria-label="Companion log">
+            {logs.data.map((entry, index) => (
+              <li key={index} className="flex items-start gap-2">
+                <Badge
+                  variant={
+                    entry.level === "error" ? "destructive" : "secondary"
+                  }
+                  className="font-numeric"
+                >
+                  {new Date(entry.at).toLocaleTimeString()}
+                </Badge>
+                <span className="min-w-0 break-words">
+                  {entry.source}: {entry.message}
+                </span>
+              </li>
+            ))}
+          </ol>
+        </ScrollArea>
+      )}
+    </FieldSet>
   )
 }
 
-/** The companion's state and health, with restart, setup and its log. */
-function CompanionPanel({
+/**
+ * The companion's controls beside the plugin's switch: Restart, the log, and Run setup while
+ * it needs setup and has a setup step.
+ */
+function CompanionControls({
   plugin,
   status,
+  logId,
+  logOpen,
+  onLogOpenChange,
 }: {
   plugin: PluginSummary
   status: CompanionStatus
+  logId: string
+  logOpen: boolean
+  onLogOpenChange: (open: boolean) => void
 }) {
   const restart = useRestartCompanion()
   const setup = useCompanionSetup()
   const busy = restart.isPending || setup.isPending
   return (
-    <FieldSet>
-      <FieldLegend variant="label">Companion</FieldLegend>
-      <div className="flex flex-wrap items-center gap-2">
-        <Badge
-          variant={status.state === "failed" ? "destructive" : "secondary"}
-        >
-          {COMPANION_STATES[status.state]}
-        </Badge>
-        {status.health && (
-          <Badge variant="outline">{HEALTH[status.health.status]}</Badge>
-        )}
-        {status.restarts > 0 && (
-          <FieldDescription>
-            Restarted {plural(status.restarts, "time")}
-          </FieldDescription>
-        )}
-      </div>
-      {status.health?.message && (
-        <FieldDescription>{status.health.message}</FieldDescription>
-      )}
-      {status.lastError && <FieldError>{status.lastError}</FieldError>}
-      <div className="flex flex-wrap gap-2">
+    <>
+      {status.setup && status.health?.status === "needs-setup" && (
         <Button
           variant="outline"
           size="sm"
           disabled={busy || !plugin.enabled}
-          onClick={() => restart.mutate(plugin.id)}
+          onClick={() => setup.mutate(plugin.id)}
         >
-          <RotateCw data-icon="inline-start" />
-          Restart
+          <Wrench data-icon="inline-start" />
+          {setup.isPending ? "Setting up…" : "Run setup"}
         </Button>
-        {status.setup && status.health?.status === "needs-setup" && (
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={busy || !plugin.enabled}
-            onClick={() => setup.mutate(plugin.id)}
-          >
-            <Wrench data-icon="inline-start" />
-            {setup.isPending ? "Setting up…" : "Run setup"}
-          </Button>
-        )}
-      </div>
-      <CompanionLogs pluginId={plugin.id} />
-    </FieldSet>
+      )}
+      <Button
+        variant="outline"
+        size="sm"
+        disabled={busy || !plugin.enabled}
+        onClick={() => restart.mutate(plugin.id)}
+      >
+        <RotateCw data-icon="inline-start" />
+        Restart
+      </Button>
+      <Button
+        variant="ghost"
+        size="sm"
+        aria-expanded={logOpen}
+        aria-controls={logId}
+        onClick={() => onLogOpenChange(!logOpen)}
+      >
+        <ScrollText data-icon="inline-start" />
+        {logOpen ? "Hide log" : "Show log"}
+      </Button>
+    </>
   )
 }
 
@@ -234,7 +200,9 @@ function RemoveButton({ plugin }: { plugin: PluginSummary }) {
 
 /**
  * One installed plugin: what it is and may do, its settings, and enable, update and remove.
- * A plugin that comes with the app updates with it and can only be disabled.
+ * A companion's controls sit beside the switch, and what it reports under the settings (on
+ * its own for a plugin without any). A plugin that comes with the app updates with it and
+ * can only be disabled.
  */
 export function InstalledPluginCard({
   plugin,
@@ -246,8 +214,12 @@ export function InstalledPluginCard({
   const id = useId()
   const setEnabled = useSetPluginEnabled()
   const update = usePrepareUpdate()
+  const [logOpen, setLogOpen] = useState(false)
+  useHoldCompanion(plugin)
   const development = plugin.source.kind === "folder"
   const bundled = plugin.source.kind === "bundled"
+  const hasSettings = plugin.manifest.settings.length > 0
+  const note = companionNote(plugin.companion)
   return (
     <Card size="sm">
       <CardHeader>
@@ -256,7 +228,16 @@ export function InstalledPluginCard({
           Version {plugin.version} ·{" "}
           <span className="font-numeric">{contents(plugin)}</span>
         </CardDescription>
-        <CardAction>
+        <CardAction className="flex items-center gap-2">
+          {plugin.companion && (
+            <CompanionControls
+              plugin={plugin}
+              status={plugin.companion}
+              logId={`${id}-log`}
+              logOpen={logOpen}
+              onLogOpenChange={setLogOpen}
+            />
+          )}
           <Field orientation="horizontal">
             <Switch
               id={`${id}-enabled`}
@@ -270,22 +251,17 @@ export function InstalledPluginCard({
           </Field>
         </CardAction>
       </CardHeader>
-      <CardContent className="flex flex-col gap-3">
-        <FieldDescription>{plugin.manifest.description}</FieldDescription>
-        <PluginSource source={plugin.source} />
-        <div className="flex flex-wrap gap-1" aria-label="Permissions">
-          {development && <Badge variant="outline">Development</Badge>}
-          {plugin.grants.map((grant) => (
-            <Badge key={grant} variant="secondary">
-              {CAPABILITY_INFO[grant].title}
-            </Badge>
-          ))}
-        </div>
-        {plugin.manifest.settings.length > 0 && (
-          <PluginSettings plugin={plugin} />
-        )}
-        {plugin.companion && (
-          <CompanionPanel plugin={plugin} status={plugin.companion} />
+      <CardContent className="flex flex-col gap-4">
+        <FieldDescription className="break-words">
+          {plugin.manifest.description} <PluginSource source={plugin.source} />
+        </FieldDescription>
+        <Permissions
+          permissions={plugin.grants.map((capability) => ({ capability }))}
+        />
+        {hasSettings && <PluginSettings plugin={plugin} />}
+        {!hasSettings && note && <CompanionNote note={note} />}
+        {logOpen && plugin.companion && (
+          <CompanionLog id={`${id}-log`} pluginId={plugin.id} />
         )}
       </CardContent>
       {!bundled && (

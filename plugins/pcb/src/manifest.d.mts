@@ -52,6 +52,10 @@ export type ParameterDefinition =
   NumberParameter | BooleanParameter | SelectParameter
 
 export declare const inputs: readonly InputDefinition[]
+export declare function isDrillFile(file: {
+  name: string
+  content: string
+}): boolean
 export declare const parameters: readonly ParameterDefinition[]
 export declare const LIMITS: Readonly<{
   inputFile: number

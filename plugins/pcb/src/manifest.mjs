@@ -106,6 +106,22 @@ export const inputs = [
   },
 ]
 
+const drillSuffixes = inputs.find((input) => input.id === "drill").detect
+  .suffixes
+
+/**
+ * Whether a file is an Excellon drill file rather than a Gerber: Gerbers state their
+ * coordinate format (%FS), drill files start with M48 or have a drill extension. Only a
+ * drill file makes Drill and Mill drill operations, only a Gerber the others: pcb2gcode
+ * crashes on a Gerber given as a drill file.
+ */
+export function isDrillFile({ name, content }) {
+  if (/%FS/i.test(content)) return false
+  if (/M48/i.test(content)) return true
+  const lower = name.toLowerCase()
+  return drillSuffixes.some((suffix) => lower.endsWith(suffix))
+}
+
 export const parameters = [
   number("zsafe", "Travel clearance", 2, 0.1, 100, 0.1, "mm"),
   number(

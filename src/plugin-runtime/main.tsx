@@ -116,20 +116,29 @@ function Appearance() {
   return null
 }
 
-/** Reports the content height so the app can size the frame to it. */
+/**
+ * Reports the content height so the app can size the frame to it: the document's own box,
+ * rounded up so no fraction of a pixel scrolls inside the frame, or the body's scrollHeight
+ * when content hangs out of its parent (an input group's addon is taller than the group),
+ * which the box leaves out. (The root's scrollHeight is never less than the frame's current
+ * height, so the frame could not shrink.)
+ */
 function reportSize(peer: Peer<PluginViewContract>) {
   let frame = 0
   let last = -1
   const observer = new ResizeObserver(() => {
     cancelAnimationFrame(frame)
     frame = requestAnimationFrame(() => {
-      const height = Math.ceil(document.documentElement.scrollHeight)
+      const height = Math.max(
+        Math.ceil(document.documentElement.getBoundingClientRect().height),
+        document.body.scrollHeight
+      )
       if (height === last) return
       last = height
       peer.call("view.resize", { height }).catch(() => undefined)
     })
   })
-  observer.observe(document.body)
+  observer.observe(document.documentElement)
 }
 
 async function start(root: HTMLElement) {

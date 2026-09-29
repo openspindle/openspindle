@@ -43,7 +43,7 @@ export function generatedToolSlots(source: string): string[] {
 }
 
 export const multipleToolsMessage = (slots: readonly string[], role: string) =>
-  `This file generates multiple tool slots (${slots.map((slot) => `T${slot}`).join(", ")}). PCB operations support one tool.${role === "drill" ? " Use the Mill method to make every hole with one end mill." : ""}`
+  `This file generates multiple tool slots (${slots.map((slot) => `T${slot}`).join(", ")}). PCB operations support one tool.${role === "drill" ? " Choose Mill drill to make every hole with one end mill." : ""}`
 
 /** Generic notices every generation repeats; the editor does not show them. */
 const GENERIC_WARNINGS = new Set([

@@ -51,6 +51,16 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/*
+ * The window is never narrower than 1000px (electron/main/window.ts), so the preset's
+ * small-screen styles never apply in the app. From 0, the sm and md variants apply in plugin
+ * frames too, which are narrower but part of the same window, so views match the app.
+ */
+@theme {
+  --breakpoint-sm: 0rem;
+  --breakpoint-md: 0rem;
+}
+
 :root {
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);

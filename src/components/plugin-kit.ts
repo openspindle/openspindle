@@ -2,6 +2,7 @@
  * The curated UI kit plugin views build with: the app's shadcn preset components and a
  * few workspace controls. Sandboxed plugin frames receive exactly this module.
  */
+export * from "@/components/ui/alert"
 export * from "@/components/ui/attachment"
 export * from "@/components/ui/badge"
 export * from "@/components/ui/button"
@@ -28,4 +29,11 @@ export {
 } from "@/components/workspace/measurement-input"
 export { ToolCard } from "@/components/workspace/tool-card"
 
-export { FileText, FileUp, Plus, Trash2 } from "lucide-react"
+export {
+  CircleAlert,
+  FileText,
+  FileUp,
+  Plus,
+  Trash2,
+  TriangleAlert,
+} from "lucide-react"

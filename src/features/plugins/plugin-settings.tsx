@@ -1,4 +1,5 @@
 import { useId } from "react"
+import type { ReactNode } from "react"
 import { useForm } from "@tanstack/react-form"
 import type { SettingDeclaration } from "@openspindle/plugin-core"
 import {
@@ -16,6 +17,7 @@ import {
   InputGroupInput,
 } from "@/components/ui/input-group"
 import type { PluginSummary } from "@/platform/contract/plugin-rpc"
+import { CompanionNote, companionNote } from "./companion-note"
 import {
   useChoosePluginSetting,
   useSetPluginSetting,
@@ -29,11 +31,14 @@ function ExecutableSetting({
   pluginId,
   setting,
   stored,
+  hint,
 }: {
   pluginId: string
   setting: SettingDeclaration
   /** The stored path, or "" while it is not set. */
   stored: string
+  /** Below the field: what the companion reported, or the setting's description. */
+  hint: ReactNode
 }) {
   const id = useId()
   const save = useSetPluginSetting()
@@ -68,7 +73,7 @@ function ExecutableSetting({
               <InputGroupInput
                 id={id}
                 value={field.state.value}
-                placeholder="Not set"
+                placeholder={`Path to ${setting.label} binary`}
                 spellCheck={false}
                 disabled={busy}
                 aria-invalid={!!error}
@@ -97,9 +102,7 @@ function ExecutableSetting({
                 </InputGroupButton>
               </InputGroupAddon>
             </InputGroup>
-            {setting.description && (
-              <FieldDescription>{setting.description}</FieldDescription>
-            )}
+            {hint}
             {error && <FieldError>{error.message}</FieldError>}
           </Field>
         )}
@@ -108,12 +111,27 @@ function ExecutableSetting({
   )
 }
 
-/** The plugin's settings, which its companion receives. */
+/**
+ * The plugin's settings, which its companion receives. Once the companion reported how it
+ * fares with them (the program it found, or what is wrong), that shows below the last one
+ * in place of their descriptions.
+ */
 export function PluginSettings({ plugin }: { plugin: PluginSummary }) {
+  const { settings } = plugin.manifest
+  const note = companionNote(plugin.companion)
+  const hint = (setting: SettingDeclaration, index: number) => {
+    if (note)
+      return index === settings.length - 1 && <CompanionNote note={note} />
+    return (
+      setting.description && (
+        <FieldDescription>{setting.description}</FieldDescription>
+      )
+    )
+  }
   return (
     <FieldSet>
       <FieldLegend variant="label">Settings</FieldLegend>
-      {plugin.manifest.settings.map((setting) => {
+      {settings.map((setting, index) => {
         const stored = plugin.settings[setting.id] ?? ""
         // A newly stored value starts the field over from it.
         return (
@@ -122,6 +140,7 @@ export function PluginSettings({ plugin }: { plugin: PluginSummary }) {
             pluginId={plugin.id}
             setting={setting}
             stored={stored}
+            hint={hint(setting, index)}
           />
         )
       })}

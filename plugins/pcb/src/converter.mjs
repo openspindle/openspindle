@@ -10,7 +10,7 @@ import {
 } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { inputs, parameters, LIMITS } from "./manifest.mjs"
+import { inputs, isDrillFile, parameters, LIMITS } from "./manifest.mjs"
 import { runProcess } from "./runtime.mjs"
 import { pluginVersion } from "./version.mjs"
 
@@ -78,6 +78,12 @@ export function validateRequest(input) {
       !file.content.isWellFormed()
     )
       fail(`${file.name} must contain valid UTF-8 text.`)
+    if (isDrillFile(file) !== (file.role === "drill"))
+      fail(
+        file.role === "drill"
+          ? `${file.name} is a Gerber file: Drill and Mill drill operations take an Excellon drill file.`
+          : `${file.name} is a drill file: ${names[file.role]} operations take a Gerber file.`
+      )
     const size = bytes(file.content)
     total += size
     if (size > LIMITS.inputFile || total > LIMITS.inputTotal)
@@ -249,7 +255,7 @@ function requireSingleTool(source, role) {
     const tools = [...slots].sort((a, b) => a - b).map((slot) => `T${slot}`)
     const hint =
       role === "drill"
-        ? " Use the Mill method to make every hole with one end mill."
+        ? " Choose Mill drill to make every hole with one end mill."
         : ""
     throw new MultipleToolSlotsError(
       `This ${role} file generates multiple tool slots (${tools.join(", ")}). PCB operations support one tool.${hint}`,

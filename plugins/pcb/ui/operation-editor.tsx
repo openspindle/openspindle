@@ -15,6 +15,9 @@ import type {
   useOperation,
 } from "@openspindle/plugin-sdk"
 import {
+  Alert,
+  AlertAction,
+  AlertDescription,
   Attachment,
   AttachmentAction,
   AttachmentActions,
@@ -24,6 +27,7 @@ import {
   AttachmentTitle,
   Button,
   Checkbox,
+  CircleAlert,
   Field,
   FieldDescription,
   FieldGroup,
@@ -40,7 +44,7 @@ import {
   SelectValue,
   ToolCard,
 } from "@openspindle/plugin-sdk/ui"
-import { LIMITS, inputs, parameters } from "../src/manifest.mjs"
+import { LIMITS, isDrillFile, parameters } from "../src/manifest.mjs"
 import type {
   DrillMethod,
   ParameterDefinition,
@@ -57,9 +61,14 @@ import { syncOperationAssignments } from "./operation-assignments"
 import type { PCBOperationData, Values } from "./operation-data"
 import { dataJson, operationName, readData, stableJson } from "./operation-data"
 import {
+  MILL_DRILL,
   drillMethod,
   geometryFields,
   operationGroup,
+  operationKind,
+  operationKindLabel,
+  operationKinds,
+  operationRole,
   preferredPreset,
   recommendedKinds,
   toolFields,
@@ -214,7 +223,7 @@ function generatedRecipe(operation: Operation): string | null {
 const parameterLabel = (parameter: ParameterDefinition) =>
   parameter.id === "cutSide" ? "Machine from" : parameter.label
 
-/** The drill method, chosen above the tool because it decides the kind of tool. */
+/** The drill method: the Operation field chooses it (Drill or Mill drill), not a field of its own. */
 const methodParameter = parameters.find(
   (parameter): parameter is SelectParameter =>
     parameter.id === "drillMethod" && parameter.type === "select"
@@ -321,8 +330,11 @@ export function OperationEditor({
   }, [draft])
 
   const data = draft.data
-  const role = data.file.role
+  const role = useMemo(() => operationRole(data.file), [data.file])
+  const kinds = useMemo(() => operationKinds(data.file), [data.file])
+  const drillFile = useMemo(() => isDrillFile(data.file), [data.file])
   const method = useMemo(() => drillMethod(data), [data])
+  const kind = useMemo(() => operationKind(data), [data])
   const group = operationGroup(role)
   const cuttingFields = toolFields(role, method)
   const library = tools.data ?? []
@@ -685,6 +697,28 @@ export function OperationEditor({
     changeSource({ ...data, toolId: "", presetId: "", values: kept })
   }
 
+  /**
+   * Another kind of operation keeps the file and waits for a tool again, as each takes its
+   * own settings and kind of tool. For a drill file, Drill or Mill drill decides how its
+   * holes are made, whatever sizes it has.
+   */
+  function changeKind(next: string) {
+    if (next === kind) return
+    const nextRole = next === MILL_DRILL ? "drill" : next
+    const nextMethod: DrillMethod = next === MILL_DRILL ? "mill" : "drill"
+    if (nextRole === "drill" && role === "drill") {
+      changeMethod(nextMethod)
+      return
+    }
+    changeSource({
+      ...data,
+      file: { ...data.file, role: nextRole },
+      toolId: "",
+      presetId: "",
+      values: nextRole === "drill" ? { drillMethod: nextMethod } : {},
+    })
+  }
+
   async function replace(file: File | undefined) {
     if (!file || inactive || readLock.current) return
     stopUpdate()
@@ -783,8 +817,7 @@ export function OperationEditor({
     )
   }
 
-  let sourceType = "Gerber"
-  if (role === "drill") sourceType = "Excellon"
+  const sourceType = drillFile ? "Excellon" : "Gerber"
   const sourceSize = Math.max(
     1,
     Math.ceil(new TextEncoder().encode(data.file.content).byteLength / 1024)
@@ -807,26 +840,49 @@ export function OperationEditor({
 
   return (
     <div className="flex min-w-0 flex-col gap-5">
+      {/* What stops the toolpath, at the top as the app shows its own problems. */}
       {companionProblem && (
-        <div className="flex flex-col gap-2">
-          <FieldDescription role="alert">{companionProblem}</FieldDescription>
-          {companion.setup.error && (
-            <FieldDescription role="alert">
-              {companion.setup.error.message}
-            </FieldDescription>
-          )}
+        <Alert variant="warning">
+          <CircleAlert />
+          <AlertDescription>
+            {companion.setup.error?.message ?? companionProblem}
+          </AlertDescription>
           {needsSetup && (
+            <AlertAction>
+              <Button
+                type="button"
+                variant="warning"
+                size="xs"
+                disabled={companion.setup.isPending}
+                onClick={() => companion.setup.mutate()}
+              >
+                {companion.setup.isPending ? "Checking…" : "Check again"}
+              </Button>
+            </AlertAction>
+          )}
+        </Alert>
+      )}
+      {error && (
+        <Alert variant="warning">
+          <CircleAlert />
+          <AlertDescription>{error}</AlertDescription>
+          <AlertAction>
             <Button
               type="button"
-              variant="outline"
-              className="self-start"
-              disabled={companion.setup.isPending}
-              onClick={() => companion.setup.mutate()}
+              variant="warning"
+              size="xs"
+              disabled={inactive}
+              onClick={() => {
+                rejectedSource.current = null
+                setForced(true)
+                change(data)
+                setRetry((current) => current + 1)
+              }}
             >
-              {companion.setup.isPending ? "Checking…" : "Check again"}
+              Retry
             </Button>
-          )}
-        </div>
+          </AlertAction>
+        </Alert>
       )}
       <form
         className="flex flex-col gap-5"
@@ -873,71 +929,36 @@ export function OperationEditor({
         />
         <FieldGroup>
           <Field>
-            <FieldLabel htmlFor={`${id}-role`}>Operation</FieldLabel>
+            <FieldLabel htmlFor={`${id}-kind`}>Operation</FieldLabel>
             <Select
               items={[
                 { value: "", label: "Choose operation…" },
-                ...inputs.map((input) => ({
-                  value: input.id,
-                  label: input.label,
+                ...kinds.map((value) => ({
+                  value,
+                  label: operationKindLabel(value),
                 })),
               ]}
-              value={role}
+              value={kind}
               disabled={inactive}
               onValueChange={(value) => {
-                if (value === null || value === role) return
-                changeSource({
-                  ...data,
-                  file: { ...data.file, role: value },
-                  toolId: "",
-                  presetId: "",
-                  values: {},
-                })
+                if (value !== null) changeKind(value)
               }}
             >
-              <SelectTrigger id={`${id}-role`} className="w-full">
+              <SelectTrigger id={`${id}-kind`} className="w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectGroup>
                   <SelectItem value="">Choose operation…</SelectItem>
-                  {inputs.map((input) => (
-                    <SelectItem key={input.id} value={input.id}>
-                      {input.label}
+                  {kinds.map((value) => (
+                    <SelectItem key={value} value={value}>
+                      {operationKindLabel(value)}
                     </SelectItem>
                   ))}
                 </SelectGroup>
               </SelectContent>
             </Select>
           </Field>
-          {group === "drilling" && methodParameter && (
-            <Field>
-              <FieldLabel htmlFor={`${id}-method`}>
-                {methodParameter.label}
-              </FieldLabel>
-              <Select
-                items={methodParameter.options}
-                value={method}
-                disabled={inactive}
-                onValueChange={(value) => {
-                  if (value === "drill" || value === "mill") changeMethod(value)
-                }}
-              >
-                <SelectTrigger id={`${id}-method`} className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    {methodParameter.options.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-            </Field>
-          )}
           {group && (
             <>
               <Field>
@@ -986,24 +1007,6 @@ export function OperationEditor({
         <FieldDescription role="status">Updating toolpath…</FieldDescription>
       )}
       {notice && <FieldDescription role="status">{notice}</FieldDescription>}
-      {error && (
-        <div className="flex flex-col gap-2">
-          <p role="alert">{error}</p>
-          <Button
-            type="button"
-            variant="outline"
-            disabled={inactive}
-            onClick={() => {
-              rejectedSource.current = null
-              setForced(true)
-              change(data)
-              setRetry((current) => current + 1)
-            }}
-          >
-            Retry toolpath update
-          </Button>
-        </div>
-      )}
     </div>
   )
 }

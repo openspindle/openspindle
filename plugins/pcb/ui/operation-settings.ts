@@ -1,7 +1,8 @@
 import type { CuttingPreset, Tool } from "@openspindle/plugin-sdk"
-import { parameters } from "../src/manifest.mjs"
+import { isDrillFile, parameters } from "../src/manifest.mjs"
 import type { DrillMethod } from "../src/manifest.mjs"
 import { holeSizeCount } from "./excellon"
+import { roleLabel } from "./inputs"
 import type { PCBOperationData, Values } from "./operation-data"
 
 type Role = string | null
@@ -21,8 +22,8 @@ export function operationGroup(role: Role): OperationGroup | null {
 }
 
 /**
- * How a Drill operation makes its holes: the method chosen for it, else Mill for a file of
- * several hole sizes, which one drill cannot make.
+ * How a drill file's operation makes its holes: as chosen in its Operation field (Drill, or
+ * Mill drill), else milled for a file of several hole sizes, which one drill cannot make.
  */
 export function drillMethod(data: PCBOperationData): DrillMethod {
   const chosen = data.values.drillMethod
@@ -31,6 +32,36 @@ export function drillMethod(data: PCBOperationData): DrillMethod {
     ? "mill"
     : "drill"
 }
+
+/** A drill file's holes made with one end mill: an operation kind of its own. */
+export const MILL_DRILL = "mill-drill"
+
+/** What a file's operation can be, as its Operation field offers it. */
+export const operationKinds = (
+  file: PCBOperationData["file"]
+): readonly string[] =>
+  isDrillFile(file) ? ["drill", MILL_DRILL] : ["front", "back", "outline"]
+
+/**
+ * The file's role, or none when the file cannot make it (a Gerber set to Drill, which
+ * pcb2gcode crashes on): the operation then waits for its Operation to be chosen again.
+ */
+export function operationRole(file: PCBOperationData["file"]): string {
+  const { role } = file
+  return role === "" || isDrillFile(file) === (role === "drill") ? role : ""
+}
+
+/**
+ * What an operation is: its file's role, with a drill file whose holes an end mill makes
+ * being Mill drill. The data keeps the role and the drill method.
+ */
+export function operationKind(data: PCBOperationData): string {
+  const role = operationRole(data.file)
+  return role === "drill" && drillMethod(data) === "mill" ? MILL_DRILL : role
+}
+
+export const operationKindLabel = (kind: string) =>
+  kind === MILL_DRILL ? "Mill drill" : roleLabel(kind)
 
 function machining(role: Role, method: DrillMethod): Machining | null {
   const group = operationGroup(role)

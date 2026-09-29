@@ -1,5 +1,6 @@
 import { AppWindow, ShieldCheck, TriangleAlert } from "lucide-react"
 import type {
+  Capability,
   InstallReview,
   PackageOrigin,
   ViewSlot,
@@ -25,47 +26,56 @@ export const VIEW_SLOT_LABELS: Record<ViewSlot, string> = {
 }
 
 /**
- * Where a package came from: a repository at one commit, a development folder, or the app
- * itself.
+ * Where a package came from, as part of a sentence: a repository at one commit, a
+ * development folder, or the app itself.
  */
 export function PluginSource({ source }: { source: PackageOrigin }) {
-  if (source.kind === "bundled")
-    return <FieldDescription>Comes with OpenSpindle</FieldDescription>
-  if (source.kind === "folder")
-    return (
-      <FieldDescription className="break-all">
-        Development folder {source.path}
-      </FieldDescription>
-    )
+  if (source.kind === "bundled") return <>Comes with OpenSpindle</>
+  if (source.kind === "folder") return <>Development folder {source.path}</>
   return (
-    <FieldDescription className="break-all">
+    <>
       <a href={source.repository} target="_blank" rel="noreferrer">
         {source.repository.replace("https://github.com/", "")}
       </a>{" "}
       at {source.commit.slice(0, 7)}
-    </FieldDescription>
+    </>
   )
 }
 
-function Permissions({ review }: { review: InstallReview }) {
-  const removed = review.removedPermissions.map(
+/**
+ * The permissions a plugin asks for or holds, each with what it allows. `added` marks the
+ * ones an update asks for anew; `removed` names those it no longer asks for.
+ */
+export function Permissions({
+  permissions,
+  removed = [],
+}: {
+  permissions: readonly {
+    readonly capability: Capability
+    readonly added?: boolean
+  }[]
+  removed?: readonly Capability[]
+}) {
+  const removedTitles = removed.map(
     (capability) => CAPABILITY_INFO[capability].title
   )
   return (
     <FieldSet>
       <FieldLegend variant="label">Permissions</FieldLegend>
-      {review.permissions.length > 0 ? (
+      {permissions.length > 0 ? (
         <ItemGroup>
-          {review.permissions.map((permission) => (
-            <Item key={permission.capability} variant="outline" size="sm">
+          {permissions.map(({ capability, added }) => (
+            <Item key={capability} variant="outline" size="sm">
               <ItemMedia variant="icon">
                 <ShieldCheck />
               </ItemMedia>
               <ItemContent>
-                <ItemTitle>{permission.title}</ItemTitle>
-                <ItemDescription>{permission.description}</ItemDescription>
+                <ItemTitle>{CAPABILITY_INFO[capability].title}</ItemTitle>
+                <ItemDescription>
+                  {CAPABILITY_INFO[capability].description}
+                </ItemDescription>
               </ItemContent>
-              {review.previous && permission.added && (
+              {added && (
                 <ItemActions>
                   <Badge>New</Badge>
                 </ItemActions>
@@ -79,9 +89,9 @@ function Permissions({ review }: { review: InstallReview }) {
           machine.
         </FieldDescription>
       )}
-      {removed.length > 0 && (
+      {removedTitles.length > 0 && (
         <FieldDescription>
-          No longer asks to {removed.join(", ")}.
+          No longer asks to {removedTitles.join(", ")}.
         </FieldDescription>
       )}
     </FieldSet>
@@ -138,7 +148,9 @@ export function InstallReviewDetails({ review }: { review: InstallReview }) {
             : `Version ${plugin.version}`}
         </FieldDescription>
         <FieldDescription>{plugin.description}</FieldDescription>
-        <PluginSource source={review.source} />
+        <FieldDescription className="break-all">
+          <PluginSource source={review.source} />
+        </FieldDescription>
       </div>
       {review.companion && (
         <Companion
@@ -147,7 +159,14 @@ export function InstallReviewDetails({ review }: { review: InstallReview }) {
           source={review.source}
         />
       )}
-      <Permissions review={review} />
+      <Permissions
+        permissions={review.permissions.map(({ capability, added }) => ({
+          capability,
+          // A first install asks for everything anew; only an update marks what is new.
+          added: review.previous !== null && added,
+        }))}
+        removed={review.removedPermissions}
+      />
       <FieldSet>
         <FieldLegend variant="label">Contents</FieldLegend>
         <FieldDescription className="font-numeric">

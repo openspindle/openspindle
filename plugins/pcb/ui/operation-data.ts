@@ -1,5 +1,5 @@
 import type { JsonValue } from "@openspindle/plugin-sdk"
-import { roleLabel } from "./inputs"
+import { operationKind, operationKindLabel } from "./operation-settings"
 
 export type Values = Record<string, string | boolean>
 
@@ -103,8 +103,9 @@ export function newData(
 export const dataBytes = (json: JsonValue) =>
   new TextEncoder().encode(JSON.stringify(json)).byteLength
 
+/** The file and what the operation is, such as "board.drl · Mill drill". */
 export const operationName = (data: PCBOperationData) =>
-  `${data.file.name} · ${roleLabel(data.file.role)}`.slice(0, 180)
+  `${data.file.name} · ${operationKindLabel(operationKind(data))}`.slice(0, 180)
 
 /** JSON with sorted keys, so equal data always gives the same text. */
 export function stableJson(value: unknown): string {

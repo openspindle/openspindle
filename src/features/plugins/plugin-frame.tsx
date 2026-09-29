@@ -157,12 +157,14 @@ function MountedFrame({
         onClose={() => onClose(null)}
       />
     )
+  // The frame is as tall as its content: in a scrolling flex column (the inspector) it must
+  // not shrink, or its content scrolls inside it instead of with the panel.
   return (
     <iframe
       ref={iframe}
       {...PLUGIN_FRAME_ATTRIBUTES}
       title={`${bundle.plugin.name}: ${view.title}`}
-      className="w-full"
+      className="w-full shrink-0"
       style={height === null ? undefined : { height }}
     />
   )
