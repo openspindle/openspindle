@@ -4,6 +4,7 @@ import { SectionErrorPlacement } from "@/features/error-report/error-fallback"
 import { JobIndicator } from "@/features/job/job-indicator"
 import { FileDropZone } from "@/features/shell/file-drop-zone"
 import { WorkspaceTabs } from "@/features/shell/workspace-tabs"
+import { useToolPictures } from "@/features/tool-library"
 
 export const Route = createFileRoute("/_workspace")({
   component: WorkspaceLayout,
@@ -11,6 +12,7 @@ export const Route = createFileRoute("/_workspace")({
 
 function WorkspaceLayout() {
   useDeviceProfileSync()
+  useToolPictures()
   return (
     <FileDropZone>
       <div className="flex h-dvh min-h-0 flex-col overflow-hidden bg-background">

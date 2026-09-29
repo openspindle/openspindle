@@ -163,9 +163,9 @@ export const CuttingPresetSchema = z.object({
 export type CuttingPreset = z.infer<typeof CuttingPresetSchema>
 
 /**
- * A library tool as plugins see it: identity and vendor data, geometry and shaft, and
- * cutting presets. The app keeps its photo, holder, other post-processor settings and
- * import source to itself.
+ * A library tool as plugins see it: identity and vendor data, geometry and shaft, cutting
+ * presets, and the app's thumbnail of it. The app keeps its photo, 3D model, holder, other
+ * post-processor settings and import source to itself.
  */
 export const ToolSchema = z.object({
   id: ToolIdSchema,
@@ -224,6 +224,11 @@ export const ToolSchema = z.object({
     ),
   }),
   presets: z.array(CuttingPresetSchema),
+  /**
+   * The app's thumbnail of the tool's cutting end, which `ToolCard` shows: a PNG data URL, or
+   * null until the app has drawn it.
+   */
+  picture: z.string().nullable().optional(),
 })
 export type Tool = z.infer<typeof ToolSchema>
 

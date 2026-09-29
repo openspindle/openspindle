@@ -2,26 +2,20 @@ import * as THREE from "three"
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js"
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js"
 import { log } from "@/app/errors/log"
+import { toolPictureCache } from "@/app/tools/tool-picture-cache"
+import type {
+  ToolFraming,
+  ToolPictureRequest,
+} from "@/app/tools/tool-picture-cache"
+import { viewerPalette } from "@/components/workspace/viewer/palette"
+import {
+  disposeToolModel,
+  toolMaterials,
+  toolModel,
+} from "@/components/workspace/viewer/tool-model"
+import type { ToolMaterials } from "@/components/workspace/viewer/tool-model"
 import type { ProfilePoint, ToolShape } from "@/domain/tools/tool-shape"
 import { disposeObjects, glbInBedSpace } from "@/lib/three-assets"
-import { viewerPalette } from "./viewer/palette"
-import { disposeToolModel, toolMaterials, toolModel } from "./viewer/tool-model"
-import type { ToolMaterials } from "./viewer/tool-model"
-
-/** "tool": the whole tool; "tip": its cutting end, as wide as the tool. */
-export type ToolFraming = "tool" | "tip"
-
-/** What a picture shows: the tool's 3D model (a GLB's URL), or the shape its dimensions describe. */
-export type ToolPictureSubject =
-  { readonly model: string } | { readonly shape: ToolShape }
-
-/** A picture to render, in CSS pixels. */
-export type ToolPictureRequest = {
-  readonly subject: ToolPictureSubject
-  readonly framing: ToolFraming
-  readonly width: number
-  readonly height: number
-}
 
 /**
  * How far a tool reaches on screen, across its axis and up from its tip, and a length it
@@ -38,11 +32,9 @@ type Extent = {
 const ELEVATION = THREE.MathUtils.degToRad(18)
 /** Room left around the tool, as a share of its size. */
 const MARGIN = 0.08
-/** Pictures kept; the list shows a few dozen at a time. */
-const CACHE_LIMIT = 600
 /**
  * Loaded models kept; each keeps its data URL (chosen models run up to 1.4 MB) and its
- * three.js objects and GPU buffers alive, so far fewer than the picture cache.
+ * three.js objects and GPU buffers alive, so far fewer than the pictures kept.
  */
 const MODEL_CACHE_LIMIT = 50
 /** Rendering yields to the page after this long, so scrolling and typing stay smooth. */
@@ -210,78 +202,45 @@ function cutColor() {
   return themed.color
 }
 
-const shapeKeys = new WeakMap<ToolShape, string>()
-
-function shapeKey(shape: ToolShape) {
-  let key = shapeKeys.get(shape)
-  if (key === undefined) {
-    key = JSON.stringify(shape.parts)
-    shapeKeys.set(shape, key)
-  }
-  return key
-}
-
 /**
- * Rendered pictures of tools: their 3D models, or the shapes their dimensions describe. One
- * offscreen renderer draws them a few at a time and keeps each as an image, so equal shapes
- * share a picture and a list scrolls without rendering again. Each model loads once, and the
- * least recently used beyond a limit are dropped and disposed. A request may name the queued
- * request it supersedes (an earlier draft of the same picture), which is dropped unrendered.
+ * Draws tools' pictures, which it keeps in `toolPictureCache`: their 3D models, or the shapes
+ * their dimensions describe. One offscreen renderer draws them a few at a time, so scrolling
+ * and typing stay smooth. Each model loads once, and the least recently used beyond a limit are
+ * dropped and disposed. A request may name the queued request it supersedes (an earlier draft
+ * of the same picture), which is dropped undrawn.
  */
 class ToolPictures {
-  private readonly images = new Map<string, string>()
   private readonly queue = new Map<
     string,
     { request: ToolPictureRequest; cut: string }
   >()
-  private readonly listeners = new Set<() => void>()
   /** Loaded models by URL, in tool space; null for one that could not be loaded. */
   private readonly models = new Map<string, THREE.Object3D | null>()
   private readonly loads = new Map<string, Promise<void>>()
-  /**
-   * Keys name models by number, oldest use first, so the least recently used can be dropped;
-   * a chosen model's URL, its number's key, is its whole file.
-   */
-  private readonly modelNumbers = new Map<string, number>()
-  /** Never reused, so a dropped model's old number is never given to a different one. */
-  private modelCount = 0
+  /** Models by use, oldest first, so the least recently used can be dropped. */
+  private readonly used = new Set<string>()
   private studio: Studio | null = null
   /** WebGL failed once; the pictures stay empty rather than retrying on every request. */
   private unavailable = false
   private scheduled = false
 
-  /** The key a picture is cached by; a shape's includes the theme's colour. */
-  key({ subject, framing, width, height }: ToolPictureRequest) {
-    const size = `${framing} ${width}×${height}@${window.devicePixelRatio}`
-    if ("shape" in subject)
-      return `${cutColor()} ${size} ${shapeKey(subject.shape)}`
-    return `model ${this.touchModel(subject.model)} ${size}`
-  }
-
-  image(key: string) {
-    return this.images.get(key) ?? null
-  }
-
-  subscribe = (listener: () => void) => {
-    this.listeners.add(listener)
-    return () => {
-      this.listeners.delete(listener)
-    }
-  }
-
   /**
-   * Queues a picture; `supersedes`, when given, is an earlier request for the same subject
-   * (a previous draft's key) that is no longer wanted, dropped from the queue unrendered if it
-   * is still there.
+   * Queues a picture, kept by `key` (`toolPictureCache.key`); `supersedes`, when given, is an
+   * earlier request for the same subject (a previous draft's key) that is no longer wanted,
+   * dropped from the queue undrawn if it is still there.
    */
   request(key: string, request: ToolPictureRequest, supersedes?: string) {
     if (supersedes !== undefined && supersedes !== key)
       this.queue.delete(supersedes)
-    if (this.unavailable || this.images.has(key) || this.queue.has(key)) return
-    const { subject } = request
-    if ("model" in subject && !this.models.has(subject.model)) {
-      void this.load(subject.model).then(() => this.request(key, request))
+    if (this.unavailable || toolPictureCache.has(key) || this.queue.has(key))
       return
+    const { subject } = request
+    if ("model" in subject) {
+      this.use(subject.model)
+      if (!this.models.has(subject.model)) {
+        void this.load(subject.model).then(() => this.request(key, request))
+        return
+      }
     }
     this.queue.set(key, { request, cut: cutColor() })
     if (this.scheduled) return
@@ -295,10 +254,9 @@ class ToolPictures {
     for (const [key, { request, cut }] of this.queue) {
       this.queue.delete(key)
       const image = this.draw(request, cut)
-      if (image) this.keep(key, image)
+      if (image) toolPictureCache.keep(key, image)
       if (performance.now() - start > TASK_BUDGET_MS) break
     }
-    for (const listener of this.listeners) listener()
     if (this.queue.size && !this.unavailable) {
       this.scheduled = true
       setTimeout(this.run)
@@ -322,23 +280,20 @@ class ToolPictures {
     return load
   }
 
-  /** The model's stable number; the least recently touched beyond the limit is dropped. */
-  private touchModel(url: string): number {
-    let number = this.modelNumbers.get(url)
-    if (number === undefined) number = this.modelCount++
-    else this.modelNumbers.delete(url)
-    this.modelNumbers.set(url, number)
-    if (this.modelNumbers.size > MODEL_CACHE_LIMIT)
-      for (const candidate of this.modelNumbers.keys()) {
+  /** Marks a model as just used; the least recently used beyond the limit is dropped. */
+  private use(url: string) {
+    this.used.delete(url)
+    this.used.add(url)
+    if (this.used.size > MODEL_CACHE_LIMIT)
+      for (const candidate of this.used) {
         if (candidate === url || this.dropModel(candidate)) break
       }
-    return number
   }
 
   /** Drops a model no longer wanted and releases its GPU resources; not one still loading. */
   private dropModel(url: string): boolean {
     if (this.loads.has(url) && !this.models.has(url)) return false
-    this.modelNumbers.delete(url)
+    this.used.delete(url)
     const model = this.models.get(url)
     this.models.delete(url)
     this.loads.delete(url)
@@ -364,14 +319,6 @@ class ToolPictures {
       this.queue.clear()
       return null
     }
-  }
-
-  /** The newest pictures stay; the least recently made go first. */
-  private keep(key: string, image: string) {
-    this.images.set(key, image)
-    if (this.images.size <= CACHE_LIMIT) return
-    const oldest = this.images.keys().next()
-    if (!oldest.done) this.images.delete(oldest.value)
   }
 }
 

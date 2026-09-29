@@ -7,6 +7,7 @@ import type {
   Tool as PluginTool,
   WorkspaceSummary,
 } from "@openspindle/plugin-core"
+import { toolThumbnail } from "@/app/tools/tool-picture-cache"
 import type { Tool } from "@/domain/tools/tool"
 import type { OperationOf } from "@/domain/operations/kinds"
 import { OperationSchema, createOperation } from "@/domain/operations/operation"
@@ -160,8 +161,8 @@ function checkOperation(operation: Operation) {
 }
 
 /**
- * A library tool as plugins see it: everything but its photo, holder, other post-processor
- * settings and import source.
+ * A library tool as plugins see it: everything but its photo, 3D model, holder, other
+ * post-processor settings and import source, with the tool library's thumbnail once drawn.
  */
 export function pluginTool(tool: Tool): PluginTool {
   return {
@@ -184,6 +185,7 @@ export function pluginTool(tool: Tool): PluginTool {
       segments: tool.shaft.segments.map((segment) => ({ ...segment })),
     },
     presets: tool.presets.map((preset) => ({ ...preset })),
+    picture: toolThumbnail(tool),
   }
 }
 

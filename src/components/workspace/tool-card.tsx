@@ -10,20 +10,24 @@ import {
   ItemMedia,
   ItemTitle,
 } from "@/components/ui/item"
+import { useToolThumbnail } from "@/app/tools/tool-picture-cache"
+import type { ToolPictureSource } from "@/app/tools/tool-picture-cache"
 import { isProbe } from "@/domain/tools/tool-table"
 import { formatToolNumber } from "@/domain/tools/format"
 import type { Tool } from "@/domain/tools/tool"
+import { ToolImage } from "./tool-image"
 import type { ToolImageSubject } from "./tool-image"
-import { CARD, ToolThumbnail } from "./tool-picture"
-import type { ToolPictureSource } from "./tool-picture"
+
+/** A tool as its card shows it; a plugin's tool DTO brings the tool library's `picture`. */
+type CardTool = ToolImageSubject &
+  ToolPictureSource &
+  Pick<Tool, "id" | "kind" | "name" | "diameter" | "flutes"> & {
+    readonly picture?: string | null
+  }
 
 export type ToolCardProps = {
-  /** Any tool with an identity, a size and dimensions, including plugin tool DTOs. */
-  tool?:
-    | (ToolImageSubject &
-        ToolPictureSource &
-        Pick<Tool, "id" | "kind" | "name" | "diameter" | "flutes">)
-    | null
+  /** Any tool with an identity and a size, including plugin tool DTOs. */
+  tool?: CardTool | null
   id?: string
   onClick?: () => void
   disabled?: boolean
@@ -32,6 +36,23 @@ export type ToolCardProps = {
   slotLabel?: string
   selected?: boolean
   "aria-label"?: string
+}
+
+/**
+ * The tool's thumbnail as the tool library draws it (`useToolThumbnail`), else its photo, else
+ * a placeholder. The card draws nothing itself, so it needs no renderer in a plugin's view.
+ */
+function CardPicture({ tool }: { tool: CardTool }) {
+  const picture = useToolThumbnail(tool)
+  if (!picture) return <ToolImage tool={tool} fallback className="h-10 w-6" />
+  return (
+    <img
+      className="h-10 w-6 shrink-0 object-contain"
+      src={picture}
+      alt=""
+      draggable={false}
+    />
+  )
 }
 
 export function ToolCard({
@@ -78,12 +99,8 @@ export function ToolCard({
         ) : undefined
       }
     >
-      <ItemMedia className={CARD.className} variant="icon">
-        {tool ? (
-          <ToolThumbnail tool={tool} size={CARD} fallback />
-        ) : (
-          <Wrench aria-hidden="true" />
-        )}
+      <ItemMedia className="h-10 w-6" variant="icon">
+        {tool ? <CardPicture tool={tool} /> : <Wrench aria-hidden="true" />}
       </ItemMedia>
       <ItemContent className="min-w-0">
         <ItemTitle className="max-w-full truncate" title={name}>
