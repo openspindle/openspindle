@@ -8,13 +8,13 @@ As with [auto-level](auto-level.md), the operation is machine-neutral and its NC
 
 ## Settings
 
-| Setting          | Meaning                                                                                                       | Range     | Default   |
-| ---------------- | ------------------------------------------------------------------------------------------------------------- | --------- | --------- |
-| Probe travel     | Longest downward search of the fast touch; the firmware's own Z probe searches to its `coordinate.toolrack_z` | 1–150 mm  | 108 mm    |
-| Clearance height | The lift above the probed surface afterwards                                                                  | 0.5–50 mm | 5 mm      |
-| Relative to      | Where the probe touches: the probe position or a stored anchor, as for auto-level                             |           | See below |
+| Setting          | Meaning                                                                                                                     | Range     | Default   |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------- | --------- | --------- |
+| Probe travel     | Longest downward search of the fast touch; the firmware's own Z probe searches to its `coordinate.toolrack_z`               | 1–150 mm  | 108 mm    |
+| Clearance height | The lift above the probed surface afterwards                                                                                | 0.5–50 mm | 5 mm      |
+| Relative to      | Where the probe touches: the probe position, or one of the machine's stored anchors with X and Y from it, as for auto-level |           | See below |
 
-The ranges are OpenSpindle's limits, not a clearance check. **Probe position** touches below the probe where it is when the operation starts; **Stored anchor** rises to the probe's travel height (machine Z −3 on the Z1), travels with `G53` to one of the machine's [stored anchors](stored-anchors.md) plus the offset, then touches, as Makera Studio's Z probe does. A new auto Z-height touches the middle of the plate's work area from a stored anchor, as **Center** places it, when the plate has anchors and cuts; otherwise it touches at the probe position.
+The ranges are OpenSpindle's limits, not a clearance check. **Probe position** touches below the probe where it is when the operation starts; from one of the machine's [stored anchors](stored-anchors.md) it rises to the probe's travel height (machine Z −3 on the Z1), travels with `G53` to the anchor plus X and Y, then touches, as Makera Studio's Z probe does. A new auto Z-height touches the middle of the plate's work area from a stored anchor, as **Center** places it, when the plate has anchors and cuts; otherwise it touches at the probe position.
 
 The 3D view marks the touch point with a red dot in a half-opaque border, the size of the anchors' markers: at the anchored point, or with the probe position where the program leaves the probe (the last sample of a grid probed before it, or the probe's start, drawn at the work origin as probe-position grids are). Tool changes return the probe to its XY; after any other XY move the program no longer says where it is, and no dot is drawn. The probe's path to the touch is drawn green, as the firmware moves ([firmware-preview.md](firmware-preview.md)).
 

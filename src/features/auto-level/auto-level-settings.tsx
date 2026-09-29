@@ -7,7 +7,6 @@ import {
   autoLevelParamsSchema,
 } from "@/domain/auto-level/params"
 import type {
-  AnchorPlacement,
   AutoLevelGridParameters,
   AutoLevelParams,
 } from "@/domain/auto-level/params"
@@ -27,6 +26,7 @@ import type {
   ProbingAnchorOption,
   WorkAreaFit,
 } from "@/features/probing/probing-form"
+import type { AnchorPlacement } from "@/domain/probing/placement"
 
 export type AutoLevelSettingsProps = {
   value: AutoLevelParams
@@ -137,17 +137,11 @@ function AutoLevelForm({
         </FieldGroup>
       </FieldSet>
       <PlacementFields
-        id={id}
         placement={probingField(form, "placement")}
-        anchorId={probingField(form, "placement.anchorId")}
-        offsetX={probingField(form, "placement.offset.x")}
-        offsetY={probingField(form, "placement.offset.y")}
         anchors={anchors}
         lastAnchor={lastAnchor}
         setLastAnchor={setLastAnchor}
         disabled={disabled}
-        probeDescription="Position the probe above the grid's lower-left corner before Run. The grid extends towards +X and +Y."
-        anchorDescription="The machine rises to its clearance height, travels to the anchor plus the offset, then probes towards +X and +Y."
       />
       <form.Field name="reviewAfterProbe">
         {(field) => (

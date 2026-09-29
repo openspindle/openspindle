@@ -1,12 +1,12 @@
 import type { BedAnchor } from "@/domain/anchors/stored-anchors"
 import { anchorPlacementAt, placementAnchors } from "../auto-level/fit"
 import { roundMillimetres } from "../auto-level/params"
-import type { AnchorPlacement, AutoLevelPlacement } from "../auto-level/params"
 import { plateWorkArea } from "../compile/toolpath-bounds"
 import type { BedXY, WorkArea } from "../compile/toolpath-bounds"
 import type { Plate } from "../plate/plate"
 import { defaultAutoZHeightParams } from "./params"
 import type { AutoZHeightParameters, AutoZHeightParams } from "./params"
+import type { AnchorPlacement, ProbePlacement } from "../probing/placement"
 
 /** The middle of the work area on the bed. */
 export const workAreaMiddle = ({ min, max }: WorkArea): BedXY => [
@@ -18,7 +18,7 @@ export const workAreaMiddle = ({ min, max }: WorkArea): BedXY => [
 export function centerAutoZHeight(
   area: WorkArea,
   anchors: readonly BedAnchor[],
-  current: AutoLevelPlacement,
+  current: ProbePlacement,
   last: AnchorPlacement | null
 ): AnchorPlacement | null {
   return anchorPlacementAt(workAreaMiddle(area), anchors, current, last)

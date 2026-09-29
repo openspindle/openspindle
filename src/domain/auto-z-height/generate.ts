@@ -1,8 +1,8 @@
-import type { AutoLevelPlacementContext } from "../auto-level/rules"
 import type { TouchOff } from "../probing/probe"
 import type { AutoZHeightParams } from "./params"
 import { planAutoZHeight } from "./rules"
 import type { AutoZHeightIssue } from "./rules"
+import type { PlacementContext } from "../probing/placement"
 
 export type AutoZHeightProgram = {
   /** Newline-terminated NC from the machine's probe. */
@@ -19,7 +19,7 @@ export type AutoZHeightGeneration =
  */
 export function generateAutoZHeightNc(
   params: AutoZHeightParams,
-  context: AutoLevelPlacementContext,
+  context: PlacementContext,
   touchOff: TouchOff
 ): AutoZHeightGeneration {
   const plan = planAutoZHeight(params, context, touchOff.parameters)

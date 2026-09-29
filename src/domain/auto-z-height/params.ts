@@ -1,8 +1,6 @@
 import { z } from "zod"
-import {
-  AUTO_LEVEL_COORDINATE_LIMIT,
-  AutoLevelPlacementSchema,
-} from "../auto-level/params"
+import { AUTO_LEVEL_COORDINATE_LIMIT } from "../auto-level/params"
+import { ProbePlacementSchema } from "../probing/placement"
 
 /** The touch-off parameters, in form order. */
 export const AUTO_Z_HEIGHT_FIELDS = ["probeTravel", "clearance"] as const
@@ -46,7 +44,7 @@ export const AutoZHeightParamsSchema = z.strictObject({
   /** Lift above the probed surface once work Z is set, mm. */
   clearance: storedLength,
   /** Where the probe touches: below the probe position, or at a stored anchor plus an offset. */
-  placement: AutoLevelPlacementSchema,
+  placement: ProbePlacementSchema,
 })
 
 export type AutoZHeightParams = z.infer<typeof AutoZHeightParamsSchema>
@@ -65,7 +63,7 @@ export function autoZHeightParamsSchema(
   const schema = z.strictObject({
     probeTravel: lengthSchema(parameters.probeTravel),
     clearance: lengthSchema(parameters.clearance),
-    placement: AutoLevelPlacementSchema,
+    placement: ProbePlacementSchema,
   })
   machineSchemas.set(parameters, schema)
   return schema

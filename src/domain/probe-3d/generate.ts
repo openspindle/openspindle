@@ -1,8 +1,8 @@
 import type { OriginProbing } from "../probing/probe"
 import type { Probe3dParams } from "./params"
-import type { AutoLevelPlacementContext } from "../auto-level/rules"
 import { planProbe3d } from "./rules"
 import type { Probe3dIssue } from "./rules"
+import type { PlacementContext } from "../probing/placement"
 
 export type Probe3dGeneration =
   { ok: true; program: { nc: string } } | { ok: false; issues: Probe3dIssue[] }
@@ -13,13 +13,13 @@ export type Probe3dGeneration =
  */
 export function generateProbe3dNc(
   params: Probe3dParams,
-  context: AutoLevelPlacementContext,
+  context: PlacementContext,
   probing: OriginProbing
 ): Probe3dGeneration {
   const plan = planProbe3d(params, context, probing.parameters)
   if (!plan.ok) return plan
   return {
     ok: true,
-    program: { nc: probing.program(plan.params, plan.start) },
+    program: { nc: probing.program(plan.params, plan.start, plan.height) },
   }
 }

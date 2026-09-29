@@ -17,7 +17,8 @@ const rounded = toMicrometre
 /**
  * A measurement committed on blur or Enter, to three decimals and within `min` and `max`;
  * Escape restores the stored value. A value left as shown keeps the stored one, however many
- * decimals it has. Coordinates and sizes alike are typed through it.
+ * decimals it has. Coordinates and sizes alike are typed through it. With `onClear`, it may be
+ * left empty: null shows empty, and emptying it clears it.
  */
 export function BoundedMeasurementInput({
   id,
@@ -29,18 +30,20 @@ export function BoundedMeasurementInput({
   max = COORDINATE_LIMIT,
   disabled,
   onCommit,
+  onClear,
 }: {
   id: string
   axis: MeasurementAxis
   unit: string
   label: string
-  value: number
+  value: number | null
   min?: number
   max?: number
   disabled?: boolean
   onCommit: (value: number) => void
+  onClear?: () => void
 }) {
-  const shown = String(rounded(value))
+  const shown = value === null ? "" : String(rounded(value))
   const [draft, setDraft] = useState(shown)
   const canceled = useRef(false)
   useEffect(() => {
@@ -59,7 +62,10 @@ export function BoundedMeasurementInput({
       onChange={(event) => setDraft(event.target.value)}
       onBlur={() => {
         const next = rounded(Number(draft))
-        if (
+        const cleared = !canceled.current && !draft.trim() && onClear
+        if (cleared) {
+          if (value !== null) onClear()
+        } else if (
           !canceled.current &&
           draft.trim() &&
           Number.isFinite(next) &&
@@ -82,7 +88,10 @@ export function BoundedMeasurementInput({
   )
 }
 
-/** A coordinate, as its own field with a hidden label, within the ±10 m limit. */
+/**
+ * A coordinate, as its own field with a hidden label, within the ±10 m limit; with `onClear`, it
+ * may be left empty.
+ */
 export function CoordinateInput({
   axis,
   unit,
@@ -91,15 +100,17 @@ export function CoordinateInput({
   disabled,
   title,
   onCommit,
+  onClear,
 }: {
   axis: MeasurementAxis
   unit: string
   label: string
-  value: number
+  value: number | null
   disabled?: boolean
   /** Hover text for the whole field, which a disabled input would not show. */
   title?: string
   onCommit: (value: number) => void
+  onClear?: () => void
 }) {
   const id = useId()
   return (
@@ -115,6 +126,7 @@ export function CoordinateInput({
         value={value}
         disabled={disabled}
         onCommit={onCommit}
+        onClear={onClear}
       />
     </Field>
   )

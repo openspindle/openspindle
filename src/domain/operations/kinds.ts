@@ -167,10 +167,11 @@ const pluginKind: OperationKind<"plugin"> = {
 }
 
 /** Where an auto-level grid is placed: the plate's device and its anchor snapshot. */
-export const autoLevelPlacement = (plate: Plate) => ({
+export const placementContext = (plate: Plate) => ({
   deviceId: plate.setup.deviceId,
   anchorSetup: plate.setup.anchors ?? undefined,
   machineWorkOrigin: workOriginOnMachine(plate.setup)?.position ?? null,
+  workOriginZ: plate.setup.workOrigin[2],
 })
 
 /**
@@ -232,7 +233,7 @@ const autoLevelKind: OperationKind<"auto-level"> = {
     const { params } = operation.source
     const generated = generateAutoLevelNc(
       params,
-      autoLevelPlacement(plate),
+      placementContext(plate),
       probe.autoLevel
     )
     if (!generated.ok)
@@ -261,7 +262,7 @@ const autoLevelKind: OperationKind<"auto-level"> = {
     return validateAutoLevel(
       operation.source.params,
       {
-        ...autoLevelPlacement(plate),
+        ...placementContext(plate),
         stock: plate.setup.stock,
         stockAnchor: plate.setup.stockAnchor,
       },
@@ -273,7 +274,7 @@ const autoLevelKind: OperationKind<"auto-level"> = {
   runChecks: (operation, plate, machine) =>
     autoLevelRunIssues(
       operation.source.params,
-      autoLevelPlacement(plate),
+      placementContext(plate),
       machine
     ).map((issue) => issueDiagnostic("auto-level", issue, operation)),
 }
@@ -315,7 +316,7 @@ const autoZHeightKind: OperationKind<"auto-z-height"> = {
     if (!probe) return fail(unsupported(operation, "probe"))
     const generated = generateAutoZHeightNc(
       operation.source.params,
-      autoLevelPlacement(plate),
+      placementContext(plate),
       probe.autoZHeight
     )
     if (!generated.ok)
@@ -341,7 +342,7 @@ const autoZHeightKind: OperationKind<"auto-z-height"> = {
       ...validateAutoZHeight(
         operation.source.params,
         {
-          ...autoLevelPlacement(plate),
+          ...placementContext(plate),
           stock: plate.setup.stock,
           stockAnchor: plate.setup.stockAnchor,
         },
@@ -356,7 +357,7 @@ const autoZHeightKind: OperationKind<"auto-z-height"> = {
   runChecks: (operation, plate, machine) =>
     autoLevelRunIssues(
       operation.source.params,
-      autoLevelPlacement(plate),
+      placementContext(plate),
       machine
     ).map((issue) => issueDiagnostic("auto-z-height", issue, operation)),
 }
@@ -435,7 +436,7 @@ const probe3dKind: OperationKind<"probe-3d"> = {
     if (!probing) return fail(unsupported(operation, "3D probe"))
     const generated = generateProbe3dNc(
       operation.source.params,
-      autoLevelPlacement(plate),
+      placementContext(plate),
       probing
     )
     if (!generated.ok)
@@ -462,7 +463,7 @@ const probe3dKind: OperationKind<"probe-3d"> = {
     return [
       ...validateProbe3d(
         params,
-        autoLevelPlacement(plate),
+        placementContext(plate),
         probing.parameters
       ).filter((issue) => !PROBE_3D_BLOCKERS.has(issue.code)),
       ...probe3dOrderIssues(params, laterAutoLevels(plate, operation)),
@@ -471,7 +472,7 @@ const probe3dKind: OperationKind<"probe-3d"> = {
   runChecks: (operation, plate, machine) =>
     autoLevelRunIssues(
       operation.source.params,
-      autoLevelPlacement(plate),
+      placementContext(plate),
       machine
     ).map((issue) => issueDiagnostic("probe-3d", issue, operation)),
 }

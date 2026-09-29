@@ -11,23 +11,12 @@ import {
   FieldSet,
   FieldTitle,
 } from "@/components/ui/field"
-import { OptionSelect } from "@/components/option-select"
 import { Switch } from "@/components/ui/switch"
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { MeasurementInput } from "@/components/workspace/measurement-input"
 import { Hint } from "@/components/workspace/hint"
 import { ReasonButton } from "@/components/workspace/reason-button"
-import { AUTO_LEVEL_COORDINATE_LIMIT } from "@/domain/auto-level/params"
-import type {
-  AnchorPlacement,
-  AutoLevelPlacement,
-} from "@/domain/auto-level/params"
-import {
-  FIELD_LAYOUT,
-  FULL_ROW,
-  anchorPlacement,
-  visibleErrors,
-} from "./probing-form"
+import { ReferencePointFields } from "@/components/workspace/reference-point-fields"
+import { FIELD_LAYOUT, FULL_ROW, visibleErrors } from "./probing-form"
 import type {
   FieldErrors,
   ProbingAnchorOption,
@@ -35,6 +24,10 @@ import type {
   ProbingForm,
   ProbingParameter,
 } from "./probing-form"
+import type {
+  AnchorPlacement,
+  ProbePlacement,
+} from "@/domain/probing/placement"
 
 /**
  * Adapts one field of a probing form into a `ProbingField`, so a shared field component can
@@ -251,161 +244,105 @@ export function NumericFields({
   )
 }
 
+const AXES = ["X", "Y", "Z"] as const
+const PLANAR_AXES = ["X", "Y"] as const
+const HEIGHT_AXES = ["Z"] as const
+
+/** The probe position among the references: an ID no stored anchor has. */
+const PROBE_POSITION = ""
+
+/** A probe-position placement, with the start's height when it has one. */
+function probePosition(height: number | undefined): ProbePlacement {
+  if (height === undefined) return { kind: "probe-position" }
+  return { kind: "probe-position", offset: { z: height } }
+}
+
 /**
- * Where a probing operation places itself: a stored anchor plus an offset, or the probe
- * position. Shared by auto-level's grid, auto Z-height's touch point and 3D probing's start: the
- * anchor items, `canUseAnchor`, `choose`, the anchor Select and the offsets are identical; only
- * the "Relative to" wording, through `action` what fits the placement to the work area (Fit
- * grid or Center), and through `height` the Z 3D probing starts at differ.
+ * Where a probing operation starts, edited as setup items' points are (`ReferencePointFields`):
+ * relative to the probe's position, or to a stored anchor of the plate's device, from which it
+ * takes X and Y. With `height`, it also takes a Z, a height on the bed, which may stay empty.
  */
 export function PlacementFields({
-  id,
   placement,
-  anchorId: anchorIdField,
-  offsetX,
-  offsetY,
   anchors,
   lastAnchor,
   setLastAnchor,
   disabled,
-  probeDescription,
-  anchorDescription,
+  height = false,
   action,
-  height,
 }: {
-  id: string
-  placement: ProbingField<AutoLevelPlacement>
-  anchorId: ProbingField<string>
-  offsetX: ProbingField<number>
-  offsetY: ProbingField<number>
+  placement: ProbingField<ProbePlacement>
   anchors: readonly ProbingAnchorOption[]
   /** The last anchor placement, kept so switching back from the probe position restores it. */
   lastAnchor: AnchorPlacement | null
   setLastAnchor: (anchor: AnchorPlacement | null) => void
   disabled: boolean
-  /** What "Probe position" does, explained on "Relative to" while it is chosen. */
-  probeDescription: string
-  /** What "Stored anchor" does, explained on "Relative to" while it is chosen. */
-  anchorDescription: string
-  /** Fit grid or Center, above "Relative to"; left out where it sits beside other fields instead. */
+  /** The operation starts at a height on the bed, such as 3D probing. */
+  height?: boolean
+  /** Fit grid or Center, above the start; left out where it sits beside other fields instead. */
   action?: (
-    placement: AutoLevelPlacement,
-    setPlacement: (next: AutoLevelPlacement) => void
+    placement: ProbePlacement,
+    setPlacement: (next: ProbePlacement) => void
   ) => ReactNode
-  /** The height the operation starts at, under the offsets, from either placement. */
-  height?: ReactNode
 }) {
-  return placement(({ value: placementValue, onChange: setPlacement }) => {
-    const anchorId =
-      placementValue.kind === "anchor" ? placementValue.anchorId : ""
-    const anchorItems = [
-      ...anchors.map((anchor) => ({ value: anchor.id, label: anchor.name })),
-      ...(anchorId && !anchors.some((anchor) => anchor.id === anchorId)
-        ? [{ value: anchorId, label: "Unavailable anchor" }]
+  const anchorAxes = height ? AXES : PLANAR_AXES
+  return placement(({ value, onChange: setPlacement }) => {
+    const anchorId = value.kind === "anchor" ? value.anchorId : PROBE_POSITION
+    const references = [
+      {
+        value: PROBE_POSITION,
+        label: "Probe position",
+        axes: height ? HEIGHT_AXES : [],
+      },
+      ...anchors.map(({ id, name }) => ({
+        value: id,
+        label: name,
+        axes: anchorAxes,
+      })),
+      ...(anchorId && !anchors.some(({ id }) => id === anchorId)
+        ? [{ value: anchorId, label: "Unavailable anchor", axes: anchorAxes }]
         : []),
     ]
-    const canUseAnchor =
-      placementValue.kind === "anchor" ||
-      lastAnchor !== null ||
-      anchors.length > 0
-    const relativeToDescription =
-      placementValue.kind === "anchor" ? anchorDescription : probeDescription
-    const choose = (kind: string | undefined) => {
-      if (kind === "probe-position" && placementValue.kind === "anchor") {
-        setLastAnchor(placementValue)
-        setPlacement({ kind: "probe-position" })
-      }
-      if (kind === "anchor" && placementValue.kind === "probe-position") {
-        const next =
-          lastAnchor ?? (anchors.length ? anchorPlacement(anchors[0].id) : null)
-        if (next) setPlacement(next)
-      }
-    }
+    const z = value.offset?.z
+    const toAnchor = (id: string, x: number, y: number, h = z) =>
+      setPlacement({
+        kind: "anchor",
+        anchorId: id,
+        offset: h === undefined ? { x, y } : { x, y, z: h },
+      })
     return (
       <FieldSet>
         <FieldLegend>Placement</FieldLegend>
         <FieldGroup className="gap-3">
-          {action?.(placementValue, setPlacement)}
-          <Field data-disabled={disabled}>
-            <FieldLabel id={`${id}-relative-to`}>
-              <Hint text={relativeToDescription}>Relative to</Hint>
-            </FieldLabel>
-            <ToggleGroup
-              variant="outline"
-              className="w-full"
-              aria-labelledby={`${id}-relative-to`}
-              aria-description={relativeToDescription}
-              value={[placementValue.kind]}
-              disabled={disabled}
-              onValueChange={(values) => choose(values[0])}
-            >
-              <ToggleGroupItem value="probe-position" className="flex-1">
-                Probe position
-              </ToggleGroupItem>
-              <ToggleGroupItem
-                value="anchor"
-                className="flex-1"
-                disabled={!canUseAnchor}
-              >
-                Stored anchor
-              </ToggleGroupItem>
-            </ToggleGroup>
-          </Field>
-          {placementValue.kind === "anchor" && (
-            <>
-              {anchorIdField(({ value, errors, onChange }) => (
-                <Field
-                  orientation="horizontal"
-                  className={FIELD_LAYOUT}
-                  data-invalid={!!errors?.length}
-                  data-disabled={disabled}
-                >
-                  <FieldLabel htmlFor={`${id}-anchor`}>Anchor</FieldLabel>
-                  <OptionSelect
-                    id={`${id}-anchor`}
-                    className="w-full min-w-0"
-                    options={anchorItems}
-                    value={value}
-                    disabled={disabled}
-                    aria-invalid={!!errors?.length}
-                    onValueChange={(next) => onChange(next)}
-                  />
-                  <FieldError className={FULL_ROW} errors={errors} />
-                </Field>
-              ))}
-              {offsetX(({ value, errors, onChange, onBlur }) => (
-                <MeasurementField
-                  id={`${id}-offset-x`}
-                  label="Offset X"
-                  axis="X"
-                  unit="mm"
-                  min={-AUTO_LEVEL_COORDINATE_LIMIT}
-                  max={AUTO_LEVEL_COORDINATE_LIMIT}
-                  value={value}
-                  errors={errors}
-                  disabled={disabled}
-                  onBlur={onBlur}
-                  onValueChange={(next) => onChange(next ?? Number.NaN)}
-                />
-              ))}
-              {offsetY(({ value, errors, onChange, onBlur }) => (
-                <MeasurementField
-                  id={`${id}-offset-y`}
-                  label="Offset Y"
-                  axis="Y"
-                  unit="mm"
-                  min={-AUTO_LEVEL_COORDINATE_LIMIT}
-                  max={AUTO_LEVEL_COORDINATE_LIMIT}
-                  value={value}
-                  errors={errors}
-                  disabled={disabled}
-                  onBlur={onBlur}
-                  onValueChange={(next) => onChange(next ?? Number.NaN)}
-                />
-              ))}
-            </>
-          )}
-          {height}
+          {action?.(value, setPlacement)}
+          <ReferencePointFields
+            label="Placement"
+            references={references}
+            reference={anchorId}
+            point={
+              value.kind === "anchor"
+                ? { X: value.offset.x, Y: value.offset.y, Z: z }
+                : { Z: z }
+            }
+            optional={HEIGHT_AXES}
+            disabled={disabled}
+            onReferenceChange={(reference) => {
+              if (reference === PROBE_POSITION) {
+                if (value.kind === "anchor") setLastAnchor(value)
+                setPlacement(probePosition(z))
+                return
+              }
+              const { x, y } =
+                value.kind === "anchor"
+                  ? value.offset
+                  : (lastAnchor?.offset ?? { x: 0, y: 0 })
+              toAnchor(reference, x, y)
+            }}
+            onPointChange={({ X = 0, Y = 0, Z }) => {
+              if (value.kind === "anchor") toAnchor(value.anchorId, X, Y, Z)
+              else setPlacement(probePosition(Z))
+            }}
+          />
         </FieldGroup>
       </FieldSet>
     )

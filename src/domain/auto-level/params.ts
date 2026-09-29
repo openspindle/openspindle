@@ -1,5 +1,6 @@
 import { z } from "zod"
 import { COORDINATE_LIMIT } from "../primitives"
+import { ProbePlacementSchema } from "../probing/placement"
 
 /** The rectangular grid's parameters, in form and plugin-manifest order. */
 export const AUTO_LEVEL_GRID_FIELDS = [
@@ -61,49 +62,6 @@ function countSchema({ label, min, max }: AutoLevelGridParameter) {
     .max(max, range)
 }
 
-function coordinateSchema(label: string) {
-  const limit = AUTO_LEVEL_COORDINATE_LIMIT
-  const range = rangeMessage(label, -limit, limit, "mm")
-  return z
-    .number({ error: `${label} is required.` })
-    .min(-limit, range)
-    .max(limit, range)
-}
-
-/** Stored anchor IDs: 1–200 characters without control characters. */
-const AnchorIdSchema = z
-  .string({ error: "Select an anchor." })
-  .min(1, "Select an anchor.")
-  .max(200, "Anchor IDs have at most 200 characters.")
-  .refine(
-    (id) => ![...id].some((character) => character.charCodeAt(0) < 32),
-    "Anchor IDs cannot contain control characters."
-  )
-
-/** The operator positions the probe above the grid's lower-left corner before Run. */
-export const ProbePositionPlacementSchema = z.strictObject({
-  kind: z.literal("probe-position"),
-})
-
-/**
- * G53 travel to a stored anchor of the plate's device, plus an offset, at the height the
- * machine's probe travels at.
- */
-export const AnchorPlacementSchema = z.strictObject({
-  kind: z.literal("anchor"),
-  anchorId: AnchorIdSchema,
-  /** Grid start relative to the anchor's machine XY, mm. */
-  offset: z.strictObject({
-    x: coordinateSchema("Offset X"),
-    y: coordinateSchema("Offset Y"),
-  }),
-})
-
-export const AutoLevelPlacementSchema = z.discriminatedUnion("kind", [
-  ProbePositionPlacementSchema,
-  AnchorPlacementSchema,
-])
-
 const storedLength = z.number().positive().max(AUTO_LEVEL_COORDINATE_LIMIT)
 const storedCount = z.int().min(2).max(AUTO_LEVEL_COORDINATE_LIMIT)
 
@@ -122,7 +80,7 @@ export const AutoLevelParamsSchema = z.strictObject({
   rows: storedCount,
   /** Lift above the detected surface between samples, mm. */
   clearance: storedLength,
-  placement: AutoLevelPlacementSchema,
+  placement: ProbePlacementSchema,
   /** Pause after probing so the measured height map can be reviewed before continuing. */
   reviewAfterProbe: z.boolean(),
 })
@@ -146,14 +104,12 @@ export function autoLevelParamsSchema(
     columns: countSchema(parameters.columns),
     rows: countSchema(parameters.rows),
     clearance: lengthSchema(parameters.clearance),
-    placement: AutoLevelPlacementSchema,
+    placement: ProbePlacementSchema,
     reviewAfterProbe: z.boolean(),
   })
   machineSchemas.set(parameters, schema)
   return schema
 }
-export type AutoLevelPlacement = z.infer<typeof AutoLevelPlacementSchema>
-export type AnchorPlacement = z.infer<typeof AnchorPlacementSchema>
 
 /** A new operation's parameters: the defaults of the machine's probe. */
 export function defaultAutoLevelParams(

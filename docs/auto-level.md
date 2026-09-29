@@ -8,20 +8,20 @@ The operation itself is machine-neutral: its placement, anchors, stock checks an
 
 ## Settings
 
-| Setting              | Meaning                                                                  | G32 | Range     | Default   |
-| -------------------- | ------------------------------------------------------------------------ | --- | --------- | --------- |
-| Width                | Grid extent along X from its start                                       | `A` | 1–200 mm  | 50 mm     |
-| Depth                | Grid extent along Y from its start                                       | `B` | 1–200 mm  | 50 mm     |
-| X probe points       | Points along X, both ends included                                       | `I` | 2–15      | 5         |
-| Y probe points       | Points along Y, both ends included                                       | `J` | 2–15      | 5         |
-| Clearance height     | Lift above the detected surface between samples, not an absolute Z       | `H` | 0.5–10 mm | 2 mm      |
-| Relative to          | Where the grid starts: the probe position or a stored anchor (see below) |     |           | See below |
-| Review after probing | Pause after probing to review the measured height map                    |     |           | On        |
+| Setting              | Meaning                                                                                                            | G32 | Range     | Default   |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------ | --- | --------- | --------- |
+| Width                | Grid extent along X from its start                                                                                 | `A` | 1–200 mm  | 50 mm     |
+| Depth                | Grid extent along Y from its start                                                                                 | `B` | 1–200 mm  | 50 mm     |
+| X probe points       | Points along X, both ends included                                                                                 | `I` | 2–15      | 5         |
+| Y probe points       | Points along Y, both ends included                                                                                 | `J` | 2–15      | 5         |
+| Clearance height     | Lift above the detected surface between samples, not an absolute Z                                                 | `H` | 0.5–10 mm | 2 mm      |
+| Relative to          | Where the grid starts: the probe position, or one of the machine's stored anchors with X and Y from it (see below) |     |           | See below |
+| Review after probing | Pause after probing to review the measured height map                                                              |     |           | On        |
 
 The ranges are OpenSpindle's limits, not a clearance check. NC words carry at most six decimals.
 
 - **Probe position**: position the probe above the grid's lower-left corner before Run; the grid extends towards +X and +Y.
-- **Stored anchor**: the grid starts at one of the machine's [stored anchors](stored-anchors.md) plus **Offset X** and **Offset Y** (machine millimetres). As Makera Studio's probing does, the machine first rises to the probe's travel height (machine Z −3 on the Z1, the clearance Makera configures), then travels there with `G53`, then probes. Offsets are limited to ±10,000 mm, like stored anchors.
+- **A stored anchor**: the grid starts at one of the machine's [stored anchors](stored-anchors.md) plus **X** and **Y** from it (machine millimetres), as the work origin keeps its X and Y relative to one. As Makera Studio's probing does, the machine first rises to the probe's travel height (machine Z −3 on the Z1, the clearance Makera configures), then travels there with `G53`, then probes. X and Y are limited to ±10,000 mm, like stored anchors.
 
 A new auto-level covers the plate's work area, as **Fit grid** sets it, from a stored anchor when the plate has them; otherwise it starts at the probe position with the probe's default size.
 

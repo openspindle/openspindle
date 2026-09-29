@@ -22,6 +22,7 @@ import type { Operation } from "@/domain/operations/operation"
 import { PROBE_3D_CORNER_LABELS, findsCorner } from "@/domain/probe-3d/params"
 import type { Probe3dParams } from "@/domain/probe-3d/params"
 import { probe3dResult } from "@/domain/probe-3d/result"
+import { placementHeight } from "@/domain/probing/placement"
 import { PROBE_3D_TOOL, PROBE_TOOL } from "@/domain/tools/tool-table"
 import { programParts } from "@/machine/contract"
 import type {
@@ -130,12 +131,14 @@ function operationSummary(
       return `Probes ${columns} × ${rows} points over ${mm(width)} × ${mm(depth)} mm.`
     }
     case "probe-3d": {
-      const { placement, startZ } = source.params
+      const { placement } = source.params
+      const height = placementHeight(placement)
+      const z = height === undefined ? "" : ` Z${mm(height)}`
       const where =
         placement.kind === "anchor"
-          ? `from ${anchorName(subject, placement.anchorId)} + X${mm(placement.offset.x)} Y${mm(placement.offset.y)}`
-          : "from the probe position"
-      return `Finds ${probe3dTarget(source.params)} ${where} at machine Z ${mm(startZ)} and sets the work origin there.`
+          ? `from ${anchorName(subject, placement.anchorId)} + X${mm(placement.offset.x)} Y${mm(placement.offset.y)}${z}`
+          : `from the probe position${z && ` at${z}`}`
+      return `Finds ${probe3dTarget(source.params)} ${where} and sets the work origin there.`
     }
     default: {
       const names = toolNames(operation, subject, tools)

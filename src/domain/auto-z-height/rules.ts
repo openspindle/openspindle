@@ -3,15 +3,12 @@ import { issueOf } from "@/domain/diagnostics"
 import type { Issue } from "@/domain/diagnostics"
 import type { Point3 } from "@/domain/nc/gcode"
 import type { Stock } from "@/domain/stock/stock"
-import type { AutoLevelPlacement } from "../auto-level/params"
 import type { AutoLevelIssue } from "../auto-level/issues"
 import { resolveAnchorStart } from "../auto-level/rules"
-import type {
-  AutoLevelPlacementContext,
-  MachineStart,
-} from "../auto-level/rules"
+import type { MachineStart } from "../auto-level/rules"
 import { autoZHeightParamsSchema } from "./params"
 import type { AutoZHeightParameters, AutoZHeightParams } from "./params"
+import type { PlacementContext, ProbePlacement } from "../probing/placement"
 
 export type AutoZHeightIssueCode =
   // Parameters
@@ -33,7 +30,7 @@ const zHeightError = issueOf<AutoZHeightIssueCode>("error")
 const zHeightWarning = issueOf<AutoZHeightIssueCode>("warning")
 
 /** The plate an auto Z-height operation belongs to. */
-export type AutoZHeightPlateContext = AutoLevelPlacementContext & {
+export type AutoZHeightPlateContext = PlacementContext & {
   stock: Pick<Stock, "width" | "depth" | "height"> | null
   /** Bed position of the stock's minimum corner. */
   stockAnchor: Point3
@@ -58,7 +55,7 @@ const EPSILON = 1e-6
  */
 export function planAutoZHeight(
   params: AutoZHeightParams,
-  plate: AutoLevelPlacementContext,
+  plate: PlacementContext,
   parameters: AutoZHeightParameters
 ): AutoZHeightPlan {
   const parsed = autoZHeightParamsSchema(parameters).safeParse(params)
@@ -108,7 +105,7 @@ export function validateAutoZHeight(
 
 /** An auto-level that runs after this operation, and whether it follows it directly. */
 export type LaterAutoLevel = {
-  placement: AutoLevelPlacement
+  placement: ProbePlacement
   /** Next in the plate without a Pause before, so the probe has not moved in between. */
   adjacent: boolean
 }
@@ -132,7 +129,7 @@ export function autoLevelOrderIssues(
 }
 
 function probesGridStart(
-  touch: AutoLevelPlacement,
+  touch: ProbePlacement,
   { placement, adjacent }: LaterAutoLevel
 ): boolean {
   // A grid from the probe's position starts where the probe is: above the point just touched.

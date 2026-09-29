@@ -20,26 +20,12 @@ import {
   formatMillimetres,
   roundMillimetres,
 } from "./params"
-import type {
-  AnchorPlacement,
-  AutoLevelGridParameters,
-  AutoLevelParams,
-} from "./params"
+import type { AutoLevelGridParameters, AutoLevelParams } from "./params"
 import type { ProbePoint } from "./probe-grid"
-
-/** The plate's device and its anchor snapshot. `Plate` satisfies it. */
-export type AutoLevelPlacementContext = {
-  deviceId: string | null
-  anchorSetup?: StoredAnchorSetup
-  /**
-   * The machine XY the program makes work X0 Y0 before its operations, from the same anchor
-   * snapshot; null when it leaves the machine's work X and Y as they are.
-   */
-  machineWorkOrigin?: ProbePoint | null
-}
+import type { AnchorPlacement, PlacementContext } from "../probing/placement"
 
 /** The plate an auto-level operation belongs to. `Plate` satisfies it. */
-export type AutoLevelPlateContext = AutoLevelPlacementContext & {
+export type AutoLevelPlateContext = PlacementContext & {
   stock: Pick<Stock, "width" | "depth" | "height"> | null
   /** Bed position of the stock's minimum corner. */
   stockAnchor: Point3
@@ -82,7 +68,7 @@ const EPSILON = 1e-6
  */
 export function planAutoLevel(
   params: AutoLevelParams,
-  plate: AutoLevelPlacementContext,
+  plate: PlacementContext,
   parameters: AutoLevelGridParameters
 ): AutoLevelPlan {
   const checked = checkParams(params, parameters)
@@ -123,7 +109,7 @@ export function validateAutoLevel(
 export function resolveAnchorStart(
   placement: AnchorPlacement,
   size: Pick<AutoLevelParams, "width" | "depth">,
-  plate: AutoLevelPlacementContext
+  plate: PlacementContext
 ): AnchorStartResolution {
   const setup = plate.anchorSetup
   if (!isStoredAnchorSetup(setup) || setup.deviceId !== plate.deviceId)
@@ -184,7 +170,7 @@ export function resolveAnchorStart(
  */
 export function autoLevelRunIssues(
   params: Pick<AutoLevelParams, "placement">,
-  plate: AutoLevelPlacementContext,
+  plate: PlacementContext,
   machine: AutoLevelMachineContext
 ): AutoLevelIssue[] {
   const { placement } = params
@@ -249,7 +235,7 @@ function checkParams(
 
 function resolveStart(
   params: AutoLevelParams,
-  plate: AutoLevelPlacementContext
+  plate: PlacementContext
 ): Checked<{ start: ProbeStart }> {
   if (params.placement.kind === "probe-position")
     return { ok: true, start: { kind: "probe-position", offset: [0, 0] } }

@@ -5,7 +5,6 @@ import type { z } from "zod"
 import type { FieldError } from "@/components/ui/field"
 import type { MeasurementAxis } from "@/components/workspace/measurement-input"
 import { formatMillimetres } from "@/domain/auto-level/params"
-import type { AnchorPlacement } from "@/domain/auto-level/params"
 import type { BedAnchor } from "@/domain/anchors/stored-anchors"
 import type { BedXY, WorkAreaResult } from "@/domain/compile/toolpath-bounds"
 
@@ -35,13 +34,6 @@ export const FULL_ROW = "col-span-2"
 /** Errors show once the user has edited the field. */
 export const visibleErrors = (meta: FieldMeta): FieldErrors =>
   meta.isTouched && !meta.isValid ? meta.errors : []
-
-/** A fresh placement at a stored anchor, with no offset. */
-export const anchorPlacement = (anchorId: string): AnchorPlacement => ({
-  kind: "anchor",
-  anchorId,
-  offset: { x: 0, y: 0 },
-})
 
 /** One field of a probing form, as the machine's probe describes its parameter. */
 export type ProbingParameter = {

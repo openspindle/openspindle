@@ -1,8 +1,6 @@
 import { z } from "zod"
-import {
-  AUTO_LEVEL_COORDINATE_LIMIT,
-  AutoLevelPlacementSchema,
-} from "../auto-level/params"
+import { AUTO_LEVEL_COORDINATE_LIMIT } from "../auto-level/params"
+import { ProbePlacementSchema } from "../probing/placement"
 
 /**
  * What a 3D probing operation finds: a corner of the stock (outside) or of a pocket (inside),
@@ -75,13 +73,8 @@ export type Probe3dParameter = {
   description: string
 }
 
-/**
- * A machine's 3D probing parameters, which its probe defines (`OriginProbing.parameters`): the
- * routine's, and the machine Z its start comes down to.
- */
-export type Probe3dParameters = Readonly<
-  Record<Probe3dField | "startZ", Probe3dParameter>
->
+/** A machine's 3D probing parameters, which its probe defines (`OriginProbing.parameters`). */
+export type Probe3dParameters = Readonly<Record<Probe3dField, Probe3dParameter>>
 
 function lengthSchema({ label, min, max, unit }: Probe3dParameter) {
   const range = `${label} must be from ${min} to ${max} ${unit}.`
@@ -92,10 +85,6 @@ function lengthSchema({ label, min, max, unit }: Probe3dParameter) {
 }
 
 const storedLength = z.number().positive().max(AUTO_LEVEL_COORDINATE_LIMIT)
-const storedCoordinate = z
-  .number()
-  .min(-AUTO_LEVEL_COORDINATE_LIMIT)
-  .max(AUTO_LEVEL_COORDINATE_LIMIT)
 
 /**
  * A built-in 3D probing operation, as stored for any machine. Its NC is derived from these
@@ -118,13 +107,11 @@ export const Probe3dParamsSchema = z.strictObject({
   distanceY: storedLength,
   /** How far below the probed top the sides are touched (corners and bosses), mm. */
   depth: storedLength,
-  /** Where the routine starts: the probe position, or a stored anchor plus an offset. */
-  placement: AutoLevelPlacementSchema,
   /**
-   * The machine Z (G53) the probe comes down to over its start before the routine: inside a
-   * pocket at the height to touch its walls, or over a top, mm.
+   * Where the routine starts: the probe position, or a stored anchor plus an offset, and the
+   * height on the bed the probe comes down to first, if any.
    */
-  startZ: storedCoordinate,
+  placement: ProbePlacementSchema,
 })
 
 export type Probe3dParams = z.infer<typeof Probe3dParamsSchema>
@@ -148,8 +135,7 @@ export function probe3dParamsSchema(
     distanceX: lengthSchema(parameters.distanceX),
     distanceY: lengthSchema(parameters.distanceY),
     depth: lengthSchema(parameters.depth),
-    placement: AutoLevelPlacementSchema,
-    startZ: lengthSchema(parameters.startZ),
+    placement: ProbePlacementSchema,
   })
   machineSchemas.set(parameters, schema)
   return schema
@@ -168,7 +154,6 @@ export function defaultProbe3dParams(
     distanceY: parameters.distanceY.default,
     depth: parameters.depth.default,
     placement: { kind: "probe-position" },
-    startZ: parameters.startZ.default,
   }
 }
 

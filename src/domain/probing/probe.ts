@@ -77,8 +77,15 @@ export interface OutlineTrace {
  */
 export interface OriginProbing {
   readonly parameters: Probe3dParameters
-  /** The NC finding the corner or centre from its start and setting the work origin there. */
-  program: (params: Probe3dParams, start: TouchOffStart) => string
+  /**
+   * The NC finding the corner or centre from its start and setting the work origin there;
+   * `height` is the work Z the probe comes down to over the start first, if any.
+   */
+  program: (
+    params: Probe3dParams,
+    start: TouchOffStart,
+    height: number | null
+  ) => string
 }
 
 /** How a program's sections see a machine's probing NC, in any NC file. */

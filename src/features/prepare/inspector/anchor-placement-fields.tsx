@@ -1,8 +1,6 @@
-import { useId } from "react"
 import type { ReactNode } from "react"
-import { Field, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field"
-import { OptionSelect } from "@/components/option-select"
-import { PointFields } from "@/components/workspace/coordinate-input"
+import { FieldLegend, FieldSet } from "@/components/ui/field"
+import { ReferencePointFields } from "@/components/workspace/reference-point-fields"
 import {
   anchorReference,
   offsetFromAnchor,
@@ -27,6 +25,8 @@ type RelativePointFieldsProps = {
   onRelativeToChange: (anchorId: string | null) => void
 }
 
+const AXES = ["X", "Y", "Z"] as const
+
 /**
  * A point on the bed whose X and Y are offsets from one of the machine's stored anchors, which
  * it follows when the anchors change, or a custom position in bed coordinates; Z stays on the
@@ -43,45 +43,30 @@ export function RelativePointFields({
   onChange,
   onRelativeToChange,
 }: RelativePointFieldsProps) {
-  const id = useId()
-  const anchors = bedAnchors(anchorSetup ?? undefined)
   const factory = anchorSetup?.source === "factory"
   const references = [
-    ...anchors.map((anchor) => ({
+    ...bedAnchors(anchorSetup ?? undefined).map((anchor) => ({
       value: anchor.id,
       label: anchorDisplayName(anchor, factory),
+      axes: AXES,
     })),
-    { value: "", label: "Custom position" },
+    { value: "", label: "Custom position", axes: AXES },
   ]
   const reference = anchorReference(anchorSetup, relativeTo)
+  const [x, y, z] = offsetFromAnchor(value, reference)
   return (
-    <>
-      {anchors.length > 0 && (
-        <Field
-          orientation="horizontal"
-          className="grid grid-cols-2 items-center gap-3"
-          data-disabled={disabled}
-        >
-          <FieldLabel htmlFor={`${id}-reference`}>Relative to</FieldLabel>
-          <OptionSelect
-            id={`${id}-reference`}
-            className="w-full min-w-0"
-            aria-label={`${label} relative to`}
-            options={references}
-            value={reference?.anchorId ?? ""}
-            disabled={disabled}
-            onValueChange={(item) => onRelativeToChange(item || null)}
-          />
-        </Field>
-      )}
-      <PointFields
-        label={label}
-        value={offsetFromAnchor(value, reference)}
-        disabled={disabled}
-        zLock={zLock}
-        onChange={(offset) => onChange(pointFromOffset(offset, reference))}
-      />
-    </>
+    <ReferencePointFields
+      label={label}
+      references={references}
+      reference={reference?.anchorId ?? ""}
+      point={{ X: x, Y: y, Z: z }}
+      locks={zLock === undefined ? {} : { Z: zLock }}
+      disabled={disabled}
+      onReferenceChange={(item) => onRelativeToChange(item || null)}
+      onPointChange={({ X = x, Y = y, Z = z }) =>
+        onChange(pointFromOffset([X, Y, Z], reference))
+      }
+    />
   )
 }
 

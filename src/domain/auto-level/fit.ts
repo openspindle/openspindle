@@ -10,12 +10,8 @@ import { plateWorkArea } from "../compile/toolpath-bounds"
 import type { BedXY, WorkArea } from "../compile/toolpath-bounds"
 import type { Plate } from "../plate/plate"
 import { defaultAutoLevelParams, roundMillimetres } from "./params"
-import type {
-  AnchorPlacement,
-  AutoLevelGridParameters,
-  AutoLevelParams,
-  AutoLevelPlacement,
-} from "./params"
+import type { AutoLevelGridParameters, AutoLevelParams } from "./params"
+import type { AnchorPlacement, ProbePlacement } from "../probing/placement"
 
 /** The anchors a placement can be relative to: the snapshot of the plate's device, on the bed. */
 export function placementAnchors(setup: {
@@ -51,7 +47,7 @@ function nearest(anchors: readonly BedAnchor[], [x, y]: BedXY) {
 export function anchorPlacementAt(
   point: BedXY,
   anchors: readonly BedAnchor[],
-  current: AutoLevelPlacement,
+  current: ProbePlacement,
   last: AnchorPlacement | null
 ): AnchorPlacement | null {
   const previous = current.kind === "anchor" ? current : last
@@ -77,7 +73,7 @@ export function anchorPlacementAt(
 export function fitAutoLevelGrid(
   area: WorkArea,
   anchors: readonly BedAnchor[],
-  current: AutoLevelPlacement,
+  current: ProbePlacement,
   last: AnchorPlacement | null,
   { width, depth }: AutoLevelGridParameters
 ): Pick<AutoLevelParams, "width" | "depth" | "placement"> {

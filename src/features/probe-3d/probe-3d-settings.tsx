@@ -8,8 +8,6 @@ import {
 } from "@/components/ui/field"
 import { OptionSelect } from "@/components/option-select"
 import { Hint } from "@/components/workspace/hint"
-import { formatMillimetres } from "@/domain/auto-level/params"
-import type { AnchorPlacement } from "@/domain/auto-level/params"
 import {
   PROBE_3D_AXES,
   PROBE_3D_AXES_LABELS,
@@ -28,7 +26,6 @@ import type {
   Probe3dParams,
   Probe3dRoutine,
 } from "@/domain/probe-3d/params"
-import { probe3dStartOffset } from "@/domain/probe-3d/rules"
 import {
   NumericFields,
   PlacementFields,
@@ -40,6 +37,7 @@ import {
   useProbingForm,
 } from "@/features/probing/probing-form"
 import type { ProbingAnchorOption } from "@/features/probing/probing-form"
+import type { AnchorPlacement } from "@/domain/probing/placement"
 
 export type Probe3dSettingsProps = {
   value: Probe3dParams
@@ -76,23 +74,6 @@ function routineDescription({ routine }: Probe3dParams) {
       return "Touches the walls either side of a pocket or bore, from inside it, and sets work X0 Y0 midway between them."
     case "boss-center":
       return "Touches the top of a boss, such as the stock or a dowel pin, then its sides either side, and sets work X0 Y0 midway between them and Z0 on the top."
-  }
-}
-
-/** Where the probe starts from what the routine finds, in words. */
-function startText(params: Probe3dParams) {
-  const [x, y] = probe3dStartOffset(params).map((value) =>
-    formatMillimetres(Math.abs(value))
-  )
-  switch (params.routine) {
-    case "outside-corner":
-      return `X ${x} Y ${y} in from the corner, over its top`
-    case "inside-corner":
-      return `over the top X ${x} Y ${y} out from the corner, beyond both walls`
-    case "pocket-center":
-      return "over the pocket, near its middle,"
-    case "boss-center":
-      return "over the boss's middle"
   }
 }
 
@@ -238,36 +219,14 @@ function Probe3dForm({
           </FieldSet>
         )}
       </form.Subscribe>
-      <form.Subscribe selector={(state) => state.values}>
-        {(values) => (
-          <PlacementFields
-            id={id}
-            placement={probingField(form, "placement")}
-            anchorId={probingField(form, "placement.anchorId")}
-            offsetX={probingField(form, "placement.offset.x")}
-            offsetY={probingField(form, "placement.offset.y")}
-            anchors={anchors}
-            lastAnchor={lastAnchor}
-            setLastAnchor={setLastAnchor}
-            disabled={disabled}
-            probeDescription={`Starts where the probe is when the job starts: position it ${startText(values)} before Run. A probe change returns above it at the firmware's clearance height, and it comes down to Machine Z.`}
-            anchorDescription="The machine rises to its clearance height, travels to the anchor plus the offset and comes down to Machine Z, then runs the routine from there."
-            height={
-              <NumericFields
-                id={id}
-                disabled={disabled}
-                fields={[
-                  {
-                    name: "startZ",
-                    parameter: parameters.startZ,
-                    field: probingField(form, "startZ"),
-                  },
-                ]}
-              />
-            }
-          />
-        )}
-      </form.Subscribe>
+      <PlacementFields
+        placement={probingField(form, "placement")}
+        anchors={anchors}
+        lastAnchor={lastAnchor}
+        setLastAnchor={setLastAnchor}
+        disabled={disabled}
+        height
+      />
     </FieldGroup>
   )
 }

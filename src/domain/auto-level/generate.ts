@@ -3,8 +3,9 @@ import { roundMillimetres } from "./params"
 import type { AutoLevelGridField, AutoLevelParams } from "./params"
 import type { ProbeGrid, ProbePoint } from "./probe-grid"
 import { planAutoLevel } from "./rules"
-import type { AutoLevelPlacementContext, ProbeStart } from "./rules"
+import type { ProbeStart } from "./rules"
 import type { AutoLevelIssue } from "./issues"
+import type { PlacementContext } from "../probing/placement"
 
 export type AutoLevelProgram = {
   /** Newline-terminated NC from the machine's probe. */
@@ -60,7 +61,7 @@ export function renderAutoLevelProgram(
 /** The complete probing NC of an auto-level operation, from its parameters and the machine's probe. */
 export function generateAutoLevelNc(
   params: AutoLevelParams,
-  context: AutoLevelPlacementContext,
+  context: PlacementContext,
   probing: GridProbing
 ): AutoLevelGeneration {
   const plan = planAutoLevel(params, context, probing.parameters)

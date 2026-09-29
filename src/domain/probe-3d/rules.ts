@@ -1,6 +1,5 @@
 import type { AutoLevelIssue } from "../auto-level/issues"
 import { resolveAnchorStart } from "../auto-level/rules"
-import type { AutoLevelPlacementContext } from "../auto-level/rules"
 import { autoLevelOrderIssues } from "../auto-z-height/rules"
 import type { LaterAutoLevel, TouchOffStart } from "../auto-z-height/rules"
 import type { BedXY } from "../compile/toolpath-bounds"
@@ -8,6 +7,9 @@ import { issueOf } from "../diagnostics"
 import type { Issue } from "../diagnostics"
 import { cornerInward, probe3dParamsSchema, setsWorkZ } from "./params"
 import type { Probe3dParameters, Probe3dParams } from "./params"
+import { roundMillimetres } from "../auto-level/params"
+import { placementHeight } from "../probing/placement"
+import type { PlacementContext } from "../probing/placement"
 
 export type Probe3dIssueCode =
   // Parameters
@@ -32,6 +34,8 @@ type Checked<TValue> =
 export type Probe3dPlan = Checked<{
   params: Probe3dParams
   start: TouchOffStart
+  /** The work Z the probe comes down to over the start: its height on the bed, if any. */
+  height: number | null
 }>
 
 /**
@@ -40,7 +44,7 @@ export type Probe3dPlan = Checked<{
  */
 export function planProbe3d(
   params: Probe3dParams,
-  plate: AutoLevelPlacementContext,
+  plate: PlacementContext,
   parameters: Probe3dParameters
 ): Probe3dPlan {
   const parsed = probe3dParamsSchema(parameters).safeParse(params)
@@ -52,13 +56,21 @@ export function planProbe3d(
       ),
     }
   const { placement } = parsed.data
+  const onBed = placementHeight(placement)
+  const height =
+    onBed === undefined ? null : roundMillimetres(onBed - plate.workOriginZ)
   if (placement.kind === "probe-position")
-    return { ok: true, params: parsed.data, start: { kind: "probe-position" } }
+    return {
+      ok: true,
+      params: parsed.data,
+      start: { kind: "probe-position" },
+      height,
+    }
   // A start is a grid without extent; only the range message speaks of a grid.
   const resolved = resolveAnchorStart(placement, { width: 0, depth: 0 }, plate)
   if (!resolved.ok)
     return { ok: false, issues: resolved.issues.map(anchorIssue) }
-  return { ok: true, params: parsed.data, start: resolved.start }
+  return { ok: true, params: parsed.data, start: resolved.start, height }
 }
 
 /**
@@ -84,7 +96,7 @@ export function probe3dStartOffset(
 /** Issues to show while editing: generation blockers and anchor provenance. */
 export function validateProbe3d(
   params: Probe3dParams,
-  plate: AutoLevelPlacementContext,
+  plate: PlacementContext,
   parameters: Probe3dParameters
 ): Probe3dIssue[] {
   const plan = planProbe3d(params, plate, parameters)
