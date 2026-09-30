@@ -65,10 +65,7 @@ export type ProbingPreview = {
   readonly bounds: Rect<"probe" | "machine"> | null
 }
 const NO_PROBING: ProbingPreview = { grids: [], pointCount: 0, bounds: null }
-const caches = new WeakMap<
-  GridProbing,
-  WeakMap<GCodeProgram, ProbingPreview>
->()
+const caches = new WeakMap<GridProbing, WeakMap<GCodeProgram, ProbingPreview>>()
 
 /**
  * The grids a program probes, as the machine's probe that probes grids reads its NC
