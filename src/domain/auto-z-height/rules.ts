@@ -1,11 +1,13 @@
 import { machineToBed } from "@/domain/anchors/stored-anchors"
 import { issueOf } from "@/domain/diagnostics"
 import type { Issue } from "@/domain/diagnostics"
-import type { Point3 } from "@/domain/nc/gcode"
 import type { Stock } from "@/domain/stock/stock"
+import type { XYZ } from "../geometry/frame"
 import { EPSILON } from "../geometry/millimetres"
-import { autoZHeightParamsSchema } from "./params"
+import { contains, rectAt } from "../geometry/rect"
+import { AutoZHeightParamsSchema } from "./params"
 import type { AutoZHeightParameters, AutoZHeightParams } from "./params"
+import { rangedSchema } from "../probing/parameters"
 import { resolvePlacement } from "../probing/placement"
 import type {
   PlacementContext,
@@ -13,6 +15,7 @@ import type {
   ProbePlacement,
   ProbeStart,
 } from "../probing/placement"
+import type { ProbingPlan } from "../probing/probe"
 
 export type AutoZHeightIssueCode =
   // Parameters
@@ -37,16 +40,13 @@ const zHeightWarning = issueOf<AutoZHeightIssueCode>("warning")
 export type AutoZHeightPlateContext = PlacementContext & {
   stock: Pick<Stock, "width" | "depth" | "height"> | null
   /** Bed position of the stock's minimum corner. */
-  stockAnchor: Point3
+  stockAnchor: XYZ<"bed">
 }
 
 type Checked<TValue> =
   ({ ok: true } & TValue) | { ok: false; issues: AutoZHeightIssue[] }
 /** Parameters and touch point that generation can render, or what blocks it. */
-export type AutoZHeightPlan = Checked<{
-  params: AutoZHeightParams
-  start: ProbeStart
-}>
+export type AutoZHeightPlan = Checked<ProbingPlan<AutoZHeightParams>>
 
 /**
  * Everything that prevents generating NC: the parameters, within the ranges of the machine's
@@ -57,7 +57,9 @@ export function planAutoZHeight(
   plate: PlacementContext,
   parameters: AutoZHeightParameters
 ): AutoZHeightPlan {
-  const parsed = autoZHeightParamsSchema(parameters).safeParse(params)
+  const parsed = rangedSchema(AutoZHeightParamsSchema, parameters).safeParse(
+    params
+  )
   if (!parsed.success)
     return {
       ok: false,
@@ -168,13 +170,11 @@ function stockIssues(
   // Machine XY reaches the bed through the snapshot's registration, as the viewer places it.
   const [x, y] = machineToBed(plate.anchorSetup)(start.machine)
   const [stockX, stockY, stockZ] = plate.stockAnchor
-  if (
-    x >= stockX - EPSILON &&
-    y >= stockY - EPSILON &&
-    x <= stockX + stock.width + EPSILON &&
-    y <= stockY + stock.depth + EPSILON
+  const stockFootprint = rectAt<"bed">(
+    [stockX, stockY],
+    [stock.width, stock.depth]
   )
-    return []
+  if (contains(stockFootprint, [x, y])) return []
   return [
     zHeightWarning(
       "point-outside-stock",
