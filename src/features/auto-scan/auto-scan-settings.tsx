@@ -2,16 +2,11 @@ import { useId } from "react"
 import { FieldGroup, FieldLegend, FieldSet } from "@/components/ui/field"
 import { Hint } from "@/components/workspace/hint"
 import { formatMillimetres } from "@/domain/geometry/millimetres"
-import {
-  AUTO_SCAN_FIELDS,
-  autoScanParamsSchema,
-} from "@/domain/auto-scan/params"
-import type {
-  AutoScanParameters,
-  AutoScanParams,
-} from "@/domain/auto-scan/params"
+import { AutoScanParamsSchema } from "@/domain/auto-scan/params"
+import type { AutoScanParams, AutoScanSpecs } from "@/domain/auto-scan/params"
 import { roundOutward } from "@/domain/compile/toolpath-bounds"
 import type { ToolpathBoundsResult } from "@/domain/compile/toolpath-bounds"
+import { rangedSchema } from "@/domain/probing/parameters"
 import {
   NumericFields,
   SwitchField,
@@ -25,7 +20,7 @@ import {
 export type AutoScanSettingsProps = {
   value: AutoScanParams
   /** The trace's parameters on the machine's probe: defaults, ranges and descriptions. */
-  parameters: AutoScanParameters
+  parameters: AutoScanSpecs
   /** What the scan traces: the plate's toolpath bounds, or why there are none. */
   outline: ToolpathBoundsResult
   /** Receives complete, valid parameters as soon as an edit makes them valid. */
@@ -75,7 +70,7 @@ function AutoScanForm({
   disabled,
 }: Required<AutoScanSettingsProps>) {
   const id = useId()
-  const schema = autoScanParamsSchema(parameters)
+  const schema = rangedSchema(AutoScanParamsSchema, parameters)
   const form = useProbingForm(value, schema, onChange)
 
   return (
@@ -88,11 +83,18 @@ function AutoScanForm({
           <NumericFields
             id={id}
             disabled={disabled}
-            fields={AUTO_SCAN_FIELDS.map((name) => ({
-              name,
-              parameter: parameters[name],
-              field: probingField(form, name),
-            }))}
+            fields={[
+              {
+                name: "travelZ",
+                parameter: parameters.travelZ,
+                field: probingField(form, "travelZ"),
+              },
+              {
+                name: "feed",
+                parameter: parameters.feed,
+                field: probingField(form, "feed"),
+              },
+            ]}
           />
         </FieldGroup>
       </FieldSet>

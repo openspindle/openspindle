@@ -6,13 +6,17 @@ import type {
   AutoLevelParams,
 } from "../auto-level/params"
 import type { ProbeGrid, ProbePoint } from "../auto-level/probe-grid"
-import type { AutoScanParameters, AutoScanParams } from "../auto-scan/params"
+import type {
+  AutoScanField,
+  AutoScanParams,
+  AutoScanSpecs,
+} from "../auto-scan/params"
 import type {
   AutoZHeightParameters,
   AutoZHeightParams,
 } from "../auto-z-height/params"
 import type { ProbeTouch } from "../auto-z-height/probe-touch"
-import type { ToolpathBounds } from "../compile/cutting-bounds"
+import type { Rect } from "../geometry/rect"
 import type { Probe3dParameters, Probe3dParams } from "../probe-3d/params"
 import type { ParameterSpecs } from "./parameters"
 import type { ProbeStart } from "./placement"
@@ -90,11 +94,21 @@ export interface TouchOff {
   touches: (program: GCodeProgram, grids: readonly ProbeGrid[]) => ProbeTouch[]
 }
 
-/** How a machine traces an outline with a pointer, such as its probe's laser. */
-export interface OutlineTrace {
-  readonly parameters: AutoScanParameters
-  /** The NC tracing an outline in work coordinates, already rounded outwards. */
-  program: (params: AutoScanParams, outline: ToolpathBounds) => string
+/**
+ * A planned trace: its parameters, checked, and the outline it traces in work coordinates, rounded
+ * outwards.
+ */
+export type TracePlan = {
+  readonly params: AutoScanParams
+  readonly outline: Rect<"work">
+}
+
+/**
+ * How a machine traces an outline with a pointer, such as its probe's laser. Its program neither
+ * probes nor reviews a measurement, so it has no probing or review line.
+ */
+export interface OutlineTrace extends Capability<TracePlan, AutoScanField> {
+  readonly parameters: AutoScanSpecs
 }
 
 /**

@@ -5,7 +5,6 @@ import type { AutoLevelIssueCode } from "../auto-level/issues"
 import type { AutoLevelParams } from "../auto-level/params"
 import { autoLevelRunIssues, validateAutoLevel } from "../auto-level/rules"
 import { generateAutoScanNc } from "../auto-scan/generate"
-import { defaultAutoScanParams } from "../auto-scan/params"
 import type { AutoScanParams } from "../auto-scan/params"
 import { outlineStockIssues, scanOrderIssues } from "../auto-scan/rules"
 import { plateAutoZHeightParams } from "../auto-z-height/fit"
@@ -35,6 +34,7 @@ import type { Plate } from "../plate/plate"
 import { workOriginOnMachine } from "../plate/work-origin"
 import { fail, ok } from "../primitives"
 import type { Result } from "../primitives"
+import { defaultsOf } from "../probing/parameters"
 import type { OriginProbing, OutlineTrace, Probe } from "../probing/probe"
 import type { Operation, Phase, SourceKind, SourceOf } from "./operation"
 
@@ -371,8 +371,10 @@ const autoScanKind: OperationKind<"auto-scan"> = {
   available: (probe) => probe !== null && probe.autoScan !== null,
   // `available` above confirms `autoScan`; this states that guarantee for the type checker,
   // as `kindOf`'s cast below states its own.
-  defaults: (_plate, probe) =>
-    defaultAutoScanParams((probe.autoScan as OutlineTrace).parameters),
+  defaults: (_plate, probe) => ({
+    ...defaultsOf((probe.autoScan as OutlineTrace).parameters),
+    pauseAfterScan: true,
+  }),
   // The outline is the plate's other operations' toolpath bounds, so it never goes stale.
   resolve: (operation, plate, kit) => {
     const trace = kit.probe?.autoScan
@@ -393,10 +395,11 @@ const autoScanKind: OperationKind<"auto-scan"> = {
           }
         )
       )
+    const { nc, reviewLine } = generated.program
     return ok({
-      nc: generated.program.nc,
+      nc,
       policy: { probing: "outline", anchoredProbing: false },
-      reviewLines: [],
+      reviewLines: reviewLine === null ? [] : [reviewLine],
     })
   },
   validate: (operation, plate, kit) => {
