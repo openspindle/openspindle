@@ -51,8 +51,6 @@ export type GridPlan = ProbingPlan<Omit<AutoLevelParams, "placement">>
 
 /** How a machine probes a height grid, which auto-level compensates with. */
 export interface GridProbing extends Capability<GridPlan, AutoLevelSpecs> {
-  /** The NC probing a planned grid from its start; it always has the probing block. */
-  program: (plan: GridPlan) => ProbeProgram & { readonly probeLine: number }
   /**
    * The samples of a grid from its first one, `size` from it (negative runs back along an axis)
    * with `points` along each axis, both edges included, in the order the firmware visits them.
