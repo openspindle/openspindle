@@ -254,9 +254,8 @@ export const TOUCH_OFF: TouchOff = {
         ...anchorTravel(start),
         ...fastTouch(params),
       ]
-    const probeLine = lines.length
     lines.push(...(work ? firmwareLift(params) : slowTouch(params)), "M2")
-    return { nc: `${lines.join("\n")}\n`, probeLine, reviewLine: null }
+    return { nc: `${lines.join("\n")}\n`, reviewLine: null }
   },
   touches: touchPoints,
 }

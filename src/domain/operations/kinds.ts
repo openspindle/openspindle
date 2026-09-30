@@ -165,7 +165,7 @@ const pluginKind: OperationKind<"plugin"> = {
       : ok(plain(operation.source.nc)),
 }
 
-/** Where an auto-level grid is placed: the plate's device and its anchor snapshot. */
+/** Where a plate's probing operations start: its device, anchor snapshot and work origin. */
 export const placementContext = (plate: Plate) => ({
   deviceId: plate.setup.deviceId,
   anchorSetup: plate.setup.anchors ?? undefined,
@@ -200,7 +200,7 @@ const ANCHOR_READS: ReadonlySet<string> = new Set([
 
 /**
  * A probing kind's issue as the operation's diagnostic: its code namespaced by the kind
- * (`auto-level/grid-limit`), and where it is, as the issue says.
+ * (`auto-level/grid-exceeds-stock`), and where it is, as the issue says.
  */
 function issueDiagnostic(
   kind: ProbingSourceKind,

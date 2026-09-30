@@ -9,7 +9,7 @@ import type { ViewerPalette } from "./palette"
 
 /** A registered grid and its XY diagram on the plate's nominal surface. */
 export type ProbeGridShape = {
-  grid: ProbeGrid
+  grid: ProbeGrid<"probe" | "bed">
   /** Planned samples in visiting order. */
   points: Point3[]
   outline: Point3[]
@@ -19,7 +19,7 @@ export type ProbeGridShape = {
 
 /** A registered touch-off and where it touches the plate's nominal surface. */
 export type ProbeTouchShape = {
-  touch: ProbeTouch
+  touch: ProbeTouch<"probe" | "bed">
   point: Point3
 }
 

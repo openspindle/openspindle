@@ -1,5 +1,5 @@
 import type { XYZ } from "../geometry/frame"
-import { cornerInward, findsCorner, setsWorkZ } from "./params"
+import { cornerInward, findsCorner, setsWorkXY, setsWorkZ } from "./params"
 import type { Probe3dParams } from "./params"
 
 /** What a 3D probing routine found, from the contacts it reported, in machine coordinates. */
@@ -12,14 +12,6 @@ export type Probe3dResult = {
   readonly size: readonly [x: number | null, y: number | null]
   /** Whether it reported every contact the routine makes. */
   readonly complete: boolean
-}
-
-type Axis = 0 | 1
-
-const CENTERED: Readonly<Record<Probe3dParams["axes"], readonly Axis[]>> = {
-  xy: [0, 1],
-  x: [0],
-  y: [1],
 }
 
 /**
@@ -60,7 +52,9 @@ export function probe3dResult(
   // A pocket's walls are a ball's diameter wider apart than the centres that touched them, a
   // boss's sides as much narrower.
   const across = params.routine === "pocket-center" ? 1 : -1
-  for (const axis of CENTERED[params.axes]) {
+  const centred = setsWorkXY(params.routine, params.axes)
+  for (const axis of [0, 1] as const) {
+    if (!centred[axis]) continue
     const minus = pair(next)
     const plus = pair(next + 2)
     next += 4

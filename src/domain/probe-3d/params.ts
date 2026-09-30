@@ -118,6 +118,18 @@ export const findsCorner = (routine: Probe3dRoutine) =>
 export const setsWorkZ = (routine: Probe3dRoutine) =>
   routine !== "pocket-center"
 
+/**
+ * Which of work X0 and Y0 a routine sets, in the axes it touches sides in: both for a corner, and
+ * those a centre routine centres.
+ */
+export function setsWorkXY(
+  routine: Probe3dRoutine,
+  axes: Probe3dAxes
+): readonly [x: boolean, y: boolean] {
+  const corner = findsCorner(routine)
+  return [corner || axes !== "y", corner || axes !== "x"]
+}
+
 /** Which of its numeric parameters a routine reads, and of the distance, in which axes. */
 export type Probe3dFields = {
   readonly ballDiameter: boolean
@@ -126,19 +138,17 @@ export type Probe3dFields = {
 }
 
 /**
- * The parameters a routine reads: the ball, the distance in the axes it touches sides in, both
- * for a corner and those a centre routine centres, and the depth, but for a pocket's centre,
- * which touches no top.
+ * The parameters a routine reads: the ball, the distance in the axes it touches sides in
+ * (`setsWorkXY`), and the depth below the top it touches (`setsWorkZ`).
  */
 export function probe3dFields(
   routine: Probe3dRoutine,
   axes: Probe3dAxes
 ): Probe3dFields {
-  const corner = findsCorner(routine)
   return {
     ballDiameter: true,
-    distance: [corner || axes !== "y", corner || axes !== "x"],
-    depth: routine !== "pocket-center",
+    distance: setsWorkXY(routine, axes),
+    depth: setsWorkZ(routine),
   }
 }
 

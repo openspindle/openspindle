@@ -142,10 +142,12 @@ function firmwareBlock(
 }
 
 /**
- * Samples in the firmware's visiting order. Makera Z1 CartGridStrategy.cpp:674–698 includes both
- * grid edges and visits alternate rows in reverse order.
+ * The samples of a grid from its first one, `size` from it (negative runs back along an axis)
+ * with `points` along each axis, in the firmware's visiting order: Makera Z1
+ * CartGridStrategy.cpp:674–698 includes both grid edges and visits alternate rows in reverse
+ * order.
  */
-function gridSamples<TFrame extends Frame>(
+export function gridSamples<TFrame extends Frame>(
   start: XY<TFrame>,
   [width, depth]: Vec2,
   [columns, rows]: Vec2
@@ -289,7 +291,6 @@ function g32Grids(program: GCodeProgram): ProbeGrid<"probe" | "machine">[] {
  */
 export const G32_GRID: GridProbing = {
   parameters: GRID_PARAMETERS,
-  samples: gridSamples,
   program({ params, start }) {
     // In work coordinates the firmware's own auto-leveling can run it, reporting as it goes.
     const work = start.kind === "anchor" ? start.work : null
@@ -319,11 +320,10 @@ export const G32_GRID: GridProbing = {
         ...anchorTravel(start),
         probeBlock(params),
       ]
-    const probeLine = lines.length
     if (params.reviewAfterProbe) lines.push(...REVIEW_PAUSE)
     const reviewLine = params.reviewAfterProbe ? lines.length : null
     lines.push(...CONCLUSION)
-    return { nc: `${lines.join("\n")}\n`, probeLine, reviewLine }
+    return { nc: `${lines.join("\n")}\n`, reviewLine }
   },
   grids: g32Grids,
 }

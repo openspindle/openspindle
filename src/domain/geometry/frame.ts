@@ -44,12 +44,6 @@ export const plus = <TFrame extends Frame>(
   delta: Vec2
 ): XY<TFrame> => [point[0] + delta[0], point[1] + delta[1]]
 
-/** The displacement from `from` to `to`, both in the same frame. */
-export const minus = <TFrame extends Frame>(
-  to: XY<TFrame>,
-  from: XY<TFrame>
-): Vec2 => [to[0] - from[0], to[1] - from[1]]
-
 /** The frames whose origins are `offset` apart: a position in `TFrom` plus it is in `TTo`. */
 export const translation =
   <TFrom extends Frame, TTo extends Frame>(

@@ -45,11 +45,11 @@ export type SpecValues<TSpecs extends ParameterSpecs> = {
     : number
 }
 
-export const isPairSpec = (spec: ParameterSpec | PairSpec): spec is PairSpec =>
+const isPairSpec = (spec: ParameterSpec | PairSpec): spec is PairSpec =>
   Array.isArray(spec)
 
 /** A value within its parameter's range, with messages that name its label. */
-export function specSchema(spec: ParameterSpec) {
+function specSchema(spec: ParameterSpec) {
   const unit = spec.unit ? ` ${spec.unit}` : ""
   const range = `${spec.label} must be from ${spec.min} to ${spec.max}${unit}.`
   const value = spec.integer
