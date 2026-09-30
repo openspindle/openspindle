@@ -1,5 +1,5 @@
 import { formatMillimetres } from "../../../geometry/millimetres"
-import type { AutoScanParameters } from "../../../auto-scan/params"
+import type { AutoScanSpecs } from "../../../auto-scan/params"
 import type { OutlineTrace } from "../../../probing/probe"
 import { CLEARANCE_Z, MACHINE_Z } from "./travel"
 
@@ -8,7 +8,7 @@ import { CLEARANCE_Z, MACHINE_Z } from "./travel"
  * (`coordinate.clearance_z`) and trace speed (`atc.margin_rate_mm_m`). The trace stays within
  * the Z the machine moves in; the feeds are application limits. Neither is a clearance check.
  */
-const TRACE_PARAMETERS: AutoScanParameters = {
+const TRACE_PARAMETERS: AutoScanSpecs = {
   travelZ: {
     label: "Machine Z",
     axis: "Z",
@@ -48,8 +48,10 @@ const PAUSE = [
  */
 export const LASER_TRACE: OutlineTrace = {
   parameters: TRACE_PARAMETERS,
-  program({ travelZ, feed, pauseAfterScan }, outline) {
-    const { min, max } = outline
+  program({
+    params: { travelZ, feed, pauseAfterScan },
+    outline: { min, max },
+  }) {
     const [x0, y0, x1, y1] = [min[0], min[1], max[0], max[1]].map(
       formatMillimetres
     )
@@ -69,6 +71,6 @@ export const LASER_TRACE: OutlineTrace = {
       ...(pauseAfterScan ? PAUSE : []),
       "M2",
     ]
-    return `${lines.join("\n")}\n`
+    return { nc: `${lines.join("\n")}\n`, probeLine: null, reviewLine: null }
   },
 }

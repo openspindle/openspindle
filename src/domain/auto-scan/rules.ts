@@ -1,13 +1,15 @@
 import { issueOf } from "../diagnostics"
-import { EPSILON } from "../geometry/millimetres"
 import type { Issue } from "../diagnostics"
 import type {
   ToolpathBounds,
   ToolpathBoundsResult,
 } from "../compile/cutting-bounds"
+import { translation } from "../geometry/frame"
+import { boxRect, contains, mapRect, rectAt } from "../geometry/rect"
 import type { PlateSetup } from "../plate/plate"
-import { autoScanParamsSchema } from "./params"
-import type { AutoScanParameters, AutoScanParams } from "./params"
+import { rangedSchema } from "../probing/parameters"
+import { AutoScanParamsSchema } from "./params"
+import type { AutoScanParams, AutoScanSpecs } from "./params"
 
 export type AutoScanIssueCode =
   | "invalid-parameters"
@@ -33,9 +35,11 @@ export type AutoScanPlan =
 export function planAutoScan(
   params: AutoScanParams,
   toolpath: ToolpathBoundsResult,
-  parameters: AutoScanParameters
+  parameters: AutoScanSpecs
 ): AutoScanPlan {
-  const parsed = autoScanParamsSchema(parameters).safeParse(params)
+  const parsed = rangedSchema(AutoScanParamsSchema, parameters).safeParse(
+    params
+  )
   if (!parsed.success)
     return {
       ok: false,
@@ -60,19 +64,17 @@ export function outlineStockIssues(
 ): AutoScanIssue[] {
   const { stock, stockAnchor, workOrigin } = setup
   if (!stock) return []
-  const inside = [0, 1].every((axis) => {
-    const size = axis ? stock.depth : stock.width
-    const low = workOrigin[axis] + outline.min[axis]
-    const high = workOrigin[axis] + outline.max[axis]
-    return (
-      low >= stockAnchor[axis] - EPSILON &&
-      high <= stockAnchor[axis] + size + EPSILON
-    )
-  })
-  if (inside) return []
+  const onBed = mapRect(
+    boxRect<"work">(outline),
+    translation<"work", "bed">([workOrigin[0], workOrigin[1]])
+  )
+  const stockRect = rectAt<"bed">(
+    [stockAnchor[0], stockAnchor[1]],
+    [stock.width, stock.depth]
+  )
+  if (contains(stockRect, onBed)) return []
   // The outline the scan traces, at the stock top.
   const top = stockAnchor[2] + stock.height
-  const [x, y] = workOrigin
   return [
     scanWarning(
       "outline-off-stock",
@@ -81,8 +83,8 @@ export function outlineStockIssues(
         places: [
           {
             kind: "area",
-            min: [x + outline.min[0], y + outline.min[1], top],
-            max: [x + outline.max[0], y + outline.max[1], top],
+            min: [onBed.min[0], onBed.min[1], top],
+            max: [onBed.max[0], onBed.max[1], top],
           },
         ],
       }
