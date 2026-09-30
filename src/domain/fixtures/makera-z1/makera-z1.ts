@@ -4,8 +4,10 @@ import type { StoredAnchorSetup } from "@/domain/anchors/stored-anchors"
 import { formatMillimetres } from "../../geometry/millimetres"
 import type { NcUnitState } from "../../compile/nc-unit"
 import type { MachineOrigin } from "../../plate/work-origin"
+import type { ProbeTool } from "../../probing/probe"
 import { FixtureKit } from "../fixture-kit"
 import type { KitFixture, KitRecolor } from "../fixture-kit"
+import { THREE_D_PROBE } from "./3d-probe"
 import { Z1DowelPin } from "./dowel-pin"
 import { Z1Firmware } from "./firmware"
 import { Z1FourthAxis } from "./fourth-axis"
@@ -17,7 +19,8 @@ import { Z1_GLOSSARY } from "./nc-glossary"
 import { Z1_PROGRAM_RULES } from "./program-rules"
 import { isZ1Park, readZ1Block } from "./nc-grammar"
 import { Z1TopClamp } from "./top-clamp"
-import { MakeraWiredProbe } from "./wired-probe"
+import { WIRED_PROBE } from "./wired-probe"
+import { Z1_PROBING_SECTIONS } from "./wired-probe/blocks"
 import { CLEARANCE_Z } from "./wired-probe/travel"
 import { Z1Bed } from "./z1-bed"
 
@@ -28,8 +31,8 @@ const ncNumber = (value: number) => String(Number(value.toFixed(4)) + 0)
 const LIGHTER_ALUMINIUM: KitRecolor = { in: 6, from: ["#a2aab3"] }
 
 /**
- * The Makera Z1 and Z1 Pro: the aluminium bed, the wired probe, the fixtures Makera makes for it
- * and its anchors.
+ * The Makera Z1 and Z1 Pro: the aluminium bed, the wired probe and the 3D probe, the fixtures
+ * Makera makes for it and its anchors.
  */
 export class MakeraZ1 extends FixtureKit {
   readonly name = "Makera Z1"
@@ -38,7 +41,8 @@ export class MakeraZ1 extends FixtureKit {
   /** The official three-axis work envelope, not the bed's size. */
   readonly workArea: Point3 = [200, 200, 100]
   readonly bed = new Z1Bed()
-  readonly probe = new MakeraWiredProbe()
+  readonly probes: readonly ProbeTool[] = [WIRED_PROBE, THREE_D_PROBE]
+  readonly probingSections = Z1_PROBING_SECTIONS
   readonly firmware = new Z1Firmware()
   readonly fixtures: readonly KitFixture[] = [
     { fixture: new Z1MdfBed(), addedIn: 1 },

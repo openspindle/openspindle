@@ -90,7 +90,7 @@ export function plateStockBounds(plate: ViewerPlate): ViewerBounds | null {
   }
 }
 
-/** The kit of the machine a viewer plate is set up for: its bed and its probe (`kitForSetup`). */
+/** The kit of the machine a viewer plate is set up for: its bed and its probes (`kitForSetup`). */
 export const plateKit = (plate: Pick<ViewerPlate, "deviceId" | "fixtures">) =>
   kitForSetup({ deviceId: plate.deviceId, fixtures: plate.fixtures ?? [] })
 
@@ -98,7 +98,7 @@ export const plateKit = (plate: Pick<ViewerPlate, "deviceId" | "fixtures">) =>
 export function plateProbeGrids(
   plate: Pick<ViewerPlate, "program" | "anchorSetup" | "deviceId" | "fixtures">
 ): ProbeGrid[] {
-  return getProbingPreview(plate.program, plateKit(plate).probe)
+  return getProbingPreview(plate.program, plateKit(plate).probes)
     .grids.map((grid) => registerProbeGrid(grid, plate.anchorSetup))
     .filter((grid): grid is ProbeGrid => grid !== null)
 }
@@ -107,7 +107,7 @@ export function plateProbeGrids(
 export function plateProbeTouches(
   plate: Pick<ViewerPlate, "program" | "anchorSetup" | "deviceId" | "fixtures">
 ): ProbeTouch[] {
-  return getProbeTouches(plate.program, plateKit(plate).probe)
+  return getProbeTouches(plate.program, plateKit(plate).probes)
     .map((touch) => registerProbeTouch(touch, plate.anchorSetup))
     .filter((touch): touch is ProbeTouch => touch !== null)
 }

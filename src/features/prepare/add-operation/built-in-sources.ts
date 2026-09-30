@@ -4,7 +4,7 @@ import type { ProbingSourceKind } from "@/domain/operations/kinds"
 import { PROBING_ICONS } from "@/features/plugins/operation-icon"
 import {
   useAddProbingOperation,
-  useProbeForAdding,
+  useProbesForAdding,
 } from "./use-add-probing-operation"
 
 /** An operation OpenSpindle generates itself, as Add operation and the Prepare toolbar offer it. */
@@ -34,11 +34,11 @@ const PROBING_DESCRIPTIONS: Record<ProbingSourceKind, string> = {
 }
 
 /**
- * The probing operations of the machine's probe: none without a probe, auto-scan if it traces,
- * 3D probing if it has a 3D probe.
+ * The probing operations the machine's probes offer: none without a probe, auto-scan if one
+ * traces, 3D probing if it has a 3D probe.
  */
 export function useBuiltInSources(): BuiltInSource[] {
-  const probe = useProbeForAdding()
+  const probes = useProbesForAdding()
   const addAutoLevel = useAddProbingOperation("auto-level")
   const addAutoZHeight = useAddProbingOperation("auto-z-height")
   const addAutoScan = useAddProbingOperation("auto-scan")
@@ -49,13 +49,13 @@ export function useBuiltInSources(): BuiltInSource[] {
     "auto-scan": addAutoScan,
     "probe-3d": addProbe3d,
   }
-  return PROBING_KINDS.filter((kind) => probingOf(kind).available(probe)).map(
-    (kind) => ({
-      id: kind,
-      icon: PROBING_ICONS[kind],
-      title: OPERATION_KINDS[kind].label,
-      description: PROBING_DESCRIPTIONS[kind],
-      add: add[kind],
-    })
-  )
+  return PROBING_KINDS.filter(
+    (kind) => probingOf(kind).offer(probes) !== null
+  ).map((kind) => ({
+    id: kind,
+    icon: PROBING_ICONS[kind],
+    title: OPERATION_KINDS[kind].label,
+    description: PROBING_DESCRIPTIONS[kind],
+    add: add[kind],
+  }))
 }

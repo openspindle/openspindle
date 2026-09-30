@@ -98,8 +98,8 @@ function touchOffName(words: Words, tool: number | null) {
     : "Z-height probing"
 }
 
-/** How the Z1's probing reads in a program's sections. */
-export const WIRED_PROBE_SECTIONS: ProbingSections = {
+/** How the Z1's probing reads in a program's sections, the wired probe's and the 3D probe's. */
+export const Z1_PROBING_SECTIONS: ProbingSections = {
   probesGrid: ({ words }) => probesGrid(words),
   touchOff: ({ words }, tool) =>
     touches(words) ? touchOffName(words, tool) : null,

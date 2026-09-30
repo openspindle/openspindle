@@ -12,6 +12,7 @@ import { Switch } from "@/components/ui/switch"
 import { templateProgram } from "@/app/workspace/templates"
 import { useWorkspaceStore } from "@/app/workspace/workspace-context"
 import { placementAnchors } from "@/domain/probing/placement"
+import { offering } from "@/domain/probing/probe"
 import { kitForPlate } from "@/domain/fixtures/catalog"
 import { closingParkCodes } from "@/domain/compile/nc-unit"
 import {
@@ -277,14 +278,14 @@ function useWorkArea(plate: Plate): WorkAreaFit {
 function AutoLevelEditor({ plate, operation }: EditorProps<"auto-level">) {
   const update = useSourceUpdate(plate, operation.id, operation.revision)
   const workArea = useWorkArea(plate)
-  const probe = kitForPlate(plate).probe
+  const grid = offering(kitForPlate(plate).probes, "grid")?.capability
   // Without a probe the operation has no settings; its diagnostic above says why.
-  if (!probe) return null
+  if (!grid) return null
   return (
     <AutoLevelSettings
       key={operation.id}
       value={operation.source.params}
-      parameters={probe.autoLevel.parameters}
+      parameters={grid.parameters}
       anchors={anchorOptions(plate)}
       workArea={workArea}
       onChange={(params) => update({ kind: "auto-level", params })}
@@ -295,14 +296,14 @@ function AutoLevelEditor({ plate, operation }: EditorProps<"auto-level">) {
 function AutoZHeightEditor({ plate, operation }: EditorProps<"auto-z-height">) {
   const update = useSourceUpdate(plate, operation.id, operation.revision)
   const workArea = useWorkArea(plate)
-  const probe = kitForPlate(plate).probe
+  const touchOff = offering(kitForPlate(plate).probes, "touch-off")?.capability
   // Without a probe the operation has no settings; its diagnostic above says why.
-  if (!probe) return null
+  if (!touchOff) return null
   return (
     <AutoZHeightSettings
       key={operation.id}
       value={operation.source.params}
-      parameters={probe.autoZHeight.parameters}
+      parameters={touchOff.parameters}
       anchors={anchorOptions(plate)}
       workArea={workArea}
       onChange={(params) => update({ kind: "auto-z-height", params })}
@@ -313,7 +314,7 @@ function AutoZHeightEditor({ plate, operation }: EditorProps<"auto-z-height">) {
 function AutoScanEditor({ plate, operation }: EditorProps<"auto-scan">) {
   const update = useSourceUpdate(plate, operation.id, operation.revision)
   const outline = useMemo(() => plateToolpathBounds(plate), [plate])
-  const trace = kitForPlate(plate).probe?.autoScan
+  const trace = offering(kitForPlate(plate).probes, "outline")?.capability
   // Without a pointer the operation has no settings; its diagnostic above says why.
   if (!trace) return null
   return (
@@ -330,7 +331,7 @@ function AutoScanEditor({ plate, operation }: EditorProps<"auto-scan">) {
 /** 3D probing's settings: the routine, and where it starts. */
 function Probe3dEditor({ plate, operation }: EditorProps<"probe-3d">) {
   const update = useSourceUpdate(plate, operation.id, operation.revision)
-  const probing = kitForPlate(plate).probe?.probe3d
+  const probing = offering(kitForPlate(plate).probes, "origin")?.capability
   // Without a 3D probe the operation has no settings; its diagnostic above says why.
   if (!probing) return null
   return (

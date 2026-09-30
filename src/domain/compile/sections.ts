@@ -54,7 +54,7 @@ export const machineRetract = (block: Pick<NcBlock, "words">) =>
   )
 
 /** What sections read of a machine's NC through its kit: its probing and its CAM's markers. */
-export type SectionMachine = Pick<FixtureKit, "probe" | "camMarkers">
+export type SectionMachine = Pick<FixtureKit, "probingSections" | "camMarkers">
 
 /** What a comment on a line of its own says; null for a line that is not one. */
 const commentText = (line: string) =>
@@ -151,7 +151,7 @@ export function buildProgramSections(
   const lines = program.lines.slice(first - 1, last)
   if (!lines.some((line) => line.trim())) return []
   const absolute = (index: number) => first + index
-  const probing = machine.probe?.sections ?? null
+  const probing = machine.probingSections
   const touchOff = (block: NcBlock, tool: number | null = null) =>
     probing?.touchOff(block, tool) ?? null
   const probesGrid = (block: NcBlock) => probing?.probesGrid(block) ?? false
