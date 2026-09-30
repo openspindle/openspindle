@@ -13,7 +13,6 @@ import {
   PROBE_3D_AXES_LABELS,
   PROBE_3D_CORNERS,
   PROBE_3D_CORNER_LABELS,
-  PROBE_3D_FIELDS,
   PROBE_3D_ROUTINES,
   PROBE_3D_ROUTINE_LABELS,
   findsCorner,
@@ -37,6 +36,7 @@ import {
   useProbingForm,
 } from "@/features/probing/probing-form"
 import type { ProbingAnchorOption } from "@/features/probing/probing-form"
+import type { ParameterSpec } from "@/domain/probing/parameters"
 import type { AnchorPlacement } from "@/domain/probing/placement"
 
 export type Probe3dSettingsProps = {
@@ -62,6 +62,9 @@ const AXES_OPTIONS = PROBE_3D_AXES.map((value) => ({
   value,
   label: PROBE_3D_AXES_LABELS[value],
 }))
+
+/** Where the form keeps each numeric input: a field, or one axis of the distance. */
+type NumericPath = "ballDiameter" | "distance[0]" | "distance[1]" | "depth"
 
 /** What the routine touches and sets. */
 function routineDescription({ routine }: Probe3dParams) {
@@ -117,12 +120,47 @@ function Probe3dForm({
   // only valid parameters: a hidden error would hold back every later edit.
   const hide = (routine: Probe3dRoutine, axes: Probe3dAxes) => {
     const shown = probe3dFields(routine, axes)
-    for (const name of PROBE_3D_FIELDS) {
-      const { min, max } = parameters[name]
-      const current = form.getFieldValue(name)
-      if (!shown.includes(name) && !(current >= min && current <= max))
-        form.setFieldValue(name, value[name], { dontRunListeners: true })
+    const restore = (
+      path: NumericPath,
+      { min, max }: ParameterSpec,
+      last: number
+    ) => {
+      const current = form.getFieldValue(path)
+      if (!(current >= min && current <= max))
+        form.setFieldValue(path, last, { dontRunListeners: true })
     }
+    if (!shown.ballDiameter)
+      restore("ballDiameter", parameters.ballDiameter, value.ballDiameter)
+    if (!shown.distance[0])
+      restore("distance[0]", parameters.distance[0], value.distance[0])
+    if (!shown.distance[1])
+      restore("distance[1]", parameters.distance[1], value.distance[1])
+    if (!shown.depth) restore("depth", parameters.depth, value.depth)
+  }
+  // The numeric inputs the routine reads, by the names their IDs end in.
+  const numericFields = ({ routine, axes }: Probe3dParams) => {
+    const shown = probe3dFields(routine, axes)
+    const input = (
+      name: string,
+      parameter: ParameterSpec,
+      path: NumericPath
+    ) => ({
+      name,
+      parameter,
+      field: probingField(form, path),
+    })
+    return [
+      ...(shown.ballDiameter
+        ? [input("ballDiameter", parameters.ballDiameter, "ballDiameter")]
+        : []),
+      ...(shown.distance[0]
+        ? [input("distanceX", parameters.distance[0], "distance[0]")]
+        : []),
+      ...(shown.distance[1]
+        ? [input("distanceY", parameters.distance[1], "distance[1]")]
+        : []),
+      ...(shown.depth ? [input("depth", parameters.depth, "depth")] : []),
+    ]
   }
 
   return (
@@ -207,13 +245,7 @@ function Probe3dForm({
               <NumericFields
                 id={id}
                 disabled={disabled}
-                fields={probe3dFields(values.routine, values.axes).map(
-                  (name) => ({
-                    name,
-                    parameter: parameters[name],
-                    field: probingField(form, name),
-                  })
-                )}
+                fields={numericFields(values)}
               />
             </FieldGroup>
           </FieldSet>
