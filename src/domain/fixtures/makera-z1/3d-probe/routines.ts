@@ -156,7 +156,7 @@ function routineBlock(params: Probe3dParams, subcode: number): string {
  * number for it): corners and centres found from where the probe starts, which set the work
  * origin there and report each contact.
  */
-export const THREE_D_PROBE: OriginProbing = {
+export const M480_ROUTINES: OriginProbing = {
   parameters: PROBE_3D_PARAMETERS,
   program({ params, start, height }) {
     const subcode = routineSubcode(params.routine, params.corner)

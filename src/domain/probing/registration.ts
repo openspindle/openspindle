@@ -3,7 +3,8 @@ import { isStoredAnchorSetup, machineToBed } from "../anchors/stored-anchors"
 import type { StoredAnchorSetup } from "../anchors/stored-anchors"
 import type { ProbeGrid, ProbePoint } from "@/domain/auto-level/probe-grid"
 import type { ProbeTouch } from "@/domain/auto-z-height/probe-touch"
-import type { Probe } from "@/domain/probing/probe"
+import { offering } from "@/domain/probing/probe"
+import type { GridProbing, ProbeTool } from "@/domain/probing/probe"
 
 export type { ProbeGrid, ProbePoint, ProbeTouch }
 export type ProbingPreview = {
@@ -12,22 +13,23 @@ export type ProbingPreview = {
   bounds: { min: ProbePoint; max: ProbePoint } | null
 }
 const NO_PROBING: ProbingPreview = { grids: [], pointCount: 0, bounds: null }
-const caches = new WeakMap<Probe, WeakMap<GCodeProgram, ProbingPreview>>()
+const caches = new WeakMap<GridProbing, WeakMap<GCodeProgram, ProbingPreview>>()
 
 /**
- * The grids a program probes, as the machine's probe reads its NC (`GridProbing.grids`):
- * planned XY samples only, never measured heights. Nothing without a probe.
+ * The grids a program probes, as the machine's probe that probes grids reads its NC
+ * (`GridProbing.grids`): planned XY samples only, never measured heights. Nothing without one.
  */
 export function getProbingPreview(
   program: GCodeProgram,
-  probe: Probe | null
+  probes: readonly ProbeTool[]
 ): ProbingPreview {
-  if (!probe) return NO_PROBING
-  let cache = caches.get(probe)
-  if (!cache) caches.set(probe, (cache = new WeakMap()))
+  const probing = offering(probes, "grid")?.capability
+  if (!probing) return NO_PROBING
+  let cache = caches.get(probing)
+  if (!cache) caches.set(probing, (cache = new WeakMap()))
   const saved = cache.get(program)
   if (saved) return saved
-  const grids = probe.autoLevel.grids(program)
+  const grids = probing.grids(program)
   let pointCount = 0
   const minimum: ProbePoint = [Infinity, Infinity]
   const maximum: ProbePoint = [-Infinity, -Infinity]
@@ -48,24 +50,29 @@ export function getProbingPreview(
   return result
 }
 
-const touchCaches = new WeakMap<Probe, WeakMap<GCodeProgram, ProbeTouch[]>>()
+/** Per machine's probes, which say both the touch-off and the grids it reads touches after. */
+const touchCaches = new WeakMap<
+  readonly ProbeTool[],
+  WeakMap<GCodeProgram, ProbeTouch[]>
+>()
 
 /**
- * Where a program's touch-offs touch, as the machine's probe reads its NC
- * (`TouchOff.touches`): planned XY only, never measured heights. Nothing without a probe.
+ * Where a program's touch-offs touch, as the machine's probe that touches off reads its NC
+ * (`TouchOff.touches`): planned XY only, never measured heights. Nothing without one.
  */
 export function getProbeTouches(
   program: GCodeProgram,
-  probe: Probe | null
+  probes: readonly ProbeTool[]
 ): ProbeTouch[] {
-  if (!probe) return []
-  let cache = touchCaches.get(probe)
-  if (!cache) touchCaches.set(probe, (cache = new WeakMap()))
+  const touchOff = offering(probes, "touch-off")?.capability
+  if (!touchOff) return []
+  let cache = touchCaches.get(probes)
+  if (!cache) touchCaches.set(probes, (cache = new WeakMap()))
   const saved = cache.get(program)
   if (saved) return saved
-  const touches = probe.autoZHeight.touches(
+  const touches = touchOff.touches(
     program,
-    getProbingPreview(program, probe).grids
+    getProbingPreview(program, probes).grids
   )
   cache.set(program, touches)
   return touches

@@ -2,14 +2,11 @@ import type { AnchorConfiguration } from "@/machine/contract"
 import { plateAutoLevelParams } from "../auto-level/fit"
 import { generateAutoLevelNc } from "../auto-level/generate"
 import type { AutoLevelIssueCode } from "../auto-level/issues"
-import type { AutoLevelParams } from "../auto-level/params"
 import { autoLevelRunIssues, validateAutoLevel } from "../auto-level/rules"
 import { generateAutoScanNc } from "../auto-scan/generate"
-import type { AutoScanParams } from "../auto-scan/params"
 import { outlineStockIssues, scanOrderIssues } from "../auto-scan/rules"
 import { plateAutoZHeightParams } from "../auto-z-height/fit"
 import { generateAutoZHeightNc } from "../auto-z-height/generate"
-import type { AutoZHeightParams } from "../auto-z-height/params"
 import {
   autoLevelOrderIssues,
   validateAutoZHeight,
@@ -20,7 +17,6 @@ import type {
 } from "../auto-z-height/rules"
 import { generateProbe3dNc } from "../probe-3d/generate"
 import { defaultProbe3dParams } from "../probe-3d/params"
-import type { Probe3dParams } from "../probe-3d/params"
 import { probe3dOrderIssues, validateProbe3d } from "../probe-3d/rules"
 import type { Probe3dIssueCode } from "../probe-3d/rules"
 import { error, operationSubject } from "../diagnostics"
@@ -35,7 +31,13 @@ import { workOriginOnMachine } from "../plate/work-origin"
 import { fail, ok } from "../primitives"
 import type { Result } from "../primitives"
 import { defaultsOf } from "../probing/parameters"
-import type { OriginProbing, OutlineTrace, Probe } from "../probing/probe"
+import { offering } from "../probing/probe"
+import type {
+  Capabilities,
+  CapabilityKind,
+  ProbeProgram,
+  ProbeTool,
+} from "../probing/probe"
 import type { Operation, Phase, SourceKind, SourceOf } from "./operation"
 
 /** The NC an operation contributes and what that NC may contain. */
@@ -50,20 +52,9 @@ export type OperationOf<TKind extends SourceKind> = Operation & {
   source: SourceOf<TKind>
 }
 
-/** The kinds whose NC, defaults and availability come from the plate's machine's probe. */
+/** The kinds whose NC, defaults and availability come from the plate's machine's probes. */
 export type ProbingSourceKind =
   "auto-level" | "auto-z-height" | "auto-scan" | "probe-3d"
-
-/** A probing kind's operation parameters, by its kind. */
-type ProbingParams<TKind extends SourceKind> = TKind extends "auto-level"
-  ? AutoLevelParams
-  : TKind extends "auto-z-height"
-    ? AutoZHeightParams
-    : TKind extends "auto-scan"
-      ? AutoScanParams
-      : TKind extends "probe-3d"
-        ? Probe3dParams
-        : never
 
 /** The connected machine, as far as running an operation depends on it. */
 export type RunContext = {
@@ -76,9 +67,9 @@ export type RunContext = {
  * Strategy per operation source kind: how it becomes NC, its phase, whether a lone
  * operation may be emitted byte-for-byte, and what to check while editing and before Run.
  * New kinds register here; nothing else switches on plugin ids. Kinds resolve and validate with
- * the kit of the plate's machine (`kitForPlate`): its probe measures for the probing kinds, which
- * also give the UI their availability and defaults here (`available`, `defaults`), so it never
- * reads a probe or a default kit itself.
+ * the kit of the plate's machine (`kitForPlate`): its probes measure for the probing kinds
+ * (`ProbingKind`), which also give the UI a new operation fitted to the probe here (`offer`), so
+ * it never reads a capability itself.
  */
 export interface OperationKind<TKind extends SourceKind> {
   readonly kind: TKind
@@ -107,17 +98,25 @@ export interface OperationKind<TKind extends SourceKind> {
     plate: Plate,
     machine: RunContext
   ) => Diagnostic[]
+}
+
+/**
+ * A probing kind: an operation kind whose NC the first of the machine's probes to offer its kind
+ * of probing (`capability`) writes, and which the machine offers only with such a probe.
+ */
+export interface ProbingKind<
+  TKind extends ProbingSourceKind,
+> extends OperationKind<TKind> {
+  readonly capability: CapabilityKind
   /**
-   * For a probing kind: whether the machine's probe offers it at all, before any plate names
-   * one (`useAddProbingOperation`, `useBuiltInSources`). Other kinds need no probe and leave
-   * this out.
+   * What a machine's probes offer of the kind, known before the plate is
+   * (`useAddProbingOperation`, `useBuiltInSources`): a new operation's source, fitted to the
+   * plate it is added to within the ranges of the probe offering the capability; null when none
+   * of the probes offers it.
    */
-  available?: (probe: Probe | null) => boolean
-  /**
-   * For a probing kind: a new operation's parameters, fitted to the plate within the probe's
-   * ranges. Called only once `available` has confirmed the probe offers the kind.
-   */
-  defaults?: (plate: Plate, probe: Probe) => ProbingParams<TKind>
+  offer: (
+    probes: readonly ProbeTool[]
+  ) => ((plate: Plate) => SourceOf<TKind>) | null
 }
 
 const plain = (nc: string): ResolvedNc => ({
@@ -219,46 +218,126 @@ function issueDiagnostic(
   }
 }
 
-const autoLevelKind: OperationKind<"auto-level"> = {
+/** A probing kind's parameters, as its operations store them. */
+type ParamsOf<TKind extends ProbingSourceKind> = SourceOf<TKind>["params"]
+
+/** A probing operation's NC, or the issues that keep it from being generated. */
+type ProbingGeneration =
+  | { readonly ok: true; readonly program: ProbeProgram }
+  | { readonly ok: false; readonly issues: readonly Issue[] }
+
+/** What sets a probing kind apart; `probingKind` makes the rest of it. */
+type ProbingKindSpec<
+  TKind extends ProbingSourceKind,
+  TCapability extends CapabilityKind,
+> = {
+  readonly kind: TKind
+  readonly label: string
+  readonly capability: TCapability
+  /** What a machine without the capability has none of, as `probing-unsupported` names it. */
+  readonly lacking: string
+  /** Why generating failed, as `<kind>-invalid` says when no issue does. */
+  readonly invalid: string
+  /** Whether an operation probes from a stored anchor (`anchoredProbing`); never without it. */
+  readonly anchored?: (operation: OperationOf<TKind>) => boolean
+  /** A new operation's parameters, fitted to the plate within the capability's ranges. */
+  readonly defaults: (
+    plate: Plate,
+    capability: Capabilities[TCapability]
+  ) => ParamsOf<TKind>
+  /** An operation's NC on its plate, as the capability writes it. */
+  readonly generate: (
+    operation: OperationOf<TKind>,
+    plate: Plate,
+    capability: Capabilities[TCapability],
+    kit: FixtureKit
+  ) => ProbingGeneration
+  readonly validate?: OperationKind<TKind>["validate"]
+  readonly runChecks?: OperationKind<TKind>["runChecks"]
+}
+
+/**
+ * A probing kind from what sets it apart: a setup operation whose NC is generated, and kept
+ * verbatim, by the first of the kit's probes that offers its capability. Without one it does
+ * not resolve (`probing-unsupported`); an operation whose NC is not generated reports its first
+ * issue as `<kind>-invalid`.
+ */
+function probingKind<
+  TKind extends ProbingSourceKind,
+  TCapability extends CapabilityKind,
+>({
+  kind,
+  label,
+  capability,
+  lacking,
+  invalid,
+  anchored,
+  defaults,
+  generate,
+  validate,
+  runChecks,
+}: ProbingKindSpec<TKind, TCapability>): ProbingKind<TKind> {
+  return {
+    kind,
+    label,
+    verbatim: true,
+    generated: true,
+    phase: () => "setup",
+    capability,
+    offer: (probes) => {
+      const offered = offering(probes, capability)
+      if (!offered) return null
+      // `SourceOf<TKind>` is the source whose kind is `TKind`, which holds `ParamsOf<TKind>`;
+      // TypeScript cannot narrow the union for a kind not known yet, so this states it.
+      return (plate) =>
+        ({
+          kind,
+          params: defaults(plate, offered.capability),
+        }) as SourceOf<TKind>
+    },
+    resolve: (operation, plate, kit) => {
+      const offered = offering(kit.probes, capability)
+      if (!offered) return fail(unsupported(operation, lacking))
+      const generated = generate(operation, plate, offered.capability, kit)
+      if (!generated.ok)
+        return fail(
+          error(
+            `${kind}-invalid`,
+            `${operation.name}: ${generated.issues.at(0)?.message ?? invalid}`,
+            {
+              subject: operationSubject(operation.id),
+              fix: { kind: "edit-operation", operationId: operation.id },
+            }
+          )
+        )
+      const { nc, reviewLine } = generated.program
+      return ok({
+        nc,
+        policy: {
+          probing: capability,
+          anchoredProbing: anchored?.(operation) ?? false,
+        },
+        reviewLines: reviewLine === null ? [] : [reviewLine],
+      })
+    },
+    validate,
+    runChecks,
+  }
+}
+
+const autoLevelKind = probingKind({
   kind: "auto-level",
   label: "Auto-level",
-  verbatim: true,
-  generated: true,
-  phase: () => "setup",
-  available: (probe) => probe !== null,
-  defaults: (plate, probe) =>
-    plateAutoLevelParams(plate, probe.autoLevel.parameters),
-  resolve: (operation, plate, { probe }) => {
-    if (!probe) return fail(unsupported(operation, "probe"))
-    const { params } = operation.source
-    const generated = generateAutoLevelNc(
-      params,
-      placementContext(plate),
-      probe.autoLevel
-    )
-    if (!generated.ok)
-      return fail(
-        error(
-          "auto-level-invalid",
-          `${operation.name}: ${generated.issues.at(0)?.message ?? "the probe grid is invalid."}`,
-          {
-            subject: operationSubject(operation.id),
-            fix: { kind: "edit-operation", operationId: operation.id },
-          }
-        )
-      )
-    const { nc, reviewLine } = generated.program
-    return ok({
-      nc,
-      policy: {
-        probing: "grid",
-        anchoredProbing: params.placement.kind === "anchor",
-      },
-      reviewLines: reviewLine === null ? [] : [reviewLine],
-    })
-  },
-  validate: (operation, plate, { probe }) => {
-    if (!probe) return []
+  capability: "grid",
+  lacking: "probe",
+  invalid: "the probe grid is invalid.",
+  anchored: ({ source }) => source.params.placement.kind === "anchor",
+  defaults: (plate, grid) => plateAutoLevelParams(plate, grid.parameters),
+  generate: ({ source }, plate, grid) =>
+    generateAutoLevelNc(source.params, placementContext(plate), grid),
+  validate: (operation, plate, kit) => {
+    const grid = offering(kit.probes, "grid")?.capability
+    if (!grid) return []
     return validateAutoLevel(
       operation.source.params,
       {
@@ -266,7 +345,7 @@ const autoLevelKind: OperationKind<"auto-level"> = {
         stock: plate.setup.stock,
         stockAnchor: plate.setup.stockAnchor,
       },
-      probe.autoLevel.parameters
+      grid.parameters
     )
       .filter((issue) => !GENERATION_BLOCKERS.has(issue.code))
       .map((issue) => issueDiagnostic("auto-level", issue, operation))
@@ -277,7 +356,7 @@ const autoLevelKind: OperationKind<"auto-level"> = {
       placementContext(plate),
       machine
     ).map((issue) => issueDiagnostic("auto-level", issue, operation)),
-}
+})
 
 /** Issues that block generating the touch-off NC; the compiler reports those already. */
 const TOUCH_OFF_BLOCKERS: ReadonlySet<AutoZHeightIssueCode> = new Set([
@@ -303,42 +382,19 @@ function laterAutoLevels(plate: Plate, operation: Operation): LaterAutoLevel[] {
   )
 }
 
-const autoZHeightKind: OperationKind<"auto-z-height"> = {
+const autoZHeightKind = probingKind({
   kind: "auto-z-height",
   label: "Auto Z-height",
-  verbatim: true,
-  generated: true,
-  phase: () => "setup",
-  available: (probe) => probe !== null,
-  defaults: (plate, probe) =>
-    plateAutoZHeightParams(plate, probe.autoZHeight.parameters),
-  resolve: (operation, plate, { probe }) => {
-    if (!probe) return fail(unsupported(operation, "probe"))
-    const generated = generateAutoZHeightNc(
-      operation.source.params,
-      placementContext(plate),
-      probe.autoZHeight
-    )
-    if (!generated.ok)
-      return fail(
-        error(
-          "auto-z-height-invalid",
-          `${operation.name}: ${generated.issues.at(0)?.message ?? "the touch-off is invalid."}`,
-          {
-            subject: operationSubject(operation.id),
-            fix: { kind: "edit-operation", operationId: operation.id },
-          }
-        )
-      )
-    const { nc, reviewLine } = generated.program
-    return ok({
-      nc,
-      policy: { probing: "touch-off", anchoredProbing: false },
-      reviewLines: reviewLine === null ? [] : [reviewLine],
-    })
-  },
-  validate: (operation, plate, { probe }) => {
-    if (!probe) return []
+  capability: "touch-off",
+  lacking: "probe",
+  invalid: "the touch-off is invalid.",
+  defaults: (plate, touchOff) =>
+    plateAutoZHeightParams(plate, touchOff.parameters),
+  generate: ({ source }, plate, touchOff) =>
+    generateAutoZHeightNc(source.params, placementContext(plate), touchOff),
+  validate: (operation, plate, kit) => {
+    const touchOff = offering(kit.probes, "touch-off")?.capability
+    if (!touchOff) return []
     return [
       ...validateAutoZHeight(
         operation.source.params,
@@ -347,7 +403,7 @@ const autoZHeightKind: OperationKind<"auto-z-height"> = {
           stock: plate.setup.stock,
           stockAnchor: plate.setup.stockAnchor,
         },
-        probe.autoZHeight.parameters
+        touchOff.parameters
       ).filter((issue) => !TOUCH_OFF_BLOCKERS.has(issue.code)),
       ...autoLevelOrderIssues(
         operation.source.params,
@@ -361,48 +417,26 @@ const autoZHeightKind: OperationKind<"auto-z-height"> = {
       placementContext(plate),
       machine
     ).map((issue) => issueDiagnostic("auto-z-height", issue, operation)),
-}
+})
 
-const autoScanKind: OperationKind<"auto-scan"> = {
+const autoScanKind = probingKind({
   kind: "auto-scan",
   label: "Auto-scan",
-  verbatim: true,
-  generated: true,
-  phase: () => "setup",
-  available: (probe) => probe !== null && probe.autoScan !== null,
-  // `available` above confirms `autoScan`; this states that guarantee for the type checker,
-  // as `kindOf`'s cast below states its own.
-  defaults: (_plate, probe) => ({
-    ...defaultsOf((probe.autoScan as OutlineTrace).parameters),
+  capability: "outline",
+  lacking: "pointer to trace with",
+  invalid: "the scan is invalid.",
+  defaults: (_plate, trace) => ({
+    ...defaultsOf(trace.parameters),
     pauseAfterScan: true,
   }),
   // The outline is the plate's other operations' toolpath bounds, so it never goes stale.
-  resolve: (operation, plate, kit) => {
-    const trace = kit.probe?.autoScan
-    if (!trace) return fail(unsupported(operation, "pointer to trace with"))
-    const generated = generateAutoScanNc(
-      operation.source.params,
+  generate: ({ source }, plate, trace, kit) =>
+    generateAutoScanNc(
+      source.params,
       toolpathBoundsOf(machiningPrograms(plate, kit)),
       trace
-    )
-    if (!generated.ok)
-      return fail(
-        error(
-          "auto-scan-invalid",
-          `${operation.name}: ${generated.issues.at(0)?.message ?? "the scan is invalid."}`,
-          {
-            subject: operationSubject(operation.id),
-            fix: { kind: "edit-operation", operationId: operation.id },
-          }
-        )
-      )
-    const { nc, reviewLine } = generated.program
-    return ok({
-      nc,
-      policy: { probing: "outline", anchoredProbing: false },
-      reviewLines: reviewLine === null ? [] : [reviewLine],
-    })
-  },
+    ),
+  // Outline and order advice needs no pointer, so a machine without one still reports it.
   validate: (operation, plate, kit) => {
     const toolpath = toolpathBoundsOf(machiningPrograms(plate, kit))
     const index = plate.operations.findIndex((item) => item.id === operation.id)
@@ -414,7 +448,7 @@ const autoScanKind: OperationKind<"auto-scan"> = {
       ...scanOrderIssues(machiningBefore),
     ].map((issue) => issueDiagnostic("auto-scan", issue, operation))
   },
-}
+})
 
 /** Issues that block generating the 3D probing NC; the compiler reports those already. */
 const PROBE_3D_BLOCKERS: ReadonlySet<Probe3dIssueCode> = new Set([
@@ -424,45 +458,17 @@ const PROBE_3D_BLOCKERS: ReadonlySet<Probe3dIssueCode> = new Set([
   "anchor-point-out-of-range",
 ])
 
-const probe3dKind: OperationKind<"probe-3d"> = {
+const probe3dKind = probingKind({
   kind: "probe-3d",
   label: "3D probing",
-  verbatim: true,
-  generated: true,
-  phase: () => "setup",
-  available: (probe) => probe !== null && probe.probe3d !== null,
-  // `available` above confirms `probe3d`; this states that guarantee for the type checker, as
-  // auto-scan's `defaults` does for its trace.
-  defaults: (_plate, probe) =>
-    defaultProbe3dParams((probe.probe3d as OriginProbing).parameters),
-  resolve: (operation, plate, kit) => {
-    const probing = kit.probe?.probe3d
-    if (!probing) return fail(unsupported(operation, "3D probe"))
-    const generated = generateProbe3dNc(
-      operation.source.params,
-      placementContext(plate),
-      probing
-    )
-    if (!generated.ok)
-      return fail(
-        error(
-          "probe-3d-invalid",
-          `${operation.name}: ${generated.issues.at(0)?.message ?? "the probing is invalid."}`,
-          {
-            subject: operationSubject(operation.id),
-            fix: { kind: "edit-operation", operationId: operation.id },
-          }
-        )
-      )
-    const { nc, reviewLine } = generated.program
-    return ok({
-      nc,
-      policy: { probing: "origin", anchoredProbing: false },
-      reviewLines: reviewLine === null ? [] : [reviewLine],
-    })
-  },
+  capability: "origin",
+  lacking: "3D probe",
+  invalid: "the probing is invalid.",
+  defaults: (_plate, probing) => defaultProbe3dParams(probing.parameters),
+  generate: ({ source }, plate, probing) =>
+    generateProbe3dNc(source.params, placementContext(plate), probing),
   validate: (operation, plate, kit) => {
-    const probing = kit.probe?.probe3d
+    const probing = offering(kit.probes, "origin")?.capability
     if (!probing) return []
     const { params } = operation.source
     return [
@@ -480,6 +486,14 @@ const probe3dKind: OperationKind<"probe-3d"> = {
       placementContext(plate),
       machine
     ).map((issue) => issueDiagnostic("probe-3d", issue, operation)),
+})
+
+/** The probing kinds, each with its own source type. */
+const PROBING: { readonly [TKind in ProbingSourceKind]: ProbingKind<TKind> } = {
+  "auto-level": autoLevelKind,
+  "auto-z-height": autoZHeightKind,
+  "auto-scan": autoScanKind,
+  "probe-3d": probe3dKind,
 }
 
 export const OPERATION_KINDS: {
@@ -505,17 +519,13 @@ export function kindOf(operation: Operation): OperationKind<SourceKind> {
 }
 
 /**
- * A probing kind's `available` and `defaults`, always both defined for one of `auto-level`,
- * `auto-z-height`, `auto-scan` or `probe-3d`; this states that guarantee for the type checker, as `kindOf`'s
- * cast above states its own. The UI adds an operation and offers it through this, never reading
- * a probe or `DEFAULT_KIT` itself.
+ * A probing kind, with what it asks of a machine's probes and the new operation it offers. The
+ * UI adds an operation and offers it through this, never reading a capability itself.
  */
 export function probingOf<TKind extends ProbingSourceKind>(
   kind: TKind
-): Required<Pick<OperationKind<TKind>, "available" | "defaults">> {
-  return OPERATION_KINDS[kind] as unknown as Required<
-    Pick<OperationKind<TKind>, "available" | "defaults">
-  >
+): ProbingKind<TKind> {
+  return PROBING[kind]
 }
 
 /** The NC an operation contributes, resolved with the kit of its plate's machine. */

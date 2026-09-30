@@ -125,15 +125,46 @@ export interface ProbingSections {
 }
 
 /**
- * A machine's probe, as its firmware measures with it. The probing operations plan in the
- * machine's terms only through it: placement, anchors and the stock are theirs; defaults,
- * ranges and NC are the probe's. A machine without one offers no probing operations, one
- * without a pointer offers no auto-scan, and one without a 3D touch probe no 3D probing.
+ * What a probe does for each kind of probing, by the kind as combining knows it (`NcProbing`).
+ * The probing operations plan in the machine's terms only through these: placement, anchors and
+ * the stock are theirs; defaults, ranges and NC are the capability's.
  */
-export interface Probe {
-  readonly autoLevel: GridProbing
-  readonly autoZHeight: TouchOff
-  readonly autoScan: OutlineTrace | null
-  readonly probe3d: OriginProbing | null
-  readonly sections: ProbingSections
+export type Capabilities = {
+  readonly grid: GridProbing
+  readonly "touch-off": TouchOff
+  readonly outline: OutlineTrace
+  readonly origin: OriginProbing
+}
+
+/** A kind of probing a probe may offer. */
+export type CapabilityKind = keyof Capabilities
+
+/**
+ * A probe a machine measures with: the tool number its firmware selects it by, which a plate's
+ * tool table holds a library probe in, its name in messages, and what the machine does with it.
+ * A machine offers a probing operation only with a probe that offers its kind of probing: none
+ * without a probe, no auto-scan without a pointer, no 3D probing without a 3D touch probe.
+ */
+export interface ProbeTool {
+  readonly slot: number
+  readonly name: string
+  readonly capabilities: Partial<Capabilities>
+}
+
+/** A capability and the probe that offers it. */
+export type Offered<TKind extends CapabilityKind> = {
+  readonly probe: ProbeTool
+  readonly capability: Capabilities[TKind]
+}
+
+/** The first of a machine's probes, in the kit's order, that offers a kind; null when none does. */
+export function offering<TKind extends CapabilityKind>(
+  probes: readonly ProbeTool[],
+  kind: TKind
+): Offered<TKind> | null {
+  for (const probe of probes) {
+    const capability: Capabilities[TKind] | undefined = probe.capabilities[kind]
+    if (capability) return { probe, capability }
+  }
+  return null
 }
