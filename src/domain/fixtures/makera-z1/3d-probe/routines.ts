@@ -6,6 +6,7 @@ import {
   cornerInward,
   findsCorner,
   probe3dFields,
+  setsWorkXY,
   setsWorkZ,
 } from "../../../probe-3d/params"
 import type { Probe3dSpecs, Probe3dParams } from "../../../probe-3d/params"
@@ -123,10 +124,10 @@ function positioning(params: Probe3dParams): string[] {
 
 /** What the program replaces, and what alarms. */
 function precautions({ routine, axes }: Probe3dParams): string[] {
-  const corner = findsCorner(routine)
+  const [x, y] = setsWorkXY(routine, axes)
   const set = [
-    ...(corner || axes !== "y" ? ["X"] : []),
-    ...(corner || axes !== "x" ? ["Y"] : []),
+    ...(x ? ["X"] : []),
+    ...(y ? ["Y"] : []),
     ...(setsWorkZ(routine) ? ["Z"] : []),
   ]
   const named =
