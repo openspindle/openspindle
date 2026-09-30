@@ -3,7 +3,6 @@ import type { ComponentProps, ReactNode } from "react"
 import { evaluate, useForm } from "@tanstack/react-form"
 import type { z } from "zod"
 import type { FieldError } from "@/components/ui/field"
-import type { MeasurementAxis } from "@/components/workspace/measurement-input"
 import { formatMillimetres } from "@/domain/geometry/millimetres"
 import type { BedAnchor } from "@/domain/anchors/stored-anchors"
 import type { BedXY, WorkAreaResult } from "@/domain/compile/toolpath-bounds"
@@ -34,17 +33,6 @@ export const FULL_ROW = "col-span-2"
 /** Errors show once the user has edited the field. */
 export const visibleErrors = (meta: FieldMeta): FieldErrors =>
   meta.isTouched && !meta.isValid ? meta.errors : []
-
-/** One field of a probing form, as the machine's probe describes its parameter. */
-export type ProbingParameter = {
-  readonly label: string
-  readonly description?: string
-  readonly min: number
-  readonly max: number
-  readonly step: number
-  readonly unit?: string
-  readonly axis?: MeasurementAxis
-}
 
 /**
  * `useForm` plus the schema listener every probing form needs: listeners run before validation,

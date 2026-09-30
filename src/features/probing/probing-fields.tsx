@@ -22,8 +22,8 @@ import type {
   ProbingAnchorOption,
   ProbingField,
   ProbingForm,
-  ProbingParameter,
 } from "./probing-form"
+import type { ParameterSpec } from "@/domain/probing/parameters"
 import type {
   AnchorPlacement,
   ProbePlacement,
@@ -74,7 +74,7 @@ export function MeasurementField({
   id: string
   label: string
   description?: string
-  axis?: ProbingParameter["axis"]
+  axis?: ParameterSpec["axis"]
   unit?: string
   placeholder?: string
   min?: number
@@ -213,7 +213,7 @@ export function NumericFields({
   disabled: boolean
   fields: readonly {
     name: string
-    parameter: ProbingParameter
+    parameter: ParameterSpec
     field: ProbingField<number>
   }[]
 }) {
