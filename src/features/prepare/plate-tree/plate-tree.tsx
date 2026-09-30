@@ -58,6 +58,7 @@ const ROW_HEIGHT = 36
 /** Plates, their operations and program sections: select, reorder, group and search. */
 export function PlateTree({ className }: { className?: string }) {
   const plates = useWorkspace((state) => state.plates)
+  const tools = useWorkspace((state) => state.tools)
   const selectedPlateId = useWorkspace((state) => state.selectedPlateId)
   const diagnosticsOf = useDiagnosticsOf()
   const selection = usePrepareSelection()
@@ -69,8 +70,8 @@ export function PlateTree({ className }: { className?: string }) {
     {}
   )
   const data = useMemo(
-    () => buildTreeRows(plates, diagnosticsOf),
-    [plates, diagnosticsOf]
+    () => buildTreeRows(plates, tools, diagnosticsOf),
+    [plates, tools, diagnosticsOf]
   )
   const searching = query.trim() !== ""
   // The row model reads the expanded state itself, so every expanded row is listed explicitly.

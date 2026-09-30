@@ -23,7 +23,7 @@ export function SelectionBar() {
   if (!plate || !compiled) return null
   const selected = selectedSections(plate, compiled, selection)
   if (selected.length < 2) return null
-  const groupable = groupableSections(plate, selected)
+  const groupable = groupableSections(plate, compiled, selected)
   return (
     <div className="flex shrink-0 flex-wrap items-center gap-2 border-t px-4 py-2">
       <FieldDescription className="font-numeric">

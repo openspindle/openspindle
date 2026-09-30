@@ -14,7 +14,7 @@ import {
 import type { Diagnostic, Place, ProgramLines, QuickFix } from "../diagnostics"
 import { kitForPlate } from "../fixtures/catalog"
 import type { FixtureKit } from "../fixtures/fixture-kit"
-import { kindOf } from "../operations/kinds"
+import { keptNcContext, kindOf } from "../operations/kinds"
 import type { Operation } from "../operations/operation"
 import type { Plate } from "../plate/plate"
 import { capitalize, toMicrometre } from "../primitives"
@@ -287,7 +287,7 @@ function lineRanges(lines: readonly number[]): ProgramLines[] {
 function ownNc(operation: Operation, plate: Plate, kit: FixtureKit) {
   const kind = kindOf(operation)
   if (kind.generated) return null
-  const resolved = kind.resolve(operation, plate, kit)
+  const resolved = kind.resolve(operation, plate, keptNcContext(kit))
   return resolved.ok ? resolved.value.nc : null
 }
 

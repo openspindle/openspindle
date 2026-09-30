@@ -41,11 +41,12 @@ const setupText = (plate: Plate) =>
 /** Exports the plate unless what blocks Run (the Prepare inspector's diagnostics) blocks it. */
 function useExportProgram(plate: Plate) {
   const host = useHost()
+  const tools = useWorkspace((state) => state.tools)
   const diagnostics = usePlateDiagnostics(plate)
   const label = plateLabel(plate, usePlateIndex(plate.id))
   return useMutation({
     mutationFn: async () => {
-      const exported = exportPlateProgram(plate, diagnostics)
+      const exported = exportPlateProgram(plate, tools, diagnostics)
       if (!exported.ok) throw new Error(exported.error)
       return host.files.save({
         kind: "program",
@@ -76,6 +77,7 @@ export function ProgramSourceDialog({
   const plate = useWorkspace((state) =>
     state.plates.find((item) => item.id === plateId)
   )
+  const tools = useWorkspace((state) => state.tools)
   const index = usePlateIndex(plateId)
   const [view, setView] = useState<View>("nc")
   const [line, setLine] = useState(0)
@@ -83,8 +85,10 @@ export function ProgramSourceDialog({
   // An operation's own NC, or the plate's whole program.
   const compiled = useMemo(() => {
     if (!plate) return null
-    return operation ? compileOperation(plate, operation) : compilePlate(plate)
-  }, [plate, operation])
+    return operation
+      ? compileOperation(plate, operation, tools)
+      : compilePlate(plate, tools)
+  }, [plate, operation, tools])
   const setup = useMemo(() => (plate ? setupText(plate) : ""), [plate])
   if (!plate || !compiled) return null
   return (

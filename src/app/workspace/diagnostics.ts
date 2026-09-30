@@ -103,7 +103,7 @@ export function plateDiagnostics(
   const saved = gathered.get(plate)
   if (saved?.tools === context.tools && saved.plugins === context.plugins)
     return saved.diagnostics
-  const compiled = compilePlate(plate)
+  const compiled = compilePlate(plate, context.tools)
   const found = [
     ...compiled.diagnostics,
     ...validateOperations(plate),
