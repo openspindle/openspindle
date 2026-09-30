@@ -19,6 +19,21 @@ const clock: Clock = {
   },
 }
 
+/**
+ * Why a connection did not open. macOS refuses the local network to an app the user has not
+ * let use it, and the refusal reads as an unreachable host, so the message says where to allow
+ * it.
+ */
+function notConnected(
+  host: string,
+  port: number,
+  error: NodeJS.ErrnoException
+): string {
+  if (error.code === "EHOSTUNREACH" && process.platform === "darwin")
+    return `Could not reach ${host}:${port}. Check that the machine is on this network and that OpenSpindle may use the local network: System Settings › Privacy & Security › Local Network.`
+  return `Could not connect to ${host}:${port} (${error.code ?? error.message}).`
+}
+
 const tcp: TcpConnector = {
   connect(host, port, events) {
     const socket = new Socket()
@@ -44,7 +59,7 @@ const tcp: TcpConnector = {
       close(
         connected
           ? `The device connection failed (${error.code ?? error.message}).`
-          : `Could not connect to ${host}:${port}.`
+          : notConnected(host, port, error)
       )
     )
     socket.on("end", () => close("The device closed the connection."))

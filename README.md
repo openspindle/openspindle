@@ -31,7 +31,7 @@ OpenSpindle is a desktop app for preparing, checking and running jobs on a Maker
 
 ## Install
 
-Download `OpenSpindle-<version>-universal.dmg` from the [latest release](../../releases/latest) and drag OpenSpindle to **Applications**. OpenSpindle is released for macOS only. Allow local network access when macOS asks, or OpenSpindle cannot reach the machine.
+Download `OpenSpindle-<version>-universal.dmg` from the [latest release](../../releases/latest) and drag OpenSpindle to **Applications**. OpenSpindle is released for macOS only. Allow local network access when macOS asks, or OpenSpindle cannot reach the machine; you can turn it on later in **System Settings › Privacy & Security › Local Network**.
 
 ## Quick start
 
