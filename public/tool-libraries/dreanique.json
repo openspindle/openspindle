@@ -5970,6 +5970,670 @@
       "unit": "millimeters",
       "vendor": "Dreanique",
       "vendor-description": "DAU3EL-D12-L45"
+    },
+    {
+      "BMC": "carbide",
+      "description": "Chamfer mill 60° Ø3 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 3,
+        "HAND": true,
+        "LCF": 2.598,
+        "NOF": 3,
+        "OAL": 50,
+        "SFDM": 3,
+        "TA": 30,
+        "tip-diameter": 0
+      },
+      "guid": "f6b54ae9-abc7-5980-ae34-214b80d4986d",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "ECP3F-D3.0-R60",
+      "start-values": {
+        "presets": []
+      },
+      "type": "chamfer mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "ECP3F-D3.0-R60"
+    },
+    {
+      "BMC": "carbide",
+      "description": "Chamfer mill 60° Ø4 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 4,
+        "HAND": true,
+        "LB": 30,
+        "LCF": 3.464,
+        "NOF": 3,
+        "OAL": 50,
+        "SFDM": 4,
+        "TA": 30,
+        "assemblyGaugeLength": 30,
+        "shoulder-diameter": 4,
+        "shoulder-length": 5,
+        "tip-diameter": 0
+      },
+      "guid": "1239c5c1-25ec-55d0-86b7-49c34dfc6a02",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "ECP3F-D4.0-R60",
+      "start-values": {
+        "presets": [
+          {
+            "f_n": 0.05555555555555555,
+            "f_z": 0.055555555555555566,
+            "guid": "2c09db3e-8a7b-558a-bf45-74637126a9a8",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 18000,
+            "n_ramp": 18000,
+            "name": "SpeTool default",
+            "ramp-angle": 2,
+            "stepdown": 2,
+            "stepover": 0.4,
+            "tool-coolant": "air",
+            "use-stepdown": true,
+            "use-stepover": true,
+            "v_c": 226.1946710584651,
+            "v_f": 3000,
+            "v_f_leadIn": 3000,
+            "v_f_leadOut": 3000,
+            "v_f_plunge": 1000,
+            "v_f_ramp": 1000,
+            "v_f_transition": 3000
+          }
+        ]
+      },
+      "type": "chamfer mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "ECP3F-D4.0-R60"
+    },
+    {
+      "BMC": "carbide",
+      "description": "Chamfer mill 60° Ø6 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 6,
+        "HAND": true,
+        "LB": 30,
+        "LCF": 5.196,
+        "NOF": 3,
+        "OAL": 50,
+        "SFDM": 6,
+        "TA": 30,
+        "assemblyGaugeLength": 30,
+        "shoulder-diameter": 6,
+        "shoulder-length": 8,
+        "tip-diameter": 0
+      },
+      "guid": "d9e604a4-445b-5848-9b86-ca63ee773f4e",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "ECP3F-D6.0-R60",
+      "start-values": {
+        "presets": [
+          {
+            "f_n": 0.08,
+            "f_z": 0.08,
+            "guid": "9bc62cad-6423-5a4f-8bd5-15800c679118",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 15000,
+            "n_ramp": 15000,
+            "name": "SpeTool default",
+            "ramp-angle": 2,
+            "stepdown": 3,
+            "stepover": 0.6,
+            "tool-coolant": "air",
+            "use-stepdown": true,
+            "use-stepover": true,
+            "v_c": 282.7433388230814,
+            "v_f": 3600,
+            "v_f_leadIn": 3600,
+            "v_f_leadOut": 3600,
+            "v_f_plunge": 1200,
+            "v_f_ramp": 1200,
+            "v_f_transition": 3600
+          }
+        ]
+      },
+      "type": "chamfer mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "ECP3F-D6.0-R60"
+    },
+    {
+      "BMC": "carbide",
+      "description": "Chamfer mill 60° Ø8 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 8,
+        "HAND": true,
+        "LCF": 6.928,
+        "NOF": 3,
+        "OAL": 60,
+        "SFDM": 8,
+        "TA": 30,
+        "tip-diameter": 0
+      },
+      "guid": "8f78aa93-27df-5f47-b40e-88ebae9510c1",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "ECP3F-D8.0-R60",
+      "start-values": {
+        "presets": []
+      },
+      "type": "chamfer mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "ECP3F-D8.0-R60"
+    },
+    {
+      "BMC": "carbide",
+      "description": "Chamfer mill 60° Ø10 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 10,
+        "HAND": true,
+        "LCF": 8.66,
+        "NOF": 3,
+        "OAL": 75,
+        "SFDM": 10,
+        "TA": 30,
+        "tip-diameter": 0
+      },
+      "guid": "0c336502-ae63-5767-b634-7c0a16d3a795",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "ECP3F-D10.0-R60",
+      "start-values": {
+        "presets": []
+      },
+      "type": "chamfer mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "ECP3F-D10.0-R60"
+    },
+    {
+      "BMC": "carbide",
+      "description": "Chamfer mill 60° Ø12 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 12,
+        "HAND": true,
+        "LCF": 10.392,
+        "NOF": 3,
+        "OAL": 75,
+        "SFDM": 12,
+        "TA": 30,
+        "tip-diameter": 0
+      },
+      "guid": "5c4d7d34-b8b7-5f9d-934a-26d5ca2c918f",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "ECP3F-D12.0-R60",
+      "start-values": {
+        "presets": []
+      },
+      "type": "chamfer mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "ECP3F-D12.0-R60"
+    },
+    {
+      "BMC": "carbide",
+      "description": "Chamfer mill 90° Ø3 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 3,
+        "HAND": true,
+        "LCF": 1.5,
+        "NOF": 3,
+        "OAL": 50,
+        "SFDM": 3,
+        "TA": 45,
+        "tip-diameter": 0
+      },
+      "guid": "f7e40d50-b667-534a-a539-734c470ca5c9",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "ECP3F-D3.0-R90",
+      "start-values": {
+        "presets": []
+      },
+      "type": "chamfer mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "ECP3F-D3.0-R90"
+    },
+    {
+      "BMC": "carbide",
+      "description": "Chamfer mill 90° Ø4 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 4,
+        "HAND": true,
+        "LB": 30,
+        "LCF": 2,
+        "NOF": 3,
+        "OAL": 50,
+        "SFDM": 4,
+        "TA": 45,
+        "assemblyGaugeLength": 30,
+        "shoulder-diameter": 4,
+        "shoulder-length": 5,
+        "tip-diameter": 0
+      },
+      "guid": "a6f6d7e3-d54d-5096-a60c-25e941e416f3",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "ECP3F-D4.0-R90",
+      "start-values": {
+        "presets": [
+          {
+            "f_n": 0.05555555555555555,
+            "f_z": 0.055555555555555566,
+            "guid": "5520f53a-fbac-5aab-acf0-6bef467c5c13",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 18000,
+            "n_ramp": 18000,
+            "name": "SpeTool default",
+            "ramp-angle": 2,
+            "stepdown": 2,
+            "stepover": 0.4,
+            "tool-coolant": "air",
+            "use-stepdown": true,
+            "use-stepover": true,
+            "v_c": 226.1946710584651,
+            "v_f": 3000,
+            "v_f_leadIn": 3000,
+            "v_f_leadOut": 3000,
+            "v_f_plunge": 1000,
+            "v_f_ramp": 1000,
+            "v_f_transition": 3000
+          }
+        ]
+      },
+      "type": "chamfer mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "ECP3F-D4.0-R90"
+    },
+    {
+      "BMC": "carbide",
+      "description": "Chamfer mill 90° Ø6 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 6,
+        "HAND": true,
+        "LB": 30,
+        "LCF": 3,
+        "NOF": 3,
+        "OAL": 50,
+        "SFDM": 6,
+        "TA": 45,
+        "assemblyGaugeLength": 30,
+        "shoulder-diameter": 6,
+        "shoulder-length": 5,
+        "tip-diameter": 0
+      },
+      "guid": "8cb627af-4747-5b14-8e72-0f0f11191a6a",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "ECP3F-D6.0-R90",
+      "start-values": {
+        "presets": [
+          {
+            "f_n": 0.08,
+            "f_z": 0.08,
+            "guid": "12dac009-f3c6-5e0b-8a31-a693d27dd42b",
+            "material": {
+              "category": "all",
+              "query": "",
+              "use-hardness": false
+            },
+            "n": 15000,
+            "n_ramp": 15000,
+            "name": "SpeTool default",
+            "ramp-angle": 2,
+            "stepdown": 3,
+            "stepover": 0.6,
+            "tool-coolant": "air",
+            "use-stepdown": true,
+            "use-stepover": true,
+            "v_c": 282.7433388230814,
+            "v_f": 3600,
+            "v_f_leadIn": 3600,
+            "v_f_leadOut": 3600,
+            "v_f_plunge": 1200,
+            "v_f_ramp": 1200,
+            "v_f_transition": 3600
+          }
+        ]
+      },
+      "type": "chamfer mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "ECP3F-D6.0-R90"
+    },
+    {
+      "BMC": "carbide",
+      "description": "Chamfer mill 90° Ø8 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 8,
+        "HAND": true,
+        "LCF": 4,
+        "NOF": 3,
+        "OAL": 60,
+        "SFDM": 8,
+        "TA": 45,
+        "tip-diameter": 0
+      },
+      "guid": "50931399-3948-50ad-85c9-23264f0c1c7b",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "ECP3F-D8.0-R90",
+      "start-values": {
+        "presets": []
+      },
+      "type": "chamfer mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "ECP3F-D8.0-R90"
+    },
+    {
+      "BMC": "carbide",
+      "description": "Chamfer mill 90° Ø10 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 10,
+        "HAND": true,
+        "LCF": 5,
+        "NOF": 3,
+        "OAL": 75,
+        "SFDM": 10,
+        "TA": 45,
+        "tip-diameter": 0
+      },
+      "guid": "8420a060-8769-5617-a49c-f2df29d0054a",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "ECP3F-D10.0-R90",
+      "start-values": {
+        "presets": []
+      },
+      "type": "chamfer mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "ECP3F-D10.0-R90"
+    },
+    {
+      "BMC": "carbide",
+      "description": "Chamfer mill 90° Ø12 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 12,
+        "HAND": true,
+        "LCF": 6,
+        "NOF": 3,
+        "OAL": 75,
+        "SFDM": 12,
+        "TA": 45,
+        "tip-diameter": 0
+      },
+      "guid": "95a21ea5-86b2-5003-acc9-414347c5574d",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "ECP3F-D12.0-R90",
+      "start-values": {
+        "presets": []
+      },
+      "type": "chamfer mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "ECP3F-D12.0-R90"
+    },
+    {
+      "BMC": "carbide",
+      "description": "Chamfer mill 120° Ø3 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 3,
+        "HAND": true,
+        "LCF": 0.866,
+        "NOF": 3,
+        "OAL": 50,
+        "SFDM": 3,
+        "TA": 60,
+        "tip-diameter": 0
+      },
+      "guid": "3abe0a69-5ece-5ee1-bd94-32c8cce7ded3",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "ECP3F-D3.0-R120",
+      "start-values": {
+        "presets": []
+      },
+      "type": "chamfer mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "ECP3F-D3.0-R120"
+    },
+    {
+      "BMC": "carbide",
+      "description": "Chamfer mill 120° Ø4 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 4,
+        "HAND": true,
+        "LCF": 1.155,
+        "NOF": 3,
+        "OAL": 50,
+        "SFDM": 4,
+        "TA": 60,
+        "tip-diameter": 0
+      },
+      "guid": "73f69e14-b9e0-5678-baa6-6e662b7f0a81",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "ECP3F-D4.0-R120",
+      "start-values": {
+        "presets": []
+      },
+      "type": "chamfer mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "ECP3F-D4.0-R120"
+    },
+    {
+      "BMC": "carbide",
+      "description": "Chamfer mill 120° Ø6 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 6,
+        "HAND": true,
+        "LCF": 1.732,
+        "NOF": 3,
+        "OAL": 50,
+        "SFDM": 6,
+        "TA": 60,
+        "tip-diameter": 0
+      },
+      "guid": "3f2e20c1-5be0-50c8-a3b9-bf63917ecd97",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "ECP3F-D6.0-R120",
+      "start-values": {
+        "presets": []
+      },
+      "type": "chamfer mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "ECP3F-D6.0-R120"
+    },
+    {
+      "BMC": "carbide",
+      "description": "Chamfer mill 120° Ø8 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 8,
+        "HAND": true,
+        "LCF": 2.309,
+        "NOF": 3,
+        "OAL": 60,
+        "SFDM": 8,
+        "TA": 60,
+        "tip-diameter": 0
+      },
+      "guid": "60d62f3e-ae84-5df7-95e7-84068fca60da",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "ECP3F-D8.0-R120",
+      "start-values": {
+        "presets": []
+      },
+      "type": "chamfer mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "ECP3F-D8.0-R120"
+    },
+    {
+      "BMC": "carbide",
+      "description": "Chamfer mill 120° Ø10 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 10,
+        "HAND": true,
+        "LCF": 2.887,
+        "NOF": 3,
+        "OAL": 75,
+        "SFDM": 10,
+        "TA": 60,
+        "tip-diameter": 0
+      },
+      "guid": "8e77faa7-80a1-5c06-995d-ad1b7d21e2a9",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "ECP3F-D10.0-R120",
+      "start-values": {
+        "presets": []
+      },
+      "type": "chamfer mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "ECP3F-D10.0-R120"
+    },
+    {
+      "BMC": "carbide",
+      "description": "Chamfer mill 120° Ø12 mm",
+      "geometry": {
+        "CSP": false,
+        "DC": 12,
+        "HAND": true,
+        "LCF": 3.464,
+        "NOF": 3,
+        "OAL": 75,
+        "SFDM": 12,
+        "TA": 60,
+        "tip-diameter": 0
+      },
+      "guid": "e77da97b-bb76-560d-bba7-cde690069acb",
+      "post-process": {
+        "break-control": false,
+        "comment": "",
+        "live": true,
+        "manual-tool-change": false
+      },
+      "product-id": "ECP3F-D12.0-R120",
+      "start-values": {
+        "presets": []
+      },
+      "type": "chamfer mill",
+      "unit": "millimeters",
+      "vendor": "Dreanique",
+      "vendor-description": "ECP3F-D12.0-R120"
     }
   ]
 }

@@ -17,7 +17,8 @@
     "Converted Dreanique's DSA1F (one flute) and DAU3E (three flutes) dimension tables to DLC-coated Fusion flat end mills for aluminium. DSA1F presets (Aluminium and copper, with mist) come from the DSA1F column of the cutting parameter table on the DSA1F listing: the low end of the speed and feed ranges and the slotting depth, 0.5 × D. DAU3E tools have no presets, as no cutting parameters were found for them.",
     "The DSA1F listing's 2022 table gave shorter overall lengths for D4.0-L12, L15, L17 and L22 (45 mm), D6.0-L25 (50), D8.0-L32 (60) and D10.0-L42 (85), 3.1 mm for the D3.1 cutters and a 12 mm flute for D8.0-L17; the catalog follows the current table, which also adds seven sizes.",
     "For every Dreanique family, each item code is checked against its diameter and flute length cells; the right hand and absent coolant supply are assumed.",
-    "SpeTool sells Dreanique tools under its own product IDs, with Dreanique's item codes as SKUs (W2B, SP1F, SA1F, SP2FC, ST2F, AU3E and more). Four are in this catalog, matched by SKU and dimensions: W04801 is W2B-R3.0-L24, W04802 is W2B-R4.0-L32, W03501 is SP1F-D3.1-L15 and W03502 is SP1F-D3.1-L12. Their Dreanique records take SpeTool's preset (named SpeTool default) and its body, shoulder and assembly gauge lengths; SpeTool's tool numbers are left out. SpeTool's W03503 record describes the uncoated SA1F-D6.0-L22, not the DLC-coated DSA1F-D6.0-L22 (SpeTool sells a DLC variant under the same number), and W03504 and W03505 are SpeTool-coated SP1F bits (SP1FT), so none of those three is copied. SpeTool sells no other W2B size and no thread mills.",
+    "Converted Dreanique's ECP3F dimension table to Fusion chamfer mills with three flutes and a pointed tip, in 60, 90 and 120 degree included angles (A; the taper angle is half of it). D is both the shank and the cutting diameter, as the drawing and SpeTool's descriptions give, and L the overall length. The flute length is the cone's length, D/2 divided by the tangent of half the angle, rounded to 0.001 mm. The table calls the tools coated but names no coating, so coating is left out. The ECP3F listing's address is not known, so these tools have no product link. Only the four sizes SpeTool also sells (below) have a preset, as no Dreanique cutting parameters were found.",
+    "SpeTool sells Dreanique tools under its own product IDs, with Dreanique's item codes as SKUs (W2B, SP1F, SA1F, SP2FC, ST2F, AU3E and more). Eight are in this catalog, matched by SKU and dimensions: W04801 is W2B-R3.0-L24, W04802 is W2B-R4.0-L32, W03501 is SP1F-D3.1-L15, W03502 is SP1F-D3.1-L12, W06506 is ECP3F-D4.0-R60, W06507 is ECP3F-D4.0-R90, W06508 is ECP3F-D6.0-R60 and W06509 is ECP3F-D6.0-R90. Their Dreanique records take SpeTool's preset (named SpeTool default) and its body, shoulder and assembly gauge lengths; SpeTool's tool numbers are left out. SpeTool's W03503 record describes the uncoated SA1F-D6.0-L22, not the DLC-coated DSA1F-D6.0-L22 (SpeTool sells a DLC variant under the same number), and W03504 and W03505 are SpeTool-coated SP1F bits (SP1FT), so none of those three is copied. SpeTool sells no other W2B or ECP3F size and no thread mills. SpeTool's W06508 flute length, 5.2 mm, is the ECP3F-D6.0-R60 cone length (5.196 mm) rounded.",
     "Translated SpeTool's Chinese preset name 默认预设 (default preset) to Default, as its other default presets are named.",
     "The Makera Wired Probe 2.0's dimensions in makera-probe.json, and its model public/models/makera-wired-probe-2.glb (scripts/wired-probe.mjs), are estimated from Makera's product photos, scaled by the known diameters of its shank adapters; they are not measured.",
     "The Makera 3D Probe's dimensions in makera-probe.json, and its model public/models/makera-3d-probe.glb (scripts/3d-probe.mjs), are estimated from Makera's product photos of the Makera 3D Wired Probe, scaled by its 1/8″ shank; its Ø2 mm ruby ball, the Ø3 mm base of its M2 stylus and its USB-C port agree with that scale. They are not measured. The model has the cable's plug in its port, leading to the back (+Y). Its post-processor number, 9999, is the tool number the Z1 firmware gives the 3D probe (ATCHandler.cpp)."
@@ -159,10 +160,10 @@
     {
       "id": "dreanique",
       "name": "Dreanique",
-      "description": "Dreanique solid carbide thread mills, ball end mills, O-flute bits and aluminium end mills",
+      "description": "Dreanique solid carbide thread mills, ball end mills, O-flute bits, aluminium end mills and chamfer mills",
       "fileName": "dreanique.json",
       "url": "/tool-libraries/dreanique.json",
-      "count": 114,
+      "count": 132,
       "sources": [
         {
           "path": "resources/dreanique/trs-thread-mill-code-key.png",
@@ -216,6 +217,11 @@
           "sha256": "1e0208be9bbab05de1343c542c8dcad032a85c68ebdb3320596b84af24c1dbcc",
           "description": "DAU3E dimension table, supplied by the user.",
           "url": "https://www.aliexpress.com/item/1005004027451152.html"
+        },
+        {
+          "path": "resources/dreanique/ECP3F-dimensions.avif",
+          "sha256": "c4dfb2c6344bf4cbe7139661db0cb6c279a819385fbd94d8ecc35bba9292e49a",
+          "description": "ECP3F dimension table, supplied by the user."
         }
       ],
       "mergedDuplicates": []
