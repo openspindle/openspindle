@@ -304,18 +304,14 @@ export function fitOrthographicBounds(
 }
 
 /**
- * XY diagram on the current setup's nominal surface; the probe's moves over it are the
- * machine program's.
+ * A registered grid's XY diagram on the current setup's nominal surface; the probe's moves over
+ * it are the machine program's.
  */
 export function probeGridVertices(
-  grid: ProbeGrid,
+  grid: ProbeGrid<"probe" | "bed">,
   stock: Stock | null,
   { stockAnchor, workOrigin }: Pick<ViewerPlate, "stockAnchor" | "workOrigin">
 ) {
-  if (grid.frame === "machine")
-    throw new Error(
-      "Register machine probe coordinates before rendering the grid."
-    )
   const origin: Point3 = [
     grid.frame === "bed" ? 0 : workOrigin[0],
     grid.frame === "bed" ? 0 : workOrigin[1],
@@ -349,16 +345,12 @@ export function probeGridVertices(
   return { origin, points, outline, lines }
 }
 
-/** Where a touch-off touches, on the surface its plate's probe grids lie on. */
+/** Where a registered touch-off touches, on the surface its plate's probe grids lie on. */
 export function probeTouchPoint(
-  touch: ProbeTouch,
+  touch: ProbeTouch<"probe" | "bed">,
   stock: Stock | null,
   { stockAnchor, workOrigin }: Pick<ViewerPlate, "stockAnchor" | "workOrigin">
 ): Point3 {
-  if (touch.frame === "machine")
-    throw new Error(
-      "Register machine probe coordinates before rendering the touch."
-    )
   const relative = touch.frame !== "bed"
   const [x, y] = touch.at
   return [
