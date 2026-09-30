@@ -4,12 +4,13 @@
   "units": "mm",
   "tools": [
     {
-      "schemaVersion": 4,
+      "schemaVersion": 5,
       "id": "foxalien-crb-vs-3e30db",
       "name": "Triangular engraving bit 30° × 0.1 mm tip",
       "kind": "engraving",
       "diameter": 0.1,
       "flutes": null,
+      "probe": null,
       "vendor": "FoxAlien",
       "productId": "CRB-VS-3E30DB",
       "productLink": "https://www.foxalien.com/products/cnc-router-bits-triangular-pyramid-30-degree-0-1mm-tip-10pcs",

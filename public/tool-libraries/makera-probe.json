@@ -4,12 +4,16 @@
   "units": "mm",
   "tools": [
     {
-      "schemaVersion": 4,
+      "schemaVersion": 5,
       "id": "makera-wired-probe-2",
       "name": "Makera Wired Probe 2.0",
       "kind": "probe",
       "diameter": 1.5,
       "flutes": null,
+      "probe": {
+        "touch": "z",
+        "pointer": true
+      },
       "vendor": "Makera",
       "productId": null,
       "productLink": null,
@@ -90,12 +94,16 @@
       }
     },
     {
-      "schemaVersion": 4,
+      "schemaVersion": 5,
       "id": "makera-3d-probe",
       "name": "Makera 3D Probe",
       "kind": "probe",
       "diameter": 2,
       "flutes": null,
+      "probe": {
+        "touch": "xyz",
+        "pointer": false
+      },
       "vendor": "Makera",
       "productId": null,
       "productLink": "https://www.makera.com/products/makera-3d-wired-probe",

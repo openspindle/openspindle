@@ -28,8 +28,12 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { FilePicker } from "@/components/file-picker"
 import { ToolImage } from "@/components/workspace/tool-image"
-import { createHolder, createPreset } from "@/domain/tools/tool"
-import type { ToolSegment, ToolSource } from "@/domain/tools/tool"
+import {
+  createHolder,
+  createPreset,
+  defaultProbeProfile,
+} from "@/domain/tools/tool"
+import type { ProbeProfile, ToolSegment, ToolSource } from "@/domain/tools/tool"
 import { OptionSelect } from "@/components/option-select"
 import { toolKindLabel } from "./tool-format"
 import type { Choice, ToolForm } from "./tool-form"
@@ -85,6 +89,14 @@ const HANDEDNESS: readonly Choice<"right" | "left">[] = [
   { value: "left", label: "Left hand" },
 ]
 const TAPERED_TIPS = ["flat", "ball", "bull nose"]
+const PROBE_TOUCHES: readonly Choice<ProbeProfile["touch"]>[] = [
+  { value: "z", label: "Z only" },
+  { value: "xyz", label: "X, Y and Z" },
+]
+const TOUCHES_HINT =
+  "What the stylus senses: touches along Z only, or in X, Y and Z, as a 3D touch probe does."
+const POINTER_HINT =
+  "Whether the probe carries a laser pointer, which traces without touching."
 const EMPTY_SEGMENT: ToolSegment = {
   height: null,
   upperDiameter: null,
@@ -173,7 +185,17 @@ function GeneralSection({ form, source }: SectionProps) {
           <form.AppField name="name">
             {(field) => <field.TextField label="Name" required wide />}
           </form.AppField>
-          <form.AppField name="kind">
+          <form.AppField
+            name="kind"
+            listeners={{
+              // Only a probe has a profile: a tool that becomes one starts with the default.
+              onChange: ({ value }) => {
+                const fresh = defaultProbeProfile(value)
+                if ((fresh === null) !== (form.getFieldValue("probe") === null))
+                  form.setFieldValue("probe", fresh)
+              },
+            }}
+          >
             {(field) => (
               <field.TextField
                 label="Tool type"
@@ -183,6 +205,34 @@ function GeneralSection({ form, source }: SectionProps) {
               />
             )}
           </form.AppField>
+          <form.Subscribe selector={(state) => state.values.probe !== null}>
+            {(profiled) =>
+              profiled && (
+                <>
+                  <form.AppField name="probe.touch">
+                    {(field) => (
+                      <field.ChoiceField
+                        label="Touches"
+                        hint={TOUCHES_HINT}
+                        choices={PROBE_TOUCHES}
+                        required
+                      />
+                    )}
+                  </form.AppField>
+                  <form.AppField name="probe.pointer">
+                    {(field) => (
+                      <field.ChoiceField
+                        label="Laser pointer"
+                        hint={POINTER_HINT}
+                        choices={YES_NO}
+                        required
+                      />
+                    )}
+                  </form.AppField>
+                </>
+              )
+            }
+          </form.Subscribe>
           <form.AppField name="material">
             {(field) => (
               <field.TextField
