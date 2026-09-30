@@ -1,18 +1,18 @@
 import type { NcBlock } from "@/machine/contract"
 import type { GCodeProgram } from "@/domain/nc/gcode"
 import type { AutoLevelSpecs, AutoLevelParams } from "../auto-level/params"
-import type { ProbeGrid, ProbePoint } from "../auto-level/probe-grid"
 import type { AutoScanParams, AutoScanSpecs } from "../auto-scan/params"
 import type {
   AutoZHeightField,
   AutoZHeightSpecs,
   AutoZHeightParams,
 } from "../auto-z-height/params"
-import type { ProbeTouch } from "../auto-z-height/probe-touch"
+import type { Frame, Vec2, XY } from "../geometry/frame"
 import type { Rect } from "../geometry/rect"
 import type { Probe3dSpecs, Probe3dParams } from "../probe-3d/params"
 import type { ParameterSpecs } from "./parameters"
 import type { ProbeStart } from "./placement"
+import type { ProbeGrid, ProbeTouch } from "./preview"
 
 /** A probing operation's NC as a machine's probe writes it, and the lines a job needs to know. */
 export type ProbeProgram = {
@@ -43,12 +43,6 @@ export interface Capability<
   program: (plan: TPlan) => ProbeProgram
 }
 
-/** A rectangular grid of samples: its first sample, its extent and endpoint-inclusive counts. */
-export type GridShape = Pick<
-  ProbeGrid,
-  "start" | "width" | "depth" | "columns" | "rows"
->
-
 /**
  * A planned auto-level grid: its size, points and clearance and whether the job pauses to review
  * what it measured, checked, and where it starts.
@@ -59,10 +53,20 @@ export type GridPlan = ProbingPlan<Omit<AutoLevelParams, "placement">>
 export interface GridProbing extends Capability<GridPlan, AutoLevelSpecs> {
   /** The NC probing a planned grid from its start; it always has the probing block. */
   program: (plan: GridPlan) => ProbeProgram & { readonly probeLine: number }
-  /** A grid's samples, in the order the firmware visits them. */
-  samples: (grid: GridShape) => ProbePoint[]
-  /** The grids a program probes, as this machine's NC writes them: previews of any file. */
-  grids: (program: GCodeProgram) => ProbeGrid[]
+  /**
+   * The samples of a grid from its first one, `size` from it (negative runs back along an axis)
+   * with `points` along each axis, both edges included, in the order the firmware visits them.
+   */
+  samples: <TFrame extends Frame>(
+    start: XY<TFrame>,
+    size: Vec2,
+    points: Vec2
+  ) => XY<TFrame>[]
+  /**
+   * The grids a program probes, as this machine's NC writes them: previews of any file, from
+   * where the probe starts or in machine coordinates.
+   */
+  grids: (program: GCodeProgram) => ProbeGrid<"probe" | "machine">[]
 }
 
 /**
@@ -77,7 +81,10 @@ export interface TouchOff extends Capability<
    * The touch-offs a program makes where this machine's NC puts the probe, which its `grids`
    * may leave above their last sample: previews of any file.
    */
-  touches: (program: GCodeProgram, grids: readonly ProbeGrid[]) => ProbeTouch[]
+  touches: (
+    program: GCodeProgram,
+    grids: readonly ProbeGrid<"probe" | "machine">[]
+  ) => ProbeTouch<"probe" | "machine">[]
 }
 
 /**

@@ -1,18 +1,21 @@
 import { formatMillimetres } from "../../../geometry/millimetres"
-import type { ProbeGrid, ProbePoint } from "../../../auto-level/probe-grid"
 import type {
   AutoZHeightField,
   AutoZHeightSpecs,
   AutoZHeightParams,
 } from "../../../auto-z-height/params"
-import type { ProbeTouch } from "../../../auto-z-height/probe-touch"
 import type { XY } from "../../../geometry/frame"
 import type { TouchOff } from "../../../probing/probe"
-import { readNcBlock } from "@/machine/contract"
-import { MAX_PROGRAM_LINES } from "@/domain/nc/gcode"
+import { PROBE_START } from "../../../probing/preview"
+import type {
+  PreviewFrame,
+  ProbeAt,
+  ProbeGrid,
+  ProbeTouch,
+} from "../../../probing/preview"
 import type { GCodeProgram } from "@/domain/nc/gcode"
-import { isAnchorXY } from "@/domain/anchors/stored-anchors"
 import { FIRMWARE_ROUTINE, GRID, TOUCH_CODES } from "./blocks"
+import { scanBlocks, travelTarget } from "./scan"
 import { anchorTravel } from "./travel"
 
 /**
@@ -133,8 +136,13 @@ function firmwareLift({ clearance }: Pick<Touch, "clearance">) {
   return ["G90", `G0 Z${formatMillimetres(clearance)}`]
 }
 
-/** Where the probe is, or null once the NC has moved it where a preview cannot follow. */
-type ProbeXY = Pick<ProbeTouch, "point" | "coordinateMode">
+/** Where a grid leaves the probe: above its last sample, in its frame; undefined without one. */
+function gridEnd<TFrame extends PreviewFrame>(
+  grid: ProbeGrid<TFrame>
+): ProbeAt<TFrame> | undefined {
+  const at = grid.samples.at(-1)
+  return at && { frame: grid.frame, at }
+}
 
 /**
  * Where a program's touch-offs touch, following the probe's XY: its start until the NC moves
@@ -146,82 +154,48 @@ type ProbeXY = Pick<ProbeTouch, "point" | "coordinateMode">
  */
 function touchPoints(
   program: GCodeProgram,
-  grids: readonly ProbeGrid[]
-): ProbeTouch[] {
-  const ends = new Map<number, ProbeXY>()
+  grids: readonly ProbeGrid<"probe" | "machine">[]
+): ProbeTouch<"probe" | "machine">[] {
+  const ends = new Map<number, ProbeAt<"probe" | "machine">>()
   for (const grid of grids) {
-    const last = grid.points.at(-1)
-    if (last)
-      ends.set(grid.sourceLine, {
-        point: last,
-        coordinateMode: grid.coordinateMode,
-      })
+    const end = gridEnd(grid)
+    if (end) ends.set(grid.sourceLine, end)
   }
-  const touches: ProbeTouch[] = []
-  let probe: ProbeXY | null = {
-    point: [0, 0],
-    coordinateMode: "relative-to-probe-start",
-  }
+  const touches: ProbeTouch<"probe" | "machine">[] = []
+  // Where the probe is, or null once the NC has moved it where a preview cannot follow.
+  let probe: ProbeAt<"probe" | "machine"> | null = PROBE_START
   let touched = false
   let travelled = false
   let scale: number | null = null
-  for (
-    let index = 0;
-    index < Math.min(program.lines.length, MAX_PROGRAM_LINES);
-    index++
-  ) {
-    const block = readNcBlock(program.lines[index])
-    if (block.problem) {
-      probe = null
-      travelled = false
-      continue
-    }
-    if (block.message !== null || !block.words.length) continue
+  for (const block of scanBlocks(program)) {
     const afterTravel = travelled
     travelled = false
-    const { words } = block
+    if (!block) {
+      probe = null
+      continue
+    }
+    const { line, words, gCodes, mCodes } = block
     const has = (letter: string) => words.some((word) => word.letter === letter)
-    const gCodes = words
-      .filter(({ letter }) => letter === "G")
-      .map(({ value }) => value)
-    const mCodes = words
-      .filter(({ letter }) => letter === "M")
-      .map(({ value }) => value)
-    if (mCodes.some((value) => value === 2 || value === 30)) break
+    // Of G20 and G21 in one block, G21 sets the units.
     if (gCodes.includes(20)) scale = 25.4
     if (gCodes.includes(21)) scale = 1
-    const end = ends.get(index + 1)
+    const end = ends.get(line)
     if (end) {
       probe = end
       touched = false
       continue
     }
     if (gCodes.includes(53)) {
-      const x = words.filter(({ letter }) => letter === "X")
-      const y = words.filter(({ letter }) => letter === "Y")
-      if (!x.length && !y.length) continue
-      const target: ProbePoint | null =
-        scale !== null &&
-        gCodes.length === 2 &&
-        gCodes[1] === 0 &&
-        x.length === 1 &&
-        y.length === 1 &&
-        words.every(({ letter }) =>
-          ["N", "G", "X", "Y", "Z", "F"].includes(letter)
-        )
-          ? [x[0].value * scale, y[0].value * scale]
-          : null
-      probe =
-        target && isAnchorXY(target)
-          ? { point: target, coordinateMode: "machine" }
-          : null
+      if (!has("X") && !has("Y")) continue
+      const target = travelTarget(block, scale)
+      probe = target && { frame: "machine", at: target }
       travelled = probe !== null
       touched = false
       continue
     }
     if (mCodes.includes(FIRMWARE_ROUTINE)) {
       probe = has("O") && afterTravel ? probe : null
-      if (probe) touches.push({ sourceLine: index + 1, ...probe })
+      if (probe) touches.push({ sourceLine: line, ...probe })
       touched = probe !== null
       continue
     }
@@ -229,7 +203,7 @@ function touchPoints(
       // A touch that moves in X or Y probes a side, not the height.
       if (has("X") || has("Y")) probe = null
       else if (probe && !touched) {
-        touches.push({ sourceLine: index + 1, ...probe })
+        touches.push({ sourceLine: line, ...probe })
         touched = true
       }
       continue

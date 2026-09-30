@@ -12,8 +12,8 @@ import {
   getProbingPreview,
   registerProbeGrid,
   registerProbeTouch,
-} from "@/domain/probing/registration"
-import type { ProbeGrid, ProbeTouch } from "@/domain/probing/registration"
+} from "@/domain/probing/preview"
+import type { ProbeGrid, ProbeTouch } from "@/domain/probing/preview"
 import { kitForSetup } from "@/domain/fixtures/catalog"
 import type {
   ViewerPlate,
@@ -97,19 +97,19 @@ export const plateKit = (plate: Pick<ViewerPlate, "deviceId" | "fixtures">) =>
 /** The grids a plate's program probes, as its machine's probe reads them, on the bed. */
 export function plateProbeGrids(
   plate: Pick<ViewerPlate, "program" | "anchorSetup" | "deviceId" | "fixtures">
-): ProbeGrid[] {
+): ProbeGrid<"probe" | "bed">[] {
   return getProbingPreview(plate.program, plateKit(plate).probe)
     .grids.map((grid) => registerProbeGrid(grid, plate.anchorSetup))
-    .filter((grid): grid is ProbeGrid => grid !== null)
+    .filter((grid) => grid !== null)
 }
 
 /** Where a plate's touch-offs touch, registered on the bed as its probe grids are. */
 export function plateProbeTouches(
   plate: Pick<ViewerPlate, "program" | "anchorSetup" | "deviceId" | "fixtures">
-): ProbeTouch[] {
+): ProbeTouch<"probe" | "bed">[] {
   return getProbeTouches(plate.program, plateKit(plate).probe)
     .map((touch) => registerProbeTouch(touch, plate.anchorSetup))
-    .filter((touch): touch is ProbeTouch => touch !== null)
+    .filter((touch) => touch !== null)
 }
 
 /** Device anchor positions stay in bed coordinates, independent of stock and NC zero. */
@@ -312,13 +312,13 @@ export function probeGridVertices(
   stock: Stock | null,
   { stockAnchor, workOrigin }: Pick<ViewerPlate, "stockAnchor" | "workOrigin">
 ) {
-  if (grid.coordinateMode === "machine")
+  if (grid.frame === "machine")
     throw new Error(
       "Register machine probe coordinates before rendering the grid."
     )
   const origin: Point3 = [
-    grid.coordinateMode === "bed" ? 0 : workOrigin[0],
-    grid.coordinateMode === "bed" ? 0 : workOrigin[1],
+    grid.frame === "bed" ? 0 : workOrigin[0],
+    grid.frame === "bed" ? 0 : workOrigin[1],
     stock ? stockAnchor[2] + stock.height : workOrigin[2],
   ]
   const point = (x: number, y: number): Point3 => [
@@ -327,22 +327,24 @@ export function probeGridVertices(
     origin[2],
   ]
   const [x, y] = grid.start
-  const points = grid.points.map(([px, py]) => point(px, py))
+  const [width, depth] = grid.size
+  const [columns, rows] = grid.points
+  const points = grid.samples.map(([px, py]) => point(px, py))
   const outline = [
     point(x, y),
-    point(x + grid.width, y),
-    point(x + grid.width, y + grid.depth),
-    point(x, y + grid.depth),
+    point(x + width, y),
+    point(x + width, y + depth),
+    point(x, y + depth),
     point(x, y),
   ]
   const lines: number[] = []
-  for (let column = 0; column < grid.columns; column++) {
-    const px = x + (grid.width * column) / (grid.columns - 1)
-    lines.push(...point(px, y), ...point(px, y + grid.depth))
+  for (let column = 0; column < columns; column++) {
+    const px = x + (width * column) / (columns - 1)
+    lines.push(...point(px, y), ...point(px, y + depth))
   }
-  for (let row = 0; row < grid.rows; row++) {
-    const py = y + (grid.depth * row) / (grid.rows - 1)
-    lines.push(...point(x, py), ...point(x + grid.width, py))
+  for (let row = 0; row < rows; row++) {
+    const py = y + (depth * row) / (rows - 1)
+    lines.push(...point(x, py), ...point(x + width, py))
   }
   return { origin, points, outline, lines }
 }
@@ -353,12 +355,12 @@ export function probeTouchPoint(
   stock: Stock | null,
   { stockAnchor, workOrigin }: Pick<ViewerPlate, "stockAnchor" | "workOrigin">
 ): Point3 {
-  if (touch.coordinateMode === "machine")
+  if (touch.frame === "machine")
     throw new Error(
       "Register machine probe coordinates before rendering the touch."
     )
-  const relative = touch.coordinateMode !== "bed"
-  const [x, y] = touch.point
+  const relative = touch.frame !== "bed"
+  const [x, y] = touch.at
   return [
     (relative ? workOrigin[0] : 0) + x,
     (relative ? workOrigin[1] : 0) + y,

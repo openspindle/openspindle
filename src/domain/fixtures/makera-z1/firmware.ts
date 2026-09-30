@@ -600,7 +600,7 @@ class Z1Preview implements GCodeFirmware {
       moves.z(height, { ...style(probePoint), feed: back })
     }
     probeAt(0)
-    G32_GRID.samples({ start, width, depth, columns, rows }).forEach(
+    G32_GRID.samples(start, [width, depth], [columns, rows]).forEach(
       (sample, index) => {
         moves.xy(sample, { ...style(index), feed: travel })
         probeAt(index)
