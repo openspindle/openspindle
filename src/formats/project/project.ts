@@ -1,9 +1,11 @@
 import { z } from "zod"
+import { kitForPlate } from "@/domain/fixtures/catalog"
 import { kindOf, resolveOperation } from "@/domain/operations/kinds"
 import type { Operation } from "@/domain/operations/operation"
 import type { Plate } from "@/domain/plate/plate"
 import { fail, ok } from "@/domain/primitives"
 import type { Result } from "@/domain/primitives"
+import type { Tool } from "@/domain/tools/tool"
 import { describePath, readOptimistically } from "../optimistic-read"
 import { isJsonObject } from "../upgrade/json"
 import { upgradeOperations } from "../upgrade/operations"
@@ -37,13 +39,14 @@ type ReadProject = Pick<OpenedProject, "document" | "leftOut">
 
 /**
  * An operation's instruction: the exact NC it contributes (stored, or derived from its
- * parameters for procedural kinds), or a pending entry until it has NC. Opening a file takes
- * procedural kinds' NC as the file attaches it (`saved`): it documents the NC when saved, and
- * newer versions may generate it differently.
+ * parameters and the project's tool library `tools` for procedural kinds), or a pending entry
+ * until it has NC. Opening a file takes procedural kinds' NC as the file attaches it (`saved`):
+ * it documents the NC when saved, and newer versions may generate it differently.
  */
 function instruction(
   plate: Plate,
   operation: Operation,
+  tools: readonly Tool[],
   saved?: ReadonlyMap<string, string>
 ): StepNcInstruction {
   const id = `${plate.id}/${operation.id}`
@@ -53,7 +56,10 @@ function instruction(
       ? { kind: "pending", id, name: operation.name }
       : { kind: "source", id, name: operation.name, nc }
   }
-  const resolved = resolveOperation(operation, plate)
+  const resolved = resolveOperation(operation, plate, {
+    kit: kitForPlate(plate),
+    tools,
+  })
   if (!resolved.ok) return { kind: "pending", id, name: operation.name }
   return { kind: "source", id, name: operation.name, nc: resolved.value.nc }
 }
@@ -69,7 +75,7 @@ function projectArchive(
       id: plate.id,
       name: plate.name,
       instructions: plate.operations.map((operation) =>
-        instruction(plate, operation, saved)
+        instruction(plate, operation, document.tools, saved)
       ),
     })),
   }

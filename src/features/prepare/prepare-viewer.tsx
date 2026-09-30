@@ -86,17 +86,18 @@ function useHighlightedLines(shown: Diagnostic | null) {
 function useHiddenLines(): Readonly<Record<string, LineRange[]>> {
   const hidden = useHiddenOperations()
   const plates = useWorkspace((state) => state.plates)
+  const tools = useWorkspace((state) => state.tools)
   return useMemo(
     () =>
       Object.fromEntries(
         plates.map((plate) => [
           plate.id,
-          compilePlate(plate)
+          compilePlate(plate, tools)
             .spans.filter((span) => hidden.has(span.operationId))
             .map((span) => ({ start: span.startLine, end: span.endLine })),
         ])
       ),
-    [hidden, plates]
+    [hidden, plates, tools]
   )
 }
 

@@ -5,6 +5,7 @@ import type { Tool } from "@/domain/tools/tool"
 import type { Stock } from "@/domain/stock/stock"
 import { DesignRulesSchema, sameDesignRules } from "../design-rules/rules"
 import type { DesignRules } from "../design-rules/rules"
+import { kitForPlate } from "../fixtures/catalog"
 import { resolveOperation } from "../operations/kinds"
 import {
   OperationSchema,
@@ -229,7 +230,10 @@ function rebind(
   library: readonly Tool[],
   preferred?: ReadonlyMap<number | null, string>
 ): Plate {
-  const resolved = resolveOperation(operation, plate)
+  const resolved = resolveOperation(operation, plate, {
+    kit: kitForPlate(plate),
+    tools: library,
+  })
   // Pending operations keep their bindings until they have NC.
   if (!resolved.ok) return plate
   return bindTools(plate, operation, localTools(resolved.value.nc), {

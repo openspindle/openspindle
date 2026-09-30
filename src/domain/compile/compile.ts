@@ -6,12 +6,13 @@ import type { Diagnostic } from "../diagnostics"
 import { kitForPlate } from "../fixtures/catalog"
 import type { FixtureKit } from "../fixtures/fixture-kit"
 import { kindOf } from "../operations/kinds"
-import type { ResolvedNc } from "../operations/kinds"
+import type { ResolveContext, ResolvedNc } from "../operations/kinds"
 import { OPERATION_LIMITS } from "../operations/operation"
 import type { Operation } from "../operations/operation"
 import type { Plate } from "../plate/plate"
 import { workOriginNc } from "../plate/work-origin"
 import { plural } from "../primitives"
+import type { Tool } from "../tools/tool"
 import { isEndWord, readNcUnit } from "./nc-unit"
 import type { NcLine } from "./nc-unit"
 import { buildProgramSections } from "./sections"
@@ -274,12 +275,13 @@ function unreadableLines(
   )
 }
 
-function compileUncached(plate: Plate): CompiledPlate {
+function compileUncached(plate: Plate, tools: readonly Tool[]): CompiledPlate {
   const kit = kitForPlate(plate)
+  const context: ResolveContext = { kit, tools }
   const diagnostics: Diagnostic[] = []
   const resolved: Resolved[] = []
   for (const operation of plate.operations) {
-    const result = kindOf(operation).resolve(operation, plate, kit)
+    const result = kindOf(operation).resolve(operation, plate, context)
     if (result.ok) resolved.push({ operation, nc: result.value })
     else diagnostics.push(result.error)
   }
@@ -354,18 +356,47 @@ function compileUncached(plate: Plate): CompiledPlate {
   return { mode, program, spans, sections, pausePoints, diagnostics }
 }
 
-const cache = new WeakMap<Plate, CompiledPlate>()
+/** The library tools a plate's table entries hold, in order; undefined where `tools` has none. */
+type HeldTools = readonly (Tool | undefined)[]
+
+const heldTools = (plate: Plate, tools: readonly Tool[]): HeldTools =>
+  plate.tools.map((entry) =>
+    entry.toolId === null
+      ? undefined
+      : tools.find((tool) => tool.id === entry.toolId)
+  )
+
+const sameTools = (a: HeldTools, b: HeldTools) =>
+  a.length === b.length && a.every((tool, index) => tool === b[index])
+
+/** Each plate's compiled program, with the library tools its table held when it compiled. */
+const cache = new WeakMap<
+  Plate,
+  { readonly held: HeldTools; readonly compiled: CompiledPlate }
+>()
 
 /**
- * Pure and total: always returns a program plus diagnostics, never throws. Results are
- * cached per plate object, so unchanged plates (structural sharing) never recompile, and a
- * plate whose operations did not change keeps its parsed program.
+ * Pure and total: always returns a program plus diagnostics, never throws. `tools` is the
+ * library the plate's table refers to. Results are cached per plate object, so unchanged plates
+ * (structural sharing) never recompile, and a plate whose operations did not change keeps its
+ * parsed program.
+ *
+ * Of the library, compiling reads only the tools the table's entries hold, so a result is kept
+ * while those are the same tool objects. Every library edit makes a new library array: keyed by
+ * that array, editing any tool would compile every plate again, and every cache keyed by a
+ * compiled plate would start over. Keyed by the held tools, editing, adding or removing a tool
+ * no entry holds keeps the result, and editing, removing or restoring one an entry holds
+ * compiles again.
  */
-export function compilePlate(plate: Plate): CompiledPlate {
+export function compilePlate(
+  plate: Plate,
+  tools: readonly Tool[]
+): CompiledPlate {
+  const held = heldTools(plate, tools)
   const cached = cache.get(plate)
-  if (cached) return cached
-  const compiled = compileUncached(plate)
-  cache.set(plate, compiled)
+  if (cached && sameTools(cached.held, held)) return cached.compiled
+  const compiled = compileUncached(plate, tools)
+  cache.set(plate, { held, compiled })
   return compiled
 }
 
@@ -376,10 +407,11 @@ export function compilePlate(plate: Plate): CompiledPlate {
  */
 export function compileOperation(
   plate: Plate,
-  operation: Operation
+  operation: Operation,
+  tools: readonly Tool[]
 ): CompiledPlate {
   const kit = kitForPlate(plate)
-  const resolved = kindOf(operation).resolve(operation, plate, kit)
+  const resolved = kindOf(operation).resolve(operation, plate, { kit, tools })
   if (!resolved.ok)
     return {
       mode: "empty",

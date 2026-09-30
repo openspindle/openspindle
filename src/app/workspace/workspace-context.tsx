@@ -37,7 +37,14 @@ export function usePlateIndex(plateId: string | undefined): number {
   return useWorkspace((state) => plateIndex(state, plateId))
 }
 
-/** Compiled program for a plate; cached per plate object by the compiler. */
+/**
+ * Compiled program for a plate with the workspace's tool library; cached per plate object by
+ * the compiler.
+ */
 export function useCompiledPlate(plate: Plate | null): CompiledPlate | null {
-  return useMemo(() => (plate ? compilePlate(plate) : null), [plate])
+  const tools = useWorkspace((state) => state.tools)
+  return useMemo(
+    () => (plate ? compilePlate(plate, tools) : null),
+    [plate, tools]
+  )
 }

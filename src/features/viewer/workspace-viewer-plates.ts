@@ -30,7 +30,7 @@ export function useWorkspaceViewerPlates(
     const drawn = plates.map((plate) =>
       shown && plate.id === shown.plate.id
         ? drawShown(shown)
-        : toViewerPlate(plate, compilePlate(plate), library)
+        : toViewerPlate(plate, compilePlate(plate, library), library)
     )
     if (shown && !plates.some((plate) => plate.id === shown.plate.id))
       drawn.push(drawShown(shown))

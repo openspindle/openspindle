@@ -1,12 +1,13 @@
 import { isProgramFileName } from "@/app/workspace/import-files"
 import { compilePlate } from "@/domain/compile/compile"
-import type { CompiledSection } from "@/domain/compile/compile"
+import type { CompiledPlate, CompiledSection } from "@/domain/compile/compile"
 import { diagnosticOperation } from "@/domain/diagnostics"
 import type { Diagnostic } from "@/domain/diagnostics"
 import { operationPhase } from "@/domain/operations/kinds"
 import type { Operation, Phase } from "@/domain/operations/operation"
 import { numberedPlate, plateLabel } from "@/domain/plate/plate"
 import type { Group, Plate } from "@/domain/plate/plate"
+import type { Tool } from "@/domain/tools/tool"
 import { sectionRowId } from "../selection"
 
 type RowBase = {
@@ -71,15 +72,13 @@ function sectionRow(
 }
 
 /**
- * The plate's groups as they apply to its program: a group keeps the sections that still
- * exist (editing an operation can remove some), a section belongs to the first group that
+ * The plate's groups as they apply to its compiled program: a group keeps the sections that
+ * still exist (editing an operation can remove some), a section belongs to the first group that
  * lists it, and a group left without sections is not shown. The tree and grouping both use
  * this view, so a stale group neither hides its sections nor keeps them from being regrouped.
  */
-function liveGroups(plate: Plate): Group[] {
-  const existing = new Set(
-    compilePlate(plate).sections.map((section) => section.id)
-  )
+function liveGroups(plate: Plate, compiled: CompiledPlate): Group[] {
+  const existing = new Set(compiled.sections.map((section) => section.id))
   const claimed = new Set<string>()
   const groups: Group[] = []
   for (const group of plate.groups) {
@@ -127,18 +126,22 @@ function operationChildren(
   return rows
 }
 
-/** Plates, their operations, groups and program sections, as rows of the plate tree. */
+/**
+ * Plates, their operations, groups and program sections, as rows of the plate tree; `tools` is
+ * the library the plates' tables refer to.
+ */
 export function buildTreeRows(
   plates: readonly Plate[],
+  tools: readonly Tool[],
   diagnosticsOf: (plate: Plate) => readonly Diagnostic[]
 ): TreeRow[] {
   return plates.map((plate, index) => {
-    const compiled = compilePlate(plate)
+    const compiled = compilePlate(plate, tools)
     const diagnostics = diagnosticsOf(plate)
     const byId = new Map(
       compiled.sections.map((section) => [section.id, section])
     )
-    const groups = liveGroups(plate)
+    const groups = liveGroups(plate, compiled)
     const label = plateLabel(plate, index)
     // A named plate is still found by its number.
     const plateSearch = `${numberedPlate(index)} ${plate.name}`
@@ -200,16 +203,20 @@ export function expandedState(
   return expanded
 }
 
-/** Sections that can form a new group: adjacent in one operation, none grouped yet. */
+/**
+ * Sections of a plate's compiled program that can form a new group: adjacent in one operation,
+ * none grouped yet.
+ */
 export function groupableSections(
   plate: Plate,
+  compiled: CompiledPlate,
   selected: readonly CompiledSection[]
 ): CompiledSection[] | null {
   if (selected.length < 2) return null
   const operationId = selected[0].operationId
   if (selected.some((section) => section.operationId !== operationId))
     return null
-  const sections = compilePlate(plate).sections.filter(
+  const sections = compiled.sections.filter(
     (section) => section.operationId === operationId
   )
   const indices = selected
@@ -219,7 +226,7 @@ export function groupableSections(
     (value, position) => position === 0 || value === indices[position - 1] + 1
   )
   const grouped = new Set(
-    liveGroups(plate).flatMap((group) => group.sectionIds)
+    liveGroups(plate, compiled).flatMap((group) => group.sectionIds)
   )
   if (!contiguous || selected.some((section) => grouped.has(section.id)))
     return null

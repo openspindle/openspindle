@@ -38,6 +38,7 @@ import type {
   ProbeProgram,
   ProbeTool,
 } from "../probing/probe"
+import type { Tool } from "../tools/tool"
 import type { Operation, Phase, SourceKind, SourceOf } from "./operation"
 
 /** The NC an operation contributes and what that NC may contain. */
@@ -56,6 +57,24 @@ export type OperationOf<TKind extends SourceKind> = Operation & {
 export type ProbingSourceKind =
   "auto-level" | "auto-z-height" | "auto-scan" | "probe-3d"
 
+/**
+ * What resolving an operation reads besides the operation and its plate: the kit of the plate's
+ * machine, and the library `tools` that the plate's tool table refers to.
+ */
+export type ResolveContext = {
+  readonly kit: FixtureKit
+  readonly tools: readonly Tool[]
+}
+
+/**
+ * The context for resolving kinds that keep their NC (files and plugins, `generated: false`):
+ * the kit alone, as their NC never reads the tool library.
+ */
+export const keptNcContext = (kit: FixtureKit): ResolveContext => ({
+  kit,
+  tools: [],
+})
+
 /** The connected machine, as far as running an operation depends on it. */
 export type RunContext = {
   readonly connectedDeviceId: string | null
@@ -67,9 +86,10 @@ export type RunContext = {
  * Strategy per operation source kind: how it becomes NC, its phase, whether a lone
  * operation may be emitted byte-for-byte, and what to check while editing and before Run.
  * New kinds register here; nothing else switches on plugin ids. Kinds resolve and validate with
- * the kit of the plate's machine (`kitForPlate`): its probes measure for the probing kinds
- * (`ProbingKind`), which also give the UI a new operation fitted to the probe here (`offer`), so
- * it never reads a capability itself.
+ * the kit of the plate's machine (`kitForPlate`), and resolve with the tool library too
+ * (`ResolveContext`): the kit's probes measure for the probing kinds (`ProbingKind`), which also
+ * give the UI a new operation fitted to the probe here (`offer`), so it never reads a capability
+ * itself.
  */
 export interface OperationKind<TKind extends SourceKind> {
   readonly kind: TKind
@@ -84,7 +104,7 @@ export interface OperationKind<TKind extends SourceKind> {
   resolve: (
     operation: OperationOf<TKind>,
     plate: Plate,
-    kit: FixtureKit
+    context: ResolveContext
   ) => Result<ResolvedNc, Diagnostic>
   /** Advice about an operation whose NC resolves; errors block Run. */
   validate?: (
@@ -131,7 +151,7 @@ const fileKind: OperationKind<"file"> = {
   verbatim: true,
   generated: false,
   phase: () => "machining",
-  resolve: ({ source }, _plate, kit) =>
+  resolve: ({ source }, _plate, { kit }) =>
     ok(plain(source.park ? source.nc : withoutClosingPark(source.nc, kit))),
 }
 
@@ -250,7 +270,7 @@ type ProbingKindSpec<
     operation: OperationOf<TKind>,
     plate: Plate,
     capability: Capabilities[TCapability],
-    kit: FixtureKit
+    context: ResolveContext
   ) => ProbingGeneration
   readonly validate?: OperationKind<TKind>["validate"]
   readonly runChecks?: OperationKind<TKind>["runChecks"]
@@ -295,10 +315,10 @@ function probingKind<
           params: defaults(plate, offered.capability),
         }) as SourceOf<TKind>
     },
-    resolve: (operation, plate, kit) => {
-      const offered = offering(kit.probes, capability)
+    resolve: (operation, plate, context) => {
+      const offered = offering(context.kit.probes, capability)
       if (!offered) return fail(unsupported(operation, lacking))
-      const generated = generate(operation, plate, offered.capability, kit)
+      const generated = generate(operation, plate, offered.capability, context)
       if (!generated.ok)
         return fail(
           error(
@@ -430,7 +450,7 @@ const autoScanKind = probingKind({
     pauseAfterScan: true,
   }),
   // The outline is the plate's other operations' toolpath bounds, so it never goes stale.
-  generate: ({ source }, plate, trace, kit) =>
+  generate: ({ source }, plate, trace, { kit }) =>
     generateAutoScanNc(
       source.params,
       toolpathBoundsOf(machiningPrograms(plate, kit)),
@@ -528,12 +548,12 @@ export function probingOf<TKind extends ProbingSourceKind>(
   return PROBING[kind]
 }
 
-/** The NC an operation contributes, resolved with the kit of its plate's machine. */
+/** The NC an operation contributes, resolved with its plate's machine and the tool library. */
 export const resolveOperation = (
   operation: Operation,
   plate: Plate,
-  kit: FixtureKit = kitForPlate(plate)
-) => kindOf(operation).resolve(operation, plate, kit)
+  context: ResolveContext
+) => kindOf(operation).resolve(operation, plate, context)
 
 export const operationPhase = (operation: Operation): Phase =>
   kindOf(operation).phase(operation)
@@ -541,16 +561,18 @@ export const operationPhase = (operation: Operation): Phase =>
 /**
  * The NC of a plate's operations outside the setup phase, those that machine it, in order; null
  * for one whose NC does not resolve. Where a plate cuts is measured from them
- * (`plateToolpathBounds`).
+ * (`plateToolpathBounds`). Only kinds that keep their NC machine (the probing kinds are setup),
+ * so they resolve without the library (`keptNcContext`).
  */
 export function machiningPrograms(
   plate: Plate,
   kit: FixtureKit = kitForPlate(plate)
 ): (string | null)[] {
+  const context = keptNcContext(kit)
   return plate.operations
     .filter((operation) => operationPhase(operation) !== "setup")
     .map((operation) => {
-      const resolved = kindOf(operation).resolve(operation, plate, kit)
+      const resolved = kindOf(operation).resolve(operation, plate, context)
       return resolved.ok ? resolved.value.nc : null
     })
 }
