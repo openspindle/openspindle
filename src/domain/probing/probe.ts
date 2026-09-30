@@ -13,7 +13,11 @@ import type {
 } from "../auto-z-height/params"
 import type { ProbeTouch } from "../auto-z-height/probe-touch"
 import type { ToolpathBounds } from "../compile/cutting-bounds"
-import type { Probe3dParameters, Probe3dParams } from "../probe-3d/params"
+import type {
+  Probe3dField,
+  Probe3dParameters,
+  Probe3dParams,
+} from "../probe-3d/params"
 import type { ParameterSpecs } from "./parameters"
 import type { ProbeStart } from "./placement"
 
@@ -97,21 +101,19 @@ export interface OutlineTrace {
   program: (params: AutoScanParams, outline: ToolpathBounds) => string
 }
 
+/** A planned 3D probing. */
+export type OriginPlan = ProbingPlan<Probe3dParams> & {
+  /** The work Z the probe comes down to over the start first; null when the placement has none. */
+  readonly height: number | null
+}
+
 /**
  * How a machine finds a work origin with a 3D touch probe: it touches a corner of the stock or of
- * a pocket, or both sides of a pocket or boss, and sets the work origin there.
+ * a pocket, or both sides of a pocket or boss, from the plan's start, and sets the work origin
+ * there. Its program's probing block is the routine's, which reports each contact.
  */
-export interface OriginProbing {
+export interface OriginProbing extends Capability<OriginPlan, Probe3dField> {
   readonly parameters: Probe3dParameters
-  /**
-   * The NC finding the corner or centre from its start and setting the work origin there;
-   * `height` is the work Z the probe comes down to over the start first, if any.
-   */
-  program: (
-    params: Probe3dParams,
-    start: ProbeStart,
-    height: number | null
-  ) => string
 }
 
 /** How a program's sections see a machine's probing NC, in any NC file. */

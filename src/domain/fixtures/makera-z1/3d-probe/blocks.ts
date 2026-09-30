@@ -5,6 +5,8 @@
  */
 import { readNcBlock } from "@/machine/contract"
 import type { NcWord } from "@/machine/contract"
+import type { Vec2 } from "../../../geometry/frame"
+import { cornerInward } from "../../../probe-3d/params"
 import type { Probe3dCorner, Probe3dRoutine } from "../../../probe-3d/params"
 
 /** The firmware's 3D probing routines (ATCHandler's M480). */
@@ -39,6 +41,17 @@ export function routineSubcode(
       each.routine === routine && (!each.corner || each.corner === corner)
   )!
   return Number(subcode)
+}
+
+/**
+ * The signs the firmware gives a routine's X and Y distances (ATCHandler's M480): a corner's X
+ * towards its stock or pocket and its Y away from them, which sends the first corner's move out
+ * towards −X and +Y; a centre's both plus.
+ */
+export function distanceSigns({ corner }: { corner?: Probe3dCorner }): Vec2 {
+  if (!corner) return [1, 1]
+  const [inX, inY] = cornerInward(corner)
+  return [inX, -inY]
 }
 
 type Words = readonly Pick<NcWord, "letter" | "value">[]

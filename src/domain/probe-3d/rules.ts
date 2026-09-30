@@ -1,17 +1,14 @@
 import { autoLevelOrderIssues } from "../auto-z-height/rules"
 import type { LaterAutoLevel } from "../auto-z-height/rules"
-import type { BedXY } from "../compile/toolpath-bounds"
 import { issueOf } from "../diagnostics"
 import type { Issue } from "../diagnostics"
 import { cornerInward, probe3dParamsSchema, setsWorkZ } from "./params"
 import type { Probe3dParameters, Probe3dParams } from "./params"
+import type { Vec2 } from "../geometry/frame"
 import { roundMillimetres } from "../geometry/millimetres"
 import { placementHeight, resolvePlacement } from "../probing/placement"
-import type {
-  PlacementContext,
-  PlacementFailure,
-  ProbeStart,
-} from "../probing/placement"
+import type { PlacementContext, PlacementFailure } from "../probing/placement"
+import type { OriginPlan } from "../probing/probe"
 
 export type Probe3dIssueCode =
   // Parameters
@@ -33,12 +30,7 @@ const probeWarning = issueOf<Probe3dIssueCode>("warning")
 type Checked<TValue> =
   ({ ok: true } & TValue) | { ok: false; issues: Probe3dIssue[] }
 /** Parameters and start that generation can render, or what blocks it. */
-export type Probe3dPlan = Checked<{
-  params: Probe3dParams
-  start: ProbeStart
-  /** The work Z the probe comes down to over the start: its height on the bed, if any. */
-  height: number | null
-}>
+export type Probe3dPlan = Checked<OriginPlan>
 
 /**
  * Everything that prevents generating NC: the parameters, within the ranges of the machine's
@@ -73,15 +65,17 @@ export function planProbe3d(
  * corner, and over the middle of a pocket or boss.
  */
 export function probe3dStartOffset(
-  params: Pick<Probe3dParams, "routine" | "corner" | "distanceX" | "distanceY">
-): BedXY {
+  params: Pick<Probe3dParams, "routine" | "corner" | "distance">
+): Vec2 {
   const [inX, inY] = cornerInward(params.corner)
-  const half = (value: number) => Number((value / 2).toFixed(6))
+  const [halfX, halfY] = params.distance.map((value) =>
+    Number((value / 2).toFixed(6))
+  )
   switch (params.routine) {
     case "outside-corner":
-      return [inX * half(params.distanceX), inY * half(params.distanceY)]
+      return [inX * halfX, inY * halfY]
     case "inside-corner":
-      return [-inX * half(params.distanceX), -inY * half(params.distanceY)]
+      return [-inX * halfX, -inY * halfY]
     default:
       return [0, 0]
   }

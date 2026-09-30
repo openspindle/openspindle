@@ -5,14 +5,28 @@ import {
   PROBE_3D_ROUTINE_LABELS,
   cornerInward,
   findsCorner,
+  probe3dFields,
   setsWorkZ,
 } from "../../../probe-3d/params"
 import type { Probe3dParameters, Probe3dParams } from "../../../probe-3d/params"
 import { probe3dStartOffset } from "../../../probe-3d/rules"
+import type { ParameterSpec } from "../../../probing/parameters"
 import type { OriginProbing } from "../../../probing/probe"
 import { PROBE_3D_TOOL } from "../../../tools/tool-table"
 import { anchorTravel } from "../wired-probe/travel"
 import { ORIGIN_ROUTINE, routineSubcode } from "./blocks"
+
+/** How far in one axis the probe moves out; X's and Y's differ only in their axis. */
+const distance = (axis: "X" | "Y"): ParameterSpec => ({
+  label: `Distance ${axis}`,
+  axis,
+  unit: "mm",
+  default: 10,
+  min: 2,
+  max: 100,
+  step: 1,
+  description: `How far in ${axis} the probe moves out from where it starts, then comes down and touches back: past a corner's side, or a boss's, which takes more than half the boss plus the ball's radius. A pocket's centring searches this far each way.`,
+})
 
 /**
  * Application limits, not a clearance check. The ball's default is the Makera 3D Probe's; the
@@ -29,28 +43,7 @@ const PROBE_3D_PARAMETERS: Probe3dParameters = {
     description:
       "The stylus's ball: each side it touches is set half of it beyond the ball's centre. The Makera 3D Probe's is 2 mm.",
   },
-  distanceX: {
-    label: "Distance X",
-    axis: "X",
-    unit: "mm",
-    default: 10,
-    min: 2,
-    max: 100,
-    step: 1,
-    description:
-      "How far in X the probe moves out from where it starts, then comes down and touches back: past a corner's side, or a boss's, which takes more than half the boss plus the ball's radius. A pocket's centring searches this far each way.",
-  },
-  distanceY: {
-    label: "Distance Y",
-    axis: "Y",
-    unit: "mm",
-    default: 10,
-    min: 2,
-    max: 100,
-    step: 1,
-    description:
-      "How far in Y the probe moves out from where it starts, then comes down and touches back: past a corner's side, or a boss's, which takes more than half the boss plus the ball's radius. A pocket's centring searches this far each way.",
-  },
+  distance: [distance("X"), distance("Y")],
   depth: {
     label: "Probe depth",
     axis: "Z",
@@ -146,17 +139,16 @@ function precautions({ routine, axes }: Probe3dParams): string[] {
 
 /**
  * The firmware's routine (ATCHandler's M480): D the ball, X and Y the distances, Z the depth,
- * which a pocket's centring, touching no top, does without. A centring routine skips an axis
- * given as 0.
+ * less what the routine does not read (`probe3dFields`): a pocket's centring, touching no top,
+ * does without the depth, and a centring routine skips an axis given as 0.
  */
-function routineBlocks(params: Probe3dParams, subcode: number): string[] {
-  const { ballDiameter, distanceX, distanceY, depth, axes } = params
-  const code = `M${ORIGIN_ROUTINE}.${subcode} D${mm(ballDiameter)}`
-  const centre = !findsCorner(params.routine)
-  const x = centre && axes === "y" ? 0 : distanceX
-  const y = centre && axes === "x" ? 0 : distanceY
-  const z = params.routine === "pocket-center" ? "" : ` Z${mm(depth)}`
-  return [`${code} X${mm(x)} Y${mm(y)}${z}`]
+function routineBlock(params: Probe3dParams, subcode: number): string {
+  const read = probe3dFields(params.routine, params.axes)
+  const [x, y] = params.distance.map((value, axis) =>
+    read.distance[axis] ? value : 0
+  )
+  const z = read.depth ? ` Z${mm(params.depth)}` : ""
+  return `M${ORIGIN_ROUTINE}.${subcode} D${mm(params.ballDiameter)} X${mm(x)} Y${mm(y)}${z}`
 }
 
 /**
@@ -166,7 +158,7 @@ function routineBlocks(params: Probe3dParams, subcode: number): string[] {
  */
 export const THREE_D_PROBE: OriginProbing = {
   parameters: PROBE_3D_PARAMETERS,
-  program(params, start, height) {
+  program({ params, start, height }) {
     const subcode = routineSubcode(params.routine, params.corner)
     const lines = [
       ...introduction(params, subcode),
@@ -182,9 +174,10 @@ export const THREE_D_PROBE: OriginProbing = {
             "; Down to the start's height.",
             `G0 Z${formatMillimetres(height)}`,
           ]),
-      ...routineBlocks(params, subcode),
-      "M2",
+      routineBlock(params, subcode),
     ]
-    return `${lines.join("\n")}\n`
+    const probeLine = lines.length
+    lines.push("M2")
+    return { nc: `${lines.join("\n")}\n`, probeLine, reviewLine: null }
   },
 }

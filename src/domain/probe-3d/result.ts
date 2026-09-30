@@ -1,17 +1,15 @@
+import type { XYZ } from "../geometry/frame"
 import { cornerInward, findsCorner, setsWorkZ } from "./params"
 import type { Probe3dParams } from "./params"
-
-/** A contact the probe reported, in machine coordinates. */
-export type Probe3dContact = readonly [x: number, y: number, z: number]
 
 /** What a 3D probing routine found, from the contacts it reported, in machine coordinates. */
 export type Probe3dResult = {
   /** Machine X and Y where it set work X0 and Y0; null for an axis it has not set. */
-  readonly origin: readonly [number | null, number | null]
+  readonly origin: readonly [x: number | null, y: number | null]
   /** Machine Z of the top it set work Z0 on; null when it sets none, or has not yet. */
   readonly top: number | null
   /** A pocket's or boss's size between the sides it touched; null for corners and axes not probed. */
-  readonly size: readonly [number | null, number | null]
+  readonly size: readonly [x: number | null, y: number | null]
   /** Whether it reported every contact the routine makes. */
   readonly complete: boolean
 }
@@ -33,11 +31,11 @@ const CENTERED: Readonly<Record<Probe3dParams["axes"], readonly Axis[]>> = {
  */
 export function probe3dResult(
   params: Pick<Probe3dParams, "routine" | "corner" | "axes" | "ballDiameter">,
-  contacts: readonly Probe3dContact[]
+  contacts: readonly XYZ<"machine">[]
 ): Probe3dResult {
   const radius = params.ballDiameter / 2
   // A touch counts from its second contact.
-  const pair = (index: number): Probe3dContact | null =>
+  const pair = (index: number): XYZ<"machine"> | null =>
     index + 1 < contacts.length ? contacts[index + 1] : null
   let next = 0
   let top: number | null = null

@@ -10,7 +10,7 @@ import type {
   FirmwareSetup,
 } from "../../firmware/firmware-model"
 import { PROBE_TOOL } from "../../tools/tool-table"
-import { ORIGIN_ROUTINE, routineOf } from "./3d-probe/blocks"
+import { ORIGIN_ROUTINE, distanceSigns, routineOf } from "./3d-probe/blocks"
 import { G32_GRID } from "./wired-probe/grid"
 import { CLEARANCE_Z } from "./wired-probe/travel"
 
@@ -70,23 +70,6 @@ const M_CODES = new Set([6, 370, 494, 494.1, 494.2, 495])
 /** M480 with a subcode: the firmware's 3D probing, which `routineOf` tells apart by its text. */
 const runsOrigin = (code: number) =>
   Math.trunc(code) === ORIGIN_ROUTINE && code !== ORIGIN_ROUTINE
-
-/**
- * The signs the firmware gives a 3D probing routine's X and Y distances, by subcode
- * (ATCHandler's M480): the first corner's move out goes towards −X and +Y.
- */
-const ORIGIN_SIGNS: Readonly<Record<number, readonly [number, number]>> = {
-  1: [1, 1],
-  2: [-1, 1],
-  3: [-1, -1],
-  4: [1, -1],
-  5: [1, 1],
-  6: [-1, 1],
-  7: [-1, -1],
-  8: [1, -1],
-  9: [1, 1],
-  10: [1, 1],
-}
 
 const RAPID = { rapid: true, feed: Z1.rapid } as const
 
@@ -315,7 +298,7 @@ class Z1Preview implements GCodeFirmware {
     if (!found) return null
     const { words, tool } = block
     const { ball, distance, depth, descent } = Z1.origin
-    const [signX, signY] = ORIGIN_SIGNS[found.subcode]
+    const [signX, signY] = distanceSigns(found)
     const radius = (words.get("D") ?? ball) / 2
     const dx = signX * (words.get("X") ?? distance)
     const dy = signY * (words.get("Y") ?? distance)
