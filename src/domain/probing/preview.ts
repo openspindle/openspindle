@@ -2,8 +2,6 @@ import type { GCodeProgram } from "../nc/gcode"
 import { isStoredAnchorSetup, machineToBed } from "../anchors/stored-anchors"
 import type { StoredAnchorSetup } from "../anchors/stored-anchors"
 import type { Frame, Vec2, XY } from "../geometry/frame"
-import { boundsOf } from "../geometry/rect"
-import type { Rect } from "../geometry/rect"
 import { offering } from "./probe"
 import type { GridProbing, ProbeTool } from "./probe"
 
@@ -61,10 +59,8 @@ export type ProbeTouch<TFrame extends PreviewFrame = PreviewFrame> =
 export type ProbingPreview = {
   readonly grids: readonly ProbeGrid<"probe" | "machine">[]
   readonly pointCount: number
-  /** Around every grid's samples, whichever frame each is in; null without samples. */
-  readonly bounds: Rect<"probe" | "machine"> | null
 }
-const NO_PROBING: ProbingPreview = { grids: [], pointCount: 0, bounds: null }
+const NO_PROBING: ProbingPreview = { grids: [], pointCount: 0 }
 const caches = new WeakMap<GridProbing, WeakMap<GCodeProgram, ProbingPreview>>()
 
 /**
@@ -82,11 +78,9 @@ export function getProbingPreview(
   const saved = cache.get(program)
   if (saved) return saved
   const grids = probing.grids(program)
-  const samples = grids.flatMap<XY<"probe" | "machine">>((grid) => grid.samples)
   const result: ProbingPreview = {
     grids,
-    pointCount: samples.length,
-    bounds: boundsOf(samples),
+    pointCount: grids.reduce((count, grid) => count + grid.samples.length, 0),
   }
   cache.set(program, result)
   return result
