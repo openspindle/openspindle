@@ -6,10 +6,15 @@ import {
 } from "@/features/viewer/viewer-toolbar"
 import { useWorkspaceViewerPlates } from "@/features/viewer/workspace-viewer-plates"
 import type { JobSubject } from "./job-view"
+import { useFreshTelemetry } from "@/platform/machine"
+import { MachineOriginCard, useMachineOrigin } from "./machine-origin"
 import type { PlayheadSource } from "@/components/workspace/bed-viewer"
 import type { TimelinePreview } from "./use-job-timeline"
 
-/** The 3D bed with every plate; the shown plate is highlighted and drawn up to the preview. */
+/**
+ * The 3D bed with every plate; the shown plate is highlighted and drawn up to the preview, with
+ * where the connected machine keeps work zero.
+ */
 export function JobViewer({
   shown,
   preview,
@@ -23,6 +28,8 @@ export function JobViewer({
   const plates = useWorkspaceViewerPlates(shown)
   const dispatch = useDispatch()
   const camera = useViewerCamera()
+  const telemetry = useFreshTelemetry()
+  const machineOrigin = useMachineOrigin(shown?.plate ?? null, telemetry)
   return (
     <div className="relative min-h-0 flex-1 overflow-hidden">
       <BedViewer
@@ -39,8 +46,14 @@ export function JobViewer({
         resetKey={camera.resetKey}
         zoom={camera.zoom}
         onZoomChange={camera.setZoom}
+        machineOrigin={machineOrigin}
       />
       <ViewerToolbar camera={camera} />
+      <MachineOriginCard
+        telemetry={telemetry}
+        origin={machineOrigin}
+        workOrigin={shown?.plate.setup.workOrigin ?? null}
+      />
     </div>
   )
 }

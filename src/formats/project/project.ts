@@ -9,6 +9,7 @@ import { PROJECT_SCHEMA_VERSION, ProjectDocumentSchema } from "./document"
 import type { ProjectDocument } from "./document"
 import { missingPlugins } from "./plugin-reference"
 import type { InstalledPluginInfo } from "./plugin-reference"
+import { ruleSettingsFromDesignRules } from "./rule-settings"
 import type { PluginReference } from "@/domain/workspace/plugin-reference"
 import { decodeStepNc, encodeStepNc } from "./step-nc"
 import type {
@@ -88,11 +89,24 @@ export function encodeProject(document: ProjectDocument): string {
 
 const VersionSchema = z.looseObject({ schemaVersion: z.int().positive() })
 
-/** The format read besides the current one, which it becomes on opening. */
-const PREVIOUS_SCHEMA_VERSION = 4
+/** The earliest format read; it and the ones after it become the current one on opening. */
+const EARLIEST_SCHEMA_VERSION = 4
 
 /**
- * Projects of this version and the previous one are read; `saved` is the NC the file attaches
+ * A payload of an earlier format as the current format holds it: formats 4 and 5 saved design
+ * rules (`designRules`), which become rule settings; the rest reads as it is.
+ */
+function currentPayload(payload: Record<string, unknown>) {
+  const { designRules, ...rest } = payload
+  return {
+    ...rest,
+    schemaVersion: PROJECT_SCHEMA_VERSION,
+    ruleSettings: ruleSettingsFromDesignRules(designRules),
+  }
+}
+
+/**
+ * Projects of this format and the two before it are read; `saved` is the NC the file attaches
  * to each instruction. The document is read optimistically: what the schema upgrades or
  * normalises is taken as it returns it, and data it does not recognize is left out and
  * reported rather than refused.
@@ -109,17 +123,14 @@ function readPayload(
     throw new Error(
       `This project was saved by a newer version of OpenSpindle (project format ${schemaVersion}). Update OpenSpindle to open it.`
     )
-  if (schemaVersion < PREVIOUS_SCHEMA_VERSION)
+  if (schemaVersion < EARLIEST_SCHEMA_VERSION)
     throw new Error(
       `This project was saved by an earlier version of OpenSpindle (project format ${schemaVersion}), which this version cannot open.`
     )
   const current =
-    schemaVersion === PREVIOUS_SCHEMA_VERSION
-      ? {
-          ...(payload as Record<string, unknown>),
-          schemaVersion: PROJECT_SCHEMA_VERSION,
-        }
-      : payload
+    schemaVersion === PROJECT_SCHEMA_VERSION
+      ? payload
+      : currentPayload(payload as Record<string, unknown>)
   const read = readOptimistically(ProjectDocumentSchema, current)
   if (!read.success)
     throw new Error(

@@ -1,6 +1,5 @@
 import { createDefaultStockLibrary } from "@/domain/stock/catalog"
 import { loadStarterTools } from "@/app/tools/tool-catalog-store"
-import { defaultDesignRules } from "@/domain/design-rules/rules"
 import { createPlate, createPlateSetup } from "@/domain/plate/plate"
 import type { Plate, PlateSetup } from "@/domain/plate/plate"
 import type { WorkspaceLibrary } from "@/domain/workspace/library"
@@ -94,7 +93,7 @@ export async function loadDefaultLibrary(): Promise<WorkspaceLibrary> {
   }
 }
 
-/** A new project: no plates yet, on the app's libraries, with the default design rules. */
+/** A new project: no plates yet, on the app's libraries, with every rule as it is by default. */
 export function newProject(library: WorkspaceLibrary): WorkspaceState {
   return {
     plates: [],
@@ -102,6 +101,6 @@ export function newProject(library: WorkspaceLibrary): WorkspaceState {
     ...library,
     project: { ...DEFAULT_PROJECT, plugins: [] },
     heightMaps: {},
-    designRules: defaultDesignRules(),
+    ruleSettings: {},
   }
 }

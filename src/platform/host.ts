@@ -9,6 +9,7 @@ import type {
   NetworkDevice,
   PrepareResult,
   RunRequest,
+  SimulatedBed,
   WriteAnchorsRequest,
   WriteAnchorsResult,
 } from "@/machine/contract"
@@ -60,6 +61,10 @@ export interface MachineHost {
   connect: (request: ConnectRequest) => Promise<MachineSnapshot>
   disconnect: (request: DisconnectRequest) => Promise<MachineSnapshot>
   execute: (command: MachineCommand) => Promise<MachineSnapshot>
+  /** Tells the simulator what the plate positions on its bed; only a simulator takes it. */
+  simulateBed: (bed: SimulatedBed) => Promise<MachineSnapshot>
+  /** Sends a line typed in the console; the console shows what the machine replies. */
+  sendConsoleLine: (line: string) => Promise<MachineSnapshot>
   stop: () => Promise<MachineSnapshot>
   /** Reboots the machine's controller, then connects to it again. */
   reset: () => Promise<MachineSnapshot>

@@ -102,6 +102,18 @@ export class MachineGateway {
     return this.controller.execute(command)
   }
 
+  /** A line typed in the app's console; only the app sends one. */
+  sendConsoleLine(line: unknown): Promise<MachineSnapshot> {
+    this.requireApp()
+    return this.controller.sendConsoleLine(line)
+  }
+
+  /** The plate's bed, for the simulator only; only the app sends one. */
+  simulateBed(bed: unknown): Promise<MachineSnapshot> {
+    this.requireApp()
+    return this.controller.simulateBed(bed)
+  }
+
   /** The app and the system menu may always stop the machine. */
   stop(): Promise<MachineSnapshot> {
     if (this.principal.kind === "plugin")

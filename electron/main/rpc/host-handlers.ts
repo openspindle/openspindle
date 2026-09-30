@@ -62,6 +62,9 @@ export function createHostHandlers(
       "machine.disconnect": (request) =>
         machine(() => gateway.disconnect(request)),
       "machine.execute": (command) => machine(() => gateway.execute(command)),
+      "machine.simulateBed": (bed) => machine(() => gateway.simulateBed(bed)),
+      "machine.sendConsoleLine": ({ line }) =>
+        machine(() => gateway.sendConsoleLine(line)),
       "machine.stop": () => machine(() => gateway.stop()),
       "machine.reset": () => machine(() => gateway.reset()),
       "machine.prepare": (input) => machine(() => gateway.prepare(input)),

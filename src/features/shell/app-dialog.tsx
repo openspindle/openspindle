@@ -52,7 +52,8 @@ export function AppDialog({
           className="min-h-0 min-w-0 flex-1"
           viewportClassName="max-h-[calc(85vh-5rem)] overflow-x-hidden"
         >
-          <div className="min-w-0 pr-3">{children}</div>
+          {/* The padding leaves room for rings at the edges, such as cards', which the viewport clips. */}
+          <div className="min-w-0 p-px pr-3">{children}</div>
         </ScrollArea>
         {footer && <DialogFooter className="shrink-0">{footer}</DialogFooter>}
       </DialogContent>

@@ -1,24 +1,22 @@
-import { issueOf } from "../diagnostics"
-import type { Issue } from "../diagnostics"
+import { editOperation } from "../auto-level/rules"
+import { issueOf, operationSubject } from "../diagnostics"
+import type { Area, Issue } from "../diagnostics"
+import { toolpathBoundsOf } from "../compile/cutting-bounds"
 import type {
   ToolpathBounds,
   ToolpathBoundsResult,
 } from "../compile/cutting-bounds"
-import type { PlateSetup } from "../plate/plate"
+import { machiningPrograms, operationPhase } from "../operations/kinds"
+import type { OperationRuleSubject, StageRule } from "../rules/stages"
 import { autoScanParamsSchema } from "./params"
 import type { AutoScanParameters, AutoScanParams } from "./params"
 
-export type AutoScanIssueCode =
-  | "invalid-parameters"
-  | "nothing-to-trace"
-  | "outline-off-stock"
-  | "after-machining"
+export type AutoScanIssueCode = "invalid-parameters" | "nothing-to-trace"
 
-/** Errors block NC generation or Run; warnings inform without blocking. */
+/** What blocks generating an auto-scan's NC; the compiler reports it. */
 export type AutoScanIssue = Issue<AutoScanIssueCode>
 
 const scanError = issueOf<AutoScanIssueCode>("error")
-const scanWarning = issueOf<AutoScanIssueCode>("warning")
 
 const EPSILON = 1e-6
 
@@ -54,13 +52,21 @@ export function planAutoScan(
   return { ok: true, params: parsed.data, outline: toolpath.bounds }
 }
 
-/** Where the outline leaves the stock as placed, which is what the scan is for. */
-export function outlineStockIssues(
-  outline: ToolpathBounds,
-  setup: Pick<PlateSetup, "stock" | "stockAnchor" | "workOrigin">
-): AutoScanIssue[] {
-  const { stock, stockAnchor, workOrigin } = setup
-  if (!stock) return []
+/**
+ * Where an auto-scan's outline, the plate's cuts, leaves the stock as placed, at the stock top
+ * where the scan traces it; null for another kind, without stock or cuts, or with the outline on
+ * the stock.
+ */
+function outlineBeyondStock({
+  operation,
+  plate,
+  kit,
+}: OperationRuleSubject): Area | null {
+  const { stock, stockAnchor, workOrigin } = plate.setup
+  if (operation.source.kind !== "auto-scan" || !stock) return null
+  const toolpath = toolpathBoundsOf(machiningPrograms(plate, kit))
+  if (!toolpath.ok) return null
+  const outline = toolpath.bounds
   const inside = [0, 1].every((axis) => {
     const size = axis ? stock.depth : stock.width
     const low = workOrigin[axis] + outline.min[axis]
@@ -70,34 +76,62 @@ export function outlineStockIssues(
       high <= stockAnchor[axis] + size + EPSILON
     )
   })
-  if (inside) return []
-  // The outline the scan traces, at the stock top.
+  if (inside) return null
   const top = stockAnchor[2] + stock.height
   const [x, y] = workOrigin
-  return [
-    scanWarning(
-      "outline-off-stock",
-      "The cuts reach beyond the stock as placed; the scan traces where they go.",
-      {
-        places: [
-          {
-            kind: "area",
-            min: [x + outline.min[0], y + outline.min[1], top],
-            max: [x + outline.max[0], y + outline.max[1], top],
-          },
-        ],
-      }
-    ),
-  ]
+  return {
+    kind: "area",
+    min: [x + outline.min[0], y + outline.min[1], top],
+    max: [x + outline.max[0], y + outline.max[1], top],
+  }
 }
 
-/** A scan after machining has started checks the outline too late. */
-export function scanOrderIssues(machiningBefore: boolean): AutoScanIssue[] {
-  if (!machiningBefore) return []
-  return [
-    scanWarning(
-      "after-machining",
-      "Auto-scan runs after machining operations. Move it before them to check the outline first."
-    ),
-  ]
+const outlineOffStock: StageRule<"operation"> = {
+  id: "auto-scan/outline-off-stock",
+  stage: "operation",
+  label: "Auto-scan outline on the stock",
+  description:
+    "Cuts that reach beyond the stock as placed are worth checking, which is what the scan is for.",
+  severity: "warning",
+  configurable: false,
+  test: (subject) => !outlineBeyondStock(subject),
+  explain: ({ first }) => {
+    const outline = outlineBeyondStock(first)
+    return {
+      problem:
+        "The cuts reach beyond the stock as placed; the scan traces where they go.",
+      about: operationSubject(first.operation.id),
+      ...(outline && { places: [outline] }),
+    }
+  },
+  fixes: editOperation,
 }
+
+const afterMachining: StageRule<"operation"> = {
+  id: "auto-scan/after-machining",
+  stage: "operation",
+  label: "Auto-scan before machining",
+  description:
+    "A scan after machining has started checks the outline too late.",
+  severity: "warning",
+  configurable: false,
+  test: ({ operation, plate }) => {
+    if (operation.source.kind !== "auto-scan") return true
+    const index = plate.operations.findIndex((item) => item.id === operation.id)
+    return plate.operations
+      .slice(0, Math.max(0, index))
+      .every((item) => operationPhase(item) === "setup")
+  },
+  explain: ({ first }) => ({
+    problem:
+      "Auto-scan runs after machining operations. Move it before them to check the outline first.",
+    about: operationSubject(first.operation.id),
+  }),
+  fixes: editOperation,
+}
+
+/** The advice for an auto-scan operation: its outline against the stock, and its order. */
+export const AUTO_SCAN_RULES: readonly StageRule<"operation">[] = [
+  outlineOffStock,
+  afterMachining,
+]

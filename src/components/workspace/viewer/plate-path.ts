@@ -20,6 +20,12 @@ import { WorkAreaView } from "./work-area-view"
 
 /** What one plate's drawing shows; inactive plates show their whole program. */
 export type PathPresentation = ProbePresentation & {
+  /**
+   * The tool the machine reports in its spindle, with its tip on the bed, shown instead of the
+   * program's (the simulator's camera) unless playback has a playhead; null or absent for the
+   * program's.
+   */
+  liveTool?: { readonly tool: number | null; readonly position: Point3 } | null
   showRapids: boolean
   /** Where simulated playback is: the moves before it drawn, the one under way up to the tool. */
   playhead?: Playhead | null
@@ -152,6 +158,15 @@ export class PlatePath {
     )
     this.workArea.emphasize(state.active)
     this.probes.present(state)
+    if (state.liveTool && !playhead) {
+      const [x, y, z] = state.liveTool.position
+      const [ox, oy, oz] = this.plate.workOrigin
+      this.toolpath.showLiveTool({
+        tool: state.liveTool.tool,
+        position: [x - ox, y - oy, z - oz],
+      })
+      return
+    }
     // While playback simulates the moves the tool is on the move under way, even where the step
     // on show ends the program, such as a firmware routine on the program's last line.
     this.toolpath.showTool(

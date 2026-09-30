@@ -1,4 +1,4 @@
-import type { DesignRules } from "@/domain/design-rules/rules"
+import type { RuleSettings } from "@/machine/contract"
 import { kitForPlate } from "@/domain/fixtures/catalog"
 import type { FixtureKit } from "@/domain/fixtures/fixture-kit"
 import type { NcOrigin, Operation } from "@/domain/operations/operation"
@@ -74,7 +74,7 @@ export function planFusionImport(
   program: FusionProgram,
   context: ImportContext,
   kit: FixtureKit,
-  rules: DesignRules
+  settings: RuleSettings
 ): Result<ImportPlan> {
   const plate = fusionPlate(program, context)
   if (!plate.ok) return plate
@@ -89,7 +89,7 @@ export function planFusionImport(
       ],
       { ...context, numberedTools: false },
       kit,
-      rules,
+      settings,
       { kind: "plate", newPlate: plate.value, numberedTools: false }
     )
   )
@@ -105,7 +105,7 @@ export function planFusionUpdate(
   operation: Operation,
   origin: NcOrigin,
   context: ImportContext,
-  rules: DesignRules
+  settings: RuleSettings
 ): ImportPlan {
   return planPrograms(
     [
@@ -117,7 +117,7 @@ export function planFusionUpdate(
     ],
     { ...context, numberedTools: false },
     kitForPlate(plate),
-    rules,
+    settings,
     {
       kind: "operation",
       plateId: plate.id,

@@ -30,7 +30,10 @@ const override = <TType extends string>(type: TType) =>
 const bare = <TType extends string>(type: TType) =>
   z.strictObject({ type: z.literal(type) })
 
-/** Closed command set: there is no raw command channel, and Stop is its own procedure. */
+/**
+ * Closed command set. A line typed in the console is its own request (`ConsoleLineSchema`),
+ * admitted like these and held to the machine's program rules, and Stop is its own procedure.
+ */
 export const MachineCommandSchema = z.discriminatedUnion("type", [
   z.strictObject({
     type: z.literal("jog"),

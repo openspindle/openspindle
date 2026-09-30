@@ -46,6 +46,12 @@ export const TelemetrySchema = z.object({
   absolute: z.boolean(),
   machine: PositionSchema.nullable(),
   work: PositionSchema.nullable(),
+  /**
+   * Where work zero is in machine coordinates, as the machine keeps it: the active work
+   * coordinate system's offset (with any G92 shift), from the machine and work positions and
+   * the tool offset. Null while any of them is unknown.
+   */
+  workOrigin: PositionSchema.nullable(),
   feed: reading,
   requestedFeed: reading,
   feedOverride: reading,
@@ -56,6 +62,7 @@ export const TelemetrySchema = z.object({
   controllerTemperature: reading,
   spindleOn: flag,
   tool: reading,
+  /** The tool's length offset from the tool work Z was set with, in millimetres. */
   toolOffset: reading,
   /** The tool a manual tool change is waiting for. */
   requestedTool: reading,

@@ -57,6 +57,8 @@ export async function connectElectronHost(
       connect: (request) => peer.call("machine.connect", request),
       disconnect: (request) => peer.call("machine.disconnect", request),
       execute: (command) => peer.call("machine.execute", command),
+      simulateBed: (bed) => peer.call("machine.simulateBed", bed),
+      sendConsoleLine: (line) => peer.call("machine.sendConsoleLine", { line }),
       stop: () => peer.call("machine.stop", undefined),
       reset: () => peer.call("machine.reset", undefined),
       prepare: (source) => peer.call("machine.prepare", { source }),

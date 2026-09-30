@@ -20,7 +20,7 @@ OpenSpindle is a desktop app for preparing, checking and running jobs on a Maker
 - Playback of the program as the firmware runs it, at its feeds, with depth and width of cut
 - The G-code exactly as the machine receives it, and a glossary of the Z1's codes (**Help › G-code Glossary**)
 - A run checklist, upload read-back and large programs sent in parts
-- Machine controls, the machine's camera, its height map and its stored anchors
+- Machine controls, a console to send the machine one line at a time, the machine's camera, its height map and its stored anchors
 - A tool library with Fusion 360 import and Makera, Genmitsu, SpeTool, Dreanique and FoxAlien catalogs
 - STEP-NC project files, and NC export with the plate's setup
 - Sandboxed plugins, and the PCB plugin for KiCad Gerber and Excellon files, which runs the pcb2gcode you install

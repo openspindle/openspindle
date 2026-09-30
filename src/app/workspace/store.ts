@@ -65,7 +65,7 @@ function mergeKey(command: WorkspaceCommand): string | null {
       return `${command.type}:${command.plateId}:${command.operationId}`
     case "library.tools":
     case "library.stocks":
-    case "designRules.set":
+    case "ruleSettings.set":
       return command.type
     case "batch": {
       const keys = new Set<string>()

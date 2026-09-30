@@ -1,12 +1,20 @@
 import { compilePlate } from "@/domain/compile/compile"
-import { stockDepthWarnings } from "@/domain/compile/stock-depth"
-import { error, operationSubject, warning } from "@/domain/diagnostics"
+import { operationSubject, toolSubject } from "@/domain/diagnostics"
 import type { Diagnostic } from "@/domain/diagnostics"
-import { validateOperations } from "@/domain/operations/kinds"
+import { kitForPlate } from "@/domain/fixtures/catalog"
 import { operationPluginId } from "@/domain/operations/operation"
+import { PLUGIN_CHAIN } from "@/domain/operations/plugin-rules"
 import type { Plate } from "@/domain/plate/plate"
-import { toolDiagnostics } from "@/domain/tools/tool-table"
+import { failureDiagnostic } from "@/domain/rules/diagnostics"
+import { rulesOf } from "@/domain/rules/rules"
+import type {
+  InstalledPlugin,
+  OperationRuleSubject,
+  StageRule,
+} from "@/domain/rules/stages"
+import { toolRuleSubjects } from "@/domain/tools/tool-table"
 import type { Tool } from "@/domain/tools/tool"
+import { runRules } from "@/machine/contract"
 import { isPluginUsable } from "@/platform/contract/plugin-rpc"
 import type { PluginSummary } from "@/platform/contract/plugin-rpc"
 
@@ -31,58 +39,27 @@ export function missingPluginIds(
   return [...missing]
 }
 
-/**
- * Template operations whose plugin changed or disappeared must be updated or reinstalled; a
- * plugin that cannot run in this OpenSpindle leaves its operations as they are until it is
- * updated.
- */
-function pluginDiagnostics(
-  plate: Plate,
+/** The installed plugins as the plugin rules read them, once per list. */
+const installed = new WeakMap<
+  readonly PluginSummary[],
+  readonly InstalledPlugin[]
+>()
+
+function installedPlugins(
   plugins: readonly PluginSummary[]
-): Diagnostic[] {
-  return plate.operations.flatMap((operation): Diagnostic[] => {
-    const source = operation.source
-    if (source.kind !== "template" && source.kind !== "plugin") return []
-    const plugin = plugins.find((item) => item.id === source.pluginId)
-    if (!plugin)
-      return [
-        warning(
-          "plugin-missing",
-          `"${operation.name}" comes from ${source.pluginId}, which is not installed.`,
-          {
-            subject: operationSubject(operation.id),
-            fix: { kind: "install-plugin", pluginId: source.pluginId },
-          }
-        ),
-      ]
-    if (plugin.incompatible)
-      return [
-        warning(
-          "plugin-incompatible",
-          `"${operation.name}" comes from ${plugin.manifest.name}, which does not work with this version of OpenSpindle.`,
-          {
-            subject: operationSubject(operation.id),
-            fix: { kind: "install-plugin", pluginId: source.pluginId },
-          }
-        ),
-      ]
-    if (
-      source.kind === "template" &&
-      isPluginUsable(plugin) &&
-      plugin.version !== source.version
-    )
-      return [
-        error(
-          "operation-stale",
-          `Update "${operation.name}": ${plugin.manifest.name} changed.`,
-          {
-            subject: operationSubject(operation.id),
-            fix: { kind: "update-operation", operationId: operation.id },
-          }
-        ),
-      ]
-    return []
-  })
+): readonly InstalledPlugin[] {
+  let found = installed.get(plugins)
+  if (!found) {
+    found = plugins.map((plugin) => ({
+      id: plugin.id,
+      name: plugin.manifest.name,
+      version: plugin.version,
+      incompatible: plugin.incompatible,
+      usable: isPluginUsable(plugin),
+    }))
+    installed.set(plugins, found)
+  }
+  return found
 }
 
 /** Each plate's latest diagnostics, with the context they were gathered in. */
@@ -92,9 +69,11 @@ const gathered = new WeakMap<
 >()
 
 /**
- * Everything that blocks or qualifies Run and export for a plate, in one list. A plate without
- * operations is not a problem to report: Run and export refuse it on their own. Kept per plate
- * object while the tools and plugins stay the same, so unchanged plates gather nothing again.
+ * Everything that blocks or qualifies Run and export for a plate, in one list: what compiling
+ * reports, then the operations' advice, the tool table's failures and the plugins' failures. A
+ * plate without operations is not a problem to report: Run and export refuse it on their own.
+ * Kept per plate object while the tools and plugins stay the same, so unchanged plates gather
+ * nothing again.
  */
 export function plateDiagnostics(
   plate: Plate,
@@ -104,15 +83,41 @@ export function plateDiagnostics(
   if (saved?.tools === context.tools && saved.plugins === context.plugins)
     return saved.diagnostics
   const compiled = compilePlate(plate)
-  const found = [
+  const kit = kitForPlate(plate)
+  const plugins = context.plugins && installedPlugins(context.plugins)
+  const operations = plate.operations.map(
+    (operation): OperationRuleSubject => ({
+      operation,
+      plate,
+      kit,
+      compiled,
+      plugins,
+    })
+  )
+  const run = { machine: kit.id }
+  const operationFailures = (
+    rules: readonly StageRule<"operation">[]
+  ): Diagnostic[] =>
+    runRules(rules, operations, run).map((failure) =>
+      failureDiagnostic(failure, operationSubject(failure.first.operation.id))
+    )
+  const operationRules = rulesOf("operation")
+  const diagnostics = [
     ...compiled.diagnostics,
-    ...validateOperations(plate),
-    ...stockDepthWarnings(plate, compiled),
-    ...toolDiagnostics(plate, context.tools),
+    ...operationFailures(
+      operationRules.filter((rule) => rule.chain !== PLUGIN_CHAIN)
+    ),
+    ...runRules(
+      rulesOf("tool"),
+      toolRuleSubjects(plate, context.tools),
+      run
+    ).map((failure) =>
+      failureDiagnostic(failure, toolSubject(failure.first.entry.number))
+    ),
+    ...operationFailures(
+      operationRules.filter((rule) => rule.chain === PLUGIN_CHAIN)
+    ),
   ]
-  const diagnostics = context.plugins
-    ? [...found, ...pluginDiagnostics(plate, context.plugins)]
-    : found
   gathered.set(plate, {
     tools: context.tools,
     plugins: context.plugins,

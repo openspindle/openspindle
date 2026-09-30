@@ -18,3 +18,11 @@ export const ConsoleEntrySchema = z.object({
   tone: ConsoleToneSchema,
 })
 export type ConsoleEntry = z.infer<typeof ConsoleEntrySchema>
+
+/** A line typed in the console: one line of text for the machine, as typed. */
+export const ConsoleLineSchema = z
+  .string()
+  .trim()
+  .min(1, "Type a command to send.")
+  .max(256, "A command is at most 256 characters.")
+  .refine((line) => !/[\r\n]/.test(line), "Send one line at a time.")

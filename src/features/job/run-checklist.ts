@@ -1,13 +1,18 @@
 import type { CompiledPlate } from "@/domain/compile/compile"
 import type { DesignRuleCheck } from "@/domain/design-rules/check"
 import {
+  PLATE_SUBJECT,
   blocking,
   diagnosticOperation,
   keyDiagnostics,
+  operationSubject,
 } from "@/domain/diagnostics"
 import type { Diagnostic, QuickFix, Severity } from "@/domain/diagnostics"
 import type { Plate } from "@/domain/plate/plate"
+import { PLATE_CHAIN } from "@/domain/plate/run-rules"
 import { plural } from "@/domain/primitives"
+import { failureDiagnostic } from "@/domain/rules/diagnostics"
+import type { StageFailure } from "@/domain/rules/stages"
 import { QUICK_FIX_LABELS } from "@/features/prepare/quick-fix"
 import type { MachineSnapshot } from "@/machine/contract"
 import type { PrepareSearch } from "@/routes/_workspace/prepare"
@@ -56,19 +61,22 @@ export type RunContext = {
   readonly compiled: CompiledPlate | null
   /** `plateDiagnostics` of the plate: everything that blocks or qualifies Run. */
   readonly diagnostics: readonly Diagnostic[]
-  /** What the plate's operations need from the connected machine (e.g. anchors read from it). */
-  readonly machineDiagnostics: readonly Diagnostic[]
+  /**
+   * What Run's rules find of the plate (or its absence) and its operations against the connected
+   * machine (e.g. anchors read from it), in the order the rules find them.
+   */
+  readonly runFailures: readonly StageFailure<"run">[]
   /** What the plate breaks of the project's design rules; null without a plate. */
   readonly designRules: DesignRuleCheck | null
   readonly snapshot: MachineSnapshot
   readonly check: ProgramCheck
 }
 
-/** Specification pattern: one named condition of Run, evaluated over the context. */
-export interface RunSpec {
+/** One row of the Run checklist: a named condition of Run, as it shows for the context. */
+export type RunCheckRow = {
   readonly id: string
   readonly label: string
-  evaluate: (context: RunContext) => RunCheckResult
+  readonly show: (context: RunContext) => RunCheckResult
 }
 
 const pass = (reason?: string, fix?: RunFix): RunCheckResult => ({
@@ -159,10 +167,19 @@ const compiles = (compiled: CompiledPlate | null) =>
   compiled.mode !== "empty" &&
   !blocking(compiled.diagnostics).length
 
-export const deviceConnected: RunSpec = {
+/** A failure of Run's rules as a diagnostic, about what its rule names, else its operation or the plate. */
+const runDiagnostic = (failure: StageFailure<"run">) =>
+  failureDiagnostic(
+    failure,
+    failure.first.operation
+      ? operationSubject(failure.first.operation.id)
+      : PLATE_SUBJECT
+  )
+
+export const deviceConnected: RunCheckRow = {
   id: "device",
   label: "Device connected",
-  evaluate: ({ snapshot }) => {
+  show: ({ snapshot }) => {
     const { status, device, error } = snapshot.connection
     if (status === "connected") return pass(device?.name)
     if (status === "connecting") return pending("Connecting…")
@@ -173,31 +190,34 @@ export const deviceConnected: RunSpec = {
   },
 }
 
-export const plateCompiles: RunSpec = {
+/**
+ * The plate chain's failure (no plate, or one without operations: Prepare reports nothing for an
+ * empty plate, but there is nothing to run yet), else what the plate's program reports.
+ */
+export const plateCompiles: RunCheckRow = {
   id: "program",
   label: "Plate compiles",
-  evaluate: ({ plate, diagnostics }) => {
-    if (!plate) return fail("Add a plate in Prepare.", OPEN_PREPARE)
-    // Prepare reports nothing for an empty plate, but there is nothing to run yet.
-    if (!plate.operations.length)
-      return fail("Add an operation to this plate.", OPEN_PREPARE)
+  show: ({ runFailures, diagnostics }) => {
+    const failure = runFailures.find(({ rule }) => rule.chain === PLATE_CHAIN)
+    if (failure)
+      return fail(failure.rule.explain(failure).problem, OPEN_PREPARE)
     return diagnosticsResult(diagnostics.filter(isProgramDiagnostic))
   },
 }
 
-export const toolsAssigned: RunSpec = {
+export const toolsAssigned: RunCheckRow = {
   id: "tools",
   label: "Tools assigned",
-  evaluate: ({ plate, diagnostics }) =>
+  show: ({ plate, diagnostics }) =>
     plate
       ? diagnosticsResult(diagnostics.filter(isToolDiagnostic))
       : pending("Waits for a plate."),
 }
 
-export const operationsCurrent: RunSpec = {
+export const operationsCurrent: RunCheckRow = {
   id: "operations",
   label: "Operations up to date",
-  evaluate: ({ plate, diagnostics }) =>
+  show: ({ plate, diagnostics }) =>
     plate
       ? diagnosticsResult(diagnostics.filter(isOperationDiagnostic))
       : pending("Waits for a plate."),
@@ -223,10 +243,10 @@ function counts(diagnostics: readonly Diagnostic[]) {
  * fail, warnings pass with a note. The first problems are listed with what resolves them; Prepare
  * shows them all, with Show and Apply.
  */
-export const designRulesMet: RunSpec = {
+export const designRulesMet: RunCheckRow = {
   id: "design-rules",
   label: "Design rules met",
-  evaluate: ({ plate, designRules }) => {
+  show: ({ plate, designRules }) => {
     if (!plate || !designRules) return pending("Waits for a plate.")
     const { violations } = designRules
     if (!violations.length) return pass()
@@ -250,21 +270,29 @@ export const designRulesMet: RunSpec = {
   },
 }
 
-export const matchesMachine: RunSpec = {
+/**
+ * What Run's rules find of the plate against the connected machine, as diagnostics: the work
+ * origin's and the probing operations' failures, every one but the plate chain's.
+ */
+export const matchesMachine: RunCheckRow = {
   id: "setup",
   label: "Plate matches the machine",
-  evaluate: ({ plate, snapshot, machineDiagnostics }) => {
+  show: ({ plate, snapshot, runFailures }) => {
     if (!plate) return pending("Waits for a plate.")
     if (snapshot.connection.status !== "connected")
       return pending("Waits for a connected device.")
-    return diagnosticsResult(machineDiagnostics)
+    return diagnosticsResult(
+      runFailures
+        .filter(({ rule }) => rule.chain !== PLATE_CHAIN)
+        .map(runDiagnostic)
+    )
   },
 }
 
-export const programTransfers: RunSpec = {
+export const programTransfers: RunCheckRow = {
   id: "transfer",
   label: "Program transfers",
-  evaluate: ({ compiled, check }) => {
+  show: ({ compiled, check }) => {
     if (!compiles(compiled)) return pending("Waits for a plate that compiles.")
     switch (check.status) {
       case "unavailable":
@@ -289,10 +317,10 @@ export const programTransfers: RunSpec = {
   },
 }
 
-export const machineReady: RunSpec = {
+export const machineReady: RunCheckRow = {
   id: "machine",
   label: "Machine ready",
-  evaluate: ({ snapshot }) => {
+  show: ({ snapshot }) => {
     if (snapshot.connection.status !== "connected")
       return pending("Waits for a connected device.")
     const run = snapshot.availability.run
@@ -306,7 +334,7 @@ export const machineReady: RunSpec = {
 }
 
 /** In the order a user resolves them: machine access, the plate, then the machine itself. */
-export const RUN_SPECS: readonly RunSpec[] = [
+export const RUN_CHECKLIST: readonly RunCheckRow[] = [
   deviceConnected,
   plateCompiles,
   toolsAssigned,
@@ -333,12 +361,12 @@ export type RunChecklist = {
 
 export function evaluateRunChecklist(
   context: RunContext,
-  specs: readonly RunSpec[] = RUN_SPECS
+  rows: readonly RunCheckRow[] = RUN_CHECKLIST
 ): RunChecklist {
-  const checks = specs.map((spec) => ({
-    id: spec.id,
-    label: spec.label,
-    result: spec.evaluate(context),
+  const checks = rows.map((row) => ({
+    id: row.id,
+    label: row.label,
+    result: row.show(context),
   }))
   const blocked = checks.find((check) => check.result.status !== "pass")
   return {

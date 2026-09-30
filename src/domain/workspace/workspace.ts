@@ -1,10 +1,8 @@
-import type { HeightMap } from "@/machine/contract"
+import type { HeightMap, RuleSettings } from "@/machine/contract"
 import type { StoredAnchorSetup } from "@/domain/anchors/stored-anchors"
 import type { FixtureInstance } from "@/domain/fixtures/definitions"
 import type { Tool } from "@/domain/tools/tool"
 import type { Stock } from "@/domain/stock/stock"
-import { DesignRulesSchema, sameDesignRules } from "../design-rules/rules"
-import type { DesignRules } from "../design-rules/rules"
 import { resolveOperation } from "../operations/kinds"
 import {
   OperationSchema,
@@ -27,6 +25,11 @@ import { moveSetupItem } from "../plate/setup-items"
 import type { SetupItemRef } from "../plate/setup-items"
 import { withAnchors, withTouchedWorkOrigin } from "../plate/work-origin"
 import { fail, normalizeText, ok, schemaIssue } from "../primitives"
+import {
+  RuleSettingsSchema,
+  sameRuleSettings,
+  savedRuleSettings,
+} from "../rules/settings"
 import type { PluginReference } from "./plugin-reference"
 import type { Point3, Result } from "../primitives"
 import {
@@ -59,8 +62,11 @@ export type WorkspaceState = {
   readonly defaultStockId: string | null
   readonly project: WorkspaceProject
   readonly heightMaps: Readonly<Record<string, HeightMap>>
-  /** The limits the project's plates are checked against; saved with the project. */
-  readonly designRules: DesignRules
+  /**
+   * How the project reports its rules, and their limits: only those it sets otherwise than the
+   * rules do by default; saved with the project.
+   */
+  readonly ruleSettings: RuleSettings
 }
 
 type PlateTarget = { readonly plateId: string }
@@ -137,13 +143,21 @@ export type WorkspaceCommand =
     } & PlateTarget)
   /**
    * A device's anchors changed (read from it, or realigned): plates set up for it, or for no
-   * device yet, follow them. `deviceId` null is the workspace profile: unassigned plates only.
+   * device yet, follow them; the connected device's, every plate moves to it. `deviceId` null
+   * is the workspace profile: unassigned plates only.
    */
   | {
       readonly type: "anchors.sync"
       readonly deviceId: string | null
       readonly anchors: StoredAnchorSetup
+      readonly connected?: boolean
     }
+  /** The plate moves to a device, whichever it was set up for, and takes its anchors. */
+  | ({
+      readonly type: "plate.useDevice"
+      readonly deviceId: string
+      readonly anchors: StoredAnchorSetup
+    } & PlateTarget)
   | ({
       readonly type: "operation.add"
       readonly operation: Operation
@@ -206,8 +220,11 @@ export type WorkspaceCommand =
       readonly plugins: readonly PluginReference[]
     }
   | { readonly type: "heightMap.store"; readonly map: HeightMap }
-  /** The project's design rules; rules equal to the current ones leave the workspace as it was. */
-  | { readonly type: "designRules.set"; readonly rules: DesignRules }
+  /**
+   * The project's rule settings, kept without those equal to the rules' defaults; settings that
+   * report every rule as the current ones do leave the workspace as it was.
+   */
+  | { readonly type: "ruleSettings.set"; readonly settings: RuleSettings }
   | { readonly type: "workspace.replace"; readonly state: WorkspaceState }
   /** Applies every command in order, or none of them: the first refusal refuses the batch. */
   | { readonly type: "batch"; readonly commands: readonly WorkspaceCommand[] }
@@ -276,20 +293,26 @@ const sameAnchors = (
 const sameGroups = (left: readonly Group[], right: readonly Group[]) =>
   JSON.stringify(left) === JSON.stringify(right)
 
-function syncAnchors(
-  plate: Plate,
-  sync: {
-    readonly deviceId: string | null
-    readonly anchors: StoredAnchorSetup
-  }
-): Plate {
+type DeviceAnchors = {
+  readonly deviceId: string | null
+  readonly anchors: StoredAnchorSetup
+}
+
+/** The plate set up for the device, with its anchors. */
+function withDeviceAnchors(plate: Plate, device: DeviceAnchors): Plate {
   const { deviceId, anchors } = plate.setup
-  if (deviceId !== null && deviceId !== sync.deviceId) return plate
-  if (deviceId === sync.deviceId && sameAnchors(anchors, sync.anchors))
+  if (deviceId === device.deviceId && sameAnchors(anchors, device.anchors))
     return plate
   // What is kept relative to an anchor follows it; nothing else moves.
-  const setup = withAnchors(plate.setup, structuredClone(sync.anchors))
-  return { ...plate, setup: { ...setup, deviceId: sync.deviceId } }
+  const setup = withAnchors(plate.setup, structuredClone(device.anchors))
+  return { ...plate, setup: { ...setup, deviceId: device.deviceId } }
+}
+
+/** A plate follows a device's anchors when it is set up for that device, or for none yet. */
+function syncAnchors(plate: Plate, sync: DeviceAnchors): Plate {
+  const { deviceId } = plate.setup
+  if (deviceId !== null && deviceId !== sync.deviceId) return plate
+  return withDeviceAnchors(plate, sync)
 }
 
 /**
@@ -467,11 +490,21 @@ function commandResult(
         return ok(patchedSetup(setup, { anchors, fixtures: fixtures.value }))
       })
     case "anchors.sync": {
-      const plates = state.plates.map((plate) => syncAnchors(plate, command))
+      const plates = state.plates.map((plate) =>
+        command.connected
+          ? withDeviceAnchors(plate, command)
+          : syncAnchors(plate, command)
+      )
       return plates.every((plate, index) => plate === state.plates[index])
         ? ok(state)
         : ok({ ...state, plates })
     }
+    case "plate.useDevice":
+      return updatePlate(state, command.plateId, (plate) => {
+        if (command.anchors.deviceId !== command.deviceId)
+          return fail("The anchors belong to another device.")
+        return ok(withDeviceAnchors(plate, command))
+      })
     case "plate.dismissNotice":
       return updatePlate(state, command.plateId, (plate) =>
         ok({
@@ -632,13 +665,13 @@ function commandResult(
           [command.map.deviceId]: command.map,
         },
       })
-    case "designRules.set": {
-      const issue = schemaIssue(DesignRulesSchema, command.rules)
+    case "ruleSettings.set": {
+      const issue = schemaIssue(RuleSettingsSchema, command.settings)
       if (issue) return fail(issue)
       return ok(
-        sameDesignRules(state.designRules, command.rules)
+        sameRuleSettings(state.ruleSettings, command.settings)
           ? state
-          : { ...state, designRules: command.rules }
+          : { ...state, ruleSettings: savedRuleSettings(command.settings) }
       )
     }
     case "workspace.replace":

@@ -1,14 +1,12 @@
 import { z } from "zod"
 import { HeightMapSchema } from "@/machine/contract"
-import {
-  DesignRulesSchema,
-  defaultDesignRules,
-} from "@/domain/design-rules/rules"
 import { PlateSchema } from "@/domain/plate/plate"
 import { EntityIdSchema, TextSchema } from "@/domain/primitives"
+import { RuleSettingsSchema } from "@/domain/rules/settings"
 import { libraryOf } from "@/domain/workspace/library"
 import { PluginReferenceSchema } from "@/domain/workspace/plugin-reference"
 import type { WorkspaceState } from "@/domain/workspace/workspace"
+import { ruleSettingsFromDesignRules } from "@/formats/project/rule-settings"
 import { PROJECT_LIMITS } from "@/formats/project/step-nc"
 import { KEPT_WORKSPACE_MAX_LENGTH } from "@/platform/contract/window"
 import type { WindowHost } from "@/platform/host"
@@ -20,36 +18,52 @@ import {
 } from "./project-session"
 import type { WorkspaceStore } from "./store"
 
+/** What a page kept, with rule settings: the design rules a page before them kept become them. */
+function withRuleSettings(kept: unknown): unknown {
+  if (
+    typeof kept !== "object" ||
+    kept === null ||
+    "ruleSettings" in kept ||
+    !("designRules" in kept)
+  )
+    return kept
+  const { designRules, ...rest } = kept
+  return { ...rest, ruleSettings: ruleSettingsFromDesignRules(designRules) }
+}
+
 /**
  * What a page keeps of the workspace for the next: its project, and whether that had unsaved
  * changes. The tool and stock libraries are not part of it: the app keeps them on its own. After
  * a code change the next page reads it with its own schemas, and starts a new project when they
  * refuse it.
  */
-const KeptSchema = z.object({
-  plates: z.array(PlateSchema).max(PROJECT_LIMITS.plates),
-  selectedPlateId: EntityIdSchema.nullable(),
-  heightMaps: z
-    .record(z.string(), HeightMapSchema)
-    .refine(
-      (maps) => Object.keys(maps).length <= PROJECT_LIMITS.heightMaps,
-      "Too many height maps."
-    ),
-  // A page before design rules kept none: its project gets the defaults.
-  designRules: DesignRulesSchema.default(defaultDesignRules),
-  project: z.object({
-    name: TextSchema,
-    fileName: z.string().min(1).max(1000),
-    plugins: z.array(PluginReferenceSchema).max(PROJECT_LIMITS.plugins),
-  }),
-  unsaved: z.boolean(),
-})
+const KeptSchema = z.preprocess(
+  withRuleSettings,
+  z.object({
+    plates: z.array(PlateSchema).max(PROJECT_LIMITS.plates),
+    selectedPlateId: EntityIdSchema.nullable(),
+    heightMaps: z
+      .record(z.string(), HeightMapSchema)
+      .refine(
+        (maps) => Object.keys(maps).length <= PROJECT_LIMITS.heightMaps,
+        "Too many height maps."
+      ),
+    // A page before design rules kept none: its project sets no rule.
+    ruleSettings: RuleSettingsSchema.default(() => ({})),
+    project: z.object({
+      name: TextSchema,
+      fileName: z.string().min(1).max(1000),
+      plugins: z.array(PluginReferenceSchema).max(PROJECT_LIMITS.plugins),
+    }),
+    unsaved: z.boolean(),
+  })
+)
 
 const keptOf = (state: WorkspaceState) => ({
   plates: state.plates,
   selectedPlateId: state.selectedPlateId,
   heightMaps: state.heightMaps,
-  designRules: state.designRules,
+  ruleSettings: state.ruleSettings,
   project: state.project,
   unsaved: hasUnsavedChanges(state),
 })

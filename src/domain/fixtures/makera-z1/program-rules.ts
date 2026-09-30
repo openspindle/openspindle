@@ -1,4 +1,4 @@
-import type { NcWord } from "@/machine/contract"
+import type { NcWord, RuleSeverity } from "@/machine/contract"
 import { ARC_PLANES, radiusArcCentre } from "@/domain/nc/gcode"
 import { initialModalState, nextModalState } from "@/domain/nc/modal-state"
 import {
@@ -9,9 +9,8 @@ import {
   programLines,
 } from "@/domain/nc/program-lines"
 import type { ProgramLines } from "@/domain/nc/program-lines"
-import { IGNORE } from "@/domain/design-rules/program-rules"
-import type { ProgramRule } from "@/domain/design-rules/program-rules"
-import type { RuleSeverity } from "@/domain/design-rules/rules"
+import type { ProgramSubject, StageRule } from "@/domain/rules/stages"
+import { MAKERA_Z1_ID } from "./makera-z1"
 
 /** A word as the fixes write it: up to four decimals, without trailing zeros. */
 const word = (letter: string, value: number) =>
@@ -19,6 +18,12 @@ const word = (letter: string, value: number) =>
 
 const isCode = (letter: string, value: number) => (item: NcWord) =>
   item.letter === letter && item.value === value
+
+/** A program with its lines changed by a fix; lines keep their numbers. */
+const withLines = (
+  subject: ProgramSubject,
+  lines: readonly string[]
+): ProgramSubject => ({ ...subject, program: programLines(lines.join("\n")) })
 
 /** A list of codes in a sentence: "G40 and G49", "G40, G49 and G80". */
 function codesText(codes: readonly string[]): string {
@@ -64,80 +69,84 @@ function dropRule({
   /** What dropping does, with the codes the program uses. */
   dropLabel: (codes: readonly string[]) => string
   dropDescription: string
-}): ProgramRule {
+}): StageRule<"program"> {
   const matches = (item: NcWord) => codes.includes(codeOf(item))
   return {
     id,
+    stage: "program",
     label,
     description,
     severity,
-    find: (program) => {
-      const lines = linesWith(program, matches)
-      if (!lines.length) return null
-      const used = usedCodes(program, codes)
-      return {
-        rule: id,
-        problem: problem(codesText(used), used.length),
-        lines,
-        choices: [
-          {
-            resolution: "drop",
-            label: dropLabel(used),
-            description: dropDescription,
-          },
-          IGNORE,
-        ],
-      }
+    configurable: true,
+    machines: [MAKERA_Z1_ID],
+    test: ({ program }) => !linesWith(program, matches).length,
+    locate: ({ program }) => linesWith(program, matches),
+    explain: ({ first }) => {
+      const used = usedCodes(first.program, codes)
+      return { problem: problem(codesText(used), used.length) }
     },
-    resolve: (program) =>
-      dropWords(
-        program,
-        (item, block) =>
-          matches(item) ||
-          (withLetters.includes(item.letter) && block.words.some(matches))
-      ),
+    fixes: {
+      offer: ({ first }) => [
+        {
+          resolution: "drop",
+          label: dropLabel(usedCodes(first.program, codes)),
+          description: dropDescription,
+        },
+      ],
+      apply: (subject) =>
+        withLines(
+          subject,
+          dropWords(
+            subject.program,
+            (item, block) =>
+              matches(item) ||
+              (withLetters.includes(item.letter) && block.words.some(matches))
+          )
+        ),
+    },
   }
 }
 
-const spindleReverse: ProgramRule = {
+const spindleReverse: StageRule<"program"> = {
   id: "spindle-reverse",
+  stage: "program",
   label: "Spindle reverse (M4)",
   description:
     "The Z1's spindle turns clockwise only. It ignores M4, so the spindle stays off while the program cuts.",
   severity: "error",
-  find: (program) => {
-    const lines = linesWith(program, isCode("M", 4))
-    if (!lines.length) return null
-    return {
-      rule: "spindle-reverse",
-      problem: "The Z1 ignores M4, so the spindle stays off.",
-      lines,
-      choices: [
-        {
-          resolution: "replace",
-          label: "Replace with M3",
-          description: "Start the spindle clockwise instead.",
-        },
-        {
-          resolution: "drop",
-          label: "Drop M4",
-          description: "The spindle stays off.",
-        },
-        IGNORE,
-      ],
-    }
+  configurable: true,
+  machines: [MAKERA_Z1_ID],
+  test: ({ program }) => !linesWith(program, isCode("M", 4)).length,
+  locate: ({ program }) => linesWith(program, isCode("M", 4)),
+  explain: () => ({ problem: "The Z1 ignores M4, so the spindle stays off." }),
+  fixes: {
+    offer: () => [
+      {
+        resolution: "replace",
+        label: "Replace with M3",
+        description: "Start the spindle clockwise instead.",
+      },
+      {
+        resolution: "drop",
+        label: "Drop M4",
+        description: "The spindle stays off.",
+      },
+    ],
+    apply: (subject, { resolution }) =>
+      withLines(
+        subject,
+        subject.program.lines.map((line, index) => {
+          const block = subject.program.blocks[index]
+          const edits = block.problem
+            ? []
+            : block.words.filter(isCode("M", 4)).map((item) => ({
+                word: item,
+                text: resolution === "replace" ? "M3" : "",
+              }))
+          return edits.length ? editWords(line, edits) : line
+        })
+      ),
   },
-  resolve: (program, resolution) =>
-    program.lines.map((line, index) => {
-      const block = program.blocks[index]
-      const edits = block.problem
-        ? []
-        : block.words.filter(isCode("M", 4)).map((item) => ({
-            word: item,
-            text: resolution === "replace" ? "M3" : "",
-          }))
-      return edits.length ? editWords(line, edits) : line
-    }),
 }
 
 const relativeCentres = dropRule({
@@ -213,37 +222,40 @@ function centreOffsets(
   })
 }
 
-const absoluteCentres: ProgramRule = {
+const absoluteCentres: StageRule<"program"> = {
   id: "absolute-arc-centres",
+  stage: "program",
   label: "Absolute arc centres (G90.1)",
   description:
     "The Z1 reads G90.1 as G90 and always takes I, J and K as offsets from the arc's start, so arcs after it turn around the wrong centre.",
   severity: "error",
-  find: (program) => {
-    const lines = linesWith(program, isCode("G", 90.1))
-    if (!lines.length) return null
-    return {
-      rule: "absolute-arc-centres",
-      problem:
-        "The Z1 takes I, J and K as offsets, so arcs after G90.1 turn around the wrong centre.",
-      lines,
-      choices: [
-        {
-          resolution: "replace",
-          label: "Convert the arc centres",
-          description:
-            "Give each arc after it its centre as an offset from its start, and drop G90.1.",
-        },
-        IGNORE,
-      ],
-    }
+  configurable: true,
+  machines: [MAKERA_Z1_ID],
+  test: ({ program }) => !linesWith(program, isCode("G", 90.1)).length,
+  locate: ({ program }) => linesWith(program, isCode("G", 90.1)),
+  explain: () => ({
+    problem:
+      "The Z1 takes I, J and K as offsets, so arcs after G90.1 turn around the wrong centre.",
+  }),
+  fixes: {
+    offer: () => [
+      {
+        resolution: "replace",
+        label: "Convert the arc centres",
+        description:
+          "Give each arc after it its centre as an offset from its start, and drop G90.1.",
+      },
+    ],
+    apply: (subject) =>
+      withLines(
+        subject,
+        dropWords(
+          // Read again: the conversion moved the words of the lines it rewrote.
+          programLines(centreOffsets(subject.program, "absolute").join("\n")),
+          isCode("G", 90.1)
+        )
+      ),
   },
-  resolve: (program) =>
-    dropWords(
-      // Read again: the conversion moved the words of the lines it rewrote.
-      programLines(centreOffsets(program, "absolute").join("\n")),
-      isCode("G", 90.1)
-    ),
 }
 
 /** Lines of arcs given by R alone, in G2 or G3 set on their block or before it. */
@@ -263,31 +275,32 @@ function radiusArcLines(program: ProgramLines): number[] {
   return lines
 }
 
-const radiusArcs: ProgramRule = {
+const radiusArcs: StageRule<"program"> = {
   id: "radius-arcs",
+  stage: "program",
   label: "Arcs given by a radius (R)",
   description:
     "The Z1 takes an arc's centre only from I, J and K, so an arc given by R has no centre.",
   severity: "error",
-  find: (program) => {
-    const lines = radiusArcLines(program)
-    if (!lines.length) return null
-    return {
-      rule: "radius-arcs",
-      problem:
-        "The Z1 takes an arc's centre only from I, J and K, so arcs given by R have none.",
-      lines,
-      choices: [
-        {
-          resolution: "replace",
-          label: "Replace R with I, J and K",
-          description: "Give each arc the centre its radius describes.",
-        },
-        IGNORE,
-      ],
-    }
+  configurable: true,
+  machines: [MAKERA_Z1_ID],
+  test: ({ program }) => !radiusArcLines(program).length,
+  locate: ({ program }) => radiusArcLines(program),
+  explain: () => ({
+    problem:
+      "The Z1 takes an arc's centre only from I, J and K, so arcs given by R have none.",
+  }),
+  fixes: {
+    offer: () => [
+      {
+        resolution: "replace",
+        label: "Replace R with I, J and K",
+        description: "Give each arc the centre its radius describes.",
+      },
+    ],
+    apply: (subject) =>
+      withLines(subject, centreOffsets(subject.program, "radius")),
   },
-  resolve: (program) => centreOffsets(program, "radius"),
 }
 
 const modeCancels = dropRule({
@@ -333,8 +346,82 @@ const cutterCompensation = dropRule({
   dropDescription: "The path is cut as programmed.",
 })
 
-/** What the Z1 does not run as written: its design rules for the programs it runs. */
-export const Z1_PROGRAM_RULES: readonly ProgramRule[] = [
+const erasesStoredData = dropRule({
+  id: "erase-stored-data",
+  label: "Erase stored tool data (M498.2)",
+  description:
+    "M498.2 zeroes the tool number, the tool lengths and the G54 offsets the Z1 saves: the work zero and the tool reference probing set are lost.",
+  severity: "error",
+  codes: ["M498.2"],
+  problem: () => "M498.2 erases the tool data and work offsets the Z1 saves.",
+  dropLabel: () => "Drop M498.2",
+  dropDescription: "Nothing the machine cuts changes.",
+})
+
+/**
+ * The firmware's own commands (SimpleShell, Configurator) that change what the Z1 keeps, or play
+ * a file outside Run, each with what it does.
+ */
+const FIRMWARE_COMMANDS: Readonly<Record<string, string>> = {
+  rm: "deletes a file on the Z1's storage",
+  mv: "renames a file on the Z1's storage",
+  "config-set": "changes a setting the Z1 stores",
+  "config-load": "reloads the settings the Z1 stores",
+  fset: "changes the Z1's factory settings",
+  dfu: "puts the Z1 into firmware update mode",
+  play: "plays a file on the Z1 outside Run",
+}
+
+/** The firmware command a line holds, as the shell reads its first word; null for NC. */
+function firmwareCommand(program: ProgramLines, index: number) {
+  if (program.blocks[index].problem !== "syntax") return null
+  const name = program.lines[index].trim().split(/\s+/)[0].toLowerCase()
+  return Object.hasOwn(FIRMWARE_COMMANDS, name) ? name : null
+}
+
+/** The lines that hold a firmware command. */
+const firmwareCommandLines = (program: ProgramLines) =>
+  program.lines.flatMap((_line, index) =>
+    firmwareCommand(program, index) === null ? [] : [index + 1]
+  )
+
+const firmwareCommands: StageRule<"program"> = {
+  id: "firmware-commands",
+  stage: "program",
+  label: "Firmware commands (rm, config-set, play)",
+  description:
+    "The Z1's own commands that delete or rename files on its storage, change its settings or factory settings, start firmware update mode or play a file outside Run.",
+  severity: "error",
+  configurable: true,
+  machines: [MAKERA_Z1_ID],
+  test: ({ program }) => !firmwareCommandLines(program).length,
+  locate: ({ program }) => firmwareCommandLines(program),
+  explain: ({ first: { program } }) => {
+    const [line] = firmwareCommandLines(program)
+    const name = firmwareCommand(program, line - 1)!
+    return { problem: `${name} ${FIRMWARE_COMMANDS[name]}.` }
+  },
+  fixes: {
+    offer: ({ count }) => [
+      {
+        resolution: "drop",
+        label: count === 1 ? "Remove the command" : "Remove the commands",
+        description: "Nothing the machine cuts changes.",
+      },
+    ],
+    // Lines keep their numbers: a command's line is left empty.
+    apply: (subject) =>
+      withLines(
+        subject,
+        subject.program.lines.map((line, index) =>
+          firmwareCommand(subject.program, index) === null ? line : ""
+        )
+      ),
+  },
+}
+
+/** The Z1's program rules: what it does not run as written. */
+export const Z1_RULES: readonly StageRule<"program">[] = [
   spindleReverse,
   relativeCentres,
   absoluteCentres,
@@ -342,4 +429,6 @@ export const Z1_PROGRAM_RULES: readonly ProgramRule[] = [
   modeCancels,
   toolLengthOffsets,
   cutterCompensation,
+  erasesStoredData,
+  firmwareCommands,
 ]

@@ -13,6 +13,7 @@ import { PROBE_TOOL } from "../../tools/tool-table"
 import { ORIGIN_ROUTINE, routineOf } from "./3d-probe/blocks"
 import { G32_GRID } from "./wired-probe/grid"
 import { CLEARANCE_Z } from "./wired-probe/travel"
+import { SETTER_RADIUS, SETTER_TOP, tipBedZ, tipMachineZ } from "./tool-setter"
 
 /**
  * The Z1's settings as its firmware (1.1.2) moves by them: `src/configZ1.default` and the
@@ -51,18 +52,6 @@ const Z1 = {
   /** Samples the configured grid holds (`leveling-strategy.rectangular-grid.size`). */
   gridSize: 15,
 } as const
-
-/**
- * How machine Z places a tool's tip on the bed: each tool meets the tool setter at a machine Z
- * of its own, and the setter's top is at one bed Z. Nominal values from a Z1 Pro's Makera Studio
- * log (2026-09-22): the wired probe met the setter at machine Z -76.54, and 5.23 mm lower the
- * stock at anchor 1, taken for a 1.6 mm PCB on the MDF bed (bed Z 7.6). Every tool is taken to
- * meet the setter where the probe did.
- */
-const SETTER_TOP = 12.83
-const SETTER_Z = -76.54
-/** A tool on the setter touches it within this distance of its centre. */
-const SETTER_RADIUS = 5
 
 const G_CODES = new Set([10, 28, 32, 38.2, 38.3, 38.4, 38.5, 38.6, 53])
 /** Tool changes and the firmware's automation, and codes of the Z1's NC that move nothing. */
@@ -126,11 +115,11 @@ class Z1Frame {
 
   /** Where a tool's tip is at machine Z. */
   z(machineZ: number) {
-    return machineZ - SETTER_Z + SETTER_TOP - this.setup.workOrigin[2]
+    return tipBedZ(machineZ) - this.setup.workOrigin[2]
   }
 
   machineZ(z: number) {
-    return z + this.setup.workOrigin[2] - SETTER_TOP + SETTER_Z
+    return tipMachineZ(z + this.setup.workOrigin[2])
   }
 
   /** What a tool going straight down at `at` meets: the tool setter, the stock or its support. */
@@ -631,5 +620,19 @@ class Z1Preview implements GCodeFirmware {
 export class Z1Firmware implements FirmwareModel {
   preview(setup: FirmwareSetup): GCodeFirmware {
     return new Z1Preview(setup)
+  }
+
+  bedPosition(setup: FirmwareSetup, [x, y, z]: Point3): Point3 {
+    const frame = new Z1Frame(setup)
+    const [ox, oy, oz] = setup.workOrigin
+    const [bedX, bedY] = frame.xy([x, y])
+    return [bedX + ox, bedY + oy, frame.z(z) + oz]
+  }
+
+  machinePosition(setup: FirmwareSetup, [x, y, z]: Point3): Point3 {
+    const frame = new Z1Frame(setup)
+    const [ox, oy, oz] = setup.workOrigin
+    const [machineX, machineY] = frame.machineXY([x - ox, y - oy])
+    return [machineX, machineY, frame.machineZ(z - oz)]
   }
 }

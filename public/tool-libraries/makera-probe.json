@@ -17,7 +17,7 @@
       "material": null,
       "grade": null,
       "coating": null,
-      "notes": "Wired touch probe with its 1/8″ shank adapter fitted. Dimensions are estimated from Makera's product photos; calibrated offsets are unspecified.",
+      "notes": "Wired touch probe with its 1/8″ shank adapter fitted.",
       "image": null,
       "model": "/models/makera-wired-probe-2.glb",
       "geometry": {
@@ -103,7 +103,7 @@
       "material": null,
       "grade": null,
       "coating": null,
-      "notes": "3D touch probe with its 1/8″ shank fitted and a Ø2 mm ruby ball on an M2 stylus. The Z1 firmware selects it as T9999. Dimensions are estimated from Makera's product photos; calibrated offsets are unspecified.",
+      "notes": "3D touch probe with its 1/8″ shank fitted and a Ø2 mm ruby ball on an M2 stylus. The Z1 firmware selects it as T9999.",
       "image": null,
       "model": "/models/makera-3d-probe.glb",
       "geometry": {

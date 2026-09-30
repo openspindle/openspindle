@@ -1,4 +1,4 @@
-import { Check, Play, X } from "lucide-react"
+import { Play, X } from "lucide-react"
 import { useMachineSnapshot } from "@/platform/machine"
 import type { JobActions, MachineAction } from "./job-hooks"
 import { JobStatusBadge } from "./job-status-badge"
@@ -49,9 +49,9 @@ function JobControls({
           {features?.atc !== true && (
             <MachineActionButton
               action={actions.confirmToolChange}
-              label="Tool installed"
+              label="Confirm installed"
               variant="default"
-              icon={<Check data-icon="inline-start" />}
+              icon={<Play data-icon="inline-start" />}
             />
           )}
           <StopButton action={actions.stop} />
