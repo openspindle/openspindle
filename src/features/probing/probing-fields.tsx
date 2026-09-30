@@ -1,4 +1,3 @@
-import { Fragment } from "react"
 import type { ReactNode } from "react"
 import type { DeepKeys, DeepValue } from "@tanstack/react-form"
 import {
@@ -203,45 +202,35 @@ export function SwitchField({
   )
 }
 
-/** The numeric fields of a probing form, each on its own `MeasurementField` row. */
-export function NumericFields({
+/** A numeric field of a probing form on its own row, as the machine's probe describes it. */
+export function ParameterField({
   id,
+  parameter,
+  field,
   disabled,
-  fields,
 }: {
   id: string
+  parameter: ParameterSpec
+  field: ProbingField<number>
   disabled: boolean
-  fields: readonly {
-    name: string
-    parameter: ParameterSpec
-    field: ProbingField<number>
-  }[]
 }) {
-  return (
-    <>
-      {fields.map(({ name, parameter, field }) => (
-        <Fragment key={name}>
-          {field(({ value, errors, onChange, onBlur }) => (
-            <MeasurementField
-              id={`${id}-${name}`}
-              label={parameter.label}
-              description={parameter.description}
-              axis={parameter.axis}
-              unit={parameter.unit}
-              min={parameter.min}
-              max={parameter.max}
-              step={parameter.step}
-              value={value}
-              errors={errors}
-              disabled={disabled}
-              onBlur={onBlur}
-              onValueChange={(next) => onChange(next ?? Number.NaN)}
-            />
-          ))}
-        </Fragment>
-      ))}
-    </>
-  )
+  return field(({ value, errors, onChange, onBlur }) => (
+    <MeasurementField
+      id={id}
+      label={parameter.label}
+      description={parameter.description}
+      axis={parameter.axis}
+      unit={parameter.unit}
+      min={parameter.min}
+      max={parameter.max}
+      step={parameter.step}
+      value={value}
+      errors={errors}
+      disabled={disabled}
+      onBlur={onBlur}
+      onValueChange={(next) => onChange(next ?? Number.NaN)}
+    />
+  ))
 }
 
 const AXES = ["X", "Y", "Z"] as const

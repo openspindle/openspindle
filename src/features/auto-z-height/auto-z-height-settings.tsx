@@ -9,7 +9,7 @@ import type {
   AutoZHeightParams,
 } from "@/domain/auto-z-height/params"
 import {
-  NumericFields,
+  ParameterField,
   PlacementFields,
   WorkAreaField,
   probingField,
@@ -109,21 +109,17 @@ function AutoZHeightForm({
           </Hint>
         </FieldLegend>
         <FieldGroup className="gap-3">
-          <NumericFields
-            id={id}
+          <ParameterField
+            id={`${id}-probeTravel`}
+            parameter={parameters.probeTravel}
+            field={probingField(form, "probeTravel")}
             disabled={disabled}
-            fields={[
-              {
-                name: "probeTravel",
-                parameter: parameters.probeTravel,
-                field: probingField(form, "probeTravel"),
-              },
-              {
-                name: "clearance",
-                parameter: parameters.clearance,
-                field: probingField(form, "clearance"),
-              },
-            ]}
+          />
+          <ParameterField
+            id={`${id}-clearance`}
+            parameter={parameters.clearance}
+            field={probingField(form, "clearance")}
+            disabled={disabled}
           />
         </FieldGroup>
       </FieldSet>

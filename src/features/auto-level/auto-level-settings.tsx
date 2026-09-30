@@ -9,7 +9,7 @@ import type {
 } from "@/domain/auto-level/params"
 import { rangedSchema } from "@/domain/probing/parameters"
 import {
-  NumericFields,
+  ParameterField,
   PlacementFields,
   SwitchField,
   WorkAreaField,
@@ -123,36 +123,35 @@ function AutoLevelForm({
             disabled={disabled}
             onApply={fitGrid}
           />
-          <NumericFields
-            id={id}
+          <ParameterField
+            id={`${id}-width`}
+            parameter={parameters.size[0]}
+            field={probingField(form, "size[0]")}
             disabled={disabled}
-            fields={[
-              {
-                name: "width",
-                parameter: parameters.size[0],
-                field: probingField(form, "size[0]"),
-              },
-              {
-                name: "depth",
-                parameter: parameters.size[1],
-                field: probingField(form, "size[1]"),
-              },
-              {
-                name: "columns",
-                parameter: parameters.points[0],
-                field: probingField(form, "points[0]"),
-              },
-              {
-                name: "rows",
-                parameter: parameters.points[1],
-                field: probingField(form, "points[1]"),
-              },
-              {
-                name: "clearance",
-                parameter: parameters.clearance,
-                field: probingField(form, "clearance"),
-              },
-            ]}
+          />
+          <ParameterField
+            id={`${id}-depth`}
+            parameter={parameters.size[1]}
+            field={probingField(form, "size[1]")}
+            disabled={disabled}
+          />
+          <ParameterField
+            id={`${id}-columns`}
+            parameter={parameters.points[0]}
+            field={probingField(form, "points[0]")}
+            disabled={disabled}
+          />
+          <ParameterField
+            id={`${id}-rows`}
+            parameter={parameters.points[1]}
+            field={probingField(form, "points[1]")}
+            disabled={disabled}
+          />
+          <ParameterField
+            id={`${id}-clearance`}
+            parameter={parameters.clearance}
+            field={probingField(form, "clearance")}
+            disabled={disabled}
           />
         </FieldGroup>
       </FieldSet>

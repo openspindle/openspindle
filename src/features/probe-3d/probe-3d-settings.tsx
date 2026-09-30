@@ -26,7 +26,7 @@ import type {
   Probe3dRoutine,
 } from "@/domain/probe-3d/params"
 import {
-  NumericFields,
+  ParameterField,
   PlacementFields,
   probingField,
 } from "@/features/probing/probing-fields"
@@ -137,119 +137,123 @@ function Probe3dForm({
       restore("distance[1]", parameters.distance[1], value.distance[1])
     if (!shown.depth) restore("depth", parameters.depth, value.depth)
   }
-  // The numeric inputs the routine reads, by the names their IDs end in.
-  const numericFields = ({ routine, axes }: Probe3dParams) => {
-    const shown = probe3dFields(routine, axes)
-    const input = (
-      name: string,
-      parameter: ParameterSpec,
-      path: NumericPath
-    ) => ({
-      name,
-      parameter,
-      field: probingField(form, path),
-    })
-    return [
-      ...(shown.ballDiameter
-        ? [input("ballDiameter", parameters.ballDiameter, "ballDiameter")]
-        : []),
-      ...(shown.distance[0]
-        ? [input("distanceX", parameters.distance[0], "distance[0]")]
-        : []),
-      ...(shown.distance[1]
-        ? [input("distanceY", parameters.distance[1], "distance[1]")]
-        : []),
-      ...(shown.depth ? [input("depth", parameters.depth, "depth")] : []),
-    ]
-  }
-
   return (
     <FieldGroup>
       <form.Subscribe selector={(state) => state.values}>
-        {(values) => (
-          <FieldSet>
-            <FieldLegend>Routine</FieldLegend>
-            <FieldGroup className="gap-3">
-              <Field
-                orientation="horizontal"
-                className={FIELD_LAYOUT}
-                data-disabled={disabled}
-              >
-                <FieldLabel htmlFor={`${id}-routine`}>
-                  <Hint text={routineDescription(values)}>Finds</Hint>
-                </FieldLabel>
-                {probingField(
-                  form,
-                  "routine"
-                )((field) => (
-                  <OptionSelect
-                    id={`${id}-routine`}
-                    className="w-full min-w-0"
-                    options={ROUTINE_OPTIONS}
-                    value={field.value}
-                    disabled={disabled}
-                    aria-description={routineDescription(values)}
-                    onValueChange={(routine) => {
-                      hide(routine, values.axes)
-                      field.onChange(routine)
-                    }}
-                  />
-                ))}
-              </Field>
-              {findsCorner(values.routine) ? (
+        {(values) => {
+          const shown = probe3dFields(values.routine, values.axes)
+          return (
+            <FieldSet>
+              <FieldLegend>Routine</FieldLegend>
+              <FieldGroup className="gap-3">
                 <Field
                   orientation="horizontal"
                   className={FIELD_LAYOUT}
                   data-disabled={disabled}
                 >
-                  <FieldLabel htmlFor={`${id}-corner`}>Corner</FieldLabel>
+                  <FieldLabel htmlFor={`${id}-routine`}>
+                    <Hint text={routineDescription(values)}>Finds</Hint>
+                  </FieldLabel>
                   {probingField(
                     form,
-                    "corner"
+                    "routine"
                   )((field) => (
                     <OptionSelect
-                      id={`${id}-corner`}
+                      id={`${id}-routine`}
                       className="w-full min-w-0"
-                      options={CORNER_OPTIONS}
+                      options={ROUTINE_OPTIONS}
                       value={field.value}
                       disabled={disabled}
-                      onValueChange={field.onChange}
-                    />
-                  ))}
-                </Field>
-              ) : (
-                <Field
-                  orientation="horizontal"
-                  className={FIELD_LAYOUT}
-                  data-disabled={disabled}
-                >
-                  <FieldLabel htmlFor={`${id}-axes`}>Axes</FieldLabel>
-                  {probingField(
-                    form,
-                    "axes"
-                  )((field) => (
-                    <OptionSelect
-                      id={`${id}-axes`}
-                      className="w-full min-w-0"
-                      options={AXES_OPTIONS}
-                      value={field.value}
-                      disabled={disabled}
-                      onValueChange={(axes) => {
-                        hide(values.routine, axes)
-                        field.onChange(axes)
+                      aria-description={routineDescription(values)}
+                      onValueChange={(routine) => {
+                        hide(routine, values.axes)
+                        field.onChange(routine)
                       }}
                     />
                   ))}
                 </Field>
-              )}
-              <NumericFields
-                id={id}
-                disabled={disabled}
-                fields={numericFields(values)}
-              />
-            </FieldGroup>
-          </FieldSet>
-        )}
+                {findsCorner(values.routine) ? (
+                  <Field
+                    orientation="horizontal"
+                    className={FIELD_LAYOUT}
+                    data-disabled={disabled}
+                  >
+                    <FieldLabel htmlFor={`${id}-corner`}>Corner</FieldLabel>
+                    {probingField(
+                      form,
+                      "corner"
+                    )((field) => (
+                      <OptionSelect
+                        id={`${id}-corner`}
+                        className="w-full min-w-0"
+                        options={CORNER_OPTIONS}
+                        value={field.value}
+                        disabled={disabled}
+                        onValueChange={field.onChange}
+                      />
+                    ))}
+                  </Field>
+                ) : (
+                  <Field
+                    orientation="horizontal"
+                    className={FIELD_LAYOUT}
+                    data-disabled={disabled}
+                  >
+                    <FieldLabel htmlFor={`${id}-axes`}>Axes</FieldLabel>
+                    {probingField(
+                      form,
+                      "axes"
+                    )((field) => (
+                      <OptionSelect
+                        id={`${id}-axes`}
+                        className="w-full min-w-0"
+                        options={AXES_OPTIONS}
+                        value={field.value}
+                        disabled={disabled}
+                        onValueChange={(axes) => {
+                          hide(values.routine, axes)
+                          field.onChange(axes)
+                        }}
+                      />
+                    ))}
+                  </Field>
+                )}
+                {shown.ballDiameter && (
+                  <ParameterField
+                    id={`${id}-ballDiameter`}
+                    parameter={parameters.ballDiameter}
+                    field={probingField(form, "ballDiameter")}
+                    disabled={disabled}
+                  />
+                )}
+                {shown.distance[0] && (
+                  <ParameterField
+                    id={`${id}-distanceX`}
+                    parameter={parameters.distance[0]}
+                    field={probingField(form, "distance[0]")}
+                    disabled={disabled}
+                  />
+                )}
+                {shown.distance[1] && (
+                  <ParameterField
+                    id={`${id}-distanceY`}
+                    parameter={parameters.distance[1]}
+                    field={probingField(form, "distance[1]")}
+                    disabled={disabled}
+                  />
+                )}
+                {shown.depth && (
+                  <ParameterField
+                    id={`${id}-depth`}
+                    parameter={parameters.depth}
+                    field={probingField(form, "depth")}
+                    disabled={disabled}
+                  />
+                )}
+              </FieldGroup>
+            </FieldSet>
+          )
+        }}
       </form.Subscribe>
       <PlacementFields
         placement={probingField(form, "placement")}

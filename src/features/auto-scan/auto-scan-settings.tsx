@@ -8,7 +8,7 @@ import { roundOutward } from "@/domain/compile/toolpath-bounds"
 import type { ToolpathBoundsResult } from "@/domain/compile/toolpath-bounds"
 import { rangedSchema } from "@/domain/probing/parameters"
 import {
-  NumericFields,
+  ParameterField,
   SwitchField,
   probingField,
 } from "@/features/probing/probing-fields"
@@ -80,21 +80,17 @@ function AutoScanForm({
           <Hint text={outlineDescription(outline)}>Outline</Hint>
         </FieldLegend>
         <FieldGroup className="gap-3">
-          <NumericFields
-            id={id}
+          <ParameterField
+            id={`${id}-travelZ`}
+            parameter={parameters.travelZ}
+            field={probingField(form, "travelZ")}
             disabled={disabled}
-            fields={[
-              {
-                name: "travelZ",
-                parameter: parameters.travelZ,
-                field: probingField(form, "travelZ"),
-              },
-              {
-                name: "feed",
-                parameter: parameters.feed,
-                field: probingField(form, "feed"),
-              },
-            ]}
+          />
+          <ParameterField
+            id={`${id}-feed`}
+            parameter={parameters.feed}
+            field={probingField(form, "feed")}
+            disabled={disabled}
           />
         </FieldGroup>
       </FieldSet>
