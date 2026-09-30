@@ -3,8 +3,9 @@ import { plateWorkArea } from "../compile/toolpath-bounds"
 import type { WorkArea } from "../compile/toolpath-bounds"
 import type { Plate } from "../plate/plate"
 import { roundMillimetres } from "../geometry/millimetres"
-import { defaultAutoLevelParams } from "./params"
-import type { AutoLevelGridParameters, AutoLevelParams } from "./params"
+import { rectSize } from "../geometry/rect"
+import type { AutoLevelParameters, AutoLevelParams } from "./params"
+import { defaultsOf } from "../probing/parameters"
 import { anchorPlacementAt, placementAnchors } from "../probing/placement"
 import type { AnchorPlacement, ProbePlacement } from "../probing/placement"
 
@@ -18,16 +19,16 @@ export function fitAutoLevelGrid(
   anchors: readonly BedAnchor[],
   current: ProbePlacement,
   last: AnchorPlacement | null,
-  { width, depth }: AutoLevelGridParameters
-): Pick<AutoLevelParams, "width" | "depth" | "placement"> {
-  const extent = (axis: 0 | 1, bounds: { min: number; max: number }) =>
+  { size }: AutoLevelParameters
+): Pick<AutoLevelParams, "size" | "placement"> {
+  const extent = rectSize(area)
+  const fit = (axis: 0 | 1) =>
     Math.min(
-      bounds.max,
-      Math.max(bounds.min, roundMillimetres(area.max[axis] - area.min[axis]))
+      size[axis].max,
+      Math.max(size[axis].min, roundMillimetres(extent[axis]))
     )
   return {
-    width: extent(0, width),
-    depth: extent(1, depth),
+    size: [fit(0), fit(1)],
     placement: anchorPlacementAt(area.min, anchors, current, last) ?? current,
   }
 }
@@ -39,9 +40,13 @@ export function fitAutoLevelGrid(
  */
 export function plateAutoLevelParams(
   plate: Plate,
-  parameters: AutoLevelGridParameters
+  parameters: AutoLevelParameters
 ): AutoLevelParams {
-  const params = defaultAutoLevelParams(parameters)
+  const params: AutoLevelParams = {
+    ...defaultsOf(parameters),
+    placement: { kind: "probe-position" },
+    reviewAfterProbe: true,
+  }
   const area = plateWorkArea(plate)
   if (!area.ok) return params
   return {

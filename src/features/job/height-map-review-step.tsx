@@ -51,7 +51,7 @@ export function HeightMapReviewStep({
   const source = view.operation?.source
   const expected =
     source?.kind === "auto-level"
-      ? { columns: source.params.columns, rows: source.params.rows }
+      ? { columns: source.params.points[0], rows: source.params.points[1] }
       : undefined
   return (
     <HeightMapReview

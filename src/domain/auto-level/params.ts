@@ -1,73 +1,36 @@
 import { z } from "zod"
 import { COORDINATE_LIMIT } from "../primitives"
+import type { PairSpec, ParameterSpec } from "../probing/parameters"
 import { ProbePlacementSchema } from "../probing/placement"
 
-/** The rectangular grid's parameters, in form and plugin-manifest order. */
-export const AUTO_LEVEL_GRID_FIELDS = [
-  "width",
-  "depth",
-  "columns",
-  "rows",
-  "clearance",
-] as const
-export type AutoLevelGridField = (typeof AUTO_LEVEL_GRID_FIELDS)[number]
-
-/** One grid parameter. Its fields are those of a plugin manifest's numeric parameter. */
-export type AutoLevelGridParameter = {
-  label: string
-  default: number
-  min: number
-  max: number
-  /** Input increment; values need not be multiples of it. */
-  step: number
-  /** Lengths are millimetres; probe-point counts have no unit. */
-  unit?: "mm"
-  axis?: "X" | "Y" | "Z"
-  description?: string
+/**
+ * A machine's grid parameters, which its probe defines (`GridProbing.parameters`), in form and
+ * plugin-manifest order.
+ */
+export type AutoLevelParameters = {
+  /** The grid's width along X and depth along Y. */
+  readonly size: PairSpec
+  /** Endpoint-inclusive probe points along X and along Y. */
+  readonly points: PairSpec
+  readonly clearance: ParameterSpec
 }
 
-/** A machine's grid parameters, which its probe defines (`GridProbing.parameters`). */
-export type AutoLevelGridParameters = Readonly<
-  Record<AutoLevelGridField, AutoLevelGridParameter>
->
-
-function rangeMessage(label: string, min: number, max: number, unit?: string) {
-  const suffix = unit ? ` ${unit}` : ""
-  return `${label} must be from ${min} to ${max}${suffix}.`
-}
-
-function lengthSchema({ label, min, max, unit }: AutoLevelGridParameter) {
-  const range = rangeMessage(label, min, max, unit)
-  return z
-    .number({ error: `${label} is required.` })
-    .min(min, range)
-    .max(max, range)
-}
-
-function countSchema({ label, min, max }: AutoLevelGridParameter) {
-  const range = rangeMessage(label, min, max)
-  return z
-    .int({ error: `${label} must be a whole number.` })
-    .min(min, range)
-    .max(max, range)
-}
+/** The grid's numeric parameters. */
+export type AutoLevelField = keyof AutoLevelParameters
 
 const storedLength = z.number().positive().max(COORDINATE_LIMIT)
 const storedCount = z.int().min(2).max(COORDINATE_LIMIT)
 
 /**
  * A built-in auto-level operation, as stored for any machine. Its NC is derived from these
- * parameters at compile time, within the ranges of the machine's probe (`autoLevelParamsSchema`).
+ * parameters at compile time, within the ranges of the machine's probe
+ * (`rangedSchema(AutoLevelParamsSchema, parameters)`).
  */
 export const AutoLevelParamsSchema = z.strictObject({
-  /** Grid extent along X from its start, mm. */
-  width: storedLength,
-  /** Grid extent along Y from its start, mm. */
-  depth: storedLength,
-  /** Endpoint-inclusive probe points along X. */
-  columns: storedCount,
-  /** Endpoint-inclusive probe points along Y. */
-  rows: storedCount,
+  /** Grid extent from its start along X and along Y, mm. */
+  size: z.tuple([storedLength, storedLength]),
+  /** Endpoint-inclusive probe points along X and along Y. */
+  points: z.tuple([storedCount, storedCount]),
   /** Lift above the detected surface between samples, mm. */
   clearance: storedLength,
   placement: ProbePlacementSchema,
@@ -76,42 +39,3 @@ export const AutoLevelParamsSchema = z.strictObject({
 })
 
 export type AutoLevelParams = z.infer<typeof AutoLevelParamsSchema>
-
-const machineSchemas = new WeakMap<
-  AutoLevelGridParameters,
-  z.ZodType<AutoLevelParams, AutoLevelParams>
->()
-
-/** The parameters within the ranges of a machine's probe, as its form and its NC take them. */
-export function autoLevelParamsSchema(
-  parameters: AutoLevelGridParameters
-): z.ZodType<AutoLevelParams, AutoLevelParams> {
-  const cached = machineSchemas.get(parameters)
-  if (cached) return cached
-  const schema = z.strictObject({
-    width: lengthSchema(parameters.width),
-    depth: lengthSchema(parameters.depth),
-    columns: countSchema(parameters.columns),
-    rows: countSchema(parameters.rows),
-    clearance: lengthSchema(parameters.clearance),
-    placement: ProbePlacementSchema,
-    reviewAfterProbe: z.boolean(),
-  })
-  machineSchemas.set(parameters, schema)
-  return schema
-}
-
-/** A new operation's parameters: the defaults of the machine's probe. */
-export function defaultAutoLevelParams(
-  grid: AutoLevelGridParameters
-): AutoLevelParams {
-  return {
-    width: grid.width.default,
-    depth: grid.depth.default,
-    columns: grid.columns.default,
-    rows: grid.rows.default,
-    clearance: grid.clearance.default,
-    placement: { kind: "probe-position" },
-    reviewAfterProbe: true,
-  }
-}

@@ -247,14 +247,14 @@ const autoLevelKind: OperationKind<"auto-level"> = {
           }
         )
       )
-    const { nc, reviewPauseLine } = generated.program
+    const { nc, reviewLine } = generated.program
     return ok({
       nc,
       policy: {
         probing: "grid",
         anchoredProbing: params.placement.kind === "anchor",
       },
-      reviewLines: reviewPauseLine === null ? [] : [reviewPauseLine],
+      reviewLines: reviewLine === null ? [] : [reviewLine],
     })
   },
   validate: (operation, plate, { probe }) => {

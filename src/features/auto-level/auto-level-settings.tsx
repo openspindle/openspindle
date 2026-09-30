@@ -2,14 +2,12 @@ import { useId, useState } from "react"
 import { Scan } from "lucide-react"
 import { FieldGroup, FieldLegend, FieldSet } from "@/components/ui/field"
 import { fitAutoLevelGrid } from "@/domain/auto-level/fit"
-import {
-  AUTO_LEVEL_GRID_FIELDS,
-  autoLevelParamsSchema,
-} from "@/domain/auto-level/params"
+import { AutoLevelParamsSchema } from "@/domain/auto-level/params"
 import type {
-  AutoLevelGridParameters,
+  AutoLevelParameters,
   AutoLevelParams,
 } from "@/domain/auto-level/params"
+import { rangedSchema } from "@/domain/probing/parameters"
 import {
   NumericFields,
   PlacementFields,
@@ -31,7 +29,7 @@ import type { AnchorPlacement } from "@/domain/probing/placement"
 export type AutoLevelSettingsProps = {
   value: AutoLevelParams
   /** The grid's parameters on the machine's probe: defaults, ranges and descriptions. */
-  parameters: AutoLevelGridParameters
+  parameters: AutoLevelParameters
   /** Stored anchors of the plate's device that the grid can start from. */
   anchors: readonly ProbingAnchorOption[]
   /** Where the plate cuts, or its stock without machining: what Fit grid covers. */
@@ -93,7 +91,7 @@ function AutoLevelForm({
   disabled,
 }: Required<AutoLevelSettingsProps>) {
   const id = useId()
-  const schema = autoLevelParamsSchema(parameters)
+  const schema = rangedSchema(AutoLevelParamsSchema, parameters)
   // Switching back from the probe position restores the anchor settings.
   const [lastAnchor, setLastAnchor] = useState<AnchorPlacement | null>(null)
   const form = useProbingForm(value, schema, onChange)
@@ -106,9 +104,9 @@ function AutoLevelForm({
       lastAnchor,
       parameters
     )
-    // One change for the three fields: only the last one runs the listener.
-    form.setFieldValue("width", fitted.width, { dontRunListeners: true })
-    form.setFieldValue("depth", fitted.depth, { dontRunListeners: true })
+    // One change for the three values: only the last one runs the listener.
+    form.setFieldValue("size[0]", fitted.size[0], { dontRunListeners: true })
+    form.setFieldValue("size[1]", fitted.size[1], { dontRunListeners: true })
     form.setFieldValue("placement", fitted.placement)
   }
 
@@ -128,11 +126,33 @@ function AutoLevelForm({
           <NumericFields
             id={id}
             disabled={disabled}
-            fields={AUTO_LEVEL_GRID_FIELDS.map((name) => ({
-              name,
-              parameter: parameters[name],
-              field: probingField(form, name),
-            }))}
+            fields={[
+              {
+                name: "width",
+                parameter: parameters.size[0],
+                field: probingField(form, "size[0]"),
+              },
+              {
+                name: "depth",
+                parameter: parameters.size[1],
+                field: probingField(form, "size[1]"),
+              },
+              {
+                name: "columns",
+                parameter: parameters.points[0],
+                field: probingField(form, "points[0]"),
+              },
+              {
+                name: "rows",
+                parameter: parameters.points[1],
+                field: probingField(form, "points[1]"),
+              },
+              {
+                name: "clearance",
+                parameter: parameters.clearance,
+                field: probingField(form, "clearance"),
+              },
+            ]}
           />
         </FieldGroup>
       </FieldSet>

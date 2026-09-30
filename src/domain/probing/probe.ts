@@ -1,8 +1,8 @@
 import type { NcBlock } from "@/machine/contract"
 import type { GCodeProgram } from "@/domain/nc/gcode"
 import type {
-  AutoLevelGridField,
-  AutoLevelGridParameters,
+  AutoLevelField,
+  AutoLevelParameters,
   AutoLevelParams,
 } from "../auto-level/params"
 import type { ProbeGrid, ProbePoint } from "../auto-level/probe-grid"
@@ -54,28 +54,20 @@ export type GridShape = Pick<
   "start" | "width" | "depth" | "columns" | "rows"
 >
 
-/** Grid probing NC, with the lines of its probing block and of its review pause, if any. */
-export type GridProgram = {
-  /** Newline-terminated NC. */
-  nc: string
-  /** One-based line of the block that probes the grid. */
-  probeLine: number
-  /** One-based line of the pause after probing; null when the job does not pause there. */
-  reviewPauseLine: number | null
-}
+/**
+ * A planned auto-level grid: its size, points and clearance and whether the job pauses to review
+ * what it measured, checked, and where it starts.
+ */
+export type GridPlan = ProbingPlan<Omit<AutoLevelParams, "placement">>
 
 /** How a machine probes a height grid, which auto-level compensates with. */
-export interface GridProbing {
+export interface GridProbing extends Capability<GridPlan, AutoLevelField> {
   /** The grid's parameters: defaults, and the ranges the machine accepts. */
-  readonly parameters: AutoLevelGridParameters
+  readonly parameters: AutoLevelParameters
+  /** The NC probing a planned grid from its start; it always has the probing block. */
+  program: (plan: GridPlan) => ProbeProgram & { readonly probeLine: number }
   /** A grid's samples, in the order the firmware visits them. */
   samples: (grid: GridShape) => ProbePoint[]
-  /** The NC probing a planned grid from its start. */
-  program: (
-    size: Pick<AutoLevelParams, AutoLevelGridField>,
-    start: ProbeStart,
-    reviewAfterProbe: boolean
-  ) => GridProgram
   /** The grids a program probes, as this machine's NC writes them: previews of any file. */
   grids: (program: GCodeProgram) => ProbeGrid[]
 }

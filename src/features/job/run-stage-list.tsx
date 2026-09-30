@@ -127,7 +127,8 @@ function operationSummary(
       return `Touches the stock top ${where} and sets work Z there.`
     }
     case "auto-level": {
-      const { columns, rows, width, depth } = source.params
+      const [columns, rows] = source.params.points
+      const [width, depth] = source.params.size
       return `Probes ${columns} × ${rows} points over ${mm(width)} × ${mm(depth)} mm.`
     }
     case "probe-3d": {
