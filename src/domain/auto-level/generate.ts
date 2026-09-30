@@ -1,7 +1,9 @@
 import type { GridPlan, GridProbing, ProbeProgram } from "../probing/probe"
 import { roundMillimetres } from "../geometry/millimetres"
+import type { Vec2, XY } from "../geometry/frame"
+import { PROBE_START } from "../probing/preview"
+import type { ProbeAt, ProbeGrid } from "../probing/preview"
 import type { AutoLevelParams } from "./params"
-import type { ProbeGrid, ProbePoint } from "./probe-grid"
 import { planAutoLevel } from "./rules"
 import type { AutoLevelIssue } from "./issues"
 import type { PlacementContext } from "../probing/placement"
@@ -9,7 +11,7 @@ import type { PlacementContext } from "../probing/placement"
 /** The NC from the machine's probe, and the grid it probes. */
 export type AutoLevelProgram = ProbeProgram & {
   /** Planned samples for the viewer; `sourceLine` is the probing line in `nc`. */
-  readonly grid: ProbeGrid
+  readonly grid: ProbeGrid<"probe" | "machine">
 }
 
 export type AutoLevelGeneration =
@@ -26,27 +28,39 @@ export function renderAutoLevelProgram(
 ): AutoLevelProgram {
   const { params, start } = plan
   const program = probing.program(plan)
-  // The grid holds the values the NC words carry, as the firmware and the NC preview read them.
-  const [x, y] = start.kind === "anchor" ? start.machine : [0, 0]
-  const origin: ProbePoint = [roundMillimetres(x), roundMillimetres(y)]
-  const width = roundMillimetres(params.size[0])
-  const depth = roundMillimetres(params.size[1])
-  const [columns, rows] = params.points
+  const from: ProbeAt<"probe" | "machine"> =
+    start.kind === "anchor"
+      ? { frame: "machine", at: start.machine }
+      : PROBE_START
   return {
     ...program,
-    grid: {
-      sourceLine: program.probeLine,
-      start: origin,
-      width,
-      depth,
-      columns,
-      rows,
-      pointCount: columns * rows,
-      points: probing.samples({ start: origin, width, depth, columns, rows }),
-      clearanceMm: roundMillimetres(params.clearance),
-      coordinateMode:
-        start.kind === "anchor" ? "machine" : "relative-to-probe-start",
-    },
+    grid: plannedGrid(from, params, probing, program.probeLine),
+  }
+}
+
+/**
+ * The grid a plan probes from where the probe starts, in that frame. It holds the values the NC
+ * words carry, as the firmware and the NC preview read them.
+ */
+function plannedGrid<TFrame extends "probe" | "machine">(
+  { frame, at }: ProbeAt<TFrame>,
+  params: GridPlan["params"],
+  probing: GridProbing,
+  sourceLine: number
+): ProbeGrid<TFrame> {
+  const start: XY<TFrame> = [roundMillimetres(at[0]), roundMillimetres(at[1])]
+  const size: Vec2 = [
+    roundMillimetres(params.size[0]),
+    roundMillimetres(params.size[1]),
+  ]
+  return {
+    sourceLine,
+    frame,
+    start,
+    size,
+    points: params.points,
+    samples: probing.samples(start, size, params.points),
+    clearance: roundMillimetres(params.clearance),
   }
 }
 

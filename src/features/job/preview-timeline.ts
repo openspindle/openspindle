@@ -5,7 +5,7 @@ import type { GCodeProgram, GCodeSegment } from "@/domain/nc/gcode"
 import type { FixtureKit } from "@/domain/fixtures/fixture-kit"
 import type { Operation } from "@/domain/operations/operation"
 import type { ProbeTool } from "@/domain/probing/probe"
-import { getProbingPreview } from "@/domain/probing/registration"
+import { getProbingPreview } from "@/domain/probing/preview"
 import { positionLabel } from "./job-view"
 
 export type PreviewStep = {
@@ -136,13 +136,13 @@ function timelineOf(
     const step = steps.length + 1
     const grid = grids.get(line)
     if (grid) {
-      for (let point = 0; point < grid.pointCount; point++)
+      for (let point = 0; point < grid.samples.length; point++)
         steps.push({ line, segmentEnd, probePoint: point })
       ticks.push({
         step,
         line,
         kind: "probe",
-        label: `Probe grid · ${grid.pointCount} points`,
+        label: `Probe grid · ${grid.samples.length} points`,
       })
     } else steps.push({ line, segmentEnd })
     for (const item of marks.get(line) ?? [])
