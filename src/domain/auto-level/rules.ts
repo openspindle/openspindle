@@ -12,9 +12,10 @@ import type { AnchorConfiguration } from "@/machine/contract"
 import { autoLevelError, autoLevelWarning } from "./issues"
 import type { AutoLevelIssue } from "./issues"
 import { EPSILON, formatMillimetres } from "../geometry/millimetres"
-import { rectAt } from "../geometry/rect"
-import { autoLevelParamsSchema } from "./params"
-import type { AutoLevelGridParameters, AutoLevelParams } from "./params"
+import { boxRect, contains, rectAt } from "../geometry/rect"
+import { AutoLevelParamsSchema } from "./params"
+import type { AutoLevelParameters, AutoLevelParams } from "./params"
+import { rangedSchema } from "../probing/parameters"
 import { resolvePlacement } from "../probing/placement"
 import type {
   PlacementContext,
@@ -51,7 +52,7 @@ export type AutoLevelPlan = Checked<{
 export function planAutoLevel(
   params: AutoLevelParams,
   plate: PlacementContext,
-  parameters: AutoLevelGridParameters
+  parameters: AutoLevelParameters
 ): AutoLevelPlan {
   const checked = checkParams(params, parameters)
   if (!checked.ok) return checked
@@ -64,7 +65,7 @@ export function planAutoLevel(
 export function validateAutoLevel(
   params: AutoLevelParams,
   plate: AutoLevelPlateContext,
-  parameters: AutoLevelGridParameters
+  parameters: AutoLevelParameters
 ): AutoLevelIssue[] {
   const checked = checkParams(params, parameters)
   if (!checked.ok) return checked.issues
@@ -156,9 +157,11 @@ export function autoLevelRunIssues(
 
 function checkParams(
   params: AutoLevelParams,
-  parameters: AutoLevelGridParameters
+  parameters: AutoLevelParameters
 ): Checked<{ params: AutoLevelParams }> {
-  const parsed = autoLevelParamsSchema(parameters).safeParse(params)
+  const parsed = rangedSchema(AutoLevelParamsSchema, parameters).safeParse(
+    params
+  )
   if (!parsed.success)
     return {
       ok: false,
@@ -176,7 +179,7 @@ function resolveStart(
   const resolved = resolvePlacement(
     params.placement,
     plate,
-    rectAt([0, 0], [params.width, params.depth])
+    rectAt([0, 0], params.size)
   )
   if (!resolved.ok)
     return { ok: false, issues: [PLACEMENT_ISSUES[resolved.error]] }
@@ -199,7 +202,7 @@ function gridArea(
   return {
     kind: "area",
     min: [x, y, top],
-    max: [x + params.width, y + params.depth, top],
+    max: [x + params.size[0], y + params.size[1], top],
   }
 }
 
@@ -219,23 +222,21 @@ function stockIssues(
   const [stockX, stockY, stockZ] = plate.stockAnchor
   const grid = gridArea(params, plate, stockZ + stock.height, start)
   const places = grid ? { places: [grid] } : {}
-  if (
-    params.width > stock.width + EPSILON ||
-    params.depth > stock.depth + EPSILON
-  )
+  const [width, depth] = params.size
+  if (width > stock.width + EPSILON || depth > stock.depth + EPSILON)
     return [
       autoLevelError(
         "grid-exceeds-stock",
-        `The ${formatMillimetres(params.width)} × ${formatMillimetres(params.depth)} mm probe grid is larger than the ${formatMillimetres(stock.width)} × ${formatMillimetres(stock.depth)} mm stock.`,
+        `The ${formatMillimetres(width)} × ${formatMillimetres(depth)} mm probe grid is larger than the ${formatMillimetres(stock.width)} × ${formatMillimetres(stock.depth)} mm stock.`,
         places
       ),
     ]
   if (
     !grid ||
-    (grid.min[0] >= stockX - EPSILON &&
-      grid.min[1] >= stockY - EPSILON &&
-      grid.max[0] <= stockX + stock.width + EPSILON &&
-      grid.max[1] <= stockY + stock.depth + EPSILON)
+    contains(
+      rectAt([stockX, stockY], [stock.width, stock.depth]),
+      boxRect(grid)
+    )
   )
     return []
   return [

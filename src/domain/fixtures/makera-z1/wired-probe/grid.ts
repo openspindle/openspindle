@@ -1,14 +1,10 @@
 import { formatMillimetres } from "../../../geometry/millimetres"
-import type {
-  AutoLevelGridField,
-  AutoLevelGridParameters,
-  AutoLevelParams,
-} from "../../../auto-level/params"
+import type { AutoLevelParameters } from "../../../auto-level/params"
 import type { ProbeGrid, ProbePoint } from "../../../auto-level/probe-grid"
 import type { XY } from "../../../geometry/frame"
 import type { AnchorStart } from "../../../probing/placement"
 import { COORDINATE_LIMIT } from "../../../primitives"
-import type { GridProbing, GridShape } from "../../../probing/probe"
+import type { GridPlan, GridProbing, GridShape } from "../../../probing/probe"
 import { readNcBlock } from "@/machine/contract"
 import { MAX_PROGRAM_LINES } from "@/domain/nc/gcode"
 import type { GCodeProgram } from "@/domain/nc/gcode"
@@ -16,34 +12,50 @@ import { isAnchorXY } from "@/domain/anchors/stored-anchors"
 import { FIRMWARE_ROUTINE, GRID, probeFields } from "./blocks"
 import { CLEARANCE_Z } from "./travel"
 
-type GridWord = (field: AutoLevelGridField) => string
-
 /**
  * The grid bounds (those of the retired makera-wired-probe plugin). They are application
  * limits, not a clearance check; the included firmware configuration allows at most 15 × 15
  * points.
  */
-const GRID_PARAMETERS: AutoLevelGridParameters = {
-  width: {
-    label: "Width",
-    axis: "X",
-    unit: "mm",
-    default: 50,
-    min: 1,
-    max: 200,
-    step: 0.1,
-  },
-  depth: {
-    label: "Depth",
-    axis: "Y",
-    unit: "mm",
-    default: 50,
-    min: 1,
-    max: 200,
-    step: 0.1,
-  },
-  columns: { label: "X probe points", default: 5, min: 2, max: 15, step: 1 },
-  rows: { label: "Y probe points", default: 5, min: 2, max: 15, step: 1 },
+const GRID_PARAMETERS: AutoLevelParameters = {
+  size: [
+    {
+      label: "Width",
+      axis: "X",
+      unit: "mm",
+      default: 50,
+      min: 1,
+      max: 200,
+      step: 0.1,
+    },
+    {
+      label: "Depth",
+      axis: "Y",
+      unit: "mm",
+      default: 50,
+      min: 1,
+      max: 200,
+      step: 0.1,
+    },
+  ],
+  points: [
+    {
+      label: "X probe points",
+      default: 5,
+      min: 2,
+      max: 15,
+      step: 1,
+      integer: true,
+    },
+    {
+      label: "Y probe points",
+      default: 5,
+      min: 2,
+      max: 15,
+      step: 1,
+      integer: true,
+    },
+  ],
   clearance: {
     label: "Clearance height",
     axis: "Z",
@@ -111,8 +123,9 @@ function anchorTravel({ anchor, source, machine }: AnchorStart): string[] {
 }
 
 /** R1: the grid from where the probe is, the probe position or the G53 target (X0 Y0). */
-function probeBlock(word: GridWord): string {
-  return `G32 R1 X0 Y0 A${word("width")} B${word("depth")} I${word("columns")} J${word("rows")} H${word("clearance")}`
+function probeBlock({ size, points, clearance }: GridPlan["params"]): string {
+  const mm = formatMillimetres
+  return `G32 R1 X0 Y0 A${mm(size[0])} B${mm(size[1])} I${points[0]} J${points[1]} H${mm(clearance)}`
 }
 
 /**
@@ -121,11 +134,11 @@ function probeBlock(word: GridWord): string {
  * and height. The firmware prints its values with three decimals, as these are.
  */
 function firmwareBlock(
-  size: Pick<AutoLevelParams, AutoLevelGridField>,
+  { size, points, clearance }: GridPlan["params"],
   [x, y]: XY<"work">
 ): string {
   const mm = (value: number) => String(Number(value.toFixed(3)) + 0)
-  return `M495 X${mm(x)} Y${mm(y)} A${mm(size.width)} B${mm(size.depth)} I${size.columns} J${size.rows} H${mm(size.clearance)}`
+  return `M495 X${mm(x)} Y${mm(y)} A${mm(size[0])} B${mm(size[1])} I${points[0]} J${points[1]} H${mm(clearance)}`
 }
 
 /**
@@ -287,8 +300,7 @@ function g32Grids(program: GCodeProgram): ProbeGrid[] {
 export const G32_GRID: GridProbing = {
   parameters: GRID_PARAMETERS,
   samples: gridSamples,
-  program(size, start, reviewAfterProbe) {
-    const word: GridWord = (field) => formatMillimetres(size[field])
+  program({ params, start }) {
     // In work coordinates the firmware's own auto-leveling can run it, reporting as it goes.
     const work = start.kind === "anchor" ? start.work : null
     let lines: string[]
@@ -299,7 +311,7 @@ export const G32_GRID: GridProbing = {
         ...PRECAUTIONS,
         ...PROBE_SETUP,
         GRID_FROM_PROBE,
-        probeBlock(word),
+        probeBlock(params),
       ]
     else if (work)
       lines = [
@@ -307,7 +319,7 @@ export const G32_GRID: GridProbing = {
         ...PRECAUTIONS,
         ...FIRMWARE_PROBE_SETUP,
         ...anchorTravel(start),
-        firmwareBlock(size, work),
+        firmwareBlock(params, work),
       ]
     else
       lines = [
@@ -315,13 +327,13 @@ export const G32_GRID: GridProbing = {
         ...PRECAUTIONS,
         ...PROBE_SETUP,
         ...anchorTravel(start),
-        probeBlock(word),
+        probeBlock(params),
       ]
     const probeLine = lines.length
-    if (reviewAfterProbe) lines.push(...REVIEW_PAUSE)
-    const reviewPauseLine = reviewAfterProbe ? lines.length : null
+    if (params.reviewAfterProbe) lines.push(...REVIEW_PAUSE)
+    const reviewLine = params.reviewAfterProbe ? lines.length : null
     lines.push(...CONCLUSION)
-    return { nc: `${lines.join("\n")}\n`, probeLine, reviewPauseLine }
+    return { nc: `${lines.join("\n")}\n`, probeLine, reviewLine }
   },
   grids: g32Grids,
 }

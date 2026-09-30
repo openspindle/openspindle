@@ -1,48 +1,41 @@
-import type { GridProbing } from "../probing/probe"
+import type { GridPlan, GridProbing, ProbeProgram } from "../probing/probe"
 import { roundMillimetres } from "../geometry/millimetres"
-import type { AutoLevelGridField, AutoLevelParams } from "./params"
+import type { AutoLevelParams } from "./params"
 import type { ProbeGrid, ProbePoint } from "./probe-grid"
 import { planAutoLevel } from "./rules"
 import type { AutoLevelIssue } from "./issues"
-import type { PlacementContext, ProbeStart } from "../probing/placement"
+import type { PlacementContext } from "../probing/placement"
 
-export type AutoLevelProgram = {
-  /** Newline-terminated NC from the machine's probe. */
-  nc: string
+/** The NC from the machine's probe, and the grid it probes. */
+export type AutoLevelProgram = ProbeProgram & {
   /** Planned samples for the viewer; `sourceLine` is the probing line in `nc`. */
-  grid: ProbeGrid
-  /** One-based line of the review pause in `nc`; null when the job does not pause for review. */
-  reviewPauseLine: number | null
+  readonly grid: ProbeGrid
 }
 
 export type AutoLevelGeneration =
   | { ok: true; program: AutoLevelProgram }
   | { ok: false; issues: AutoLevelIssue[] }
 
-type GridSize = Pick<AutoLevelParams, AutoLevelGridField>
-
 /**
  * Renders an already planned program with the machine's probe; generateAutoLevelNc validates
  * its parameters first.
  */
 export function renderAutoLevelProgram(
-  size: GridSize,
-  start: ProbeStart,
-  reviewAfterProbe: boolean,
+  plan: GridPlan,
   probing: GridProbing
 ): AutoLevelProgram {
-  const text = probing.program(size, start, reviewAfterProbe)
+  const { params, start } = plan
+  const program = probing.program(plan)
   // The grid holds the values the NC words carry, as the firmware and the NC preview read them.
   const [x, y] = start.kind === "anchor" ? start.machine : [0, 0]
   const origin: ProbePoint = [roundMillimetres(x), roundMillimetres(y)]
-  const width = roundMillimetres(size.width)
-  const depth = roundMillimetres(size.depth)
-  const { columns, rows } = size
+  const width = roundMillimetres(params.size[0])
+  const depth = roundMillimetres(params.size[1])
+  const [columns, rows] = params.points
   return {
-    nc: text.nc,
-    reviewPauseLine: text.reviewPauseLine,
+    ...program,
     grid: {
-      sourceLine: text.probeLine,
+      sourceLine: program.probeLine,
       start: origin,
       width,
       depth,
@@ -50,7 +43,7 @@ export function renderAutoLevelProgram(
       rows,
       pointCount: columns * rows,
       points: probing.samples({ start: origin, width, depth, columns, rows }),
-      clearanceMm: roundMillimetres(size.clearance),
+      clearanceMm: roundMillimetres(params.clearance),
       coordinateMode:
         start.kind === "anchor" ? "machine" : "relative-to-probe-start",
     },
@@ -68,9 +61,7 @@ export function generateAutoLevelNc(
   return {
     ok: true,
     program: renderAutoLevelProgram(
-      plan.params,
-      plan.start,
-      plan.params.reviewAfterProbe,
+      { params: plan.params, start: plan.start },
       probing
     ),
   }
