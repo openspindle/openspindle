@@ -14,10 +14,11 @@ export type JsonObject = { [key: string]: JsonValue }
 
 /**
  * A tool record's version. Version 2 records (without the shaft, photo, vendor description,
- * grade, the geometry, preset and holder fields version 3 added) and version 3 records
- * (without the 3D model) are upgraded when read (src/formats/tool-library/upgrade.ts).
+ * grade, the geometry, preset and holder fields version 3 added), version 3 records (without
+ * the 3D model) and version 4 records (without the probe profile) are upgraded when read
+ * (src/formats/tool-library/upgrade.ts).
  */
-export const TOOL_SCHEMA_VERSION = 4
+export const TOOL_SCHEMA_VERSION = 5
 
 /** The most tools a library may hold; src/formats/tool-library adds its own file size limits. */
 export const TOOL_COUNT_LIMIT = 10_000
@@ -245,6 +246,18 @@ const ModelSchema = z
   )
   .nullable()
 
+/** What a probe senses and carries, which decides the probing it can do. */
+export const ProbeProfileSchema = z.object(
+  {
+    /** What the stylus senses: touches along Z only, or in X, Y and Z (a 3D touch probe). */
+    touch: z.enum(["z", "xyz"], "must be z or xyz."),
+    /** Whether it carries a laser pointer, which traces without touching. */
+    pointer: z.boolean("must be true or false."),
+  },
+  "must be an object or unknown."
+)
+export type ProbeProfile = z.infer<typeof ProbeProfileSchema>
+
 /**
  * The record a tool was imported from, kept as provenance in its original units: the app
  * reads nothing from it but the upgrade of tools stored by earlier versions. Never evaluate
@@ -275,6 +288,8 @@ export const ToolShapeSchema = z.object(
     kind: RequiredText,
     diameter: measure(1000, 0.000001),
     flutes: count(100, 1),
+    /** A probe's profile, which only a probe may have; null for a probe of unknown profile. */
+    probe: ProbeProfileSchema.nullable(),
     vendor: OptionalText,
     productId: OptionalText,
     productLink: OptionalText,
@@ -339,15 +354,40 @@ function checkGeometry(
   if (exceeds(geometry.threadPitchMin, geometry.threadPitchMax))
     report("threadPitchMin", "exceeds threadPitchMax.")
 }
+/** Only a probe has a probe profile; a probe may lack one. */
+function checkProbe(
+  tool: { kind: string; probe: ProbeProfile | null },
+  context: z.RefinementCtx
+) {
+  if (tool.probe !== null && !isProbeKind(tool.kind))
+    context.addIssue({
+      code: "custom",
+      path: ["probe"],
+      message: "must be unknown unless the tool is a probe.",
+    })
+}
+/** The physical rules: consistent dimensions, and a probe profile only on a probe. */
+function checkPhysics(
+  tool: {
+    kind: string
+    diameter: number | null
+    geometry: ToolGeometry
+    probe: ProbeProfile | null
+  },
+  context: z.RefinementCtx
+) {
+  checkGeometry(tool, context)
+  checkProbe(tool, context)
+}
 /** Physical rules only judge a structurally valid tool. */
 const PHYSICAL_RULES = {
   when: (payload: { issues: readonly unknown[] }) =>
     payload.issues.length === 0,
 }
 
-/** A tool with every rule a saved tool must meet: structure, limits and geometry. */
+/** A tool with every rule a saved tool must meet: structure, limits, geometry and profile. */
 export const ToolSchema = ToolShapeSchema.superRefine(
-  checkGeometry,
+  checkPhysics,
   PHYSICAL_RULES
 )
 export type Tool = z.infer<typeof ToolSchema>
@@ -355,7 +395,7 @@ export type Tool = z.infer<typeof ToolSchema>
 /** The editable part of a tool: everything but its read-only import source. */
 export const ToolDraftSchema = ToolShapeSchema.omit({
   source: true,
-}).superRefine(checkGeometry, PHYSICAL_RULES)
+}).superRefine(checkPhysics, PHYSICAL_RULES)
 export type ToolDraft = z.infer<typeof ToolDraftSchema>
 
 export function toToolDraft({ source: _source, ...draft }: Tool): ToolDraft {
@@ -392,6 +432,24 @@ export const toolKindKey = (kind: string) =>
     .toLowerCase()
     .replace(/[-_\s]+/g, " ")
     .trim()
+
+/** Whether a tool type is the probe's, compared loosely ({@link toolKindKey}). */
+const isProbeKind = (kind: string) => toolKindKey(kind) === "probe"
+
+/**
+ * The profile a tool of a type starts with: a probe touches along Z only and carries no
+ * pointer, which any touch probe can do; any other tool has none.
+ */
+export function defaultProbeProfile(kind: string): ProbeProfile | null {
+  return isProbeKind(kind) ? { touch: "z", pointer: false } : null
+}
+
+/** A probe's profile; null for any other tool, and for a probe of unknown profile. */
+export function probeProfile(
+  tool: Pick<ToolDraft, "kind" | "probe">
+): ProbeProfile | null {
+  return isProbeKind(tool.kind) ? tool.probe : null
+}
 
 /** Structural problems if there are any, otherwise physical inconsistencies. */
 export function validateTool(value: unknown): string[] {
@@ -457,6 +515,7 @@ export function createTool(existing: readonly Tool[] = []): Tool {
     kind: "flat end mill",
     diameter: null,
     flutes: null,
+    probe: null,
     vendor: null,
     productId: null,
     productLink: null,

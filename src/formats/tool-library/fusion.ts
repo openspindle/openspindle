@@ -3,6 +3,7 @@ import {
   clone,
   createPreset,
   createTool,
+  defaultProbeProfile,
   isJson,
   issueMessages,
   record,
@@ -169,6 +170,8 @@ export function fusionTool(
   const tool = createTool()
   tool.id = optionalText(raw.guid, "guid") ?? `imported-tool-${index + 1}`
   tool.kind = raw.type
+  // Fusion does not say what a probe senses: it gets the profile any probe starts with.
+  tool.probe = defaultProbeProfile(raw.type)
   tool.name =
     optionalText(raw.description, "description") ??
     optionalText(raw["product-id"], "product-id") ??

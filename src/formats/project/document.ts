@@ -97,7 +97,7 @@ function hasValidModel(tool: Tool): boolean {
   }
 }
 
-/** Tools saved by earlier versions (version 2 and 3 records) are brought up to date. */
+/** Tools saved by earlier versions (version 2 to 4 records) are brought up to date. */
 const ToolSchema = z.preprocess(
   upgradeTool,
   z

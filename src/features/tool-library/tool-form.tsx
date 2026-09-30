@@ -8,6 +8,7 @@ import {
 import { Field, FieldError, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
+import { Hint } from "@/components/workspace/hint"
 import { MeasurementInput } from "@/components/workspace/measurement-input"
 import { toMicrometre } from "@/domain/primitives"
 import { ToolDraftSchema } from "@/domain/tools/tool"
@@ -30,14 +31,16 @@ function fieldErrors(errors: readonly unknown[]) {
   })
 }
 
-/** Label, control and validation message of the field in context. */
+/** Label, explained by `hint`, control and validation message of the field in context. */
 function FieldFrame({
   label,
+  hint,
   controlId,
   wide = false,
   children,
 }: {
   label: string
+  hint?: string
   controlId: string
   wide?: boolean
   children: ReactNode
@@ -48,7 +51,9 @@ function FieldFrame({
       className={wide ? "col-span-full" : undefined}
       data-invalid={!field.state.meta.isValid}
     >
-      <FieldLabel htmlFor={controlId}>{label}</FieldLabel>
+      <FieldLabel htmlFor={controlId}>
+        <Hint text={hint}>{label}</Hint>
+      </FieldLabel>
       {children}
       <FieldError errors={fieldErrors(field.state.meta.errors)} />
     </Field>
@@ -175,30 +180,36 @@ export interface Choice<T extends string | boolean> {
 }
 const UNSPECIFIED = { value: "", label: "Unspecified" }
 
-/** One of a few values, or unspecified (null). */
+/** One of a few values, or unspecified (null) unless the choice is required. */
 function ChoiceField<T extends string | boolean>({
   label,
+  hint,
   choices,
+  required = false,
 }: {
   label: string
+  hint?: string
   choices: readonly Choice<T>[]
+  /** A required choice is never null, so it offers no Unspecified. */
+  required?: boolean
 }) {
   const field = useFieldContext<T | null>()
   const id = useId()
   const options = [
-    UNSPECIFIED,
+    ...(required ? [] : [UNSPECIFIED]),
     ...choices.map((choice) => ({
       value: String(choice.value),
       label: choice.label,
     })),
   ]
   return (
-    <FieldFrame label={label} controlId={id}>
+    <FieldFrame label={label} hint={hint} controlId={id}>
       <OptionSelect
         id={id}
         className="w-full"
         options={options}
         value={field.state.value === null ? "" : String(field.state.value)}
+        aria-description={hint}
         aria-invalid={!field.state.meta.isValid}
         onBlur={field.handleBlur}
         onValueChange={(next) =>
