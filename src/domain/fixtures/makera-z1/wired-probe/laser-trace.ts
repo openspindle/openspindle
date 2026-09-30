@@ -71,6 +71,6 @@ export const LASER_TRACE: OutlineTrace = {
       ...(pauseAfterScan ? PAUSE : []),
       "M2",
     ]
-    return { nc: `${lines.join("\n")}\n`, probeLine: null, reviewLine: null }
+    return { nc: `${lines.join("\n")}\n`, reviewLine: null }
   },
 }

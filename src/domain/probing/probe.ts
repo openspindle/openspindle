@@ -7,19 +7,16 @@ import type {
   AutoZHeightSpecs,
   AutoZHeightParams,
 } from "../auto-z-height/params"
-import type { Frame, Vec2, XY } from "../geometry/frame"
 import type { Rect } from "../geometry/rect"
 import type { Probe3dSpecs, Probe3dParams } from "../probe-3d/params"
 import type { ParameterSpecs } from "./parameters"
 import type { ProbeStart } from "./placement"
 import type { ProbeGrid, ProbeTouch } from "./preview"
 
-/** A probing operation's NC as a machine's probe writes it, and the lines a job needs to know. */
+/** A probing operation's NC as a machine's probe writes it, and where a job pauses in it. */
 export type ProbeProgram = {
   /** Newline-terminated NC. */
   readonly nc: string
-  /** One-based line of the block that probes, which reports what it measures; null for none. */
-  readonly probeLine: number | null
   /** One-based line of the pause to review what was measured; null when the job does not pause. */
   readonly reviewLine: number | null
 }
@@ -52,15 +49,6 @@ export type GridPlan = ProbingPlan<Omit<AutoLevelParams, "placement">>
 /** How a machine probes a height grid, which auto-level compensates with. */
 export interface GridProbing extends Capability<GridPlan, AutoLevelSpecs> {
   /**
-   * The samples of a grid from its first one, `size` from it (negative runs back along an axis)
-   * with `points` along each axis, both edges included, in the order the firmware visits them.
-   */
-  samples: <TFrame extends Frame>(
-    start: XY<TFrame>,
-    size: Vec2,
-    points: Vec2
-  ) => XY<TFrame>[]
-  /**
    * The grids a program probes, as this machine's NC writes them: previews of any file, from
    * where the probe starts or in machine coordinates.
    */
@@ -69,7 +57,7 @@ export interface GridProbing extends Capability<GridPlan, AutoLevelSpecs> {
 
 /**
  * How a machine touches off the stock top below a plan's start and sets work Z0 there. Its
- * program's probe line is the first touch; it never pauses for a review.
+ * program never pauses for a review.
  */
 export interface TouchOff extends Capability<
   ProbingPlan<Pick<AutoZHeightParams, AutoZHeightField>>,
@@ -96,7 +84,7 @@ export type TracePlan = {
 
 /**
  * How a machine traces an outline with a pointer, such as its probe's laser. Its program neither
- * probes nor reviews a measurement, so it has no probing or review line.
+ * probes nor reviews a measurement, so it has no review line.
  */
 export type OutlineTrace = Capability<TracePlan, AutoScanSpecs>
 

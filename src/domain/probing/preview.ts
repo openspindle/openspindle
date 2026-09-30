@@ -37,7 +37,7 @@ export type ProbeGrid<TFrame extends PreviewFrame = PreviewFrame> = {
     readonly size: Vec2
     /** Its samples along each axis, both edges included. */
     readonly points: Vec2
-    /** In the order the machine's probe visits them (`GridProbing.samples`). */
+    /** In the order the machine's probe visits them. */
     readonly samples: readonly XY<TKey>[]
     /**
      * How high above its first touch the probe moves between samples (the firmware's H); null

@@ -176,8 +176,7 @@ export const M480_ROUTINES: OriginProbing = {
           ]),
       routineBlock(params, subcode),
     ]
-    const probeLine = lines.length
     lines.push("M2")
-    return { nc: `${lines.join("\n")}\n`, probeLine, reviewLine: null }
+    return { nc: `${lines.join("\n")}\n`, reviewLine: null }
   },
 }

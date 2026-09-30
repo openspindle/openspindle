@@ -11,7 +11,7 @@ import type {
 } from "../../firmware/firmware-model"
 import { PROBE_TOOL } from "../../tools/tool-table"
 import { ORIGIN_ROUTINE, distanceSigns, routineOf } from "./3d-probe/blocks"
-import { G32_GRID } from "./wired-probe/grid"
+import { gridSamples } from "./wired-probe/grid"
 import { CLEARANCE_Z } from "./wired-probe/travel"
 
 /**
@@ -600,7 +600,7 @@ class Z1Preview implements GCodeFirmware {
       moves.z(height, { ...style(probePoint), feed: back })
     }
     probeAt(0)
-    G32_GRID.samples(start, [width, depth], [columns, rows]).forEach(
+    gridSamples(start, [width, depth], [columns, rows]).forEach(
       (sample, index) => {
         moves.xy(sample, { ...style(index), feed: travel })
         probeAt(index)
