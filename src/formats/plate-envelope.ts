@@ -8,6 +8,7 @@ import {
 } from "@/domain/plate/plate"
 import { OperationSchema } from "@/domain/operations/operation"
 import { adler32, decodeBase64Json, encodeBase64Json } from "./base64-json"
+import { isJsonObject } from "./upgrade/json"
 import { upgradeOperations } from "./upgrade/operations"
 
 /** Setup and editable operations embedded as leading comments of an exported NC file. */
@@ -38,7 +39,8 @@ export const OLDEST_PLATE_ENVELOPE_VERSION = 4
  * is left for reading to leave out and report, rather than rewritten field by field.
  */
 export function upgradeEnvelopePayload(payload: unknown): unknown {
-  const exported = payload as Record<string, unknown>
+  if (!isJsonObject(payload)) return payload
+  const exported = payload
   return {
     ...exported,
     schemaVersion: PLATE_ENVELOPE_VERSION,

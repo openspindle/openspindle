@@ -28,11 +28,19 @@ export type ParameterSpecs<TField extends string = string> = Readonly<
   Record<TField, ParameterSpec | PairSpec>
 >
 
+/** The fields of an operation's parameters a probe can give a range: numbers and pairs of them. */
+export type NumericField<TParams> = {
+  [TKey in keyof TParams]: TParams[TKey] extends
+    number | readonly [number, number]
+    ? TKey
+    : never
+}[keyof TParams]
+
 /**
  * The specs of an operation's numeric parameters `TField`: one for a number, a pair for a value
  * per axis.
  */
-export type SpecsOf<TParams, TField extends keyof TParams> = {
+export type SpecsOf<TParams, TField extends NumericField<TParams>> = {
   readonly [TKey in TField]: TParams[TKey] extends readonly [number, number]
     ? PairSpec
     : ParameterSpec
@@ -69,16 +77,17 @@ const schemas = new WeakMap<ParameterSpecs, WeakMap<z.ZodObject, z.ZodType>>()
  * An operation's stored parameters within the ranges of a machine's probe, as its form and its NC
  * take them: the stored schema with each of `specs`' fields held to its range.
  */
-export function rangedSchema<TParams>(
+export function rangedSchema<TParams, TField extends NumericField<TParams>>(
   stored: z.ZodObject & z.ZodType<TParams, TParams>,
-  specs: ParameterSpecs
+  specs: SpecsOf<TParams, TField>
 ): z.ZodType<TParams, TParams> {
   let bySchema = schemas.get(specs)
   if (!bySchema) schemas.set(specs, (bySchema = new WeakMap()))
   const cached = bySchema.get(stored)
   if (cached) return cached as z.ZodType<TParams, TParams>
+  const fields: ParameterSpecs = specs
   const shape = Object.fromEntries(
-    Object.entries(specs).map(([field, spec]) => [field, fieldSchema(spec)])
+    Object.entries(fields).map(([field, spec]) => [field, fieldSchema(spec)])
   )
   const schema = stored.extend(shape) as z.ZodType as z.ZodType<
     TParams,
