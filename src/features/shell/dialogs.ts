@@ -2,6 +2,7 @@ import { createAtom, useSelector } from "@tanstack/react-store"
 import type { ImportPlan } from "@/app/workspace/import-plan"
 import type { PluginSourceRef } from "@/features/plugins/plugin-sources"
 import type { ProjectCandidate } from "@/features/project/use-project"
+import type { SettingsSection } from "@/features/settings/settings-dialog"
 
 /** Every dialog of the workspace. One is open at a time; the dialog host renders it. */
 export type WorkspaceDialog =
@@ -40,6 +41,8 @@ export type WorkspaceDialog =
   | { readonly kind: "open-project"; readonly candidate: ProjectCandidate }
   /** What opening a project converted or left out, and plugins it needs that are not installed. */
   | { readonly kind: "project-report"; readonly report: ProjectCandidate }
+  /** The app's settings: General (appearance) and Privacy (logging and error reports). */
+  | { readonly kind: "settings"; readonly section?: SettingsSection }
   /** The project's settings, such as its design rules. */
   | { readonly kind: "workspace-settings" }
   /** The machine's G-code, code by code; closing it goes back to the dialog it opened from. */

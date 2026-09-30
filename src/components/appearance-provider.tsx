@@ -14,24 +14,44 @@ import {
   isAppearance,
   readAppearance,
 } from "@/lib/appearance"
+import type { FontId, FontRole, Fonts } from "@/lib/fonts"
+import {
+  DEFAULT_FONTS,
+  FONT_STORAGE_KEYS,
+  applyFonts,
+  isFontFor,
+  readFonts,
+} from "@/lib/fonts"
 
 const AppearanceContext = createContext<{
   appearance: Appearance
   setAppearance: (appearance: Appearance) => void
+  fonts: Fonts
+  setFont: (role: FontRole, font: FontId) => void
   saveError: string | null
 } | null>(null)
 
+const SAVED_KEYS = new Set([
+  APPEARANCE_STORAGE_KEY,
+  FONT_STORAGE_KEYS.sans,
+  FONT_STORAGE_KEYS.mono,
+])
+
 export function AppearanceProvider({ children }: { children: ReactNode }) {
   const [appearance, setPreference] = useState<Appearance | null>(null)
+  const [fonts, setFonts] = useState<Fonts>(DEFAULT_FONTS)
   const [saveError, setSaveError] = useState<string | null>(null)
 
   useEffect(() => {
     const syncPreference = () => {
       setPreference(readAppearance())
+      const saved = readFonts()
+      setFonts(saved)
+      applyFonts(saved)
       setSaveError(null)
     }
     const onStorage = (event: StorageEvent) => {
-      if (event.key === APPEARANCE_STORAGE_KEY || event.key === null) {
+      if (event.key === null || SAVED_KEYS.has(event.key)) {
         syncPreference()
       }
     }
@@ -63,9 +83,31 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  const setFont = useCallback(
+    (role: FontRole, font: FontId) => {
+      if (!isFontFor(role, font)) return
+      const next = { ...fonts, [role]: font }
+      setFonts(next)
+      applyFonts(next)
+      try {
+        localStorage.setItem(FONT_STORAGE_KEYS[role], font)
+        setSaveError(null)
+      } catch {
+        setSaveError("This font is applied, but could not be saved. Try again.")
+      }
+    },
+    [fonts]
+  )
+
   return (
     <AppearanceContext.Provider
-      value={{ appearance: appearance ?? "system", setAppearance, saveError }}
+      value={{
+        appearance: appearance ?? "system",
+        setAppearance,
+        fonts,
+        setFont,
+        saveError,
+      }}
     >
       {children}
     </AppearanceContext.Provider>

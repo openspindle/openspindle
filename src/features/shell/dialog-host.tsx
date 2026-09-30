@@ -16,6 +16,7 @@ import {
   ProjectReportDialog,
 } from "@/features/project/project-dialogs"
 import { StockDialog } from "@/features/prepare/stock/stock-dialog"
+import { SettingsDialog } from "@/features/settings/settings-dialog"
 import { WorkspaceToolLibrary } from "@/features/tool-library"
 import { WorkspaceSettingsDialog } from "@/features/workspace-settings/workspace-settings-dialog"
 import { AppDialog } from "./app-dialog"
@@ -74,6 +75,8 @@ function OpenDialog({ dialog }: { dialog: WorkspaceDialog }) {
       return <OpenProjectDialog candidate={dialog.candidate} />
     case "project-report":
       return <ProjectReportDialog report={dialog.report} />
+    case "settings":
+      return <SettingsDialog section={dialog.section} onClose={closeDialog} />
     case "workspace-settings":
       return <WorkspaceSettingsDialog onClose={closeDialog} />
     case "import":

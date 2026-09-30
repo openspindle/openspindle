@@ -31,7 +31,7 @@ function RootLayout() {
   useMachineSync()
   usePluginSync()
   useUnsavedChanges()
-  // Menu commands and their dialogs work on every page, Settings included.
+  // Menu commands and their dialogs work on every page.
   useWorkspaceMenu()
   useCloseOrphanedDialog()
   useSaveErrors()

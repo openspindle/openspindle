@@ -1,12 +1,16 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
+/* The fonts Settings offers (src/lib/fonts.ts). */
 @import "@fontsource-variable/space-grotesk";
-/* Latin only: numbers and G-code need no more, and the plugin frame inlines every face. */
+@import "@fontsource-variable/roboto";
+@import "@fontsource-variable/ibm-plex-sans";
+@import "@fontsource-variable/jetbrains-mono";
+/* Latin only: numbers and G-code need no more. */
 @import "@fontsource/space-mono/latin-400.css";
 @import "./theme.css";
 
-/* Space Mono's digits, signs and separators alone: numbers in it keep Space Grotesk's words. */
+/* The mono fonts' digits, signs and separators alone: numbers in them keep the display font's words. */
 @font-face {
   font-family: "Space Mono Numerals";
   font-style: normal;
@@ -14,6 +18,15 @@
   font-weight: 400;
   src: url("@fontsource/space-mono/files/space-mono-latin-400-normal.woff2")
     format("woff2");
+  unicode-range: U+002B-002E, U+0030-003A, U+2212;
+}
+@font-face {
+  font-family: "JetBrains Mono Numerals";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 800;
+  src: url("@fontsource-variable/jetbrains-mono/files/jetbrains-mono-latin-wght-normal.woff2")
+    format("woff2-variations");
   unicode-range: U+002B-002E, U+0030-003A, U+2212;
 }
 

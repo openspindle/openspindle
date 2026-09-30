@@ -28,8 +28,8 @@ import {
   viewErrorMessage,
 } from "@/components/plugin-view-boundary"
 import { applyAppearance } from "@/lib/appearance"
+import { applyFonts, fontFor } from "@/lib/fonts"
 import { FRAME_CONNECT_MESSAGE, FRAME_READY_MESSAGE } from "./frame-policy"
-import "@/styles.css"
 
 /*
  * The plugin frame runtime: a classic script in a sandboxed, opaque-origin frame. It
@@ -109,10 +109,13 @@ function injectStyles(styles: string) {
   document.head.append(element)
 }
 
-/** Follows the app's light or dark appearance. */
+/** Follows the app's light or dark appearance and its fonts. */
 function Appearance() {
-  const { theme } = useViewContext()
+  const { theme, fonts } = useViewContext()
   useEffect(() => applyAppearance(theme, false), [theme])
+  const sans = fontFor("sans", fonts.sans)
+  const mono = fontFor("mono", fonts.mono)
+  useEffect(() => applyFonts({ sans, mono }), [sans, mono])
   return null
 }
 

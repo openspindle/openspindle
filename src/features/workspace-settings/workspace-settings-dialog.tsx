@@ -1,3 +1,4 @@
+import { useRef } from "react"
 import type { CSSProperties } from "react"
 import { ShieldCheck } from "lucide-react"
 import {
@@ -24,6 +25,7 @@ import { DesignRulesSettings } from "./design-rules-settings"
  * far. A page applies its changes on Save.
  */
 export function WorkspaceSettingsDialog({ onClose }: { onClose: () => void }) {
+  const page = useRef<HTMLElement>(null)
   return (
     <Dialog
       open
@@ -31,7 +33,11 @@ export function WorkspaceSettingsDialog({ onClose }: { onClose: () => void }) {
         if (!open) onClose()
       }}
     >
-      <DialogContent className="h-[min(560px,85vh)] gap-0 overflow-hidden p-0 sm:max-w-3xl">
+      {/* Opening focuses the page, not the sidebar's first item, which would show its focus ring. */}
+      <DialogContent
+        initialFocus={page}
+        className="h-[min(560px,85vh)] gap-0 overflow-hidden p-0 sm:max-w-3xl"
+      >
         <SidebarProvider
           className="min-h-0 items-stretch"
           style={{ "--sidebar-width": "12rem" } as CSSProperties}
@@ -57,7 +63,11 @@ export function WorkspaceSettingsDialog({ onClose }: { onClose: () => void }) {
               </SidebarGroup>
             </SidebarContent>
           </Sidebar>
-          <main className="flex min-w-0 flex-1 flex-col">
+          <main
+            ref={page}
+            tabIndex={-1}
+            className="flex min-w-0 flex-1 flex-col outline-none"
+          >
             <header className="flex shrink-0 flex-col gap-1 p-4 pr-10">
               <h2 className="font-heading text-sm font-medium">Design rules</h2>
               <DialogDescription>

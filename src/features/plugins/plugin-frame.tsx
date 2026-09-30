@@ -9,6 +9,7 @@ import { useIsMutating, useQuery, useQueryClient } from "@tanstack/react-query"
 import type { QueryClient } from "@tanstack/react-query"
 import { createAtom } from "@tanstack/react-store"
 import type { ViewContext } from "@openspindle/plugin-core"
+import { useAppearance } from "@/components/appearance-provider"
 import { Spinner } from "@/components/ui/spinner"
 import {
   ViewFailure,
@@ -69,6 +70,8 @@ const sameContext = (a: ViewContext, b: ViewContext) =>
   a.plateId === b.plateId &&
   a.operationId === b.operationId &&
   a.theme === b.theme &&
+  a.fonts.sans === b.fonts.sans &&
+  a.fonts.mono === b.fonts.mono &&
   a.disabled === b.disabled
 
 /** The installed plugin while it can serve; operations record the version that wrote them. */
@@ -96,6 +99,7 @@ function MountedFrame({
   const client = useQueryClient()
   const importContext = useImportContext()
   const theme = useSyncExternalStore(subscribeTheme, readTheme)
+  const { fonts } = useAppearance()
   const imports = useIsMutating({ mutationKey: WORKSPACE_MUTATION })
   const job = isJobActive(useMachineSnapshot().job)
   const context: ViewContext = {
@@ -104,6 +108,7 @@ function MountedFrame({
     plateId,
     operationId,
     theme,
+    fonts,
     disabled: imports > 0 || job,
   }
   const [contextAtom] = useState(() =>

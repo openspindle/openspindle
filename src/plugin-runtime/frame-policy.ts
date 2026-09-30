@@ -12,14 +12,15 @@ export const PLUGIN_FRAME_SANDBOX = "allow-scripts allow-forms"
 
 /**
  * The frame document's policy: only the app's runtime files and the plugin bundle (a
- * blob: module) execute, fonts are inlined, and the frame cannot connect anywhere.
+ * blob: module) execute, styles and fonts come from the app, and the frame cannot connect
+ * anywhere.
  */
 export const PLUGIN_FRAME_CSP = [
   "default-src 'none'",
   "script-src 'self' blob:",
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' blob: data:",
-  "font-src data:",
+  "font-src 'self' data:",
   "connect-src 'none'",
   "base-uri 'none'",
   "form-action 'none'",

@@ -2,7 +2,6 @@ import { readFile } from "node:fs/promises"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 import { frameReact, quietDirectives } from "@openspindle/plugin-sdk/vite"
-import tailwindcss from "@tailwindcss/vite"
 import { build } from "vite"
 import type { AliasOptions, InlineConfig, Plugin } from "vite"
 import {
@@ -19,11 +18,22 @@ const RUNTIME_GLOBAL = "OpenSpindleFrameRuntime"
 const FILES: Readonly<Record<string, string>> = {
   "index.html": "text/html; charset=utf-8",
   "runtime.js": "text/javascript; charset=utf-8",
-  "runtime.css": "text/css; charset=utf-8",
 }
 
-/** Emits the frame document with its policy filled in. */
-function frameDocument(): Plugin {
+/** The app's stylesheet on the dev server; the app build names its own. */
+const DEV_STYLESHEET = "/src/styles.css"
+const FONT_FILE = /\.woff2?(\?|$)/
+
+/** The stylesheet the built app document links, as a path on the app origin. */
+async function appStylesheet(appDocument: string) {
+  const html = await readFile(appDocument, "utf8")
+  const href = /<link rel="stylesheet"[^>]*href="([^"]+)"/.exec(html)?.[1]
+  if (!href) throw new Error(`No stylesheet is linked in ${appDocument}.`)
+  return new URL(href, "http://app/").pathname
+}
+
+/** Emits the frame document with its policy and the app's stylesheet filled in. */
+function frameDocument(stylesheet: string): Plugin {
   return {
     name: "openspindle:plugin-frame-document",
     async generateBundle() {
@@ -31,19 +41,24 @@ function frameDocument(): Plugin {
       this.emitFile({
         type: "asset",
         fileName: "index.html",
-        source: template.replace("%PLUGIN_FRAME_CSP%", PLUGIN_FRAME_CSP),
+        source: template
+          .replace("%PLUGIN_FRAME_CSP%", PLUGIN_FRAME_CSP)
+          .replace("%APP_STYLESHEET%", stylesheet),
       })
     },
   }
 }
 
 /**
- * The dedicated plugin-frame build: its own document, one classic script exposing the
- * shared modules, and one stylesheet with fonts inlined (the frame loads nothing else).
+ * The dedicated plugin-frame build: its own document and one classic script exposing the
+ * shared modules. The document links the app's own stylesheet, so views share its theme,
+ * fonts and the kit's styles with the app.
  */
 export function pluginFrameConfig(options: {
   readonly outDir: string
   readonly alias: AliasOptions
+  /** The app's stylesheet, as a path on the app origin. */
+  readonly stylesheet: string
   readonly watch?: boolean
 }): InlineConfig {
   return {
@@ -53,8 +68,7 @@ export function pluginFrameConfig(options: {
     logLevel: "warn",
     resolve: { alias: options.alias },
     plugins: [
-      tailwindcss(),
-      frameDocument(),
+      frameDocument(options.stylesheet),
       frameReact(),
       quietDirectives(),
       thirdPartyNotices("frame"),
@@ -69,7 +83,6 @@ export function pluginFrameConfig(options: {
         formats: ["iife"],
         name: RUNTIME_GLOBAL,
         fileName: () => "runtime.js",
-        cssFileName: "runtime",
       },
       rolldownOptions: { output: { codeSplitting: false } },
       watch: options.watch ? {} : null,
@@ -93,12 +106,28 @@ export function pluginFrame(options: { readonly alias: AliasOptions }): Plugin {
       )
     },
     async closeBundle() {
-      await build(pluginFrameConfig({ outDir, alias: options.alias }))
+      const stylesheet = await appStylesheet(
+        path.join(path.dirname(outDir), "index.html")
+      )
+      await build(
+        pluginFrameConfig({ outDir, alias: options.alias, stylesheet })
+      )
     },
     configureServer(server) {
+      // Frames have an opaque origin, and fonts load with CORS: the app's fonts allow any.
+      server.middlewares.use((request, response, next) => {
+        if (FONT_FILE.test(request.url ?? ""))
+          response.setHeader("Access-Control-Allow-Origin", "*")
+        next()
+      })
       const cache = path.join(server.config.cacheDir, PLUGIN_FRAME_DIRECTORY)
       const watcher = build(
-        pluginFrameConfig({ outDir: cache, alias: options.alias, watch: true })
+        pluginFrameConfig({
+          outDir: cache,
+          alias: options.alias,
+          stylesheet: DEV_STYLESHEET,
+          watch: true,
+        })
       )
       watcher.catch((error: unknown) => {
         server.config.logger.error(

@@ -56,6 +56,8 @@ export function registerAppScheme() {
         standard: true,
         secure: true,
         supportFetchAPI: true,
+        // Lets plugin frames load the app's fonts, the only responses that allow them.
+        corsEnabled: true,
         codeCache: true,
       },
     },
@@ -104,6 +106,8 @@ export function handleAppProtocol(root: string) {
       "x-content-type-options": "nosniff",
       "cache-control": "no-cache",
     }
+    // Plugin frames have an opaque origin, and fonts load with CORS: the app's fonts allow any.
+    if (type.startsWith("font/")) headers["access-control-allow-origin"] = "*"
     if (type.startsWith("text/html"))
       headers["content-security-policy"] = frame
         ? PLUGIN_FRAME_CSP_HEADER

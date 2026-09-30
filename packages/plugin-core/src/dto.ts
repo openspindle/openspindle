@@ -285,6 +285,8 @@ export const ViewContextSchema = z.object({
   /** The operation an operation.editor view edits. */
   operationId: OperationIdSchema.nullable(),
   theme: ThemeSchema,
+  /** The app's display and mono fonts, by the ids its settings offer. */
+  fonts: z.object({ sans: z.string(), mono: z.string() }),
   /** The workspace is busy (a job or an import); views should not start edits. */
   disabled: z.boolean(),
 })

@@ -102,7 +102,7 @@ export function useWorkspaceMenu() {
     if (!settled || currentDialog() !== null) return
     switch (command) {
       case "settings.open":
-        void navigate({ to: "/settings" })
+        openDialog({ kind: "settings" })
         return
       case "plugins.manage":
         openDialog({ kind: "plugins" })
