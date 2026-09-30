@@ -1,5 +1,5 @@
 import { z } from "zod"
-import { AUTO_LEVEL_COORDINATE_LIMIT } from "../auto-level/params"
+import { COORDINATE_LIMIT } from "../primitives"
 import { ProbePlacementSchema } from "../probing/placement"
 
 /** The touch-off parameters, in form order. */
@@ -32,7 +32,7 @@ function lengthSchema({ label, min, max, unit }: AutoZHeightParameter) {
     .max(max, range)
 }
 
-const storedLength = z.number().positive().max(AUTO_LEVEL_COORDINATE_LIMIT)
+const storedLength = z.number().positive().max(COORDINATE_LIMIT)
 
 /**
  * A built-in auto Z-height operation, as stored for any machine. Its NC is derived from these

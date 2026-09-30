@@ -1,0 +1,91 @@
+import { z } from "zod"
+
+/**
+ * A numeric parameter of a probing operation as the machine's probe describes it: its label,
+ * default and the range the probe accepts, with the fields of a plugin manifest's numeric
+ * parameter.
+ */
+export type ParameterSpec = {
+  readonly label: string
+  readonly description?: string
+  readonly default: number
+  readonly min: number
+  readonly max: number
+  /** Input increment; values need not be multiples of it. */
+  readonly step: number
+  /** Lengths are millimetres and feeds mm/min; counts have none. */
+  readonly unit?: "mm" | "mm/min"
+  readonly axis?: "X" | "Y" | "Z"
+  /** Only whole numbers, such as probe point counts. */
+  readonly integer?: boolean
+}
+
+/** A parameter per axis, such as a grid's size: X, then Y. */
+export type PairSpec = readonly [x: ParameterSpec, y: ParameterSpec]
+
+/** A machine's numeric parameters of one probing operation, by field, in form order. */
+export type ParameterSpecs<TField extends string = string> = Readonly<
+  Record<TField, ParameterSpec | PairSpec>
+>
+
+/** The values parameters take: a number, or a pair of them. */
+export type SpecValues<TSpecs extends ParameterSpecs> = {
+  -readonly [TField in keyof TSpecs]: TSpecs[TField] extends PairSpec
+    ? [number, number]
+    : number
+}
+
+export const isPairSpec = (spec: ParameterSpec | PairSpec): spec is PairSpec =>
+  Array.isArray(spec)
+
+/** A value within its parameter's range, with messages that name its label. */
+export function specSchema(spec: ParameterSpec) {
+  const unit = spec.unit ? ` ${spec.unit}` : ""
+  const range = `${spec.label} must be from ${spec.min} to ${spec.max}${unit}.`
+  const value = spec.integer
+    ? z.int({ error: `${spec.label} must be a whole number.` })
+    : z.number({ error: `${spec.label} is required.` })
+  return value.min(spec.min, range).max(spec.max, range)
+}
+
+const fieldSchema = (spec: ParameterSpec | PairSpec) =>
+  isPairSpec(spec)
+    ? z.tuple([specSchema(spec[0]), specSchema(spec[1])])
+    : specSchema(spec)
+
+const schemas = new WeakMap<ParameterSpecs, WeakMap<z.ZodObject, z.ZodType>>()
+
+/**
+ * An operation's stored parameters within the ranges of a machine's probe, as its form and its NC
+ * take them: the stored schema with each of `specs`' fields held to its range.
+ */
+export function rangedSchema<TParams>(
+  stored: z.ZodObject & z.ZodType<TParams, TParams>,
+  specs: ParameterSpecs
+): z.ZodType<TParams, TParams> {
+  let bySchema = schemas.get(specs)
+  if (!bySchema) schemas.set(specs, (bySchema = new WeakMap()))
+  const cached = bySchema.get(stored)
+  if (cached) return cached as z.ZodType<TParams, TParams>
+  const shape = Object.fromEntries(
+    Object.entries(specs).map(([field, spec]) => [field, fieldSchema(spec)])
+  )
+  const schema = stored.extend(shape) as z.ZodType as z.ZodType<
+    TParams,
+    TParams
+  >
+  bySchema.set(stored, schema)
+  return schema
+}
+
+/** The parameters' defaults, as a new operation takes them. */
+export function defaultsOf<TSpecs extends ParameterSpecs>(
+  specs: TSpecs
+): SpecValues<TSpecs> {
+  return Object.fromEntries(
+    Object.entries(specs).map(([field, spec]) => [
+      field,
+      isPairSpec(spec) ? [spec[0].default, spec[1].default] : spec.default,
+    ])
+  ) as SpecValues<TSpecs>
+}

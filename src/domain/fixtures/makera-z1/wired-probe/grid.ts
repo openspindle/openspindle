@@ -1,11 +1,12 @@
-import { formatMillimetres } from "../../../auto-level/params"
+import { formatMillimetres } from "../../../geometry/millimetres"
 import type {
   AutoLevelGridField,
   AutoLevelGridParameters,
   AutoLevelParams,
 } from "../../../auto-level/params"
 import type { ProbeGrid, ProbePoint } from "../../../auto-level/probe-grid"
-import type { MachineStart, ProbeStart } from "../../../auto-level/rules"
+import type { XY } from "../../../geometry/frame"
+import type { AnchorStart } from "../../../probing/placement"
 import { COORDINATE_LIMIT } from "../../../primitives"
 import type { GridProbing, GridShape } from "../../../probing/probe"
 import { readNcBlock } from "@/machine/contract"
@@ -93,7 +94,7 @@ const CONCLUSION = [
  * Ordinary queued moves, never M496's deferred main-loop action: up to the clearance, then over
  * the grid's start.
  */
-function anchorTravel({ anchor, source, target }: MachineStart): string[] {
+function anchorTravel({ anchor, source, machine }: AnchorStart): string[] {
   const provenance =
     source === "factory"
       ? "FACTORY DEFAULT coordinates - verify against the device before Run"
@@ -105,14 +106,13 @@ function anchorTravel({ anchor, source, target }: MachineStart): string[] {
     "; Clear previous height compensation before machine-coordinate travel.",
     "M370",
     `G53 G0 Z${formatMillimetres(CLEARANCE_Z)}`,
-    `G53 G0 X${formatMillimetres(target[0])} Y${formatMillimetres(target[1])}`,
+    `G53 G0 X${formatMillimetres(machine[0])} Y${formatMillimetres(machine[1])}`,
   ]
 }
 
-/** R1: X/Y offset the grid from the probe position, or from the G53 target (X0 Y0). */
-function probeBlock(word: GridWord, start: ProbeStart): string {
-  const [x, y] = start.kind === "probe-position" ? start.offset : [0, 0]
-  return `G32 R1 X${formatMillimetres(x)} Y${formatMillimetres(y)} A${word("width")} B${word("depth")} I${word("columns")} J${word("rows")} H${word("clearance")}`
+/** R1: the grid from where the probe is, the probe position or the G53 target (X0 Y0). */
+function probeBlock(word: GridWord): string {
+  return `G32 R1 X0 Y0 A${word("width")} B${word("depth")} I${word("columns")} J${word("rows")} H${word("clearance")}`
 }
 
 /**
@@ -122,7 +122,7 @@ function probeBlock(word: GridWord, start: ProbeStart): string {
  */
 function firmwareBlock(
   size: Pick<AutoLevelParams, AutoLevelGridField>,
-  [x, y]: ProbePoint
+  [x, y]: XY<"work">
 ): string {
   const mm = (value: number) => String(Number(value.toFixed(3)) + 0)
   return `M495 X${mm(x)} Y${mm(y)} A${mm(size.width)} B${mm(size.depth)} I${size.columns} J${size.rows} H${mm(size.clearance)}`
@@ -290,7 +290,7 @@ export const G32_GRID: GridProbing = {
   program(size, start, reviewAfterProbe) {
     const word: GridWord = (field) => formatMillimetres(size[field])
     // In work coordinates the firmware's own auto-leveling can run it, reporting as it goes.
-    const work = start.kind === "machine" ? start.work : null
+    const work = start.kind === "anchor" ? start.work : null
     let lines: string[]
     if (start.kind === "probe-position")
       lines = [
@@ -299,7 +299,7 @@ export const G32_GRID: GridProbing = {
         ...PRECAUTIONS,
         ...PROBE_SETUP,
         GRID_FROM_PROBE,
-        probeBlock(word, start),
+        probeBlock(word),
       ]
     else if (work)
       lines = [
@@ -315,7 +315,7 @@ export const G32_GRID: GridProbing = {
         ...PRECAUTIONS,
         ...PROBE_SETUP,
         ...anchorTravel(start),
-        probeBlock(word, start),
+        probeBlock(word),
       ]
     const probeLine = lines.length
     if (reviewAfterProbe) lines.push(...REVIEW_PAUSE)

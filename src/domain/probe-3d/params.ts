@@ -1,5 +1,5 @@
 import { z } from "zod"
-import { AUTO_LEVEL_COORDINATE_LIMIT } from "../auto-level/params"
+import { COORDINATE_LIMIT } from "../primitives"
 import { ProbePlacementSchema } from "../probing/placement"
 
 /**
@@ -84,7 +84,7 @@ function lengthSchema({ label, min, max, unit }: Probe3dParameter) {
     .max(max, range)
 }
 
-const storedLength = z.number().positive().max(AUTO_LEVEL_COORDINATE_LIMIT)
+const storedLength = z.number().positive().max(COORDINATE_LIMIT)
 
 /**
  * A built-in 3D probing operation, as stored for any machine. Its NC is derived from these

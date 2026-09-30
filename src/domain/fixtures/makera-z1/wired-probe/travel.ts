@@ -1,5 +1,5 @@
-import { formatMillimetres } from "../../../auto-level/params"
-import type { MachineStart } from "../../../auto-level/rules"
+import { formatMillimetres } from "../../../geometry/millimetres"
+import type { AnchorStart } from "../../../probing/placement"
 
 /**
  * Machine Z the Z1 moves in (G53): the firmware stops a move above Z -1, its soft limit, and
@@ -21,8 +21,8 @@ export const CLEARANCE_Z = -3
 export function anchorTravel({
   anchor,
   source,
-  target,
-}: MachineStart): string[] {
+  machine,
+}: AnchorStart): string[] {
   const provenance =
     source === "factory"
       ? "FACTORY DEFAULT coordinates - verify against the device before Run"
@@ -31,6 +31,6 @@ export function anchorTravel({
     `; Probe placement: stored anchor ${JSON.stringify(anchor.id)}; ${provenance}.`,
     "; Rises to the machine's clearance before moving in X and Y; verify homing.",
     `G53 G0 Z${formatMillimetres(CLEARANCE_Z)}`,
-    `G53 G0 X${formatMillimetres(target[0])} Y${formatMillimetres(target[1])}`,
+    `G53 G0 X${formatMillimetres(machine[0])} Y${formatMillimetres(machine[1])}`,
   ]
 }

@@ -1,14 +1,18 @@
-import { bedAnchors } from "@/domain/anchors/stored-anchors"
+import { machineToBed } from "@/domain/anchors/stored-anchors"
 import { issueOf } from "@/domain/diagnostics"
 import type { Issue } from "@/domain/diagnostics"
 import type { Point3 } from "@/domain/nc/gcode"
 import type { Stock } from "@/domain/stock/stock"
-import type { AutoLevelIssue } from "../auto-level/issues"
-import { resolveAnchorStart } from "../auto-level/rules"
-import type { MachineStart } from "../auto-level/rules"
+import { EPSILON } from "../geometry/millimetres"
 import { autoZHeightParamsSchema } from "./params"
 import type { AutoZHeightParameters, AutoZHeightParams } from "./params"
-import type { PlacementContext, ProbePlacement } from "../probing/placement"
+import { resolvePlacement } from "../probing/placement"
+import type {
+  PlacementContext,
+  PlacementFailure,
+  ProbePlacement,
+  ProbeStart,
+} from "../probing/placement"
 
 export type AutoZHeightIssueCode =
   // Parameters
@@ -36,18 +40,13 @@ export type AutoZHeightPlateContext = PlacementContext & {
   stockAnchor: Point3
 }
 
-/** The touch happens below the probe where it is, or after travel to machine XY (G53). */
-export type TouchOffStart = { kind: "probe-position" } | MachineStart
-
 type Checked<TValue> =
   ({ ok: true } & TValue) | { ok: false; issues: AutoZHeightIssue[] }
 /** Parameters and touch point that generation can render, or what blocks it. */
 export type AutoZHeightPlan = Checked<{
   params: AutoZHeightParams
-  start: TouchOffStart
+  start: ProbeStart
 }>
-
-const EPSILON = 1e-6
 
 /**
  * Everything that prevents generating NC: the parameters, within the ranges of the machine's
@@ -66,14 +65,10 @@ export function planAutoZHeight(
         zHeightError("invalid-parameters", issue.message)
       ),
     }
-  const { placement } = parsed.data
-  if (placement.kind === "probe-position")
-    return { ok: true, params: parsed.data, start: { kind: "probe-position" } }
-  // A point is a grid without extent; only the range message speaks of a grid.
-  const resolved = resolveAnchorStart(placement, { width: 0, depth: 0 }, plate)
+  const resolved = resolvePlacement(parsed.data.placement, plate)
   if (!resolved.ok)
-    return { ok: false, issues: resolved.issues.map(anchorIssue) }
-  return { ok: true, params: parsed.data, start: resolved.start }
+    return { ok: false, issues: [PLACEMENT_ISSUES[resolved.error]] }
+  return { ok: true, params: parsed.data, start: resolved.value }
 }
 
 /** Issues to show while editing: generation blockers, anchor provenance and the stock. */
@@ -91,7 +86,7 @@ export function validateAutoZHeight(
   const start = plan.ok ? plan.start : null
   return [
     ...(plan.ok ? [] : plan.issues),
-    ...(start?.kind === "machine" && start.source === "factory"
+    ...(start?.kind === "anchor" && start.source === "factory"
       ? [
           zHeightWarning(
             "factory-anchors",
@@ -137,27 +132,29 @@ function probesGridStart(
   return (
     touch.kind === "anchor" &&
     touch.anchorId === placement.anchorId &&
-    Math.abs(touch.offset.x - placement.offset.x) <= EPSILON &&
-    Math.abs(touch.offset.y - placement.offset.y) <= EPSILON
+    Math.abs(touch.offset[0] - placement.offset[0]) <= EPSILON &&
+    Math.abs(touch.offset[1] - placement.offset[1]) <= EPSILON
   )
 }
 
-function anchorIssue(issue: AutoLevelIssue): AutoZHeightIssue {
-  switch (issue.code) {
-    case "anchor-snapshot-missing":
-    case "anchor-unavailable":
-      return { ...issue, code: issue.code }
-    default:
-      return zHeightError(
-        "anchor-point-out-of-range",
-        "The anchored probe point exceeds the supported coordinate range."
-      )
-  }
+const PLACEMENT_ISSUES: Readonly<Record<PlacementFailure, AutoZHeightIssue>> = {
+  "anchor-snapshot-missing": zHeightError(
+    "anchor-snapshot-missing",
+    "Select an anchor snapshot for this plate's device."
+  ),
+  "anchor-unavailable": zHeightError(
+    "anchor-unavailable",
+    "The selected probe anchor is unavailable."
+  ),
+  "out-of-range": zHeightError(
+    "anchor-point-out-of-range",
+    "The anchored probe point exceeds the supported coordinate range."
+  ),
 }
 
 function stockIssues(
   plate: AutoZHeightPlateContext,
-  start: TouchOffStart | null
+  start: ProbeStart | null
 ): AutoZHeightIssue[] {
   const { stock } = plate
   if (!stock)
@@ -167,16 +164,9 @@ function stockIssues(
         "The stock size is unspecified, so the touch point cannot be checked against it."
       ),
     ]
-  if (start?.kind !== "machine") return []
+  if (start?.kind !== "anchor" || !plate.anchorSetup) return []
   // Machine XY reaches the bed through the snapshot's registration, as the viewer places it.
-  const anchor = bedAnchors(plate.anchorSetup).find(
-    (item) => item.id === start.anchor.id
-  )
-  if (!anchor) return []
-  const x =
-    anchor.position[0] + start.target[0] - start.anchor.machinePosition[0]
-  const y =
-    anchor.position[1] + start.target[1] - start.anchor.machinePosition[1]
+  const [x, y] = machineToBed(plate.anchorSetup)(start.machine)
   const [stockX, stockY, stockZ] = plate.stockAnchor
   if (
     x >= stockX - EPSILON &&

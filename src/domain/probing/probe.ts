@@ -6,16 +6,42 @@ import type {
   AutoLevelParams,
 } from "../auto-level/params"
 import type { ProbeGrid, ProbePoint } from "../auto-level/probe-grid"
-import type { ProbeStart } from "../auto-level/rules"
 import type { AutoScanParameters, AutoScanParams } from "../auto-scan/params"
 import type {
   AutoZHeightParameters,
   AutoZHeightParams,
 } from "../auto-z-height/params"
 import type { ProbeTouch } from "../auto-z-height/probe-touch"
-import type { TouchOffStart } from "../auto-z-height/rules"
 import type { ToolpathBounds } from "../compile/cutting-bounds"
 import type { Probe3dParameters, Probe3dParams } from "../probe-3d/params"
+import type { ParameterSpecs } from "./parameters"
+import type { ProbeStart } from "./placement"
+
+/** A probing operation's NC as a machine's probe writes it, and the lines a job needs to know. */
+export type ProbeProgram = {
+  /** Newline-terminated NC. */
+  readonly nc: string
+  /** One-based line of the block that probes, which reports what it measures; null for none. */
+  readonly probeLine: number | null
+  /** One-based line of the pause to review what was measured; null when the job does not pause. */
+  readonly reviewLine: number | null
+}
+
+/** What every planned probing operation has: its parameters, checked, and where it starts. */
+export type ProbingPlan<TParams> = {
+  readonly params: TParams
+  readonly start: ProbeStart
+}
+
+/**
+ * What a machine's probe does for one probing operation: the ranges and defaults of the
+ * operation's parameters (`parameters`), and the NC of a planned operation (`program`). Each
+ * operation's plan says what else its NC needs.
+ */
+export interface Capability<TPlan, TField extends string = string> {
+  readonly parameters: ParameterSpecs<TField>
+  program: (plan: TPlan) => ProbeProgram
+}
 
 /** A rectangular grid of samples: its first sample, its extent and endpoint-inclusive counts. */
 export type GridShape = Pick<
@@ -55,7 +81,7 @@ export interface TouchOff {
   /** The NC touching off below its start and setting work Z0 there. */
   program: (
     touch: Pick<AutoZHeightParams, "probeTravel" | "clearance">,
-    start: TouchOffStart
+    start: ProbeStart
   ) => string
   /**
    * The touch-offs a program makes where this machine's NC puts the probe, which its `grids`
@@ -83,7 +109,7 @@ export interface OriginProbing {
    */
   program: (
     params: Probe3dParams,
-    start: TouchOffStart,
+    start: ProbeStart,
     height: number | null
   ) => string
 }

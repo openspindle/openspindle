@@ -1,11 +1,10 @@
 import type { GridProbing } from "../probing/probe"
-import { roundMillimetres } from "./params"
+import { roundMillimetres } from "../geometry/millimetres"
 import type { AutoLevelGridField, AutoLevelParams } from "./params"
 import type { ProbeGrid, ProbePoint } from "./probe-grid"
 import { planAutoLevel } from "./rules"
-import type { ProbeStart } from "./rules"
 import type { AutoLevelIssue } from "./issues"
-import type { PlacementContext } from "../probing/placement"
+import type { PlacementContext, ProbeStart } from "../probing/placement"
 
 export type AutoLevelProgram = {
   /** Newline-terminated NC from the machine's probe. */
@@ -34,7 +33,7 @@ export function renderAutoLevelProgram(
 ): AutoLevelProgram {
   const text = probing.program(size, start, reviewAfterProbe)
   // The grid holds the values the NC words carry, as the firmware and the NC preview read them.
-  const [x, y] = start.kind === "machine" ? start.target : start.offset
+  const [x, y] = start.kind === "anchor" ? start.machine : [0, 0]
   const origin: ProbePoint = [roundMillimetres(x), roundMillimetres(y)]
   const width = roundMillimetres(size.width)
   const depth = roundMillimetres(size.depth)
@@ -53,7 +52,7 @@ export function renderAutoLevelProgram(
       points: probing.samples({ start: origin, width, depth, columns, rows }),
       clearanceMm: roundMillimetres(size.clearance),
       coordinateMode:
-        start.kind === "machine" ? "machine" : "relative-to-probe-start",
+        start.kind === "anchor" ? "machine" : "relative-to-probe-start",
     },
   }
 }

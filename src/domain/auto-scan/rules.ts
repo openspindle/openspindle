@@ -1,4 +1,5 @@
 import { issueOf } from "../diagnostics"
+import { EPSILON } from "../geometry/millimetres"
 import type { Issue } from "../diagnostics"
 import type {
   ToolpathBounds,
@@ -19,8 +20,6 @@ export type AutoScanIssue = Issue<AutoScanIssueCode>
 
 const scanError = issueOf<AutoScanIssueCode>("error")
 const scanWarning = issueOf<AutoScanIssueCode>("warning")
-
-const EPSILON = 1e-6
 
 /** Parameters and outline that generation can render, or what blocks it. */
 export type AutoScanPlan =

@@ -4,7 +4,7 @@ import { evaluate, useForm } from "@tanstack/react-form"
 import type { z } from "zod"
 import type { FieldError } from "@/components/ui/field"
 import type { MeasurementAxis } from "@/components/workspace/measurement-input"
-import { formatMillimetres } from "@/domain/auto-level/params"
+import { formatMillimetres } from "@/domain/geometry/millimetres"
 import type { BedAnchor } from "@/domain/anchors/stored-anchors"
 import type { BedXY, WorkAreaResult } from "@/domain/compile/toolpath-bounds"
 

@@ -1,7 +1,7 @@
 import { useId } from "react"
 import { FieldGroup, FieldLegend, FieldSet } from "@/components/ui/field"
 import { Hint } from "@/components/workspace/hint"
-import { formatMillimetres } from "@/domain/auto-level/params"
+import { formatMillimetres } from "@/domain/geometry/millimetres"
 import {
   AUTO_SCAN_FIELDS,
   autoScanParamsSchema,

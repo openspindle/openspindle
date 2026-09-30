@@ -1,5 +1,5 @@
 import type { GCodeSegment } from "@/domain/nc/gcode"
-import { formatMillimetres } from "../auto-level/params"
+import { formatMillimetres } from "../geometry/millimetres"
 import { operationSubject, warning } from "../diagnostics"
 import type { Area, Diagnostic } from "../diagnostics"
 import { operationPhase } from "../operations/kinds"

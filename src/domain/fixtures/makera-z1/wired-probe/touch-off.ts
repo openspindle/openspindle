@@ -1,10 +1,11 @@
-import { formatMillimetres } from "../../../auto-level/params"
+import { formatMillimetres } from "../../../geometry/millimetres"
 import type { ProbeGrid, ProbePoint } from "../../../auto-level/probe-grid"
 import type {
   AutoZHeightParameters,
   AutoZHeightParams,
 } from "../../../auto-z-height/params"
 import type { ProbeTouch } from "../../../auto-z-height/probe-touch"
+import type { XY } from "../../../geometry/frame"
 import type { TouchOff } from "../../../probing/probe"
 import { readNcBlock } from "@/machine/contract"
 import { MAX_PROGRAM_LINES } from "@/domain/nc/gcode"
@@ -114,7 +115,7 @@ function touchOff({ probeTravel, clearance }: Touch) {
  */
 function firmwareTouch(
   { clearance }: Pick<Touch, "clearance">,
-  [x, y]: ProbePoint
+  [x, y]: XY<"work">
 ) {
   const mm = (value: number) => String(Number(value.toFixed(3)) + 0)
   return [
@@ -245,7 +246,7 @@ export const TOUCH_OFF: TouchOff = {
   program(touch, start) {
     const travel = formatMillimetres(touch.probeTravel)
     // In work coordinates the firmware's own Z probe can run it, reporting as it goes.
-    const work = start.kind === "machine" ? start.work : null
+    const work = start.kind === "anchor" ? start.work : null
     let lines: string[]
     if (start.kind === "probe-position")
       lines = [

@@ -17,10 +17,11 @@ import {
 } from "@/domain/tools/tool-table"
 import {
   PLATE_ENVELOPE_VERSION,
-  PREVIOUS_PLATE_ENVELOPE_VERSION,
+  OLDEST_PLATE_ENVELOPE_VERSION,
   PlateEnvelopeSchema,
   bodyChecksum,
   readEnvelope,
+  upgradeEnvelopePayload,
 } from "@/formats/plate-envelope"
 import { describePath, readOptimistically } from "@/formats/optimistic-read"
 
@@ -111,7 +112,7 @@ function filePlate(
  * Builds a plate from an NC file: a plain program, or an export with its setup and editable
  * operations. A plain program keeps the setup made on the empty plate it replaces, if any. An
  * export whose NC body was edited keeps its setup and becomes a single program, with a
- * notice. Exports of the previous version open as the current one; other versions are
+ * notice. Exports of earlier versions from 4 open as the current one; other versions are
  * refused.
  */
 export function importProgram(
@@ -167,19 +168,14 @@ export function importProgram(
   }
   if (envelope.version > PLATE_ENVELOPE_VERSION)
     return fail("It was exported by a newer version of OpenSpindle.")
-  if (envelope.version < PREVIOUS_PLATE_ENVELOPE_VERSION)
+  if (envelope.version < OLDEST_PLATE_ENVELOPE_VERSION)
     return fail(
       "It was exported by an earlier version of OpenSpindle, which this version cannot read."
     )
-  // A previous-version payload becomes the current version before reading it optimistically:
-  // what it still does not recognize (such as format 4's travel Z) is left out and reported,
-  // rather than rewritten field by field.
+  // An earlier version's payload becomes the current version before reading it optimistically.
   const rawPayload =
-    envelope.version === PREVIOUS_PLATE_ENVELOPE_VERSION
-      ? {
-          ...(envelope.payload as Record<string, unknown>),
-          schemaVersion: PLATE_ENVELOPE_VERSION,
-        }
+    envelope.version < PLATE_ENVELOPE_VERSION
+      ? upgradeEnvelopePayload(envelope.payload)
       : envelope.payload
   const read = readOptimistically(PlateEnvelopeSchema, rawPayload)
   if (!read.success)

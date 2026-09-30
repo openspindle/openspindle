@@ -1,11 +1,11 @@
 import type { BedAnchor } from "@/domain/anchors/stored-anchors"
-import { anchorPlacementAt, placementAnchors } from "../auto-level/fit"
-import { roundMillimetres } from "../auto-level/params"
+import { roundMillimetres } from "../geometry/millimetres"
 import { plateWorkArea } from "../compile/toolpath-bounds"
 import type { BedXY, WorkArea } from "../compile/toolpath-bounds"
 import type { Plate } from "../plate/plate"
 import { defaultAutoZHeightParams } from "./params"
 import type { AutoZHeightParameters, AutoZHeightParams } from "./params"
+import { anchorPlacementAt, placementAnchors } from "../probing/placement"
 import type { AnchorPlacement, ProbePlacement } from "../probing/placement"
 
 /** The middle of the work area on the bed. */

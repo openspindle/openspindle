@@ -1,7 +1,7 @@
 import type { NcWord } from "@/machine/contract"
 import type { Point3 } from "@/domain/nc/gcode"
 import type { StoredAnchorSetup } from "@/domain/anchors/stored-anchors"
-import { formatMillimetres } from "../../auto-level/params"
+import { formatMillimetres } from "../../geometry/millimetres"
 import type { NcUnitState } from "../../compile/nc-unit"
 import type { MachineOrigin } from "../../plate/work-origin"
 import { FixtureKit } from "../fixture-kit"

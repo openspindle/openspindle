@@ -6,6 +6,7 @@ import {
   EntityIdSchema,
   TextSchema,
 } from "@/domain/primitives"
+import type { Transform } from "@/domain/geometry/frame"
 
 /** X and Y in millimetres, on the bed or the machine, bounded like bed coordinates. */
 export const AnchorXYSchema = z.tuple([CoordinateSchema, CoordinateSchema])
@@ -95,21 +96,28 @@ export function anchorsFromDevice(
   }
 }
 
+/**
+ * Machine XY on the bed, through the setup's registration: its first anchor is at its machine
+ * position there and at `anchor1BedPosition` on the bed.
+ */
+export function machineToBed(
+  setup: Pick<StoredAnchorSetup, "anchors" | "anchor1BedPosition">
+): Transform<"machine", "bed"> {
+  const reference = setup.anchors[0].machinePosition
+  const bed = setup.anchor1BedPosition
+  return (point) => [
+    Number((point[0] - reference[0] + bed[0]).toFixed(6)),
+    Number((point[1] - reference[1] + bed[1]).toFixed(6)),
+  ]
+}
+
 export function bedAnchors(setup?: StoredAnchorSetup): BedAnchor[] {
   if (!setup?.anchors.length) return []
-  const reference = setup.anchors[0].machinePosition
+  const toBed = machineToBed(setup)
   return setup.anchors.map((anchor) => ({
     id: anchor.id,
     name: anchor.name,
-    position: [0, 1].map((axis) =>
-      Number(
-        (
-          anchor.machinePosition[axis] -
-          reference[axis] +
-          setup.anchor1BedPosition[axis]
-        ).toFixed(6)
-      )
-    ) as AnchorXY,
+    position: [...toBed(anchor.machinePosition)] as AnchorXY,
   }))
 }
 

@@ -31,16 +31,6 @@ export type AutoLevelGridParameters = Readonly<
   Record<AutoLevelGridField, AutoLevelGridParameter>
 >
 
-/** Anchor offsets and anchored grid corners share the stored anchors' range. */
-export const AUTO_LEVEL_COORDINATE_LIMIT = COORDINATE_LIMIT
-
-/** Millimetres as NC words carry them: rounded to 6 decimals. */
-export const roundMillimetres = (value: number) => Number(value.toFixed(6))
-
-/** Plain decimal millimetres without exponent notation, for NC words and messages. */
-export const formatMillimetres = (value: number) =>
-  String(roundMillimetres(value))
-
 function rangeMessage(label: string, min: number, max: number, unit?: string) {
   const suffix = unit ? ` ${unit}` : ""
   return `${label} must be from ${min} to ${max}${suffix}.`
@@ -62,8 +52,8 @@ function countSchema({ label, min, max }: AutoLevelGridParameter) {
     .max(max, range)
 }
 
-const storedLength = z.number().positive().max(AUTO_LEVEL_COORDINATE_LIMIT)
-const storedCount = z.int().min(2).max(AUTO_LEVEL_COORDINATE_LIMIT)
+const storedLength = z.number().positive().max(COORDINATE_LIMIT)
+const storedCount = z.int().min(2).max(COORDINATE_LIMIT)
 
 /**
  * A built-in auto-level operation, as stored for any machine. Its NC is derived from these

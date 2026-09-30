@@ -1,15 +1,17 @@
-import type { AutoLevelIssue } from "../auto-level/issues"
-import { resolveAnchorStart } from "../auto-level/rules"
 import { autoLevelOrderIssues } from "../auto-z-height/rules"
-import type { LaterAutoLevel, TouchOffStart } from "../auto-z-height/rules"
+import type { LaterAutoLevel } from "../auto-z-height/rules"
 import type { BedXY } from "../compile/toolpath-bounds"
 import { issueOf } from "../diagnostics"
 import type { Issue } from "../diagnostics"
 import { cornerInward, probe3dParamsSchema, setsWorkZ } from "./params"
 import type { Probe3dParameters, Probe3dParams } from "./params"
-import { roundMillimetres } from "../auto-level/params"
-import { placementHeight } from "../probing/placement"
-import type { PlacementContext } from "../probing/placement"
+import { roundMillimetres } from "../geometry/millimetres"
+import { placementHeight, resolvePlacement } from "../probing/placement"
+import type {
+  PlacementContext,
+  PlacementFailure,
+  ProbeStart,
+} from "../probing/placement"
 
 export type Probe3dIssueCode =
   // Parameters
@@ -33,7 +35,7 @@ type Checked<TValue> =
 /** Parameters and start that generation can render, or what blocks it. */
 export type Probe3dPlan = Checked<{
   params: Probe3dParams
-  start: TouchOffStart
+  start: ProbeStart
   /** The work Z the probe comes down to over the start: its height on the bed, if any. */
   height: number | null
 }>
@@ -59,18 +61,10 @@ export function planProbe3d(
   const onBed = placementHeight(placement)
   const height =
     onBed === undefined ? null : roundMillimetres(onBed - plate.workOriginZ)
-  if (placement.kind === "probe-position")
-    return {
-      ok: true,
-      params: parsed.data,
-      start: { kind: "probe-position" },
-      height,
-    }
-  // A start is a grid without extent; only the range message speaks of a grid.
-  const resolved = resolveAnchorStart(placement, { width: 0, depth: 0 }, plate)
+  const resolved = resolvePlacement(placement, plate)
   if (!resolved.ok)
-    return { ok: false, issues: resolved.issues.map(anchorIssue) }
-  return { ok: true, params: parsed.data, start: resolved.start, height }
+    return { ok: false, issues: [PLACEMENT_ISSUES[resolved.error]] }
+  return { ok: true, params: parsed.data, start: resolved.value, height }
 }
 
 /**
@@ -102,7 +96,7 @@ export function validateProbe3d(
   const plan = planProbe3d(params, plate, parameters)
   if (!plan.ok) return plan.issues
   const { start } = plan
-  if (start.kind !== "machine" || start.source !== "factory") return []
+  if (start.kind !== "anchor" || start.source !== "factory") return []
   return [
     probeWarning(
       "factory-anchors",
@@ -132,15 +126,17 @@ export function probe3dOrderIssues(
   )
 }
 
-function anchorIssue(issue: AutoLevelIssue): Probe3dIssue {
-  switch (issue.code) {
-    case "anchor-snapshot-missing":
-    case "anchor-unavailable":
-      return { ...issue, code: issue.code }
-    default:
-      return probeError(
-        "anchor-point-out-of-range",
-        "The anchored start exceeds the supported coordinate range."
-      )
-  }
+const PLACEMENT_ISSUES: Readonly<Record<PlacementFailure, Probe3dIssue>> = {
+  "anchor-snapshot-missing": probeError(
+    "anchor-snapshot-missing",
+    "Select an anchor snapshot for this plate's device."
+  ),
+  "anchor-unavailable": probeError(
+    "anchor-unavailable",
+    "The selected probe anchor is unavailable."
+  ),
+  "out-of-range": probeError(
+    "anchor-point-out-of-range",
+    "The anchored start exceeds the supported coordinate range."
+  ),
 }

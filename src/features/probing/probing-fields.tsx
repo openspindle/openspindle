@@ -254,7 +254,7 @@ const PROBE_POSITION = ""
 /** A probe-position placement, with the start's height when it has one. */
 function probePosition(height: number | undefined): ProbePlacement {
   if (height === undefined) return { kind: "probe-position" }
-  return { kind: "probe-position", offset: { z: height } }
+  return { kind: "probe-position", height }
 }
 
 /**
@@ -303,7 +303,7 @@ export function PlacementFields({
         ? [{ value: anchorId, label: "Unavailable anchor", axes: anchorAxes }]
         : []),
     ]
-    const z = value.offset?.z
+    const z = value.height
     // The height is always passed: an emptied Z is undefined, which must clear it.
     const toAnchor = (
       id: string,
@@ -311,11 +311,11 @@ export function PlacementFields({
       y: number,
       h: number | undefined
     ) =>
-      setPlacement({
-        kind: "anchor",
-        anchorId: id,
-        offset: h === undefined ? { x, y } : { x, y, z: h },
-      })
+      setPlacement(
+        h === undefined
+          ? { kind: "anchor", anchorId: id, offset: [x, y] }
+          : { kind: "anchor", anchorId: id, offset: [x, y], height: h }
+      )
     return (
       <FieldSet>
         <FieldLegend>Placement</FieldLegend>
@@ -327,7 +327,7 @@ export function PlacementFields({
             reference={anchorId}
             point={
               value.kind === "anchor"
-                ? { X: value.offset.x, Y: value.offset.y, Z: z }
+                ? { X: value.offset[0], Y: value.offset[1], Z: z }
                 : { Z: z }
             }
             optional={HEIGHT_AXES}
@@ -338,10 +338,10 @@ export function PlacementFields({
                 setPlacement(probePosition(z))
                 return
               }
-              const { x, y } =
+              const [x, y] =
                 value.kind === "anchor"
                   ? value.offset
-                  : (lastAnchor?.offset ?? { x: 0, y: 0 })
+                  : (lastAnchor?.offset ?? [0, 0])
               toAnchor(reference, x, y, z)
             }}
             onPointChange={({ X = 0, Y = 0, Z }) => {

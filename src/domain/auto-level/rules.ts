@@ -1,13 +1,9 @@
 import {
   anchorsFromDevice,
-  bedAnchors,
-  isAnchorXY,
   isStoredAnchorSetup,
+  machineToBed,
 } from "@/domain/anchors/stored-anchors"
-import type {
-  StoredAnchor,
-  StoredAnchorSetup,
-} from "@/domain/anchors/stored-anchors"
+import type { StoredAnchor } from "@/domain/anchors/stored-anchors"
 import type { Area } from "@/domain/diagnostics"
 import type { Point3 } from "@/domain/nc/gcode"
 import type { Stock } from "@/domain/stock/stock"
@@ -15,14 +11,16 @@ import { isAnchorConfiguration } from "@/machine/contract"
 import type { AnchorConfiguration } from "@/machine/contract"
 import { autoLevelError, autoLevelWarning } from "./issues"
 import type { AutoLevelIssue } from "./issues"
-import {
-  autoLevelParamsSchema,
-  formatMillimetres,
-  roundMillimetres,
-} from "./params"
+import { EPSILON, formatMillimetres } from "../geometry/millimetres"
+import { rectAt } from "../geometry/rect"
+import { autoLevelParamsSchema } from "./params"
 import type { AutoLevelGridParameters, AutoLevelParams } from "./params"
-import type { ProbePoint } from "./probe-grid"
-import type { AnchorPlacement, PlacementContext } from "../probing/placement"
+import { resolvePlacement } from "../probing/placement"
+import type {
+  PlacementContext,
+  PlacementFailure,
+  ProbeStart,
+} from "../probing/placement"
 
 /** The plate an auto-level operation belongs to. `Plate` satisfies it. */
 export type AutoLevelPlateContext = PlacementContext & {
@@ -38,19 +36,6 @@ export type AutoLevelMachineContext = {
   anchors?: AnchorConfiguration | null
 }
 
-/** The grid starts at the operator-positioned probe, offset in X and Y. */
-export type ProbePositionStart = { kind: "probe-position"; offset: ProbePoint }
-/** Travel to machine XY (G53), at the height the probe travels at, then the grid from there. */
-export type MachineStart = {
-  kind: "machine"
-  anchor: StoredAnchor
-  source: StoredAnchorSetup["source"]
-  target: ProbePoint
-  /** The target in work coordinates when the program sets work X and Y; null otherwise. */
-  work: ProbePoint | null
-}
-export type ProbeStart = ProbePositionStart | MachineStart
-
 type Checked<TValue> =
   ({ ok: true } & TValue) | { ok: false; issues: AutoLevelIssue[] }
 /** Parameters and grid start that generation can render, or what blocks it. */
@@ -58,9 +43,6 @@ export type AutoLevelPlan = Checked<{
   params: AutoLevelParams
   start: ProbeStart
 }>
-export type AnchorStartResolution = Checked<{ start: MachineStart }>
-
-const EPSILON = 1e-6
 
 /**
  * Everything that prevents generating NC: the parameters, within the ranges of the machine's
@@ -90,7 +72,7 @@ export function validateAutoLevel(
   const start = resolved.ok ? resolved.start : null
   return [
     ...(resolved.ok ? [] : resolved.issues),
-    ...(start?.kind === "machine" && start.source === "factory"
+    ...(start?.kind === "anchor" && start.source === "factory"
       ? [
           autoLevelWarning(
             "factory-anchors",
@@ -102,65 +84,19 @@ export function validateAutoLevel(
   ]
 }
 
-/**
- * The anchored grid's machine start from the plate's anchor snapshot. Issues keep the order of the
- * plugin-era checks: snapshot, anchor, coordinate range.
- */
-export function resolveAnchorStart(
-  placement: AnchorPlacement,
-  size: Pick<AutoLevelParams, "width" | "depth">,
-  plate: PlacementContext
-): AnchorStartResolution {
-  const setup = plate.anchorSetup
-  if (!isStoredAnchorSetup(setup) || setup.deviceId !== plate.deviceId)
-    return {
-      ok: false,
-      issues: [
-        autoLevelError(
-          "anchor-snapshot-missing",
-          "Select an anchor snapshot for this plate's device."
-        ),
-      ],
-    }
-  const anchor = setup.anchors.find((item) => item.id === placement.anchorId)
-  if (!anchor)
-    return {
-      ok: false,
-      issues: [
-        autoLevelError(
-          "anchor-unavailable",
-          "The selected probe anchor is unavailable."
-        ),
-      ],
-    }
-  const target: ProbePoint = [
-    anchor.machinePosition[0] + placement.offset.x,
-    anchor.machinePosition[1] + placement.offset.y,
-  ]
-  const inRange =
-    isAnchorXY(target) &&
-    isAnchorXY([target[0] + size.width, target[1] + size.depth])
-  if (!inRange)
-    return {
-      ok: false,
-      issues: [
-        autoLevelError(
-          "anchor-grid-out-of-range",
-          "The anchored probe grid exceeds the supported coordinate range."
-        ),
-      ],
-    }
-  const origin = plate.machineWorkOrigin ?? null
-  const work: ProbePoint | null = origin
-    ? [
-        roundMillimetres(target[0] - origin[0]),
-        roundMillimetres(target[1] - origin[1]),
-      ]
-    : null
-  return {
-    ok: true,
-    start: { kind: "machine", anchor, source: setup.source, target, work },
-  }
+const PLACEMENT_ISSUES: Readonly<Record<PlacementFailure, AutoLevelIssue>> = {
+  "anchor-snapshot-missing": autoLevelError(
+    "anchor-snapshot-missing",
+    "Select an anchor snapshot for this plate's device."
+  ),
+  "anchor-unavailable": autoLevelError(
+    "anchor-unavailable",
+    "The selected probe anchor is unavailable."
+  ),
+  "out-of-range": autoLevelError(
+    "anchor-grid-out-of-range",
+    "The anchored probe grid exceeds the supported coordinate range."
+  ),
 }
 
 /**
@@ -237,9 +173,14 @@ function resolveStart(
   params: AutoLevelParams,
   plate: PlacementContext
 ): Checked<{ start: ProbeStart }> {
-  if (params.placement.kind === "probe-position")
-    return { ok: true, start: { kind: "probe-position", offset: [0, 0] } }
-  return resolveAnchorStart(params.placement, params, plate)
+  const resolved = resolvePlacement(
+    params.placement,
+    plate,
+    rectAt([0, 0], [params.width, params.depth])
+  )
+  if (!resolved.ok)
+    return { ok: false, issues: [PLACEMENT_ISSUES[resolved.error]] }
+  return { ok: true, start: resolved.value }
 }
 
 /**
@@ -252,16 +193,9 @@ function gridArea(
   top: number,
   start: ProbeStart | null
 ): Area | null {
-  if (start?.kind !== "machine") return null
+  if (start?.kind !== "anchor" || !plate.anchorSetup) return null
   // Machine XY reaches the bed through the snapshot's registration, as the viewer places it.
-  const anchor = bedAnchors(plate.anchorSetup).find(
-    (item) => item.id === start.anchor.id
-  )
-  if (!anchor) return null
-  const x =
-    anchor.position[0] + start.target[0] - start.anchor.machinePosition[0]
-  const y =
-    anchor.position[1] + start.target[1] - start.anchor.machinePosition[1]
+  const [x, y] = machineToBed(plate.anchorSetup)(start.machine)
   return {
     kind: "area",
     min: [x, y, top],

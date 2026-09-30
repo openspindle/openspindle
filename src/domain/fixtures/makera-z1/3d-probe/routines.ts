@@ -1,4 +1,4 @@
-import { formatMillimetres } from "../../../auto-level/params"
+import { formatMillimetres } from "../../../geometry/millimetres"
 import {
   PROBE_3D_AXES_LABELS,
   PROBE_3D_CORNER_LABELS,
@@ -175,7 +175,7 @@ export const THREE_D_PROBE: OriginProbing = {
       "M5",
       "G21 G90",
       `M6 T${PROBE_3D_TOOL}`,
-      ...(start.kind === "machine" ? anchorTravel(start) : []),
+      ...(start.kind === "anchor" ? anchorTravel(start) : []),
       ...(height === null
         ? []
         : [

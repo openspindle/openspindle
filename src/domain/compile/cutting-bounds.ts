@@ -1,6 +1,8 @@
 import { parseGCode } from "@/domain/nc/gcode"
 import type { GCodeSegment } from "@/domain/nc/gcode"
 import type { PlateSetup } from "../plate/plate"
+import type { XY } from "../geometry/frame"
+import type { Rect } from "../geometry/rect"
 import type { Point3 } from "../primitives"
 import { isProbeSlot } from "../tools/tool-table"
 
@@ -12,9 +14,9 @@ export type ToolpathBoundsResult =
   | { readonly ok: false; readonly reason: string }
 
 /** A position on the bed, X and Y in millimetres. */
-export type BedXY = readonly [number, number]
+export type BedXY = XY<"bed">
 /** Where probing works: the toolpath bounds on the bed, within the stock. */
-export type WorkArea = { readonly min: BedXY; readonly max: BedXY }
+export type WorkArea = Rect<"bed">
 export type WorkAreaResult =
   | {
       readonly ok: true

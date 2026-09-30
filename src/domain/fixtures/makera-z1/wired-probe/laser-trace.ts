@@ -1,4 +1,4 @@
-import { formatMillimetres } from "../../../auto-level/params"
+import { formatMillimetres } from "../../../geometry/millimetres"
 import type { AutoScanParameters } from "../../../auto-scan/params"
 import type { OutlineTrace } from "../../../probing/probe"
 import { CLEARANCE_Z, MACHINE_Z } from "./travel"

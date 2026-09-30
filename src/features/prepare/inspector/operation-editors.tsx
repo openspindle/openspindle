@@ -11,7 +11,7 @@ import {
 import { Switch } from "@/components/ui/switch"
 import { templateProgram } from "@/app/workspace/templates"
 import { useWorkspaceStore } from "@/app/workspace/workspace-context"
-import { placementAnchors } from "@/domain/auto-level/fit"
+import { placementAnchors } from "@/domain/probing/placement"
 import { kitForPlate } from "@/domain/fixtures/catalog"
 import { closingParkCodes } from "@/domain/compile/nc-unit"
 import {

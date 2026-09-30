@@ -8,6 +8,7 @@ import {
 } from "@/domain/plate/plate"
 import { OperationSchema } from "@/domain/operations/operation"
 import { adler32, decodeBase64Json, encodeBase64Json } from "./base64-json"
+import { upgradeOperations } from "./upgrade/operations"
 
 /** Setup and editable operations embedded as leading comments of an exported NC file. */
 const MAX_ENVELOPE_BYTES = 32 * 1024 * 1024
@@ -22,13 +23,28 @@ export const carriesPlate = (source: string) =>
 
 /**
  * The envelope version exports write: version 3 fixtures name their model's source, since
- * version 4 the wasteboard is one of them, and since version 5 anchored probing travels at the
- * height the machine's probe travels at.
+ * version 4 the wasteboard is one of them, since version 5 anchored probing travels at the
+ * height the machine's probe travels at, and since version 6 probing parameters hold a value per
+ * axis together, and placements their height apart from their offset.
  */
-export const PLATE_ENVELOPE_VERSION = 5
+export const PLATE_ENVELOPE_VERSION = 6
 
-/** The version read besides the current one, which it becomes on import. */
-export const PREVIOUS_PLATE_ENVELOPE_VERSION = 4
+/** The earliest version read besides the current one, which it becomes on import. */
+export const OLDEST_PLATE_ENVELOPE_VERSION = 4
+
+/**
+ * An export's payload of an earlier version, in the current one: its probing operations
+ * upgraded (`upgradeOperations`). What it still does not recognize (such as format 4's travel Z)
+ * is left for reading to leave out and report, rather than rewritten field by field.
+ */
+export function upgradeEnvelopePayload(payload: unknown): unknown {
+  const exported = payload as Record<string, unknown>
+  return {
+    ...exported,
+    schemaVersion: PLATE_ENVELOPE_VERSION,
+    operations: upgradeOperations(exported.operations),
+  }
+}
 
 /** The exported plate: everything needed to restore editable operations exactly. */
 export const PlateEnvelopeSchema = z.object({

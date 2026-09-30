@@ -1,69 +1,12 @@
-import {
-  bedAnchors,
-  isStoredAnchorSetup,
-} from "@/domain/anchors/stored-anchors"
-import type {
-  BedAnchor,
-  StoredAnchorSetup,
-} from "@/domain/anchors/stored-anchors"
+import type { BedAnchor } from "@/domain/anchors/stored-anchors"
 import { plateWorkArea } from "../compile/toolpath-bounds"
-import type { BedXY, WorkArea } from "../compile/toolpath-bounds"
+import type { WorkArea } from "../compile/toolpath-bounds"
 import type { Plate } from "../plate/plate"
-import { defaultAutoLevelParams, roundMillimetres } from "./params"
+import { roundMillimetres } from "../geometry/millimetres"
+import { defaultAutoLevelParams } from "./params"
 import type { AutoLevelGridParameters, AutoLevelParams } from "./params"
+import { anchorPlacementAt, placementAnchors } from "../probing/placement"
 import type { AnchorPlacement, ProbePlacement } from "../probing/placement"
-
-/** The anchors a placement can be relative to: the snapshot of the plate's device, on the bed. */
-export function placementAnchors(setup: {
-  deviceId: string | null
-  anchors: StoredAnchorSetup | null
-}): BedAnchor[] {
-  const { anchors, deviceId } = setup
-  return isStoredAnchorSetup(anchors) && anchors.deviceId === deviceId
-    ? bedAnchors(anchors)
-    : []
-}
-
-function nearest(anchors: readonly BedAnchor[], [x, y]: BedXY) {
-  let best: BedAnchor | null = null
-  let bestDistance = Infinity
-  for (const anchor of anchors) {
-    const distance =
-      (anchor.position[0] - x) ** 2 + (anchor.position[1] - y) ** 2
-    if (distance < bestDistance) {
-      best = anchor
-      bestDistance = distance
-    }
-  }
-  return best
-}
-
-/**
- * The anchored placement of a bed point: relative to the current (or last) anchor while the plate
- * has it, otherwise to the anchor nearest the point. The offset is the point's distance from the
- * anchor on the bed, which the G53 travel repeats in machine coordinates. Null when the plate has
- * no anchors.
- */
-export function anchorPlacementAt(
-  point: BedXY,
-  anchors: readonly BedAnchor[],
-  current: ProbePlacement,
-  last: AnchorPlacement | null
-): AnchorPlacement | null {
-  const previous = current.kind === "anchor" ? current : last
-  const anchor =
-    anchors.find((item) => item.id === previous?.anchorId) ??
-    nearest(anchors, point)
-  if (!anchor) return null
-  return {
-    kind: "anchor",
-    anchorId: anchor.id,
-    offset: {
-      x: roundMillimetres(point[0] - anchor.position[0]),
-      y: roundMillimetres(point[1] - anchor.position[1]),
-    },
-  }
-}
 
 /**
  * The grid that covers the work area, within the sizes the machine's probe accepts: its size,

@@ -21,8 +21,12 @@ import { upgradeTool } from "../tool-library/upgrade"
 import { usedPluginIds } from "./plugin-reference"
 import { PROJECT_LIMITS } from "./step-nc"
 
-/** Version 5: anchored probing travels at the height the machine's probe travels at. */
-export const PROJECT_SCHEMA_VERSION = 5
+/**
+ * Version 5: anchored probing travels at the height the machine's probe travels at. Version 6:
+ * probing parameters hold a value per axis together, and placements their height apart from
+ * their offset.
+ */
+export const PROJECT_SCHEMA_VERSION = 6
 
 /** The workspace fields a project stores exactly as the workspace holds them. */
 type WorkspaceData = Pick<

@@ -1,5 +1,5 @@
 import { z } from "zod"
-import { AUTO_LEVEL_COORDINATE_LIMIT } from "../auto-level/params"
+import { COORDINATE_LIMIT } from "../primitives"
 
 /** The trace parameters, in form order. */
 export const AUTO_SCAN_FIELDS = ["travelZ", "feed"] as const
@@ -40,10 +40,7 @@ const storedFeed = z.number().positive().max(100_000)
  */
 export const AutoScanParamsSchema = z.strictObject({
   /** Machine Z of the trace (G53), mm. */
-  travelZ: z
-    .number()
-    .min(-AUTO_LEVEL_COORDINATE_LIMIT)
-    .max(AUTO_LEVEL_COORDINATE_LIMIT),
+  travelZ: z.number().min(-COORDINATE_LIMIT).max(COORDINATE_LIMIT),
   /** Feed of the traced edges, mm/min. */
   feed: storedFeed,
   /** Pause after the trace so the outline can be checked before the job goes on. */

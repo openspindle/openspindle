@@ -1,5 +1,5 @@
 import type { GCodeProgram } from "../nc/gcode"
-import { isStoredAnchorSetup } from "../anchors/stored-anchors"
+import { isStoredAnchorSetup, machineToBed } from "../anchors/stored-anchors"
 import type { StoredAnchorSetup } from "../anchors/stored-anchors"
 import type { ProbeGrid, ProbePoint } from "@/domain/auto-level/probe-grid"
 import type { ProbeTouch } from "@/domain/auto-z-height/probe-touch"
@@ -71,18 +71,6 @@ export function getProbeTouches(
   return touches
 }
 
-/** Machine XY on the bed, through the device/bed registration of the setup's first anchor. */
-function machineToBed(setup: StoredAnchorSetup) {
-  const offset: ProbePoint = [
-    setup.anchor1BedPosition[0] - setup.anchors[0].machinePosition[0],
-    setup.anchor1BedPosition[1] - setup.anchors[0].machinePosition[1],
-  ]
-  return ([x, y]: ProbePoint): ProbePoint => [
-    Number((x + offset[0]).toFixed(6)),
-    Number((y + offset[1]).toFixed(6)),
-  ]
-}
-
 /** A touch-off's machine XY on the bed, through the device/bed registration grids use. */
 export function registerProbeTouch(
   touch: ProbeTouch,
@@ -93,7 +81,7 @@ export function registerProbeTouch(
   return {
     ...touch,
     coordinateMode: "bed",
-    point: machineToBed(setup)(touch.point),
+    point: [...machineToBed(setup)(touch.point)] as ProbePoint,
   }
 }
 
@@ -104,7 +92,8 @@ export function registerProbeGrid(
 ): ProbeGrid | null {
   if (grid.coordinateMode !== "machine") return grid
   if (!isStoredAnchorSetup(setup)) return null
-  const point = machineToBed(setup)
+  const toBed = machineToBed(setup)
+  const point = (xy: ProbePoint) => [...toBed(xy)] as ProbePoint
   return {
     ...grid,
     coordinateMode: "bed",

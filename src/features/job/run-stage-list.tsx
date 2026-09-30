@@ -17,7 +17,7 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { Spinner } from "@/components/ui/spinner"
-import { formatMillimetres } from "@/domain/auto-level/params"
+import { formatMillimetres } from "@/domain/geometry/millimetres"
 import type { Operation } from "@/domain/operations/operation"
 import { PROBE_3D_CORNER_LABELS, findsCorner } from "@/domain/probe-3d/params"
 import type { Probe3dParams } from "@/domain/probe-3d/params"
@@ -122,7 +122,7 @@ function operationSummary(
       const { placement } = source.params
       const where =
         placement.kind === "anchor"
-          ? `at ${anchorName(subject, placement.anchorId)} + X${mm(placement.offset.x)} Y${mm(placement.offset.y)}`
+          ? `at ${anchorName(subject, placement.anchorId)} + X${mm(placement.offset[0])} Y${mm(placement.offset[1])}`
           : "below the probe"
       return `Touches the stock top ${where} and sets work Z there.`
     }
@@ -136,7 +136,7 @@ function operationSummary(
       const z = height === undefined ? "" : ` Z${mm(height)}`
       const where =
         placement.kind === "anchor"
-          ? `from ${anchorName(subject, placement.anchorId)} + X${mm(placement.offset.x)} Y${mm(placement.offset.y)}${z}`
+          ? `from ${anchorName(subject, placement.anchorId)} + X${mm(placement.offset[0])} Y${mm(placement.offset[1])}${z}`
           : `from the probe position${z && ` at${z}`}`
       return `Finds ${probe3dTarget(source.params)} ${where} and sets the work origin there.`
     }

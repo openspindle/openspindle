@@ -5,6 +5,8 @@ import type { Plate } from "@/domain/plate/plate"
 import { fail, ok } from "@/domain/primitives"
 import type { Result } from "@/domain/primitives"
 import { describePath, readOptimistically } from "../optimistic-read"
+import { isJsonObject } from "../upgrade/json"
+import { upgradeOperations } from "../upgrade/operations"
 import { PROJECT_SCHEMA_VERSION, ProjectDocumentSchema } from "./document"
 import type { ProjectDocument } from "./document"
 import { missingPlugins } from "./plugin-reference"
@@ -88,11 +90,28 @@ export function encodeProject(document: ProjectDocument): string {
 
 const VersionSchema = z.looseObject({ schemaVersion: z.int().positive() })
 
-/** The format read besides the current one, which it becomes on opening. */
-const PREVIOUS_SCHEMA_VERSION = 4
+/** The earliest format read besides the current one, which it becomes on opening. */
+const OLDEST_SCHEMA_VERSION = 4
 
 /**
- * Projects of this version and the previous one are read; `saved` is the NC the file attaches
+ * A project of an earlier format, in the current one: its probing operations upgraded
+ * (`upgradeOperations`). What it still does not recognize (such as format 4's travel Z) is left
+ * for reading to leave out and report, rather than rewritten field by field.
+ */
+function upgradePayload(payload: unknown): unknown {
+  const project = payload as Record<string, unknown>
+  const plates = Array.isArray(project.plates)
+    ? project.plates.map((plate: unknown) =>
+        isJsonObject(plate)
+          ? { ...plate, operations: upgradeOperations(plate.operations) }
+          : plate
+      )
+    : project.plates
+  return { ...project, schemaVersion: PROJECT_SCHEMA_VERSION, plates }
+}
+
+/**
+ * Projects of this version and the earlier ones from format 4 are read; `saved` is the NC the file attaches
  * to each instruction. The document is read optimistically: what the schema upgrades or
  * normalises is taken as it returns it, and data it does not recognize is left out and
  * reported rather than refused.
@@ -109,17 +128,12 @@ function readPayload(
     throw new Error(
       `This project was saved by a newer version of OpenSpindle (project format ${schemaVersion}). Update OpenSpindle to open it.`
     )
-  if (schemaVersion < PREVIOUS_SCHEMA_VERSION)
+  if (schemaVersion < OLDEST_SCHEMA_VERSION)
     throw new Error(
       `This project was saved by an earlier version of OpenSpindle (project format ${schemaVersion}), which this version cannot open.`
     )
   const current =
-    schemaVersion === PREVIOUS_SCHEMA_VERSION
-      ? {
-          ...(payload as Record<string, unknown>),
-          schemaVersion: PROJECT_SCHEMA_VERSION,
-        }
-      : payload
+    schemaVersion < PROJECT_SCHEMA_VERSION ? upgradePayload(payload) : payload
   const read = readOptimistically(ProjectDocumentSchema, current)
   if (!read.success)
     throw new Error(
