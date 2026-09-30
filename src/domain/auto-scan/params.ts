@@ -1,12 +1,12 @@
 import { z } from "zod"
 import { COORDINATE_LIMIT } from "../primitives"
-import type { ParameterSpec } from "../probing/parameters"
+import type { SpecsOf } from "../probing/parameters"
 
 /** The trace's numeric parameters. */
 export type AutoScanField = "travelZ" | "feed"
 
 /** A machine's trace parameters, which its probe defines (`OutlineTrace.parameters`). */
-export type AutoScanSpecs = Readonly<Record<AutoScanField, ParameterSpec>>
+export type AutoScanSpecs = SpecsOf<AutoScanParams, AutoScanField>
 
 /** A sanity bound for stored feeds, mm/min; the machine's probe sets the usable range. */
 const storedFeed = z.number().positive().max(100_000)

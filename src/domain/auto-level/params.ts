@@ -1,22 +1,13 @@
 import { z } from "zod"
 import { COORDINATE_LIMIT } from "../primitives"
-import type { PairSpec, ParameterSpec } from "../probing/parameters"
+import type { SpecsOf } from "../probing/parameters"
 import { ProbePlacementSchema } from "../probing/placement"
 
-/**
- * A machine's grid parameters, which its probe defines (`GridProbing.parameters`), in form and
- * plugin-manifest order.
- */
-export type AutoLevelParameters = {
-  /** The grid's width along X and depth along Y. */
-  readonly size: PairSpec
-  /** Endpoint-inclusive probe points along X and along Y. */
-  readonly points: PairSpec
-  readonly clearance: ParameterSpec
-}
+/** The grid's numeric parameters, in form and plugin-manifest order. */
+export type AutoLevelField = "size" | "points" | "clearance"
 
-/** The grid's numeric parameters. */
-export type AutoLevelField = keyof AutoLevelParameters
+/** A machine's grid parameters, which its probe defines (`GridProbing.parameters`). */
+export type AutoLevelSpecs = SpecsOf<AutoLevelParams, AutoLevelField>
 
 const storedLength = z.number().positive().max(COORDINATE_LIMIT)
 const storedCount = z.int().min(2).max(COORDINATE_LIMIT)

@@ -2,7 +2,7 @@ import { formatMillimetres } from "../../../geometry/millimetres"
 import type { ProbeGrid, ProbePoint } from "../../../auto-level/probe-grid"
 import type {
   AutoZHeightField,
-  AutoZHeightParameters,
+  AutoZHeightSpecs,
   AutoZHeightParams,
 } from "../../../auto-z-height/params"
 import type { ProbeTouch } from "../../../auto-z-height/probe-touch"
@@ -20,7 +20,7 @@ import { anchorTravel } from "./travel"
  * Z probe uses on the Z1 (`coordinate.toolrack_z`): a probe change ends at the firmware's
  * clearance Z near the top of travel, and the search has to reach the stock from there.
  */
-const TOUCH_PARAMETERS: AutoZHeightParameters = {
+const TOUCH_PARAMETERS: AutoZHeightSpecs = {
   probeTravel: {
     label: "Probe travel",
     axis: "Z",

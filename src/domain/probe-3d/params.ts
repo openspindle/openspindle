@@ -2,7 +2,7 @@ import { z } from "zod"
 import type { Vec2 } from "../geometry/frame"
 import { COORDINATE_LIMIT } from "../primitives"
 import { defaultsOf, rangedSchema } from "../probing/parameters"
-import type { PairSpec, ParameterSpec } from "../probing/parameters"
+import type { SpecsOf } from "../probing/parameters"
 import { ProbePlacementSchema } from "../probing/placement"
 
 /**
@@ -54,18 +54,11 @@ export const PROBE_3D_AXES_LABELS: Readonly<Record<Probe3dAxes, string>> = {
   y: "Y only",
 }
 
-/**
- * A machine's 3D probing parameters, in form order, which its probe defines
- * (`OriginProbing.parameters`).
- */
-export type Probe3dParameters = {
-  readonly ballDiameter: ParameterSpec
-  readonly distance: PairSpec
-  readonly depth: ParameterSpec
-}
+/** The routine's numeric parameters, in form order. */
+export type Probe3dField = "ballDiameter" | "distance" | "depth"
 
-/** The routine's numeric parameters. */
-export type Probe3dField = keyof Probe3dParameters
+/** A machine's 3D probing parameters, which its probe defines (`OriginProbing.parameters`). */
+export type Probe3dSpecs = SpecsOf<Probe3dParams, Probe3dField>
 
 const storedLength = z.number().positive().max(COORDINATE_LIMIT)
 
@@ -99,14 +92,12 @@ export const Probe3dParamsSchema = z.strictObject({
 export type Probe3dParams = z.infer<typeof Probe3dParamsSchema>
 
 /** The parameters within the ranges of a machine's 3D probe, as its form and its NC take them. */
-export function probe3dParamsSchema(parameters: Probe3dParameters) {
+export function probe3dParamsSchema(parameters: Probe3dSpecs) {
   return rangedSchema(Probe3dParamsSchema, parameters)
 }
 
 /** A new operation's parameters: an outside corner at the front left, with the probe's defaults. */
-export function defaultProbe3dParams(
-  parameters: Probe3dParameters
-): Probe3dParams {
+export function defaultProbe3dParams(parameters: Probe3dSpecs): Probe3dParams {
   return {
     routine: "outside-corner",
     corner: "front-left",

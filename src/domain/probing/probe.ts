@@ -1,28 +1,16 @@
 import type { NcBlock } from "@/machine/contract"
 import type { GCodeProgram } from "@/domain/nc/gcode"
-import type {
-  AutoLevelField,
-  AutoLevelParameters,
-  AutoLevelParams,
-} from "../auto-level/params"
+import type { AutoLevelSpecs, AutoLevelParams } from "../auto-level/params"
 import type { ProbeGrid, ProbePoint } from "../auto-level/probe-grid"
-import type {
-  AutoScanField,
-  AutoScanParams,
-  AutoScanSpecs,
-} from "../auto-scan/params"
+import type { AutoScanParams, AutoScanSpecs } from "../auto-scan/params"
 import type {
   AutoZHeightField,
-  AutoZHeightParameters,
+  AutoZHeightSpecs,
   AutoZHeightParams,
 } from "../auto-z-height/params"
 import type { ProbeTouch } from "../auto-z-height/probe-touch"
 import type { Rect } from "../geometry/rect"
-import type {
-  Probe3dField,
-  Probe3dParameters,
-  Probe3dParams,
-} from "../probe-3d/params"
+import type { Probe3dSpecs, Probe3dParams } from "../probe-3d/params"
 import type { ParameterSpecs } from "./parameters"
 import type { ProbeStart } from "./placement"
 
@@ -47,8 +35,11 @@ export type ProbingPlan<TParams> = {
  * operation's parameters (`parameters`), and the NC of a planned operation (`program`). Each
  * operation's plan says what else its NC needs.
  */
-export interface Capability<TPlan, TField extends string = string> {
-  readonly parameters: ParameterSpecs<TField>
+export interface Capability<
+  TPlan,
+  TSpecs extends ParameterSpecs = ParameterSpecs,
+> {
+  readonly parameters: TSpecs
   program: (plan: TPlan) => ProbeProgram
 }
 
@@ -65,9 +56,7 @@ export type GridShape = Pick<
 export type GridPlan = ProbingPlan<Omit<AutoLevelParams, "placement">>
 
 /** How a machine probes a height grid, which auto-level compensates with. */
-export interface GridProbing extends Capability<GridPlan, AutoLevelField> {
-  /** The grid's parameters: defaults, and the ranges the machine accepts. */
-  readonly parameters: AutoLevelParameters
+export interface GridProbing extends Capability<GridPlan, AutoLevelSpecs> {
   /** The NC probing a planned grid from its start; it always has the probing block. */
   program: (plan: GridPlan) => ProbeProgram & { readonly probeLine: number }
   /** A grid's samples, in the order the firmware visits them. */
@@ -82,9 +71,8 @@ export interface GridProbing extends Capability<GridPlan, AutoLevelField> {
  */
 export interface TouchOff extends Capability<
   ProbingPlan<Pick<AutoZHeightParams, AutoZHeightField>>,
-  AutoZHeightField
+  AutoZHeightSpecs
 > {
-  readonly parameters: AutoZHeightParameters
   /**
    * The touch-offs a program makes where this machine's NC puts the probe, which its `grids`
    * may leave above their last sample: previews of any file.
@@ -105,9 +93,7 @@ export type TracePlan = {
  * How a machine traces an outline with a pointer, such as its probe's laser. Its program neither
  * probes nor reviews a measurement, so it has no probing or review line.
  */
-export interface OutlineTrace extends Capability<TracePlan, AutoScanField> {
-  readonly parameters: AutoScanSpecs
-}
+export type OutlineTrace = Capability<TracePlan, AutoScanSpecs>
 
 /** A planned 3D probing. */
 export type OriginPlan = ProbingPlan<Probe3dParams> & {
@@ -120,9 +106,7 @@ export type OriginPlan = ProbingPlan<Probe3dParams> & {
  * a pocket, or both sides of a pocket or boss, from the plan's start, and sets the work origin
  * there. Its program's probing block is the routine's, which reports each contact.
  */
-export interface OriginProbing extends Capability<OriginPlan, Probe3dField> {
-  readonly parameters: Probe3dParameters
-}
+export type OriginProbing = Capability<OriginPlan, Probe3dSpecs>
 
 /** How a program's sections see a machine's probing NC, in any NC file. */
 export interface ProbingSections {

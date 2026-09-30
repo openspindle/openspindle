@@ -4,7 +4,7 @@ import type { WorkArea } from "../compile/toolpath-bounds"
 import type { Plate } from "../plate/plate"
 import { roundMillimetres } from "../geometry/millimetres"
 import { rectSize } from "../geometry/rect"
-import type { AutoLevelParameters, AutoLevelParams } from "./params"
+import type { AutoLevelSpecs, AutoLevelParams } from "./params"
 import { defaultsOf } from "../probing/parameters"
 import { anchorPlacementAt, placementAnchors } from "../probing/placement"
 import type { AnchorPlacement, ProbePlacement } from "../probing/placement"
@@ -19,7 +19,7 @@ export function fitAutoLevelGrid(
   anchors: readonly BedAnchor[],
   current: ProbePlacement,
   last: AnchorPlacement | null,
-  { size }: AutoLevelParameters
+  { size }: AutoLevelSpecs
 ): Pick<AutoLevelParams, "size" | "placement"> {
   const extent = rectSize(area)
   const fit = (axis: 0 | 1) =>
@@ -40,7 +40,7 @@ export function fitAutoLevelGrid(
  */
 export function plateAutoLevelParams(
   plate: Plate,
-  parameters: AutoLevelParameters
+  parameters: AutoLevelSpecs
 ): AutoLevelParams {
   const params: AutoLevelParams = {
     ...defaultsOf(parameters),

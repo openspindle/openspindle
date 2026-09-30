@@ -5,7 +5,7 @@ import { rectCenter } from "../geometry/rect"
 import { plateWorkArea } from "../compile/toolpath-bounds"
 import type { WorkArea } from "../compile/toolpath-bounds"
 import type { Plate } from "../plate/plate"
-import type { AutoZHeightParameters, AutoZHeightParams } from "./params"
+import type { AutoZHeightSpecs, AutoZHeightParams } from "./params"
 import { defaultsOf } from "../probing/parameters"
 import { anchorPlacementAt, placementAnchors } from "../probing/placement"
 import type { AnchorPlacement, ProbePlacement } from "../probing/placement"
@@ -33,7 +33,7 @@ export function centerAutoZHeight(
  */
 export function plateAutoZHeightParams(
   plate: Plate,
-  parameters: AutoZHeightParameters
+  parameters: AutoZHeightSpecs
 ): AutoZHeightParams {
   const params: AutoZHeightParams = {
     ...defaultsOf(parameters),

@@ -5,7 +5,7 @@ import { Hint } from "@/components/workspace/hint"
 import { centerAutoZHeight, workAreaMiddle } from "@/domain/auto-z-height/fit"
 import { AutoZHeightParamsSchema } from "@/domain/auto-z-height/params"
 import type {
-  AutoZHeightParameters,
+  AutoZHeightSpecs,
   AutoZHeightParams,
 } from "@/domain/auto-z-height/params"
 import {
@@ -29,7 +29,7 @@ import type { AnchorPlacement } from "@/domain/probing/placement"
 export type AutoZHeightSettingsProps = {
   value: AutoZHeightParams
   /** The touch-off's parameters on the machine's probe: defaults, ranges and descriptions. */
-  parameters: AutoZHeightParameters
+  parameters: AutoZHeightSpecs
   /** Stored anchors of the plate's device that the touch point can be relative to. */
   anchors: readonly ProbingAnchorOption[]
   /** Where the plate cuts, or its stock without machining: Center touches its middle. */

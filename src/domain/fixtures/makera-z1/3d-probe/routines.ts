@@ -8,7 +8,7 @@ import {
   probe3dFields,
   setsWorkZ,
 } from "../../../probe-3d/params"
-import type { Probe3dParameters, Probe3dParams } from "../../../probe-3d/params"
+import type { Probe3dSpecs, Probe3dParams } from "../../../probe-3d/params"
 import { probe3dStartOffset } from "../../../probe-3d/rules"
 import type { ParameterSpec } from "../../../probing/parameters"
 import type { OriginProbing } from "../../../probing/probe"
@@ -32,7 +32,7 @@ const distance = (axis: "X" | "Y"): ParameterSpec => ({
  * Application limits, not a clearance check. The ball's default is the Makera 3D Probe's; the
  * firmware's own defaults are 20 mm distances and a 2 mm depth.
  */
-const PROBE_3D_PARAMETERS: Probe3dParameters = {
+const PROBE_3D_PARAMETERS: Probe3dSpecs = {
   ballDiameter: {
     label: "Ball diameter",
     unit: "mm",

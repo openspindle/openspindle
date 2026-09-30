@@ -6,7 +6,7 @@ import type { XYZ } from "../geometry/frame"
 import { EPSILON } from "../geometry/millimetres"
 import { contains, rectAt } from "../geometry/rect"
 import { AutoZHeightParamsSchema } from "./params"
-import type { AutoZHeightParameters, AutoZHeightParams } from "./params"
+import type { AutoZHeightSpecs, AutoZHeightParams } from "./params"
 import { rangedSchema } from "../probing/parameters"
 import { resolvePlacement } from "../probing/placement"
 import type {
@@ -55,7 +55,7 @@ export type AutoZHeightPlan = Checked<ProbingPlan<AutoZHeightParams>>
 export function planAutoZHeight(
   params: AutoZHeightParams,
   plate: PlacementContext,
-  parameters: AutoZHeightParameters
+  parameters: AutoZHeightSpecs
 ): AutoZHeightPlan {
   const parsed = rangedSchema(AutoZHeightParamsSchema, parameters).safeParse(
     params
@@ -77,7 +77,7 @@ export function planAutoZHeight(
 export function validateAutoZHeight(
   params: AutoZHeightParams,
   plate: AutoZHeightPlateContext,
-  parameters: AutoZHeightParameters
+  parameters: AutoZHeightSpecs
 ): AutoZHeightIssue[] {
   const plan = planAutoZHeight(params, plate, parameters)
   if (

@@ -28,6 +28,16 @@ export type ParameterSpecs<TField extends string = string> = Readonly<
   Record<TField, ParameterSpec | PairSpec>
 >
 
+/**
+ * The specs of an operation's numeric parameters `TField`: one for a number, a pair for a value
+ * per axis.
+ */
+export type SpecsOf<TParams, TField extends keyof TParams> = {
+  readonly [TKey in TField]: TParams[TKey] extends readonly [number, number]
+    ? PairSpec
+    : ParameterSpec
+}
+
 /** The values parameters take: a number, or a pair of them. */
 export type SpecValues<TSpecs extends ParameterSpecs> = {
   -readonly [TField in keyof TSpecs]: TSpecs[TField] extends PairSpec

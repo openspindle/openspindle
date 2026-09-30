@@ -14,7 +14,7 @@ import type { AutoLevelIssue } from "./issues"
 import { EPSILON, formatMillimetres } from "../geometry/millimetres"
 import { boxRect, contains, rectAt } from "../geometry/rect"
 import { AutoLevelParamsSchema } from "./params"
-import type { AutoLevelParameters, AutoLevelParams } from "./params"
+import type { AutoLevelSpecs, AutoLevelParams } from "./params"
 import { rangedSchema } from "../probing/parameters"
 import { resolvePlacement } from "../probing/placement"
 import type {
@@ -52,7 +52,7 @@ export type AutoLevelPlan = Checked<{
 export function planAutoLevel(
   params: AutoLevelParams,
   plate: PlacementContext,
-  parameters: AutoLevelParameters
+  parameters: AutoLevelSpecs
 ): AutoLevelPlan {
   const checked = checkParams(params, parameters)
   if (!checked.ok) return checked
@@ -65,7 +65,7 @@ export function planAutoLevel(
 export function validateAutoLevel(
   params: AutoLevelParams,
   plate: AutoLevelPlateContext,
-  parameters: AutoLevelParameters
+  parameters: AutoLevelSpecs
 ): AutoLevelIssue[] {
   const checked = checkParams(params, parameters)
   if (!checked.ok) return checked.issues
@@ -157,7 +157,7 @@ export function autoLevelRunIssues(
 
 function checkParams(
   params: AutoLevelParams,
-  parameters: AutoLevelParameters
+  parameters: AutoLevelSpecs
 ): Checked<{ params: AutoLevelParams }> {
   const parsed = rangedSchema(AutoLevelParamsSchema, parameters).safeParse(
     params

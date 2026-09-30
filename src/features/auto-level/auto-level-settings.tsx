@@ -4,7 +4,7 @@ import { FieldGroup, FieldLegend, FieldSet } from "@/components/ui/field"
 import { fitAutoLevelGrid } from "@/domain/auto-level/fit"
 import { AutoLevelParamsSchema } from "@/domain/auto-level/params"
 import type {
-  AutoLevelParameters,
+  AutoLevelSpecs,
   AutoLevelParams,
 } from "@/domain/auto-level/params"
 import { rangedSchema } from "@/domain/probing/parameters"
@@ -29,7 +29,7 @@ import type { AnchorPlacement } from "@/domain/probing/placement"
 export type AutoLevelSettingsProps = {
   value: AutoLevelParams
   /** The grid's parameters on the machine's probe: defaults, ranges and descriptions. */
-  parameters: AutoLevelParameters
+  parameters: AutoLevelSpecs
   /** Stored anchors of the plate's device that the grid can start from. */
   anchors: readonly ProbingAnchorOption[]
   /** Where the plate cuts, or its stock without machining: what Fit grid covers. */

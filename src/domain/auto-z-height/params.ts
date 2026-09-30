@@ -1,15 +1,13 @@
 import { z } from "zod"
 import { COORDINATE_LIMIT } from "../primitives"
-import type { ParameterSpec } from "../probing/parameters"
+import type { SpecsOf } from "../probing/parameters"
 import { ProbePlacementSchema } from "../probing/placement"
 
 /** The touch-off parameters that a machine's probe gives ranges and defaults. */
 export type AutoZHeightField = "probeTravel" | "clearance"
 
 /** A machine's touch-off parameters, which its probe defines (`TouchOff.parameters`). */
-export type AutoZHeightParameters = Readonly<
-  Record<AutoZHeightField, ParameterSpec>
->
+export type AutoZHeightSpecs = SpecsOf<AutoZHeightParams, AutoZHeightField>
 
 const storedLength = z.number().positive().max(COORDINATE_LIMIT)
 

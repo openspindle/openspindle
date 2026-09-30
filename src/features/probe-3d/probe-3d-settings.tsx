@@ -21,7 +21,7 @@ import {
 } from "@/domain/probe-3d/params"
 import type {
   Probe3dAxes,
-  Probe3dParameters,
+  Probe3dSpecs,
   Probe3dParams,
   Probe3dRoutine,
 } from "@/domain/probe-3d/params"
@@ -42,7 +42,7 @@ import type { AnchorPlacement } from "@/domain/probing/placement"
 export type Probe3dSettingsProps = {
   value: Probe3dParams
   /** The routine's parameters on the machine's 3D probe: defaults, ranges and descriptions. */
-  parameters: Probe3dParameters
+  parameters: Probe3dSpecs
   /** Stored anchors of the plate's device that the start can be relative to. */
   anchors: readonly ProbingAnchorOption[]
   /** Receives complete, valid parameters as soon as an edit makes them valid. */

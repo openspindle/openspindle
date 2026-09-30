@@ -3,7 +3,7 @@ import type { LaterAutoLevel } from "../auto-z-height/rules"
 import { issueOf } from "../diagnostics"
 import type { Issue } from "../diagnostics"
 import { cornerInward, probe3dParamsSchema, setsWorkZ } from "./params"
-import type { Probe3dParameters, Probe3dParams } from "./params"
+import type { Probe3dSpecs, Probe3dParams } from "./params"
 import type { Vec2 } from "../geometry/frame"
 import { roundMillimetres } from "../geometry/millimetres"
 import { placementHeight, resolvePlacement } from "../probing/placement"
@@ -39,7 +39,7 @@ export type Probe3dPlan = Checked<OriginPlan>
 export function planProbe3d(
   params: Probe3dParams,
   plate: PlacementContext,
-  parameters: Probe3dParameters
+  parameters: Probe3dSpecs
 ): Probe3dPlan {
   const parsed = probe3dParamsSchema(parameters).safeParse(params)
   if (!parsed.success)
@@ -85,7 +85,7 @@ export function probe3dStartOffset(
 export function validateProbe3d(
   params: Probe3dParams,
   plate: PlacementContext,
-  parameters: Probe3dParameters
+  parameters: Probe3dSpecs
 ): Probe3dIssue[] {
   const plan = planProbe3d(params, plate, parameters)
   if (!plan.ok) return plan.issues
