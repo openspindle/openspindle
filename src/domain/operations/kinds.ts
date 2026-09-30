@@ -330,10 +330,11 @@ const autoZHeightKind: OperationKind<"auto-z-height"> = {
           }
         )
       )
+    const { nc, reviewLine } = generated.program
     return ok({
-      nc: generated.program.nc,
+      nc,
       policy: { probing: "touch-off", anchoredProbing: false },
-      reviewLines: [],
+      reviewLines: reviewLine === null ? [] : [reviewLine],
     })
   },
   validate: (operation, plate, { probe }) => {

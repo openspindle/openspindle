@@ -1,6 +1,7 @@
 import { formatMillimetres } from "../../../geometry/millimetres"
 import type { ProbeGrid, ProbePoint } from "../../../auto-level/probe-grid"
 import type {
+  AutoZHeightField,
   AutoZHeightParameters,
   AutoZHeightParams,
 } from "../../../auto-z-height/params"
@@ -54,7 +55,7 @@ const TOUCH_OFF_MOTION = {
   backOff: 1,
 } as const
 
-type Touch = Pick<AutoZHeightParams, "probeTravel" | "clearance">
+type Touch = Pick<AutoZHeightParams, AutoZHeightField>
 
 const INTRODUCTION = [
   "; Makera wired Probe 2.0 - auto Z-height",
@@ -87,16 +88,25 @@ const FIRMWARE_PRECAUTIONS = [
 ]
 
 /**
- * The firmware's own Z probe (ATCHandler::fill_zprobe_scripts): a fast touch, a back-off, a slow
- * touch, then G10 L20 P0 sets work Z0 at the contact. The firmware reads G38.2 distances as
- * relative in any mode; G91 says so for every reader.
+ * The firmware's own Z probe (ATCHandler::fill_zprobe_scripts) up to its first touch, the fast
+ * one; `slowTouch` follows it. The firmware reads G38.2 distances as relative in any mode; G91
+ * says so for every reader.
  */
-function touchOff({ probeTravel, clearance }: Touch) {
-  const { fastFeed, slowFeed, backOff } = TOUCH_OFF_MOTION
+function fastTouch({ probeTravel }: Pick<Touch, "probeTravel">) {
   return [
     "; Touch fast, back off, touch again slowly (relative G38.2 distances).",
     "G91",
-    `G38.2 Z-${formatMillimetres(probeTravel)} F${fastFeed}`,
+    `G38.2 Z-${formatMillimetres(probeTravel)} F${TOUCH_OFF_MOTION.fastFeed}`,
+  ]
+}
+
+/**
+ * The rest of the firmware's own Z probe after the fast touch: a back-off, a slow touch, then
+ * G10 L20 P0 sets work Z0 at the contact.
+ */
+function slowTouch({ clearance }: Pick<Touch, "clearance">) {
+  const { slowFeed, backOff } = TOUCH_OFF_MOTION
+  return [
     `G0 Z${backOff}`,
     `G38.2 Z-${backOff + 1} F${slowFeed}`,
     "G90",
@@ -113,16 +123,14 @@ function touchOff({ probeTravel, clearance }: Touch) {
  * and slow touches, then work Z0 at the contact and 1 mm up, left in G91. The machine reports
  * every step.
  */
-function firmwareTouch(
-  { clearance }: Pick<Touch, "clearance">,
-  [x, y]: XY<"work">
-) {
+function firmwareTouch([x, y]: XY<"work">) {
   const mm = (value: number) => String(Number(value.toFixed(3)) + 0)
-  return [
-    `M495 X${mm(x)} Y${mm(y)} O0 F0`,
-    "G90",
-    `G0 Z${formatMillimetres(clearance)}`,
-  ]
+  return `M495 X${mm(x)} Y${mm(y)} O0 F0`
+}
+
+/** Back to absolute distances after the firmware's Z probe, and up to the clearance. */
+function firmwareLift({ clearance }: Pick<Touch, "clearance">) {
+  return ["G90", `G0 Z${formatMillimetres(clearance)}`]
 }
 
 /** Where the probe is, or null once the NC has moved it where a preview cannot follow. */
@@ -243,8 +251,8 @@ function touchPoints(
 /** The firmware's own Z probe with the wired probe, then work Z set at the contact. */
 export const TOUCH_OFF: TouchOff = {
   parameters: TOUCH_PARAMETERS,
-  program(touch, start) {
-    const travel = formatMillimetres(touch.probeTravel)
+  program({ params, start }) {
+    const travel = formatMillimetres(params.probeTravel)
     // In work coordinates the firmware's own Z probe can run it, reporting as it goes.
     const work = start.kind === "anchor" ? start.work : null
     let lines: string[]
@@ -254,7 +262,7 @@ export const TOUCH_OFF: TouchOff = {
         ...POSITION_PROBE,
         ...precautions(travel),
         ...PROBE_SETUP,
-        ...touchOff(touch),
+        ...fastTouch(params),
       ]
     else if (work)
       lines = [
@@ -262,7 +270,7 @@ export const TOUCH_OFF: TouchOff = {
         ...FIRMWARE_PRECAUTIONS,
         ...FIRMWARE_PROBE_SETUP,
         ...anchorTravel(start),
-        ...firmwareTouch(touch, work),
+        firmwareTouch(work),
       ]
     else
       lines = [
@@ -270,10 +278,11 @@ export const TOUCH_OFF: TouchOff = {
         ...precautions(travel),
         ...PROBE_SETUP,
         ...anchorTravel(start),
-        ...touchOff(touch),
+        ...fastTouch(params),
       ]
-    lines.push("M2")
-    return `${lines.join("\n")}\n`
+    const probeLine = lines.length
+    lines.push(...(work ? firmwareLift(params) : slowTouch(params)), "M2")
+    return { nc: `${lines.join("\n")}\n`, probeLine, reviewLine: null }
   },
   touches: touchPoints,
 }

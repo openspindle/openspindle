@@ -12,6 +12,7 @@ import type {
   AutoScanSpecs,
 } from "../auto-scan/params"
 import type {
+  AutoZHeightField,
   AutoZHeightParameters,
   AutoZHeightParams,
 } from "../auto-z-height/params"
@@ -79,14 +80,15 @@ export interface GridProbing {
   grids: (program: GCodeProgram) => ProbeGrid[]
 }
 
-/** How a machine touches off the stock top and sets work Z there. */
-export interface TouchOff {
+/**
+ * How a machine touches off the stock top below a plan's start and sets work Z0 there. Its
+ * program's probe line is the first touch; it never pauses for a review.
+ */
+export interface TouchOff extends Capability<
+  ProbingPlan<Pick<AutoZHeightParams, AutoZHeightField>>,
+  AutoZHeightField
+> {
   readonly parameters: AutoZHeightParameters
-  /** The NC touching off below its start and setting work Z0 there. */
-  program: (
-    touch: Pick<AutoZHeightParams, "probeTravel" | "clearance">,
-    start: ProbeStart
-  ) => string
   /**
    * The touch-offs a program makes where this machine's NC puts the probe, which its `grids`
    * may leave above their last sample: previews of any file.

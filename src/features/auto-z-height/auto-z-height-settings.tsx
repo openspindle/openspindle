@@ -3,10 +3,7 @@ import { LocateFixed } from "lucide-react"
 import { FieldGroup, FieldLegend, FieldSet } from "@/components/ui/field"
 import { Hint } from "@/components/workspace/hint"
 import { centerAutoZHeight, workAreaMiddle } from "@/domain/auto-z-height/fit"
-import {
-  AUTO_Z_HEIGHT_FIELDS,
-  autoZHeightParamsSchema,
-} from "@/domain/auto-z-height/params"
+import { AutoZHeightParamsSchema } from "@/domain/auto-z-height/params"
 import type {
   AutoZHeightParameters,
   AutoZHeightParams,
@@ -26,6 +23,7 @@ import type {
   ProbingAnchorOption,
   WorkAreaFit,
 } from "@/features/probing/probing-form"
+import { rangedSchema } from "@/domain/probing/parameters"
 import type { AnchorPlacement } from "@/domain/probing/placement"
 
 export type AutoZHeightSettingsProps = {
@@ -97,7 +95,7 @@ function AutoZHeightForm({
   disabled,
 }: Required<AutoZHeightSettingsProps>) {
   const id = useId()
-  const schema = autoZHeightParamsSchema(parameters)
+  const schema = rangedSchema(AutoZHeightParamsSchema, parameters)
   // Switching back from the probe position restores the anchor settings.
   const [lastAnchor, setLastAnchor] = useState<AnchorPlacement | null>(null)
   const form = useProbingForm(value, schema, onChange)
@@ -114,11 +112,18 @@ function AutoZHeightForm({
           <NumericFields
             id={id}
             disabled={disabled}
-            fields={AUTO_Z_HEIGHT_FIELDS.map((name) => ({
-              name,
-              parameter: parameters[name],
-              field: probingField(form, name),
-            }))}
+            fields={[
+              {
+                name: "probeTravel",
+                parameter: parameters.probeTravel,
+                field: probingField(form, "probeTravel"),
+              },
+              {
+                name: "clearance",
+                parameter: parameters.clearance,
+                field: probingField(form, "clearance"),
+              },
+            ]}
           />
         </FieldGroup>
       </FieldSet>

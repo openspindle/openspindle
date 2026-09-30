@@ -1,16 +1,11 @@
-import type { TouchOff } from "../probing/probe"
+import type { ProbeProgram, TouchOff } from "../probing/probe"
 import type { AutoZHeightParams } from "./params"
 import { planAutoZHeight } from "./rules"
 import type { AutoZHeightIssue } from "./rules"
 import type { PlacementContext } from "../probing/placement"
 
-export type AutoZHeightProgram = {
-  /** Newline-terminated NC from the machine's probe. */
-  nc: string
-}
-
 export type AutoZHeightGeneration =
-  | { ok: true; program: AutoZHeightProgram }
+  | { ok: true; program: ProbeProgram }
   | { ok: false; issues: AutoZHeightIssue[] }
 
 /**
@@ -26,6 +21,6 @@ export function generateAutoZHeightNc(
   if (!plan.ok) return plan
   return {
     ok: true,
-    program: { nc: touchOff.program(plan.params, plan.start) },
+    program: touchOff.program({ params: plan.params, start: plan.start }),
   }
 }
