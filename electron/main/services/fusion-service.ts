@@ -20,6 +20,7 @@ import type {
   FusionProgramSummary,
 } from "../../../src/platform/contract/fusion"
 import { log } from "../diagnostics/log"
+import type { FusionCredentials } from "./fusion-credentials"
 
 const LIST_MAX_BYTES = 256 * 1024
 // JSON can escape a single byte as six characters (\u0000). The decoded NC has its own cap.
@@ -39,6 +40,7 @@ const OfferSchema = FusionPairingRequestSchema.extend({
 const PairingResultSchema = z.strictObject({
   token: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
 })
+const RevokedSchema = z.strictObject({})
 const BridgeErrorSchema = z.strictObject({
   error: z
     .string()
@@ -155,11 +157,14 @@ async function readBridgeError(
 }
 
 /**
- * Accepts loopback pairing offers, discovers live NC programs, and posts on import.
- * Credentials stay in this process and last only for this app session.
+ * Accepts loopback pairing offers, discovers live NC programs, and posts on import. The
+ * connection's token is kept between app sessions (`credentials`), as Fusion keeps its pairing;
+ * a token Fusion no longer accepts is dropped, and Disconnect forgets it in both.
  */
 export class FusionService {
   private token: string | null = null
+  /** Counts connections and disconnections, so a token read late does not undo one. */
+  private changes = 0
   private session = new AbortController()
   private readonly lifetime = new AbortController()
   private busy = false
@@ -177,8 +182,11 @@ export class FusionService {
     (snapshot: FusionConnectionSnapshot) => void
   >()
 
+  constructor(private readonly credentials: FusionCredentials | null = null) {}
+
   start(): void {
     if (this.socket || this.lifetime.signal.aborted) return
+    void this.restore()
     const socket = createSocket("udp4")
     this.socket = socket
     socket.on("message", (message, remote) => {
@@ -256,9 +264,13 @@ export class FusionService {
         throw new RpcError("CANCELLED", "The Fusion connection was cancelled.")
       if (pending.expiresAt <= Date.now()) throw responseError(410, true)
       // A failed replacement pairing leaves the previous connection usable.
+      const previous = this.token
       this.token = token
+      this.changes++
       this.clearPairing()
       this.emit()
+      void this.keep(token)
+      if (previous && previous !== token) void this.revoke(previous)
     } catch (error) {
       if (
         this.pending === pending &&
@@ -305,20 +317,82 @@ export class FusionService {
     return program
   }
 
+  /** Forgets the connection, here and in Fusion when it is running. */
   disconnect(): void {
+    const token = this.token
     this.token = null
+    this.changes++
     this.session.abort()
     this.session = new AbortController()
     this.cancelVerification(true)
     this.clearPairing()
     this.emit()
+    void this.discard()
+    if (token) void this.revoke(token)
   }
 
+  /** Stops for quitting: the connection stays kept for the next session. */
   dispose(): void {
-    this.disconnect()
+    this.token = null
+    this.session.abort()
+    this.cancelVerification(true)
+    this.clearPairing()
     this.lifetime.abort()
     this.closeSocket()
     this.listeners.clear()
+  }
+
+  /** The token kept from an earlier session, unless this one connected or disconnected since. */
+  private async restore(): Promise<void> {
+    const changes = this.changes
+    const token = await this.credentials?.load().catch(() => null)
+    if (!token || this.changes !== changes || this.lifetime.signal.aborted)
+      return
+    this.token = token
+    this.emit()
+  }
+
+  private async keep(token: string): Promise<void> {
+    try {
+      if (this.credentials && !(await this.credentials.save(token)))
+        log.warn(
+          "The Fusion connection lasts for this session only: the system cannot encrypt it."
+        )
+    } catch {
+      log.warn("Could not keep the Fusion connection for the next session.")
+    }
+  }
+
+  private async discard(): Promise<void> {
+    try {
+      await this.credentials?.clear()
+    } catch {
+      log.warn("Could not forget the kept Fusion connection.")
+    }
+  }
+
+  /** Drops a token Fusion no longer accepts, such as one it forgot. */
+  private drop(token: string): void {
+    if (this.token !== token) return
+    this.token = null
+    this.changes++
+    this.emit()
+    void this.discard()
+  }
+
+  /** Asks Fusion to forget `token`. Fusion may be closed: it keeps only its newest pairings. */
+  private async revoke(token: string): Promise<void> {
+    try {
+      await this.request(
+        "/v1/pairing",
+        ERROR_MAX_BYTES,
+        RevokedSchema,
+        AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+        { token, method: "DELETE" }
+      )
+    } catch {
+      // Fusion closed, or it forgot the token already.
+    }
   }
 
   private receiveOffer(message: Buffer): void {
@@ -471,6 +545,11 @@ export class FusionService {
         AbortSignal.any(signals),
         { ...options, token }
       )
+    } catch (error) {
+      // Fusion no longer accepts the token: connecting again is the way back.
+      if (error instanceof RpcError && error.code === "PERMISSION_DENIED")
+        this.drop(token)
+      throw error
     } finally {
       this.busy = false
     }
@@ -481,7 +560,12 @@ export class FusionService {
     maxBytes: number,
     schema: z.ZodType<T>,
     callerSignal: AbortSignal,
-    options: { token?: string; body?: string; timeoutMs?: number } = {}
+    options: {
+      token?: string
+      body?: string
+      timeoutMs?: number
+      method?: "DELETE"
+    } = {}
   ): Promise<T> {
     const timeout = AbortSignal.timeout(options.timeoutMs ?? REQUEST_TIMEOUT_MS)
     const signal = AbortSignal.any([
@@ -506,7 +590,7 @@ export class FusionService {
             hostname: "127.0.0.1",
             port: 38764,
             path: route,
-            method: options.body ? "POST" : "GET",
+            method: options.method ?? (options.body ? "POST" : "GET"),
             agent: false,
             signal,
             headers,

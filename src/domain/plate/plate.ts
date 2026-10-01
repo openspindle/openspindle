@@ -4,9 +4,18 @@ import {
   FIXTURE_LIMIT,
   FixtureInstanceSchema,
   defaultFixtureInstances,
+  fixtureBounds,
+  fixtureInstance,
+  isBedKind,
+  isLocked,
   stockSupportHeight,
 } from "@/domain/fixtures/definitions"
-import type { FixtureInstance } from "@/domain/fixtures/definitions"
+import type {
+  FixtureBounds,
+  FixtureDefinition,
+  FixtureInstance,
+} from "@/domain/fixtures/definitions"
+import { formatMillimetres } from "@/domain/geometry/millimetres"
 import { kitForSetup } from "../fixtures/catalog"
 import { defaultPlateCoordinates } from "./placement"
 import {
@@ -14,7 +23,7 @@ import {
   bedAnchors,
 } from "@/domain/anchors/stored-anchors"
 import type { StoredAnchorSetup } from "@/domain/anchors/stored-anchors"
-import type { StockPlacement } from "@/domain/nc/stock-markers"
+import type { MarkedFixture, StockPlacement } from "@/domain/nc/stock-markers"
 import { StockSchema } from "@/domain/stock/stock"
 import type { Stock } from "@/domain/stock/stock"
 import { OperationSchema } from "../operations/operation"
@@ -277,6 +286,151 @@ export function withStockPlacement(
       toMicrometre(y + originY),
       toMicrometre(supportHeight + originZ),
     ],
+  }
+}
+
+/** A fixture's name without Fusion 360's number for each use of a component ("Jig:1"). */
+const fixtureName = (name: string) => name.replace(/:\d+$/, "").trim()
+
+/** What fixtures are found by: their name, whatever its case and spacing. */
+const fixtureKey = (name: string) =>
+  fixtureName(name).replace(/\s+/g, " ").toLowerCase()
+
+/** How far a fixture's size in a program may be from the device's and still be the same, mm. */
+const FIXTURE_SIZE_TOLERANCE = 0.5
+
+const sizeText = (size: readonly number[]) =>
+  size.map((length) => formatMillimetres(Number(length.toFixed(2)))).join(" × ")
+
+/**
+ * The setup with the fixtures that hold its program's stock (`fixtures`, read from its markers)
+ * where the program has them beside the stock: each is the device's fixture of that name
+ * (`definitions`; Fusion 360's use number, as in "Jig:1", aside), the plate's own if it has one,
+ * enabled. The stock and the fixtures under it keep the program's heights between them, the
+ * lowest resting on what carries it (a wasteboard under it, else the bed), and the work origin
+ * moves up with the stock; the other fixtures rest on what carries them. Beds stay as the plate
+ * has them. Notices say which fixtures the plate could not have, and which differ in size from
+ * the program's. A setup without stock stays as it is.
+ */
+export function withProgramFixtures(
+  setup: PlateSetup,
+  fixtures: readonly MarkedFixture[],
+  definitions: readonly FixtureDefinition[]
+): { readonly setup: PlateSetup; readonly notices: readonly string[] } {
+  const { stock } = setup
+  if (!stock || !fixtures.length) return { setup, notices: [] }
+  const [x, y, rest] = setup.stockAnchor
+  const notices: string[] = []
+  const placed = [...setup.fixtures]
+  const held: {
+    readonly instance: FixtureInstance
+    readonly index: number
+    readonly box: FixtureBounds
+    readonly corner: readonly [number, number]
+    readonly below: number
+    readonly support: number
+    /** Whether its footprint and the stock's overlap. */
+    readonly under: boolean
+  }[] = []
+  for (const marked of fixtures) {
+    const key = fixtureKey(marked.name)
+    const definition = definitions.find((item) => fixtureKey(item.name) === key)
+    if (!definition?.model) {
+      notices.push(
+        `${fixtureName(marked.name)} holds the program's stock, but it is not one of this device's fixtures, so the plate does not have it.`
+      )
+      continue
+    }
+    if (isBedKind(definition.kind)) continue
+    const index = placed.findIndex(
+      (item, at) =>
+        item.definition.id === definition.id &&
+        !held.some((other) => other.index === at)
+    )
+    const own = index >= 0 ? placed[index] : null
+    if (own && isLocked(own)) {
+      notices.push(
+        `${definition.name} is locked, so it stays where it is, not where the program has it.`
+      )
+      continue
+    }
+    if (
+      !own &&
+      placed.length + held.filter((item) => item.index < 0).length >=
+        FIXTURE_LIMIT
+    ) {
+      notices.push(
+        `The plate holds no more fixtures, so it does not have ${definition.name}.`
+      )
+      continue
+    }
+    const instance = own
+      ? { ...own, enabled: true }
+      : fixtureInstance(definition)
+    // Its box from its position, as it is turned.
+    const box = fixtureBounds({ ...instance, position: [0, 0, 0] })
+    if (!box) continue
+    const size = box.max.map((high, axis) => high - box.min[axis])
+    if (
+      size.some(
+        (length, axis) =>
+          Math.abs(length - marked.size[axis]) > FIXTURE_SIZE_TOLERANCE
+      )
+    )
+      notices.push(
+        `${definition.name} is ${sizeText(marked.size)} mm in the program but ${sizeText(size)} mm on this device: check where the plate has it.`
+      )
+    const corner = [x + marked.corner[0], y + marked.corner[1]] as const
+    const support = stockSupportHeight(
+      setup.fixtures.filter((item) => item !== own),
+      corner,
+      { width: size[0], depth: size[1] }
+    )
+    const under =
+      corner[0] < x + stock.width &&
+      x < corner[0] + size[0] &&
+      corner[1] < y + stock.depth &&
+      y < corner[1] + size[1]
+    held.push({
+      instance,
+      index,
+      box,
+      corner,
+      below: marked.corner[2],
+      support,
+      under,
+    })
+  }
+  if (!held.length) return { setup, notices }
+  // Heights from the stock's bottom, as the program has them, for the fixtures under it: the
+  // lowest rests on its support. The others rest on theirs.
+  const bottom = Math.max(
+    rest,
+    ...held
+      .filter((item) => item.under)
+      .map((item) => item.support - item.below)
+  )
+  for (const { instance, index, box, corner, below, support, under } of held) {
+    const moved: FixtureInstance = {
+      ...instance,
+      position: [
+        toMicrometre(corner[0] - box.min[0]),
+        toMicrometre(corner[1] - box.min[1]),
+        toMicrometre((under ? bottom + below : support) - box.min[2]),
+      ],
+    }
+    if (index >= 0) placed[index] = moved
+    else placed.push(moved)
+  }
+  const [originX, originY, originZ] = setup.workOrigin
+  return {
+    setup: {
+      ...setup,
+      fixtures: placed,
+      stockAnchor: [x, y, toMicrometre(bottom)],
+      workOrigin: [originX, originY, toMicrometre(originZ + bottom - rest)],
+    },
+    notices,
   }
 }
 

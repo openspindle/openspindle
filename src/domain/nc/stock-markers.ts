@@ -1,3 +1,8 @@
+import { hasControlCharacter } from "@/machine/contract"
+import {
+  FIXTURE_LIMIT,
+  FIXTURE_NAME_LIMIT,
+} from "@/domain/fixtures/definitions"
 import { COORDINATE_LIMIT, EntityIdSchema } from "@/domain/primitives"
 import type { Point3 } from "@/domain/primitives"
 import { isStock } from "@/domain/stock/stock"
@@ -14,19 +19,29 @@ export type StockPlacement = {
   } | null
 }
 
-/** The stock a program describes, and where it puts it. */
+/** A fixture a program's stock is held by, by its name, and its box beside the stock's. */
+export type MarkedFixture = {
+  readonly name: string
+  /** Its box's front-left bottom corner from the stock's front-left bottom corner. */
+  readonly corner: Point3
+  /** Its box's size along X, Y and Z. */
+  readonly size: Point3
+}
+
+/** The stock a program describes, where it puts it, and the fixtures that hold it. */
 export type MarkedStock = {
   readonly stock: Stock
   readonly placement: StockPlacement
+  readonly fixtures: readonly MarkedFixture[]
 }
 
 const PREFIX = ";@OPENSPINDLE|"
 
-/** The first of each OpenSpindle marker (`;@OPENSPINDLE|TYPE|key=value|…`), by its type. */
+/** OpenSpindle's markers (`;@OPENSPINDLE|TYPE|key=value|…`) by their type, in program order. */
 function markers(
   lines: readonly string[]
-): ReadonlyMap<string, Readonly<Record<string, string>>> {
-  const found = new Map<string, Record<string, string>>()
+): ReadonlyMap<string, readonly Readonly<Record<string, string>>[]> {
+  const found = new Map<string, Record<string, string>[]>()
   for (const line of lines) {
     const text = line.trim()
     if (
@@ -36,13 +51,13 @@ function markers(
     )
       continue
     const [type, ...entries] = text.slice(PREFIX.length).split("|")
-    if (found.has(type.toUpperCase())) continue
     const values: Record<string, string> = {}
     for (const entry of entries) {
       const equals = entry.indexOf("=")
       if (equals > 0) values[entry.slice(0, equals)] = entry.slice(equals + 1)
     }
-    found.set(type.toUpperCase(), values)
+    const key = type.toUpperCase()
+    found.set(key, [...(found.get(key) ?? []), values])
   }
   return found
 }
@@ -74,15 +89,34 @@ function anchor(
     : null
 }
 
+function fixture(
+  values: Readonly<Partial<Record<string, string>>>
+): MarkedFixture | null {
+  const name = values.name?.trim() ?? ""
+  const corner = [values.x, values.y, values.z].map(coordinate)
+  const size = [values.width, values.depth, values.height].map(coordinate)
+  if (
+    !name ||
+    name.length > FIXTURE_NAME_LIMIT ||
+    hasControlCharacter(name) ||
+    corner.some((value) => value === null) ||
+    size.some((value) => value === null || value <= 0)
+  )
+    return null
+  return { name, corner: corner as Point3, size: size as Point3 }
+}
+
 /**
  * The stock a program describes in OpenSpindle's markers, as the Makera Z1 post for Fusion 360
  * writes them, in millimetres, on `fallback`'s other properties:
  * - `;@OPENSPINDLE|STOCK|width=…|depth=…|height=…`, its size along X, Y and Z;
  * - `;@OPENSPINDLE|WORK_ORIGIN|x=…|y=…|z=…`, the program's zero from its front-left bottom corner;
- * - `;@OPENSPINDLE|STOCK_ANCHOR|relative_to=…|x=…|y=…`, that corner's X and Y from a stored anchor.
+ * - `;@OPENSPINDLE|STOCK_ANCHOR|relative_to=…|x=…|y=…`, that corner's X and Y from a stored anchor;
+ * - `;@OPENSPINDLE|FIXTURE|name=…|x=…|y=…|z=…|width=…|depth=…|height=…`, one for each fixture
+ *   holding it: its name, its box's front-left bottom corner from that corner, and its size.
  *
- * Null without a stock marker, or with one that does not make a valid stock. A work origin or
- * anchor marker that does not read as one is left out.
+ * Null without a stock marker, or with one that does not make a valid stock. A work origin,
+ * anchor or fixture marker that does not read as one is left out.
  */
 export function markedStock(
   lines: readonly string[],
@@ -90,7 +124,7 @@ export function markedStock(
   fallback: Stock
 ): MarkedStock | null {
   const found = markers(lines)
-  const size = found.get("STOCK")
+  const size = found.get("STOCK")?.[0]
   if (!size) return null
   // Its own id, not the fallback's, which would pass it off as that library stock.
   const stock: Stock = {
@@ -107,8 +141,11 @@ export function markedStock(
   return {
     stock,
     placement: {
-      workOrigin: workOrigin(found.get("WORK_ORIGIN")),
-      anchor: anchor(found.get("STOCK_ANCHOR")),
+      workOrigin: workOrigin(found.get("WORK_ORIGIN")?.[0]),
+      anchor: anchor(found.get("STOCK_ANCHOR")?.[0]),
     },
+    fixtures: (found.get("FIXTURE") ?? [])
+      .flatMap((values) => fixture(values) ?? [])
+      .slice(0, FIXTURE_LIMIT),
   }
 }

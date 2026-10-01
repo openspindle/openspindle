@@ -5,8 +5,11 @@ thread-safe fireCustomEvent method captured by the add-in on the main thread.
 """
 
 from dataclasses import dataclass, field
+import hashlib
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
+import os
+from pathlib import Path
 import re
 import secrets
 import select
@@ -29,10 +32,86 @@ MAX_PROGRAMS = 100
 LIST_SECONDS = 8
 POST_SECONDS = 120
 NC_EXTENSIONS = frozenset((".nc", ".cnc", ".gcode", ".tap", ".ngc"))
+# The most OpenSpindle apps paired at once, such as an installed one and one in development.
+MAX_PAIRINGS = 4
 # Main-thread event info for a completed pairing; request events carry a UUID instead.
 PAIRED = "paired"
 _PROGRAM_PATH = re.compile(r"/v2/programs/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/post\Z")
 _PAIRING_CODE = re.compile(r"[0-9]{6}\Z")
+_TOKEN = re.compile(r"[A-Za-z0-9_-]{43}\Z")
+_TOKEN_HASH = re.compile(r"[0-9a-f]{64}\Z")
+
+
+def _token_hash(token):
+    return hashlib.sha256(token.encode("ascii")).hexdigest()
+
+
+class Pairings:
+    """The OpenSpindle apps paired with this add-in, kept across Fusion sessions in `path`.
+
+    Each app has a token of its own. Only a hash of each is stored, so the file alone connects
+    nobody. The newest MAX_PAIRINGS stay: pairing another app beyond that forgets the oldest.
+    Without a path, or when the file cannot be written, pairings last for this session only.
+    """
+
+    def __init__(self, path=None):
+        self._path = Path(path) if path else None
+        self._lock = threading.Lock()
+        self._hashes = self._load()
+
+    def _load(self):
+        if self._path is None:
+            return []
+        try:
+            data = json.loads(self._path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return []
+        hashes = data.get("pairings") if isinstance(data, dict) else None
+        if not isinstance(hashes, list):
+            return []
+        return [item for item in hashes if isinstance(item, str) and _TOKEN_HASH.fullmatch(item)][-MAX_PAIRINGS:]
+
+    def _save(self):
+        # Called holding _lock. Readable by this user only, and replaced whole.
+        if self._path is None:
+            return
+        temporary = self._path.with_name(self._path.name + ".tmp")
+        try:
+            self._path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+            descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+            with os.fdopen(descriptor, "w", encoding="utf-8") as file:
+                json.dump({"version": 1, "pairings": self._hashes}, file)
+            os.replace(temporary, self._path)
+        except OSError:
+            try:
+                temporary.unlink()
+            except OSError:
+                pass
+
+    def add(self):
+        token = secrets.token_urlsafe(32)
+        with self._lock:
+            self._hashes = [*self._hashes, _token_hash(token)][-MAX_PAIRINGS:]
+            self._save()
+        return token
+
+    def accepts(self, token):
+        digest = _token_hash(token)
+        with self._lock:
+            hashes = list(self._hashes)
+        # Compares with every stored hash, so timing does not tell which matched.
+        matched = False
+        for stored in hashes:
+            matched = secrets.compare_digest(stored, digest) or matched
+        return matched
+
+    def forget(self, token):
+        digest = _token_hash(token)
+        with self._lock:
+            kept = [item for item in self._hashes if not secrets.compare_digest(item, digest)]
+            if len(kept) != len(self._hashes):
+                self._hashes = kept
+                self._save()
 
 
 @dataclass
@@ -228,13 +307,17 @@ class _SnapshotRequestHandler(BaseHTTPRequestHandler):
             return False
         return True
 
-    def _is_authorized(self):
+    def _bearer(self):
         authorization = self.headers.get_all("Authorization", [])
-        expected = ("Bearer " + self.server.bridge.token).encode("utf-8")
-        if len(authorization) != 1 or not secrets.compare_digest(
-            authorization[0].encode("utf-8"), expected
-        ):
-            self._send_json(401, {"error": "Invalid session token."})
+        if len(authorization) != 1 or not authorization[0].startswith("Bearer "):
+            return None
+        token = authorization[0][len("Bearer "):]
+        return token if _TOKEN.fullmatch(token) else None
+
+    def _is_authorized(self):
+        token = self._bearer()
+        if token is None or not self.server.bridge.pairings.accepts(token):
+            self._send_json(401, {"error": "This OpenSpindle app is not connected."})
             return False
         return True
 
@@ -288,6 +371,24 @@ class _SnapshotRequestHandler(BaseHTTPRequestHandler):
             return json.loads(body.decode("utf-8", errors="strict"), object_pairs_hook=_unique_json_object)
         except (ValueError, UnicodeError, OSError):
             raise BridgeError(400, "Invalid JSON request.") from None
+
+    def do_DELETE(self):
+        # Disconnecting an app: Fusion forgets its token.
+        if not self._is_local_request():
+            return
+        if self.path != "/v1/pairing":
+            self._send_json(404, {"error": "Unknown route. Update the OpenSpindle app and Fusion add-in together."})
+            return
+        if not self._is_authorized():
+            return
+        if (
+            self.headers.get_all("Transfer-Encoding") is not None
+            or self.headers.get_all("Content-Length", ["0"]) != ["0"]
+        ):
+            self._send_json(400, {"error": "Disconnecting must not contain a body."})
+            return
+        self.server.bridge.pairings.forget(self._bearer())
+        self._send_json(200, {})
 
     def do_POST(self):
         if not self._is_local_request():
@@ -381,8 +482,8 @@ class _SnapshotHTTPServer(ThreadingHTTPServer):
 
 
 class SnapshotBridge:
-    def __init__(self, fire_event):
-        self.token = secrets.token_urlsafe(32)
+    def __init__(self, fire_event, pairings_path=None):
+        self.pairings = Pairings(pairings_path)
         self._fire_event = fire_event
         self.requests = MainThreadRequests(fire_event)
         self._pairing_lock = threading.Lock()
@@ -454,9 +555,9 @@ class SnapshotBridge:
         except Exception:
             # A dialog left open is harmless: the user closes it.
             pass
-        # One bearer belongs to this Fusion session. Opening or failing a
-        # new connection request cannot revoke an already paired app.
-        return 200, {"token": self.token}
+        # Each app gets a token of its own, kept across Fusion sessions. Opening or
+        # failing a new connection request cannot revoke an already paired app.
+        return 200, {"token": self.pairings.add()}
 
     def _announce_pairing(self):
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as announcement:

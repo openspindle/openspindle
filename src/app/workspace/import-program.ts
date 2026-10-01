@@ -7,10 +7,13 @@ import type { ProgramTool } from "@/domain/nc/cam-markers"
 import { markedStock } from "@/domain/nc/stock-markers"
 import { programTools } from "@/domain/nc/tool-comments"
 import { fitsWorkArea } from "@/domain/plate/placement"
+import { deviceDefinitions } from "@/domain/fixtures/profiles"
+import type { FixtureProfiles } from "@/domain/fixtures/profiles"
 import {
   createPlate,
   createPlateSetup,
   notice,
+  withProgramFixtures,
   withStockPlacement,
 } from "@/domain/plate/plate"
 import type { Plate, PlateSetup } from "@/domain/plate/plate"
@@ -61,6 +64,11 @@ export type ImportContext = {
   /** Base for stock described by markers; files without markers get none. */
   readonly stock: Stock
   readonly placement?: PlatePlacement
+  /**
+   * The fixture library's profiles: a new plate finds the fixtures its program's markers name
+   * among those its device's profile defines. Absent: it has none of them.
+   */
+  readonly fixtureProfiles?: FixtureProfiles
   /** The setup plain programs keep of the empty plate they replace (see `keptSetup`). */
   readonly setup?: PlateSetup
 }
@@ -169,21 +177,31 @@ export function importProgram(
       stockSource: stock ? "source" : "unspecified",
       ...context.placement,
     })
-    return ok(
-      filePlate(
-        fileName,
-        text,
-        marked
-          ? withStockPlacement(setup, marked.placement, {
-              workArea: kit.workArea,
-              anchors: kit.factoryAnchors(setup.deviceId),
-            })
-          : setup,
-        context.tools,
-        context.numberedTools,
-        context.describedTools
-      )
+    // Where the markers put the stock, with the fixtures they say hold it.
+    const held = marked
+      ? withProgramFixtures(
+          withStockPlacement(setup, marked.placement, {
+            workArea: kit.workArea,
+            anchors: kit.factoryAnchors(setup.deviceId),
+          }),
+          marked.fixtures,
+          context.fixtureProfiles
+            ? deviceDefinitions(context.fixtureProfiles, setup.deviceId)
+            : []
+        )
+      : { setup, notices: [] }
+    const plate = filePlate(
+      fileName,
+      text,
+      held.setup,
+      context.tools,
+      context.numberedTools,
+      context.describedTools
     )
+    return ok({
+      ...plate,
+      notices: [...plate.notices, ...held.notices.map(notice)],
+    })
   }
   if (envelope.version > PLATE_ENVELOPE_VERSION)
     return fail("It was exported by a newer version of OpenSpindle.")

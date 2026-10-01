@@ -18,7 +18,7 @@ import { programLines } from "@/domain/nc/program-lines"
 import { programTools } from "@/domain/nc/tool-comments"
 import type { NcOrigin } from "@/domain/operations/operation"
 import type { Plate } from "@/domain/plate/plate"
-import { fail, ok } from "@/domain/primitives"
+import { fail, normalizeText, ok } from "@/domain/primitives"
 import type { Result } from "@/domain/primitives"
 import { rulesOf } from "@/domain/rules/rules"
 import { programSubject } from "@/domain/rules/stages"
@@ -234,6 +234,14 @@ export function describedPlate(
 
 /** A file's name without its extension: "1002_top_1_Face3_T1". */
 const stem = (fileName: string) => fileName.replace(/\.[a-z0-9]+$/i, "")
+
+/**
+ * What a program is called, as a plate's name: its Fusion NC program's name, else its file's
+ * name without the extension. Empty when nothing printable remains.
+ */
+export const programName = (
+  program: Pick<PlannedProgram, "fileName" | "origin">
+) => normalizeText(program.origin?.programName ?? stem(program.fileName))
 
 /** An NC file operation that keeps where its NC came from; any other operation as it is. */
 function withOrigin(

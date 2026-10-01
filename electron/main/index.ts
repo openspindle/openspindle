@@ -14,6 +14,7 @@ import { handleAppProtocol, registerAppScheme } from "./protocol"
 import { createHostHandlers } from "./rpc/host-handlers"
 import { sendPort, serveHostConnections } from "./rpc/host-server"
 import { FileService } from "./services/file-service"
+import { storedFusionCredentials } from "./services/fusion-credentials"
 import { FusionService } from "./services/fusion-service"
 import { KeptWorkspace } from "./services/kept-workspace"
 import { MenuBus } from "./services/menu-bus"
@@ -113,7 +114,11 @@ function start(diagnostics: Diagnostics, openedFiles: OpenedFileBus) {
   const storage = new StorageService(app.getPath("userData"))
   const models = createModelLibrary(app.getPath("userData"))
   const files = new FileService(currentWindow)
-  const fusion = new FusionService()
+  const fusion = new FusionService(
+    storedFusionCredentials(
+      path.join(app.getPath("userData"), "fusion-connection")
+    )
+  )
   fusion.start()
   const machine: MachineHost = new MachineHost({
     userData: app.getPath("userData"),

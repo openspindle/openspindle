@@ -15,6 +15,7 @@ import {
   describedPlate,
   planImport,
   plannedOperations,
+  programName,
   updatedNc,
 } from "@/app/workspace/import-plan"
 import type {
@@ -72,6 +73,7 @@ export function useImportContext(): () => ImportContext {
         state.stocks.at(0) ??
         createDefaultStockLibrary()[0],
       placement: empty ? bedOf(empty.setup) : profilePlacement(fixtures.state),
+      fixtureProfiles: fixtures.state.profiles,
       setup: empty ? keptSetup(empty) : undefined,
     }
   }
@@ -205,8 +207,17 @@ export function useApplyImport() {
     let targetId: string | null = null
     if (operations.length) {
       targetId = into.id
+      // A plate without a name yet takes the first program's.
+      const first = plan.programs.at(0)
+      const name = into.name || (first ? programName(first) : "")
       if (into !== chosen)
-        commands.push({ type: "plates.add", plates: [into], select: true })
+        commands.push({
+          type: "plates.add",
+          plates: [{ ...into, name }],
+          select: true,
+        })
+      else if (name !== into.name)
+        commands.push({ type: "plate.rename", plateId: into.id, name })
       for (const { operation, preferredTools } of operations)
         commands.push({
           type: "operation.add",

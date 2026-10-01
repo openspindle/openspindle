@@ -1,12 +1,17 @@
 """Discover open Fusion NC programs and post them when OpenSpindle imports."""
 
+import json
+import os
 from pathlib import Path
 import re
+import sys
 import tempfile
+import traceback
 import uuid
 
 import adsk.cam
 import adsk.core
+import adsk.fusion
 
 from .bridge_server import (
     BridgeError, MAX_PROGRAM_BYTES, MAX_PROGRAMS, NC_EXTENSIONS, PAIRED, SnapshotBridge,
@@ -26,6 +31,16 @@ _custom_handler = None
 
 def _application():
     return adsk.core.Application.get()
+
+
+def _pairings_path():
+    # Where the OpenSpindle apps paired with this add-in are kept across Fusion sessions: the
+    # user's application data, not the add-in's own folder.
+    if sys.platform == "win32":
+        base = Path(os.environ.get("APPDATA") or Path.home() / "AppData" / "Roaming")
+    else:
+        base = Path.home() / "Library" / "Application Support"
+    return base / "OpenSpindle Bridge" / "pairings.json"
 
 
 def _show_error(message):
@@ -137,6 +152,82 @@ def _without_splitting(program):
     return restore
 
 
+# What OpenSpindle's Makera Z1 post reads of the setup that Fusion does not give a post, its Part
+# Position distances and its fixtures: a file beside the program, in the folder it posts to.
+# Fusion's API gives lengths in centimetres; the file holds millimetres.
+_SETUP_FILE = "openspindle-setup.json"
+_MAX_FIXTURES = 32
+
+
+def _log(message, level=adsk.core.LogLevels.InfoLogLevel):
+    # Fusion's own log file, where imports can be traced afterwards.
+    try:
+        _application().log("OpenSpindle: " + message, level, adsk.core.LogTypes.FileLogType)
+    except Exception:
+        pass
+
+
+def _millimetres(centimetres):
+    # Fusion's API gives lengths in centimetres.
+    return round(float(centimetres) * 10, 4)
+
+
+def _part_position(setup):
+    # The setup's Part Position distances along X, Y and Z in millimetres; None without them.
+    distances = []
+    for name in ("job_positionXOffset", "job_positionYOffset", "job_positionZOffset"):
+        parameter = setup.parameters.itemByName(name)
+        if not parameter:
+            return None
+        distances.append(_millimetres(parameter.value.value))
+    return distances
+
+
+def _fixtures(setup):
+    # The setup's fixtures: each its name (its occurrence's, such as "Jig:1") and its box in the
+    # design's coordinates in millimetres, which the post turns into the WCS. (The setup's own
+    # WCS matrix is no help: its origin is in millimetres, the design's boxes in centimetres.)
+    if not setup.fixtureEnabled:
+        return []
+    found = []
+    models = setup.fixtures
+    for index in range(min(models.count, _MAX_FIXTURES)):
+        model = models.item(index)
+        box = model.boundingBox if model else None
+        if box is None:
+            continue
+        occurrence = adsk.fusion.Occurrence.cast(model)
+        context = occurrence or getattr(model, "assemblyContext", None)
+        found.append({
+            "name": _display_name(context.name if context else model.name, "Fixture"),
+            "lower": [_millimetres(value) for value in box.minPoint.asArray()],
+            "upper": [_millimetres(value) for value in box.maxPoint.asArray()],
+        })
+    return found
+
+
+def _write_setup(setup, directory):
+    # Writes what the post reads of the setup into the folder it posts to, and logs it. What
+    # cannot be read is left out, and logged: the post then writes what it can.
+    found = {}
+    for key, read in (("partPosition", _part_position), ("fixtures", _fixtures)):
+        try:
+            value = read(setup)
+            if value is not None:
+                found[key] = value
+        except Exception:
+            _log(
+                f"Could not read the setup's {key}: {traceback.format_exc()}",
+                adsk.core.LogLevels.WarningLogLevel,
+            )
+    text = json.dumps(found)
+    try:
+        (Path(directory) / _SETUP_FILE).write_text(text, encoding="utf-8")
+        _log("Setup for the post: " + text)
+    except OSError:
+        _log("Could not write the setup for the post.", adsk.core.LogLevels.WarningLogLevel)
+
+
 def _whole_program(contents):
     # A program file of its own: moves in it, and no call to a subprogram in another file.
     code = [re.sub(r"\([^)]*\)|;.*$", "", line) for line in contents.splitlines()]
@@ -150,16 +241,17 @@ def _post_snapshot(document, program, program_id, ensure_live):
         raise ValueError("The NC program is no longer available. Refresh the program list in OpenSpindle.")
     if program.postConfiguration is None:
         raise ValueError("Choose a machine post processor in the NC program first.")
-    setup_ids = set()
+    setups = {}
     for entry in program.operations:
         setup = adsk.cam.Setup.cast(entry)
         if setup is None:
             setup = entry.parentSetup
         if setup is None:
             raise ValueError("Every NC program operation must belong to one setup.")
-        setup_ids.add(setup.operationId)
-    if len(setup_ids) != 1:
+        setups[setup.operationId] = setup
+    if len(setups) != 1:
         raise ValueError("Import an NC program containing exactly one setup, using G54.")
+    (setup,) = setups.values()
 
     parameters = program.parameters
     file_parameter = parameters.itemByName("nc_program_filename")
@@ -209,6 +301,7 @@ def _post_snapshot(document, program, program_id, ensure_live):
                 overrides.append((parameter, parameter.value.value))
                 parameter.value.value = value
             restore_splitting = _without_splitting(program)
+            _write_setup(setup, directory)
             options = adsk.cam.NCProgramPostProcessOptions.create()
             options.postProcessExecutionBehavior = (
                 adsk.cam.PostProcessExecutionBehaviors.PostProcessExecutionBehavior_Fail
@@ -237,7 +330,7 @@ def _post_snapshot(document, program, program_id, ensure_live):
 
         files = [
             path for path in Path(directory).rglob("*")
-            if path.is_file() and path.suffix.lower() != ".log"
+            if path.is_file() and path.suffix.lower() != ".log" and path.name != _SETUP_FILE
         ]
         programs = [path for path in files if path.suffix.lower() in NC_EXTENSIONS]
         if not programs:
@@ -267,6 +360,9 @@ def _post_snapshot(document, program, program_id, ensure_live):
             raise ValueError("The post must produce UTF-8 or ASCII NC text.") from error
         if not contents.strip() or "\x00" in contents:
             raise ValueError("The posted NC program is empty or contains NUL bytes.")
+        # What the program tells OpenSpindle of its setup, as the post wrote it.
+        markers = [line.strip() for line in contents.splitlines() if line.startswith(";@OPENSPINDLE")]
+        _log("Program markers: " + (" ".join(markers[:40])[:4000] or "none"))
         # Other files beside it are its parts or subprograms: it must hold the whole program.
         if len(files) > 1 and not _whole_program(contents):
             raise ValueError(_SPLIT_OUTPUT)
@@ -421,7 +517,9 @@ def run(_context):
             raise ValueError("Fusion could not register the OpenSpindle request event.")
         # Capture the one documented thread-safe API method on the main thread.
         fire_event = app.fireCustomEvent
-        _bridge = SnapshotBridge(lambda request_id: fire_event(_EVENT_ID, request_id))
+        _bridge = SnapshotBridge(
+            lambda request_id: fire_event(_EVENT_ID, request_id), _pairings_path()
+        )
         _custom_handler = _MainThreadHandler(_bridge.requests)
         if not _custom_event.add(_custom_handler):
             raise ValueError("Fusion could not attach the OpenSpindle request handler.")

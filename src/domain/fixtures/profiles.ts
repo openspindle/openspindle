@@ -56,6 +56,15 @@ export const FixtureProfilesSchema = z
   })
 export type FixtureProfiles = z.infer<typeof FixtureProfilesSchema>
 
+/** The fixtures a device's profile defines (the workspace profile's without a device), if any. */
+export function deviceDefinitions(
+  profiles: FixtureProfiles,
+  deviceId: string | null
+): readonly FixtureDefinition[] {
+  const id = deviceId ?? WORKSPACE_PROFILE
+  return Object.hasOwn(profiles, id) ? profiles[id].definitions : []
+}
+
 /**
  * A held definition of a kit's fixture with what the kit's versions after `from` up to `to`
  * changed in it: the model and default placement of a correction, and the colour of a
