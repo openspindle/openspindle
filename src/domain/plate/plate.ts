@@ -242,7 +242,10 @@ export function createPlateSetup(options: {
  * front-left bottom corner at the offsets from its anchor, where the plate's anchors, else
  * `machine.anchors`, have that anchor and the stock then overlaps the work area; else where it
  * is. It rests on what carries it there, with the work origin at the program's zero on it, else
- * on its top front-left corner. A setup without stock stays as it is.
+ * on its top front-left corner. Placed from an anchor, the stock and the work origin stay
+ * relative to it, so Run sets the machine's work X and Y from it, and the plate holds the anchors
+ * it was placed by (`machine.anchors` when it had none, which Run asks to read from the device).
+ * A setup without stock stays as it is.
  */
 export function withStockPlacement(
   setup: PlateSetup,
@@ -255,10 +258,9 @@ export function withStockPlacement(
   const { stock } = setup
   if (!stock) return setup
   const { anchor } = placement
+  const anchors = setup.anchors ?? machine.anchors
   const position = anchor
-    ? bedAnchors(setup.anchors ?? machine.anchors).find(
-        (bed) => bed.id === anchor.id
-      )?.position
+    ? bedAnchors(anchors).find((bed) => bed.id === anchor.id)?.position
     : undefined
   const corner =
     anchor && position
@@ -278,8 +280,14 @@ export function withStockPlacement(
     0,
     stock.height,
   ]
+  const relativeTo = overlaps && anchor ? anchor.id : null
   return {
     ...setup,
+    ...(relativeTo && {
+      anchors,
+      stockRelativeTo: relativeTo,
+      workOriginAnchor: relativeTo,
+    }),
     stockAnchor: [toMicrometre(x), toMicrometre(y), supportHeight],
     workOrigin: [
       toMicrometre(x + originX),
@@ -308,9 +316,10 @@ const sizeText = (size: readonly number[]) =>
  * (`definitions`; Fusion 360's use number, as in "Jig:1", aside), the plate's own if it has one,
  * enabled. The stock and the fixtures under it keep the program's heights between them, the
  * lowest resting on what carries it (a wasteboard under it, else the bed), and the work origin
- * moves up with the stock; the other fixtures rest on what carries them. Beds stay as the plate
- * has them. Notices say which fixtures the plate could not have, and which differ in size from
- * the program's. A setup without stock stays as it is.
+ * moves up with the stock; the other fixtures rest on what carries them. They stay relative to
+ * the anchor the stock is. Beds stay as the plate has them. Notices say which fixtures the plate
+ * could not have, and which differ in size from the program's. A setup without stock stays as it
+ * is.
  */
 export function withProgramFixtures(
   setup: PlateSetup,
@@ -413,6 +422,8 @@ export function withProgramFixtures(
   for (const { instance, index, box, corner, below, support, under } of held) {
     const moved: FixtureInstance = {
       ...instance,
+      // Kept relative to the anchor the stock is, as it is placed beside the stock.
+      relativeTo: setup.stockRelativeTo ?? null,
       position: [
         toMicrometre(corner[0] - box.min[0]),
         toMicrometre(corner[1] - box.min[1]),
