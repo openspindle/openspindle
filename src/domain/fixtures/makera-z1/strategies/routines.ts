@@ -1,5 +1,4 @@
 import { issueOf } from "../../../diagnostics"
-import type { Issue } from "../../../diagnostics"
 import { formatMillimetres } from "../../../geometry/millimetres"
 import {
   PROBE_3D_AXES_LABELS,
@@ -20,7 +19,7 @@ import {
   originStartOffset,
   planOrigin,
 } from "../../../probing/tasks/origin/plan"
-import { fail, ok } from "../../../primitives"
+import { fail, ok, toolNumberText } from "../../../primitives"
 import type { Result } from "../../../primitives"
 import type { ParameterSpec } from "../../../probing/parameters"
 import { placementContext } from "../../../probing/placement"
@@ -70,26 +69,24 @@ const BALL = { min: 0.5, max: 10 } as const
 /** Lengths as the firmware prints its own routines' values. */
 const mm = firmwareMillimetres
 
-const ballError = issueOf<"ball-unknown" | "ball-out-of-range">("error")
-
-/** A probe's ball, its diameter, when the routines take it; why they do not otherwise. */
-function ballOf({ name, diameter }: Tool): Result<number, Issue> {
+/**
+ * A probe's ball, its diameter, when the routines take it; otherwise why not, as a sentence
+ * about the probe that `held` names.
+ */
+function ballOf({ diameter }: Tool, held: string): Result<number, string> {
   if (diameter === null)
     return fail(
-      ballError(
-        "ball-unknown",
-        `${name} has no ball diameter. Set it in the tool library.`
-      )
+      `${held} has no ball diameter: set it in the tool library, or assign another probe.`
     )
   if (diameter < BALL.min || diameter > BALL.max)
     return fail(
-      ballError(
-        "ball-out-of-range",
-        `${name}'s ball is ${formatMillimetres(diameter)} mm; the 3D probing routines take a ball from ${BALL.min} to ${BALL.max} mm.`
-      )
+      `${held} has a ${formatMillimetres(diameter)} mm ball, but the 3D probing routines take ${BALL.min} to ${BALL.max} mm: correct it in the tool library, or assign another probe.`
     )
   return ok(diameter)
 }
+
+/** A probe whose ball the routines do not take, which resolving refuses first (`refuses`). */
+const ballRefused = issueOf<"ball-refused">("error")
 
 /** What the routine touches, and what it sets. */
 function introduction(params: OriginParams, subcode: number): string[] {
@@ -198,14 +195,19 @@ export const ROUTINES: ProbingStrategy<"origin", OriginParams, OriginSpecs> = {
   description:
     "Find a corner or center with the 3D probe and set the work origin there.",
   accepts: ({ touch }) => touch === "xyz",
+  refuses: (tool, number) => {
+    const ball = ballOf(tool, `${tool.name} in ${toolNumberText(number)}`)
+    return ball.ok ? null : ball.error
+  },
   parameters: () => ROUTINE_PARAMETERS,
   reads: (params) => originFields(params.routine, params.axes),
   defaults: (_plate, parameters) => defaultOriginParams(parameters),
   generate: ({ params, plate, probe, machine }) => {
     const plan = planOrigin(params, placementContext(plate), ROUTINE_PARAMETERS)
     if (!plan.ok) return plan
-    const ball = ballOf(probe.tool)
-    if (!ball.ok) return { ok: false, issues: [ball.error] }
+    const ball = ballOf(probe.tool, probe.tool.name)
+    if (!ball.ok)
+      return { ok: false, issues: [ballRefused("ball-refused", ball.error)] }
     const { start, height } = plan
     const subcode = routineSubcode(plan.params.routine, plan.params.corner)
     const lines = [

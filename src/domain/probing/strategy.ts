@@ -87,6 +87,12 @@ export interface ProbingStrategy<
    */
   accepts: (probe: ProbeProfile, machine: MachineProbing) => boolean
   /**
+   * Why it cannot probe with a probe tool it accepts, such as a ball it does not take, naming the
+   * tool and `number`, the plate's table entry that holds it; null where it can. Assigning another
+   * tool there, or correcting this one in the tool library, fixes it.
+   */
+  refuses?: (tool: Tool, number: number | null) => string | null
+  /**
    * Why it cannot run on this plate, whatever its settings, as picking it shows; null where it
    * can. Not a rule: generating its NC still fails on its own where it cannot.
    */

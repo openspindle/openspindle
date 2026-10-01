@@ -110,8 +110,8 @@ const INVALID: { readonly [TTask in ProbingTask]: string } = {
  * Probing operations: a setup operation whose NC its strategy writes, and is kept verbatim, on
  * the plate's machine with the probe the plate's table holds in the number the operation
  * selects. Without the strategy it does not resolve (`probing-unsupported`), nor without a probe
- * the strategy runs with there (`probing-probe`); an operation whose NC the strategy does not
- * generate reports its first issue (`probing-invalid`).
+ * the strategy runs with there (`probing-probe`, also where the strategy refuses that tool); an
+ * operation whose NC the strategy does not generate reports its first issue (`probing-invalid`).
  */
 const probingKind: OperationKind<"probing"> = {
   kind: "probing",
@@ -148,6 +148,17 @@ const probingKind: OperationKind<"probing"> = {
         })
       )
     }
+    // The entry the operation's binding maps its probe number to, which holds the probe.
+    const table =
+      operation.tools.find((item) => item.local === source.probe)?.plate ?? null
+    const refused = strategy.refuses?.(probe.value.tool, table)
+    if (refused)
+      return fail(
+        error("probing-probe", `${operation.name}: ${refused}`, {
+          subject,
+          fix: { kind: "assign-tool", toolNumber: table },
+        })
+      )
     const generated = generateProbing(strategy, source, {
       plate,
       probe: probe.value,
