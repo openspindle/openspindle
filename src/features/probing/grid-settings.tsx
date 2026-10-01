@@ -54,7 +54,7 @@ function gridFitDescription({ result, origin, anchors }: WorkAreaFit) {
 }
 
 /**
- * Parameters of a built-in auto-level operation. Edits apply as soon as the parameters are valid;
+ * Parameters of a grid probing operation. Edits apply as soon as the parameters are valid;
  * invalid input stays in the form with its errors and is never passed on.
  */
 export function GridSettings({

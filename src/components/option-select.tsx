@@ -14,6 +14,8 @@ export interface Option<T extends string | number> {
   label: string
   /** Shown but not selectable, such as a stock origin the current stock cannot reach. */
   disabled?: boolean
+  /** Why a disabled option is not selectable, shown while the pointer rests on it. */
+  reason?: string
 }
 
 type OptionSelectProps<T extends string | number> = Omit<
@@ -60,6 +62,11 @@ export function OptionSelect<T extends string | number>({
               key={option.value}
               value={option.value}
               disabled={option.disabled}
+              title={option.reason}
+              // A disabled option takes no pointer events, which its reason needs to show.
+              className={cn(
+                option.reason && "data-disabled:pointer-events-auto"
+              )}
             >
               {option.label}
             </SelectItem>

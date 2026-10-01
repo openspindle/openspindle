@@ -1,4 +1,4 @@
-import { Settings2, ShieldCheck } from "lucide-react"
+import { Crosshair, Settings2, ShieldCheck } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import { TooltipProvider } from "@/components/ui/tooltip"
@@ -18,17 +18,20 @@ import {
 } from "@/features/plugins/plugin-sources"
 import { openDialog } from "@/features/shell/dialogs"
 import { useInstalledPlugins } from "@/platform/plugins"
-import { useBuiltInSources } from "./add-operation/built-in-sources"
+import {
+  PROBING_DESCRIPTION,
+  useProbingReason,
+} from "./add-operation/probing-picker"
 import { ArrangeTools } from "./arrange/arrange-tools"
 
 /**
  * Tools over the viewer, as icons that say what they do on hover: moving and locking what is
- * selected in it, quick actions (built-in auto-level, auto Z-height and auto-scan, and plugin
- * sources), then checking the selected plate's design rules and the workspace settings.
+ * selected in it, quick actions (Probing, and plugin sources), then checking the selected plate's
+ * design rules and the workspace settings.
  */
 export function PrepareToolbar() {
   const plugins = useInstalledPlugins().data ?? []
-  const builtIns = useBuiltInSources()
+  const probingReason = useProbingReason()
   const workspace = useWorkspaceStore()
   const hasPlate = useWorkspace((state) => selectedPlate(state) !== null)
   return (
@@ -44,16 +47,14 @@ export function PrepareToolbar() {
         >
           <ArrangeTools />
           <Separator orientation="vertical" />
-          {builtIns.map(({ id, icon: Icon, title, description, add }) => (
-            <ToolbarButton
-              key={id}
-              label={title}
-              description={description}
-              onClick={add}
-            >
-              <Icon />
-            </ToolbarButton>
-          ))}
+          <ToolbarButton
+            label="Probing"
+            description={PROBING_DESCRIPTION}
+            reason={probingReason}
+            onClick={() => openDialog({ kind: "probing" })}
+          >
+            <Crosshair />
+          </ToolbarButton>
           {toolbarItems(plugins).map(({ item, source }) => {
             const Icon = TOOLBAR_ICONS[item.icon]
             return (

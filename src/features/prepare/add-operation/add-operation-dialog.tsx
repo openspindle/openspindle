@@ -1,16 +1,8 @@
 import { useState } from "react"
-import type { ReactNode } from "react"
-import { ArrowLeft, Puzzle } from "lucide-react"
+import { ArrowLeft, Crosshair, Puzzle } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { FieldDescription, FieldLegend, FieldSet } from "@/components/ui/field"
-import {
-  Item,
-  ItemContent,
-  ItemDescription,
-  ItemMedia,
-  ItemTitle,
-} from "@/components/ui/item"
 import { templateOperation } from "@/app/workspace/templates"
 import { selectedPlate, useWorkspace } from "@/app/workspace/workspace-context"
 import {
@@ -31,40 +23,13 @@ import { openDialog } from "@/features/shell/dialogs"
 import { useHost } from "@/platform/host-context"
 import { useInstalledPlugins } from "@/platform/plugins"
 import { usePrepareSelection } from "../plate-tree/use-prepare-selection"
-import { useBuiltInSources } from "./built-in-sources"
+import {
+  PROBING_DESCRIPTION,
+  ProbingSteps,
+  useProbingReason,
+} from "./probing-picker"
+import { SourceItem } from "./source-item"
 import { useAddOperation } from "./use-add-operation"
-
-function SourceItem({
-  icon,
-  title,
-  description,
-  onSelect,
-}: {
-  icon: ReactNode
-  title: string
-  description: string
-  onSelect: () => void
-}) {
-  return (
-    <Item
-      render={
-        <Button
-          variant="ghost"
-          className="h-auto whitespace-normal"
-          type="button"
-        />
-      }
-      className="text-left"
-      onClick={onSelect}
-    >
-      <ItemMedia variant="icon">{icon}</ItemMedia>
-      <ItemContent>
-        <ItemTitle>{title}</ItemTitle>
-        <ItemDescription>{description}</ItemDescription>
-      </ItemContent>
-    </Item>
-  )
-}
 
 /** A plugin's template program as a form that adds its operation. */
 function TemplateSource({
@@ -132,7 +97,7 @@ function ImporterSource({
 const sourceTitle = (source: PluginSource) =>
   source.kind === "program" ? source.program.name : source.view.title
 
-/** Built-in probing and plugin sources for adding an operation. */
+/** Built-in Probing and plugin sources for adding an operation. */
 export function AddOperationDialog({
   preset,
   onClose,
@@ -141,10 +106,17 @@ export function AddOperationDialog({
   onClose: () => void
 }) {
   const plugins = useInstalledPlugins().data ?? []
-  const builtIns = useBuiltInSources()
+  const probingReason = useProbingReason()
   const sources = pluginSources(plugins)
   const [chosen, choose] = useState<PluginSourceRef | null>(preset ?? null)
+  const [probing, setProbing] = useState(false)
   const selected = chosen ? findSource(sources, chosen) : undefined
+  if (probing)
+    return (
+      <AppDialog title="Probing" width="wide" onClose={onClose}>
+        <ProbingSteps onAdded={onClose} onBack={() => setProbing(false)} />
+      </AppDialog>
+    )
   if (selected)
     return (
       <AppDialog title={sourceTitle(selected)} width="wide" onClose={onClose}>
@@ -168,22 +140,16 @@ export function AddOperationDialog({
   return (
     <AppDialog title="Add operation" width="wide" onClose={onClose}>
       <div className="flex flex-col gap-6">
-        {builtIns.length > 0 && (
-          <FieldSet>
-            <FieldLegend>Built in</FieldLegend>
-            {builtIns.map(({ id, icon: Icon, title, description, add }) => (
-              <SourceItem
-                key={id}
-                icon={<Icon />}
-                title={title}
-                description={description}
-                onSelect={() => {
-                  if (add()) onClose()
-                }}
-              />
-            ))}
-          </FieldSet>
-        )}
+        <FieldSet>
+          <FieldLegend>Built in</FieldLegend>
+          <SourceItem
+            icon={<Crosshair />}
+            title="Probing"
+            description={PROBING_DESCRIPTION}
+            reason={probingReason}
+            onSelect={() => setProbing(true)}
+          />
+        </FieldSet>
         <FieldSet>
           <FieldLegend>Plugins</FieldLegend>
           {sources.map((source) => (

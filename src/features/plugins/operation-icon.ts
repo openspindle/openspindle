@@ -1,4 +1,5 @@
 import {
+  ArrowDownToDot,
   ArrowDownToLine,
   Axis3d,
   FileCode2,
@@ -8,18 +9,32 @@ import {
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 import type { ToolbarItem } from "@openspindle/plugin-core"
-import type { Operation } from "@/domain/operations/operation"
+import type { Operation, ProbingSource } from "@/domain/operations/operation"
+import { GENERIC_STRATEGIES } from "@/domain/probing/strategies"
 import type { ProbingTask } from "@/domain/probing/strategy"
 import type { PluginSummary } from "@/platform/contract/plugin-rpc"
 import { useInstalledPlugins } from "@/platform/plugins"
 import { TOOLBAR_ICONS } from "./plugin-sources"
 
-/** The probing operations' icons by task, wherever they are offered or listed. */
-export const PROBING_ICONS: Record<ProbingTask, LucideIcon> = {
+/** The probing operations' icons by task. */
+const PROBING_ICONS: Record<ProbingTask, LucideIcon> = {
   grid: LandPlot,
   "touch-off": ArrowDownToLine,
   outline: SquareDashed,
   origin: Axis3d,
+}
+
+/**
+ * A probing strategy's icon, wherever it is offered or its operations are listed: its task's,
+ * and for a machine's own touch-off, such as the Z1 firmware's Z probe, one apart from Surface
+ * touch.
+ */
+export function probingIcon({
+  task,
+  strategy,
+}: Pick<ProbingSource, "task" | "strategy">): LucideIcon {
+  const generic = GENERIC_STRATEGIES.some((item) => item.id === strategy)
+  return task === "touch-off" && !generic ? ArrowDownToDot : PROBING_ICONS[task]
 }
 
 /** The icon of the plugin's toolbar item for what made an operation; the plugin icon without one. */
@@ -35,7 +50,7 @@ function pluginIcon(
 }
 
 /**
- * An operation's icon: a program file's, its probing task's, or the one its plugin's toolbar
+ * An operation's icon: a program file's, its probing strategy's, or the one its plugin's toolbar
  * gives the template program or importer that made it.
  */
 export function operationIcon(
@@ -59,7 +74,7 @@ export function operationIcon(
         (item) => item.viewId !== undefined
       )
     case "probing":
-      return PROBING_ICONS[source.task]
+      return probingIcon(source)
   }
 }
 

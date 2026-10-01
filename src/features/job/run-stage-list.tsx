@@ -153,7 +153,7 @@ function operationSummary(
       const names = toolNames(operation, subject, tools)
       return names.length
         ? names.join(", ")
-        : `${operationKindLabel(operation, plugins)} with no tool change.`
+        : `${operationKindLabel(operation, subject.plate, plugins)} with no tool change.`
     }
   }
 }

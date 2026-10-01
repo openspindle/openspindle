@@ -31,7 +31,7 @@ export function PlateSetupPanel({ plate }: { plate: Plate }) {
   // The touch-off sets work Z0 on the stock top, where the work origin then stays.
   const zLock =
     plate.setup.stock && touchesOffWorkZ(plate)
-      ? "Auto Z-height sets work Z0 on the stock top."
+      ? "Touch-off sets work Z0 on the stock top."
       : undefined
   return (
     <FieldGroup className="p-4" aria-label="Setup">
