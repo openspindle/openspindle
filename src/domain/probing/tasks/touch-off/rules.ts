@@ -60,10 +60,10 @@ function touchOnStock(subject: OperationRuleSubject): {
 }
 
 /** The stock checks of a touch point: without stock, it cannot be placed on it. */
-const AUTO_Z_HEIGHT_STOCK_CHAIN = "auto-z-height/stock"
+const AUTO_Z_HEIGHT_STOCK_CHAIN = "touch-off/stock"
 
 const zHeightFactoryAnchors: StageRule<"operation"> = {
-  id: "auto-z-height/factory-anchors",
+  id: "touch-off/factory-anchors",
   stage: "operation",
   label: "Auto Z-height anchors read",
   description:
@@ -83,7 +83,7 @@ const zHeightFactoryAnchors: StageRule<"operation"> = {
 }
 
 const zHeightStockUnspecified: StageRule<"operation"> = {
-  id: "auto-z-height/stock-unspecified",
+  id: "touch-off/stock-unspecified",
   stage: "operation",
   label: "Auto Z-height stock size",
   description:
@@ -102,7 +102,7 @@ const zHeightStockUnspecified: StageRule<"operation"> = {
 }
 
 const pointOutsideStock: StageRule<"operation"> = {
-  id: "auto-z-height/point-outside-stock",
+  id: "touch-off/outside-stock",
   stage: "operation",
   label: "Auto Z-height point on the stock",
   description:
@@ -124,7 +124,7 @@ const pointOutsideStock: StageRule<"operation"> = {
 }
 
 const zHeightBeforeAutoLevel: StageRule<"operation"> = {
-  id: "auto-z-height/before-auto-level",
+  id: "touch-off/before-grid",
   stage: "operation",
   label: "Auto Z-height after auto-level",
   description:

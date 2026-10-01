@@ -30,7 +30,7 @@ function probingStart({
 }
 
 const probe3dFactoryAnchors: StageRule<"operation"> = {
-  id: "probe-3d/factory-anchors",
+  id: "origin/factory-anchors",
   stage: "operation",
   label: "3D probing anchors read",
   description:
@@ -57,7 +57,7 @@ const probe3dFactoryAnchors: StageRule<"operation"> = {
  * it found rather than over the top it touched.
  */
 const probe3dBeforeAutoLevel: StageRule<"operation"> = {
-  id: "probe-3d/before-auto-level",
+  id: "origin/before-grid",
   stage: "operation",
   label: "3D probing after auto-level",
   description:

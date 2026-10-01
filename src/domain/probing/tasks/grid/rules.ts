@@ -98,10 +98,10 @@ const gridPlaces = (grid: Area | null | undefined) =>
   grid ? { places: [grid] } : {}
 
 /** A grid's checks against the stock: without stock, or larger than it, the later ones do not apply. */
-const AUTO_LEVEL_STOCK_CHAIN = "auto-level/stock"
+const AUTO_LEVEL_STOCK_CHAIN = "grid/stock"
 
 const autoLevelFactoryAnchors: StageRule<"operation"> = {
-  id: "auto-level/factory-anchors",
+  id: "grid/factory-anchors",
   stage: "operation",
   label: "Auto-level anchors read",
   description:
@@ -121,7 +121,7 @@ const autoLevelFactoryAnchors: StageRule<"operation"> = {
 }
 
 const autoLevelStockUnspecified: StageRule<"operation"> = {
-  id: "auto-level/stock-unspecified",
+  id: "grid/stock-unspecified",
   stage: "operation",
   label: "Auto-level stock size",
   description: "A grid is checked against the stock, which needs its size.",
@@ -141,7 +141,7 @@ const autoLevelStockUnspecified: StageRule<"operation"> = {
 }
 
 const gridExceedsStock: StageRule<"operation"> = {
-  id: "auto-level/grid-exceeds-stock",
+  id: "grid/exceeds-stock",
   stage: "operation",
   label: "Auto-level grid within the stock size",
   description:
@@ -167,7 +167,7 @@ const gridExceedsStock: StageRule<"operation"> = {
 }
 
 const gridOutsideStock: StageRule<"operation"> = {
-  id: "auto-level/grid-outside-stock",
+  id: "grid/outside-stock",
   stage: "operation",
   label: "Auto-level grid on the stock",
   description:

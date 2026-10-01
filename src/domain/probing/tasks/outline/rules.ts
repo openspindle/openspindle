@@ -41,7 +41,7 @@ function outlineBeyondStock({
 }
 
 const outlineOffStock: StageRule<"operation"> = {
-  id: "auto-scan/outline-off-stock",
+  id: "outline/outside-stock",
   stage: "operation",
   label: "Auto-scan outline on the stock",
   description:
@@ -62,7 +62,7 @@ const outlineOffStock: StageRule<"operation"> = {
 }
 
 const afterMachining: StageRule<"operation"> = {
-  id: "auto-scan/after-machining",
+  id: "outline/after-machining",
   stage: "operation",
   label: "Auto-scan before machining",
   description:
