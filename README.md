@@ -21,6 +21,7 @@ OpenSpindle is a desktop app for preparing, checking and running jobs on a Maker
 - The G-code exactly as the machine receives it, and a glossary of the Z1's codes (**Help › G-code Glossary**)
 - A run checklist, upload read-back and large programs sent in parts
 - Machine controls, a console to send the machine one line at a time, the machine's camera, its height map and its stored anchors
+- A simulated Z1 to try jobs on without a machine, its camera picture drawn as the Z1's camera sees the bed (**Settings › General › Z1 Simulator device**)
 - A firmware configuration editor with verified saves, a saved vacuum-power default, and work-light brightness for each appearance with an inactivity timer
 - A tool library with Fusion 360 import and Makera, Genmitsu, SpeTool, Dreanique and FoxAlien catalogs
 - STEP-NC project files, and NC export with the plate's setup
@@ -79,7 +80,7 @@ You need Node.js 22.18 or later and, to build releases, macOS.
 ```sh
 npm ci
 npm run dev      # the app, with the renderer's dev server
-npm run sim:z1   # a simulated Z1 to connect to on 127.0.0.1
+npm run sim:z1   # another simulated Z1, with fault injection, on 127.0.0.1:2222
 ```
 
 The renderer updates while developing. Changes to Electron main, preload or the host RPC contract require a full app restart: save your project, quit normally, and run `npm run dev` again. Reloading the window alone keeps the old host and can cause an `Unknown method` error when the renderer calls a newly added method.

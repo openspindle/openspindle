@@ -6,7 +6,7 @@ OpenSpindle is an Electron desktop app for preparing and running jobs on a Maker
 
 - `npm ci` installs everything; `npm run dev` runs the app with the renderer dev server. The build scripts run TypeScript directly, so they need Node.js 22.18 or later.
 - Before handing over a change, `npm run typecheck`, `npm run lint` and `npm run check` (Prettier; `npm run format` fixes what it finds) must pass, and `npm run build` must succeed.
-- `npm run sim:z1` starts a simulated Makera Z1 on 127.0.0.1:2222 to connect to without a machine; `npm run sim:z1 -- --help` lists its fault injection options.
+- The app runs a simulated Makera Z1 on 127.0.0.1:2223 (Settings › General › Z1 Simulator device). `npm run sim:z1` starts another on 127.0.0.1:2222 to connect to without a machine; `npm run sim:z1 -- --help` lists its port, speed and fault injection options.
 
 # Pull requests
 
