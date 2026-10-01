@@ -139,6 +139,32 @@ function ballNotice(
 }
 
 /**
+ * A G32 grid's program section as earlier formats named it in the section ids its plate's groups
+ * hold (`<operation id>/probe:<name>#<occurrence>`, `ProgramSection.key`), and as it is named now.
+ */
+const GRID_SECTION = {
+  was: "/probe:Auto-level probing#",
+  is: "/probe:Height map probing#",
+} as const
+
+/** A plate's groups holding their grids' sections by their current name. */
+function upgradeGroups(groups: unknown): unknown {
+  if (!Array.isArray(groups)) return groups
+  return groups.map((group: unknown) =>
+    isJsonObject(group) && Array.isArray(group.sectionIds)
+      ? {
+          ...group,
+          sectionIds: group.sectionIds.map((id: unknown) =>
+            typeof id === "string"
+              ? id.replace(GRID_SECTION.was, GRID_SECTION.is)
+              : id
+          ),
+        }
+      : group
+  )
+}
+
+/**
  * A plate's saved data as earlier formats saved it (projects before format 8, exports before
  * version 7), in the current one: a project's plate, or an export's payload, which holds the
  * plate's setup, tool table and operations alike. Its
@@ -149,13 +175,16 @@ function ballNotice(
  * name, as saved or as the app holds them) that adding the operation picks for that number
  * (`libraryPreferences`), or no tool when it has none. A probe there that the strategy cannot run
  * with is a notice, and so is a 3D probing set for another ball than its probe's, or without a
- * probe from the library. What it does not recognize stays as it is, for reading to leave out and
- * report.
+ * probe from the library. Its groups hold its grids' sections by their current name. What it
+ * does not recognize stays as it is, for reading to leave out and report.
  */
 export function upgradePlate(
-  plate: JsonObject,
+  saved: JsonObject,
   library: readonly unknown[]
 ): UpgradedPlate {
+  const plate = Object.hasOwn(saved, "groups")
+    ? { ...saved, groups: upgradeGroups(saved.groups) }
+    : saved
   const savedNames = new Map<string, string>()
   if (!Array.isArray(plate.operations))
     return { plate, notices: [], savedNames }
