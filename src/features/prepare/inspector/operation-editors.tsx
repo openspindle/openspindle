@@ -1,4 +1,4 @@
-import { useId, useMemo } from "react"
+import { useEffect, useId, useMemo } from "react"
 import { FileCode2, RefreshCw } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
@@ -26,6 +26,7 @@ import type {
   ProbingSourceOf,
 } from "@/domain/operations/operation"
 import type { Plate } from "@/domain/plate/plate"
+import { itemEdges } from "@/domain/plate/item-edges"
 import { localTools } from "@/domain/tools/tool-table"
 import { GridSettings } from "@/features/probing/grid-settings"
 import { OutlineSettings } from "@/features/probing/outline-settings"
@@ -37,6 +38,12 @@ import type { WorkAreaFit } from "@/features/probing/probing-form"
 import { openDialog } from "@/features/shell/dialogs"
 import { anchorDisplayName, bedAnchors } from "@/domain/anchors/stored-anchors"
 import { ProbingChoiceFields } from "./probing-choice-fields"
+import type { ProbingPick } from "@/features/probing/probing-fields"
+import {
+  currentPicking,
+  setPicking,
+  usePicking,
+} from "../arrange/arrange-state"
 
 type EditorProps<TKind extends OperationSource["kind"]> = {
   plate: Plate
@@ -171,6 +178,36 @@ function useWorkArea(plate: Plate): WorkAreaFit {
   )
 }
 
+/**
+ * Picking for an operation in the 3D view: a point to start it at, or edges for it to trace.
+ * Picking ends when its editor goes, such as when another operation is selected. A start is
+ * kept from an anchor, so a plate without anchors cannot pick one.
+ */
+function usePick(
+  plate: Plate,
+  operationId: string,
+  kind: "point" | "edges"
+): ProbingPick {
+  const picking = usePicking()
+  useEffect(
+    () => () => {
+      if (currentPicking()?.operationId === operationId) setPicking(null)
+    },
+    [operationId]
+  )
+  const active = picking?.operationId === operationId && picking.kind === kind
+  const reason =
+    kind === "point" && !placementAnchors(plate.setup).length
+      ? "Read the device's anchors: a picked start is kept from one."
+      : null
+  return {
+    picking: active,
+    reason,
+    onPick: () =>
+      setPicking(active ? null : { kind, plateId: plate.id, operationId }),
+  }
+}
+
 /** A probing task's settings editor: its operation, on a machine that has its strategy. */
 type TaskEditorProps<TSource> = {
   plate: Plate
@@ -184,6 +221,7 @@ function GridEditor({
   machine,
 }: TaskEditorProps<ProbingSourceOf<"grid">>) {
   const update = useSourceUpdate(plate, operation.id, operation.revision)
+  const pick = usePick(plate, operation.id, "point")
   const workArea = useWorkArea(plate)
   const { source } = operation
   const strategy = strategyFor(source, machine)
@@ -195,6 +233,7 @@ function GridEditor({
       parameters={strategy.parameters(machine)}
       anchors={anchorOptions(plate)}
       workArea={workArea}
+      pick={pick}
       onChange={(params) => update({ ...source, params })}
     />
   )
@@ -206,6 +245,7 @@ function TouchOffEditor({
   machine,
 }: TaskEditorProps<ProbingSourceOf<"touch-off">>) {
   const update = useSourceUpdate(plate, operation.id, operation.revision)
+  const pick = usePick(plate, operation.id, "point")
   const workArea = useWorkArea(plate)
   const { source } = operation
   const strategy = strategyFor(source, machine)
@@ -218,6 +258,7 @@ function TouchOffEditor({
       reads={strategyReads(strategy, source.params, machine)}
       anchors={anchorOptions(plate)}
       workArea={workArea}
+      pick={pick}
       onChange={(params) => update({ ...source, params })}
     />
   )
@@ -230,6 +271,8 @@ function OutlineEditor({
 }: TaskEditorProps<ProbingSourceOf<"outline">>) {
   const update = useSourceUpdate(plate, operation.id, operation.revision)
   const outline = useMemo(() => plateToolpathBounds(plate), [plate])
+  const edges = useMemo(() => itemEdges(plate.setup), [plate.setup])
+  const pick = usePick(plate, operation.id, "edges")
   const { source } = operation
   const strategy = strategyFor(source, machine)
   if (!strategy) return null
@@ -239,6 +282,9 @@ function OutlineEditor({
       value={source.params}
       parameters={strategy.parameters(machine)}
       outline={outline}
+      edges={edges}
+      hasStock={!!plate.setup.stock}
+      pick={pick}
       onChange={(params) => update({ ...source, params })}
     />
   )
@@ -251,6 +297,7 @@ function OriginEditor({
   machine,
 }: TaskEditorProps<ProbingSourceOf<"origin">>) {
   const update = useSourceUpdate(plate, operation.id, operation.revision)
+  const pick = usePick(plate, operation.id, "point")
   const { source } = operation
   const strategy = strategyFor(source, machine)
   if (!strategy) return null
@@ -260,6 +307,7 @@ function OriginEditor({
       value={source.params}
       parameters={strategy.parameters(machine)}
       anchors={anchorOptions(plate)}
+      pick={pick}
       onChange={(params) => update({ ...source, params })}
     />
   )

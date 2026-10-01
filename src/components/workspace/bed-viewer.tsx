@@ -129,6 +129,8 @@ export function BedViewer({
       menu: (request) => arrange.current?.menu(request),
       pick: (pick) => arrange.current?.pick(pick),
       drag: (drag) => arrange.current?.drag(drag),
+      pickPoint: (plateId, point) => arrange.current?.pickPoint(plateId, point),
+      pickEdge: (plateId, edge) => arrange.current?.pickEdge(plateId, edge),
     }
     const scene = BedScene.create(
       container.current,

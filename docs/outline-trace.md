@@ -1,6 +1,6 @@
 # Outline trace
 
-Outline trace is OpenSpindle's own strategy for tracing an outline: it traces the edges of the plate's work area with a probe's laser pointer at a safe height, so the outline can be checked against the stock and fixtures before anything is cut. It is the explicit equivalent of the margin scan in the Z1 firmware's `M495` automation. **Probing** on the Prepare toolbar, or **Probing** in **Add operation**, adds one to the selected plate: pick a probe with a laser pointer, such as the Makera Wired Probe 2.0, then **Outline trace** under **Generic** ([probing](probing.md)). Its NC is generated whenever the plate is compiled.
+Outline trace is OpenSpindle's own strategy for tracing an outline: it traces the edges of the plate's work area, or chosen edges of its stock and fixtures, with a probe's laser pointer at a safe height, so the outline can be checked against the stock and fixtures before anything is cut. It is the explicit equivalent of the margin scan in the Z1 firmware's `M495` automation. **Probing** on the Prepare toolbar, or **Probing** in **Add operation**, adds one to the selected plate: pick a probe with a laser pointer, such as the Makera Wired Probe 2.0, then **Outline trace** under **Generic** ([probing](probing.md)). Its NC is generated whenever the plate is compiled.
 
 The trace follows the firmware's own margin scan and has been checked against its source, but it has not run on a machine yet: read the [firmware background](#firmware-background) first.
 
@@ -8,7 +8,12 @@ It probes with a probe whose **Laser pointer** is Yes in the tool library, and t
 
 ## What it traces
 
-The outline is the plate's [toolpath bounds](#toolpath-bounds): where its machining operations cut, not clipped to the stock, so cuts that overhang the stock show as an outline that does too. It is derived on every compile and never goes stale. The 3D view draws the same bounds as a dashed outline on the stock, and the hint on the settings' **Outline** names the rectangle in work coordinates.
+**Trace** chooses what it follows:
+
+- **Toolpath bounds**: the plate's [toolpath bounds](#toolpath-bounds), where its machining operations cut, not clipped to the stock, so cuts that overhang the stock show as an outline that does too. The rectangle is in work coordinates, so it shows where the machine will cut with the work X and Y it has. The 3D view draws the same bounds as a dashed outline on the stock, and the hint on the settings' **Outline** names the rectangle in work coordinates. A plate without machining operations has nothing to trace this way.
+- **Edges**: chosen edges of the plate's stock and of the fixtures on its bed that lie flat (turned about Z only), each one side of its top (front, right, back or left, the fixture's own when it is turned). **Pick edges** marks the edges in the 3D view as the pointer comes near them; clicking one adds it, clicking it again drops it, and Escape or the button again ends picking. **Stock outline** chooses the stock's four edges, and each chosen edge has a remove button. The edges are traced in machine coordinates from the device's first anchor, where the plate's setup puts them, whatever work X and Y are, so a plate needs no machining operations and its anchors read from the device ([stored anchors](stored-anchors.md#coordinate-registration)). Up to 32 edges.
+
+A new trace on a plate with stock and without machining operations traces the stock's outline. Both are derived on every compile and never go stale.
 
 ## Settings
 
@@ -48,20 +53,25 @@ M2
 - The rectangle is in work coordinates, from its lower-left corner, as the firmware's margin scan: it shows where the machine will cut with the work X and Y it has: set by hand, by the program from the plate's work origin ([stored anchors](stored-anchors.md#work-origin-from-an-anchor)), or by 3D probing before the trace. The bounds are rounded outwards to hundredths.
 - The pause is a standard `M0` program stop (sent as `M600`); Resume continues, Stop ends the job before it cuts.
 
+Tracing edges, the program goes up to the machine Z as above, then follows each edge in machine coordinates: `G53 G0 X… Y…` to its start, unless it continues the edge before (an edge is reversed when that saves the travel), and `G53 G1 X… Y… F…` along it, each point the first anchor's machine position plus its X and Y on the bed. Its header names the edges.
+
 The traced moves form one **Probe scan** section: feed moves with a probe in a probe slot (T0 or T9999) never cut, so the Plates list, the G-code list and the Job timeline name them as a scan, and the 3D view draws them in the probe's green ([firmware-preview.md](firmware-preview.md)).
 
 ## Checks
 
 Errors block Run; warnings inform. What stops the NC from being generated is the operation's error (`probing-invalid`, or `probing-probe` for the probe); the rest are rules in the [rule list](workspace-model.md#rules).
 
-| Check                                                                                                        | Id                        | Severity |
-| ------------------------------------------------------------------------------------------------------------ | ------------------------- | -------- |
-| A setting is missing or out of range                                                                         | `probing-invalid`         | error    |
-| Nothing to trace: the plate has no machining operations, or they have no cutting moves                       | `probing-invalid`         | error    |
-| T0 holds no probe the strategy runs with, such as one without a laser pointer ([probing](probing.md#checks)) | `probing-probe`           | error    |
-| The toolpath bounds reach beyond the stock as placed                                                         | `outline/outside-stock`   | warning  |
-| A machining operation runs before the trace, which then checks too late                                      | `outline/after-machining` | warning  |
-| 3D probing after the trace, and before machining, sets work X or Y, which the program does not set first     | `outline/before-origin`   | warning  |
+| Check                                                                                                                      | Id                        | Severity |
+| -------------------------------------------------------------------------------------------------------------------------- | ------------------------- | -------- |
+| A setting is missing or out of range                                                                                       | `probing-invalid`         | error    |
+| Nothing to trace: the plate has no machining operations, or they have no cutting moves (toolpath bounds)                   | `probing-invalid`         | error    |
+| No edges chosen, or a chosen edge's stock or fixture is gone or no longer lies flat (edges)                                | `probing-invalid`         | error    |
+| Edges without the plate's anchors, or beyond the supported coordinate range                                                | `probing-invalid`         | error    |
+| Anchors for traced edges not read from the connected device, or changed since ([probing](probing.md#checks))               | `probing/anchors-…`       | error    |
+| T0 holds no probe the strategy runs with, such as one without a laser pointer ([probing](probing.md#checks))               | `probing-probe`           | error    |
+| The toolpath bounds reach beyond the stock as placed (toolpath bounds)                                                     | `outline/outside-stock`   | warning  |
+| A machining operation runs before the trace, which then checks too late                                                    | `outline/after-machining` | warning  |
+| 3D probing after the trace, and before machining, sets work X or Y, which the program does not set first (toolpath bounds) | `outline/before-origin`   | warning  |
 
 ## Toolpath bounds
 

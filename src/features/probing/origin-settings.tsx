@@ -30,6 +30,7 @@ import {
   PlacementFields,
   probingField,
 } from "@/features/probing/probing-fields"
+import type { ProbingPick } from "@/features/probing/probing-fields"
 import {
   FIELD_LAYOUT,
   useProbingDraft,
@@ -47,6 +48,8 @@ export type OriginSettingsProps = {
   anchors: readonly ProbingAnchorOption[]
   /** Receives complete, valid parameters as soon as an edit makes them valid. */
   onChange: (value: OriginParams) => void
+  /** Picking its start in the 3D view; null where it cannot be picked. */
+  pick?: ProbingPick | null
   disabled?: boolean
 }
 
@@ -89,6 +92,7 @@ export function OriginSettings({
   parameters,
   anchors,
   onChange,
+  pick = null,
   disabled = false,
 }: OriginSettingsProps) {
   const draft = useProbingDraft(value, onChange)
@@ -98,6 +102,7 @@ export function OriginSettings({
       value={value}
       parameters={parameters}
       anchors={anchors}
+      pick={pick}
       disabled={disabled}
       onChange={draft.onChange}
     />
@@ -109,6 +114,7 @@ function OriginForm({
   parameters,
   anchors,
   onChange,
+  pick,
   disabled,
 }: Required<OriginSettingsProps>) {
   const id = useId()
@@ -250,6 +256,7 @@ function OriginForm({
         anchors={anchors}
         lastAnchor={lastAnchor}
         setLastAnchor={setLastAnchor}
+        pick={pick}
         disabled={disabled}
         height
       />

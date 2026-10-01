@@ -35,6 +35,8 @@ import { DesignRuleResults } from "@/features/design-rules/design-rule-results"
 import { ArrangeHint } from "./arrange/arrange-hint"
 import { ArrangeMenu } from "./arrange/arrange-menu"
 import { useArrange, useArrangeTarget } from "./arrange/arrange-state"
+import { outlineTarget } from "@/domain/probing/tasks/outline/params"
+import type { ItemEdgeRef } from "@/domain/plate/item-edges"
 import { useArrangeEvents } from "./arrange/use-arrange-events"
 import { useArrangeShortcuts } from "./arrange/use-arrange-shortcuts"
 import { usePrepareSelection } from "./plate-tree/use-prepare-selection"
@@ -42,6 +44,9 @@ import { selectedSections, useSectionSelection } from "./selection"
 import { useHiddenOperations } from "./visibility"
 import { PrepareToolbar } from "./prepare-toolbar"
 import { useShowProblem } from "./show-problem"
+
+/** No edges: one array, so that what is drawn changes only when edges do. */
+const NO_EDGES: readonly ItemEdgeRef[] = []
 
 const NO_PICK: ArrangePick = { from: null, notice: null }
 
@@ -141,14 +146,31 @@ export function PrepareViewer() {
   const [menu, setMenu] = useState<ArrangeMenuRequest | null>(null)
   const [pick, setPick] = useState<ArrangePick>(NO_PICK)
   const events = useArrangeEvents({ menu: setMenu, pick: setPick })
+  // The edges a trace follows so far, drawn while its edges are picked.
+  const pickedEdges = useWorkspace((state) => {
+    const { picking } = arrange
+    if (picking?.kind !== "edges") return NO_EDGES
+    const source = state.plates
+      .find(({ id }) => id === picking.plateId)
+      ?.operations.find(({ id }) => id === picking.operationId)?.source
+    if (source?.kind !== "probing" || source.task !== "outline") return NO_EDGES
+    const traced = outlineTarget(source.params)
+    return traced.kind === "edges" ? traced.edges : NO_EDGES
+  })
   const arrangement = useMemo<ArrangeView>(
     () => ({
       selection: target ? arrange.selection : null,
-      moving: arrange.moving && !!target && !target.item.fixed,
+      moving:
+        arrange.moving && !arrange.picking && !!target && !target.item.fixed,
       axes: arrange.axes,
       snap: arrange.snap,
+      picking: arrange.picking && {
+        kind: arrange.picking.kind,
+        plateId: arrange.picking.plateId,
+        edges: pickedEdges,
+      },
     }),
-    [target, arrange]
+    [target, arrange, pickedEdges]
   )
   useArrangeShortcuts(target)
   return (

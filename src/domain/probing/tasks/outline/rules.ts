@@ -9,6 +9,7 @@ import { workOriginOnMachine } from "../../../plate/work-origin"
 import type { OperationRuleSubject, StageRule } from "../../../rules/stages"
 import { editOperation } from "../../rules"
 import { setsWorkXY } from "../origin/params"
+import { outlineTarget } from "./params"
 
 /**
  * Where an outline operation's outline, the plate's cuts, leaves the stock as placed, at the
@@ -22,7 +23,12 @@ function outlineBeyondStock({
 }: OperationRuleSubject): Area | null {
   const { source } = operation
   const { stock, stockAnchor, workOrigin } = plate.setup
-  if (source.kind !== "probing" || source.task !== "outline" || !stock)
+  if (
+    source.kind !== "probing" ||
+    source.task !== "outline" ||
+    outlineTarget(source.params).kind !== "toolpath" ||
+    !stock
+  )
     return null
   const toolpath = plateMachining(plate, kit).toolpath()
   if (!toolpath.ok) return null
@@ -100,6 +106,8 @@ function originAfterOutline({
 }: OperationRuleSubject): Operation | null {
   const { source } = operation
   if (source.kind !== "probing" || source.task !== "outline") return null
+  // Edges are traced in machine coordinates, wherever work X and Y are.
+  if (outlineTarget(source.params).kind !== "toolpath") return null
   if (workOriginOnMachine(plate.setup)) return null
   const index = plate.operations.findIndex((item) => item.id === operation.id)
   if (index < 0) return null

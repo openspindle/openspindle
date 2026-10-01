@@ -31,6 +31,8 @@ import {
   originResult,
 } from "@/domain/probing/tasks/origin/result"
 import { placementHeight } from "@/domain/probing/placement"
+import { outlineTarget } from "@/domain/probing/tasks/outline/params"
+import { itemEdges, sameEdge } from "@/domain/plate/item-edges"
 import { SURFACE_TOUCH } from "@/domain/probing/generic/surface-touch"
 import {
   PROBE_3D_TOOL,
@@ -143,6 +145,18 @@ function operationSummary(
       const [columns, rows] = probing.params.points
       const [width, depth] = probing.params.size
       return `Probes ${columns} × ${rows} points over ${mm(width)} × ${mm(depth)} mm.`
+    }
+    case "outline": {
+      const target = outlineTarget(probing.params)
+      if (target.kind === "toolpath")
+        return "Traces the plate's toolpath bounds with the probe's pointer."
+      const edges = itemEdges(subject.plate.setup)
+      const names = target.edges.map(
+        (ref) =>
+          edges.find((edge) => sameEdge(edge.ref, ref))?.label ??
+          `a missing ${ref.side} edge`
+      )
+      return `Traces ${names.join(", ")} with the probe's pointer.`
     }
     case "origin": {
       const { placement } = probing.params

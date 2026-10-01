@@ -1,5 +1,7 @@
 import { bedAt } from "@/domain/fixtures/machine-bed"
 import type { MachineBed } from "@/domain/fixtures/machine-bed"
+import { itemEdges } from "@/domain/plate/item-edges"
+import type { ItemEdge } from "@/domain/plate/item-edges"
 import { setupPoints } from "@/domain/plate/setup-items"
 import type { SetupPoint, SetupSubject } from "@/domain/plate/setup-items"
 import type { Point3 } from "@/domain/nc/gcode"
@@ -155,6 +157,21 @@ export function plateSetupPoints(plate: ViewerPlate): SetupPoint[] {
   const points = setupPoints(viewerSetup(plate), plate.toolpathBounds)
   pointLists.set(plate, points)
   return points
+}
+
+const edgeLists = new WeakMap<ViewerPlate, ItemEdge[]>()
+
+/** The edges of this plate's stock and flat fixtures, which a trace can follow. */
+export function plateItemEdges(plate: ViewerPlate): ItemEdge[] {
+  const cached = edgeLists.get(plate)
+  if (cached) return cached
+  const edges = itemEdges({
+    stock: plate.stock,
+    stockAnchor: plate.stockAnchor,
+    fixtures: plate.fixtures ?? [],
+  })
+  edgeLists.set(plate, edges)
+  return edges
 }
 
 /** What the viewer draws of a machine's bed: the bed with a margin, down to its reference grid. */

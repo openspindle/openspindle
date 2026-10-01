@@ -5,6 +5,7 @@ import {
   selectSetupItem,
   setMoveAxes,
   setMoving,
+  setPicking,
   useArrange,
 } from "./arrange-state"
 import type { ArrangeTarget } from "./arrange-state"
@@ -12,8 +13,8 @@ import { toggleLock } from "./use-arrange-events"
 
 /**
  * Keys for the selected setup item: M moves, L locks, X, Y and Z keep a move to one axis (again
- * for X and Y), Escape ends move mode and then clears the selection. The viewer's own Escape
- * (dropping a drag or a picked point) comes first.
+ * for X and Y), Escape ends picking, then move mode, and then clears the selection. The viewer's
+ * own Escape (dropping a drag or a picked point) comes first. Nothing moves while picking.
  */
 export function useArrangeShortcuts(target: ArrangeTarget | null) {
   const workspace = useWorkspaceStore()
@@ -24,12 +25,13 @@ export function useArrangeShortcuts(target: ArrangeTarget | null) {
     const handle = (key: string) => {
       switch (key) {
         case "escape":
-          if (moving) setMoving(false)
+          if (state.picking) setPicking(null)
+          else if (moving) setMoving(false)
           else if (state.selection) selectSetupItem(null)
           else return false
           return true
         case "m":
-          if (!movable) return false
+          if (!movable || state.picking) return false
           setMoving(!moving)
           return true
         case "l":

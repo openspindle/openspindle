@@ -17,6 +17,7 @@ import {
   WorkAreaField,
   probingField,
 } from "@/features/probing/probing-fields"
+import type { ProbingPick } from "@/features/probing/probing-fields"
 import {
   fromWorkOrigin,
   useProbingDraft,
@@ -42,6 +43,8 @@ export type TouchOffSettingsProps = {
   workArea: WorkAreaFit
   /** Receives complete, valid parameters as soon as an edit makes them valid. */
   onChange: (value: TouchOffParams) => void
+  /** Picking its start in the 3D view; null where it cannot be picked. */
+  pick?: ProbingPick | null
   disabled?: boolean
 }
 
@@ -77,6 +80,7 @@ export function TouchOffSettings({
   anchors,
   workArea,
   onChange,
+  pick = null,
   disabled = false,
 }: TouchOffSettingsProps) {
   const draft = useProbingDraft(value, onChange)
@@ -88,6 +92,7 @@ export function TouchOffSettings({
       reads={reads}
       anchors={anchors}
       workArea={workArea}
+      pick={pick}
       disabled={disabled}
       onChange={draft.onChange}
     />
@@ -101,6 +106,7 @@ function TouchOffForm({
   anchors,
   workArea,
   onChange,
+  pick,
   disabled,
 }: Required<TouchOffSettingsProps>) {
   const id = useId()
@@ -160,6 +166,7 @@ function TouchOffForm({
         anchors={anchors}
         lastAnchor={lastAnchor}
         setLastAnchor={setLastAnchor}
+        pick={pick}
         disabled={disabled}
         action={(placement, setPlacement) => (
           <WorkAreaField

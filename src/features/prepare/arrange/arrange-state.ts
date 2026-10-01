@@ -13,6 +13,13 @@ import type {
   SetupItemRef,
 } from "@/domain/plate/setup-items"
 
+/** Picking in the viewer for an operation: a point to start it at, or edges for it to trace. */
+export type OperationPicking = {
+  readonly kind: "point" | "edges"
+  readonly plateId: string
+  readonly operationId: string
+}
+
 /** The setup item selected in the Prepare viewer, move mode and how moves go. */
 export type ArrangeState = {
   readonly selection: ArrangeSelection | null
@@ -21,6 +28,8 @@ export type ArrangeState = {
   readonly axes: MoveAxes
   /** Whether drags snap the item's points to other points. */
   readonly snap: boolean
+  /** Picking for an operation, which clicks then do instead of selecting. */
+  readonly picking: OperationPicking | null
 }
 
 const arrangeAtom = createAtom<ArrangeState>({
@@ -28,6 +37,7 @@ const arrangeAtom = createAtom<ArrangeState>({
   moving: false,
   axes: "xy",
   snap: true,
+  picking: null,
 })
 
 /** How far a drag has moved its item, while it lasts. */
@@ -56,6 +66,20 @@ export const setMoveAxes = (axes: MoveAxes) =>
   arrangeAtom.set((state) => ({ ...state, axes }))
 export const setSnap = (snap: boolean) =>
   arrangeAtom.set((state) => ({ ...state, snap }))
+
+/** Starts picking for an operation, which ends move mode, or ends picking (null). */
+export const setPicking = (picking: OperationPicking | null) =>
+  arrangeAtom.set((state) => ({
+    ...state,
+    picking,
+    moving: picking ? false : state.moving,
+  }))
+
+export const usePicking = () =>
+  useSelector(arrangeAtom, (state) => state.picking)
+
+/** The picking under way, read outside a component. */
+export const currentPicking = () => arrangeAtom.get().picking
 
 /** Whether an item is the one selected in the viewer, read outside a component. */
 export function isArrangeSelection(

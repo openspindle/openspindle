@@ -405,12 +405,16 @@ function probeSetup(
   return ok({})
 }
 
-/** The probe's travel in machine coordinates, to a stored anchor or its trace height. */
+/**
+ * The probe's travel in machine coordinates, to a stored anchor or its trace height; an
+ * outline's trace also follows edges there, along `G53 G1 X Y F` with a feed of its own.
+ */
 function probeTravel(
   words: readonly NcWord[],
   gCodes: readonly NcWord[],
   { policy, activeTool, metric, absolute }: NcUnitState
 ): Reading {
+  const traced = policy.probing === "outline" && gCodes[1]?.value === 1
   if (
     policy.probing === "none" ||
     activeTool !== probeFor(policy) ||
@@ -418,11 +422,30 @@ function probeTravel(
     !absolute ||
     gCodes.length !== 2 ||
     gCodes[0].value !== 53 ||
-    gCodes[1].value !== 0
+    (gCodes[1].value !== 0 && !traced)
   )
     return fail(
-      "Machine-coordinate probe travel requires the operation's probe active, G21 G90 and an explicit G53 G0 block."
+      "Machine-coordinate probe travel requires the operation's probe active, G21 G90 and an explicit G53 G0 block (G53 G1 only in an outline trace)."
     )
+  if (traced) {
+    const values = probeFields(words, ["N", "G", "X", "Y", "F"])
+    const feed = values?.get("F")
+    const xy = ["X", "Y"].flatMap((axis) => {
+      const value = values?.get(axis)
+      return value === undefined ? [] : [value]
+    })
+    if (
+      !values ||
+      feed === undefined ||
+      feed <= 0 ||
+      !xy.length ||
+      xy.some((value) => Math.abs(value) > COORDINATE_LIMIT)
+    )
+      return fail(
+        "An outline's machine-coordinate trace needs bounded X and Y and a positive F in each G53 G1 block."
+      )
+    return ok({ motion: 1 })
+  }
   const values = probeFields(words, ["N", "G", "X", "Y", "Z"])
   if (!values) return fail(FIELDS)
   const axes = ["X", "Y", "Z"].flatMap((axis) => {

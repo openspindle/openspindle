@@ -1,4 +1,5 @@
 import type { ReactNode } from "react"
+import { Crosshair } from "lucide-react"
 import type { DeepKeys, DeepValue } from "@tanstack/react-form"
 import {
   Field,
@@ -251,6 +252,43 @@ function probePosition(height: number | undefined): ProbePlacement {
  * relative to the probe's position, or to a stored anchor of the plate's device, from which it
  * takes X and Y. With `height`, it also takes a Z, a height on the bed, which may stay empty.
  */
+/** Picking a probing operation's start, or an outline's edges, in the 3D view. */
+export type ProbingPick = {
+  /** Whether picking is under way for it. */
+  readonly picking: boolean
+  /** Why it cannot be picked; null when it can. */
+  readonly reason: string | null
+  /** Starts picking, or ends it. */
+  readonly onPick: () => void
+}
+
+/** The button that picks in the 3D view, pressed while picking. */
+export function PickButton({
+  pick,
+  label,
+  disabled,
+}: {
+  pick: ProbingPick
+  label: string
+  disabled?: boolean
+}) {
+  return (
+    <ReasonButton
+      label={label}
+      variant={pick.picking ? "secondary" : "outline"}
+      size="sm"
+      className="self-start"
+      aria-pressed={pick.picking}
+      reason={pick.reason}
+      disabled={disabled}
+      onClick={pick.onPick}
+    >
+      <Crosshair data-icon="inline-start" />
+      {pick.picking ? "Picking in the 3D view…" : label}
+    </ReasonButton>
+  )
+}
+
 export function PlacementFields({
   placement,
   anchors,
@@ -259,6 +297,7 @@ export function PlacementFields({
   disabled,
   height = false,
   action,
+  pick = null,
 }: {
   placement: ProbingField<ProbePlacement>
   anchors: readonly ProbingAnchorOption[]
@@ -268,6 +307,8 @@ export function PlacementFields({
   disabled: boolean
   /** The operation starts at a height on the bed, such as finding an origin. */
   height?: boolean
+  /** Picking the start in the 3D view; null where it cannot be picked. */
+  pick?: ProbingPick | null
   /** Fit grid or Center, above the start; left out where it sits beside other fields instead. */
   action?: (
     placement: ProbePlacement,
@@ -309,6 +350,13 @@ export function PlacementFields({
       <FieldSet>
         <FieldLegend>Placement</FieldLegend>
         <FieldGroup className="gap-3">
+          {pick && (
+            <PickButton
+              pick={pick}
+              label="Pick in the 3D view"
+              disabled={disabled}
+            />
+          )}
           {action?.(value, setPlacement)}
           <ReferencePointFields
             label="Placement"

@@ -44,6 +44,8 @@ import {
   sameRanges,
 } from "./plate-identity"
 import type { FieldEquality } from "./plate-identity"
+import { EdgeHighlights } from "./edge-highlights"
+import type { EdgeHighlight } from "./edge-highlights"
 import { ProblemView } from "./problem-view"
 import { SetupMarkers } from "./setup-markers"
 import type { Marker } from "./setup-markers"
@@ -482,6 +484,7 @@ export class PlateView {
   private readonly outline = new THREE.Group()
   private readonly markers: SetupMarkers
   private readonly problems: ProblemView
+  private readonly edges: EdgeHighlights
   private readonly machineOrigin: THREE.Group
   private selectedItem: SetupItemRef | null = null
   /** An item drawn moved by a delta, while it is dragged or until its move arrives. */
@@ -509,6 +512,7 @@ export class PlateView {
     this.selection = selectionOutline(context.palette.primary, machineBed)
     this.markers = new SetupMarkers(context.palette.primary, context.pixelRatio)
     this.problems = new ProblemView(context.palette)
+    this.edges = new EdgeHighlights(context.palette.primary)
     this.machineOrigin = machineOriginMarker(context.palette.primary)
     this.decoration.add(
       this.axes,
@@ -530,6 +534,7 @@ export class PlateView {
       this.outline,
       this.markers.object,
       this.problems.group,
+      this.edges.group,
       this.machineOrigin,
       this.pick
     )
@@ -593,6 +598,11 @@ export class PlateView {
     this.markers.show(markers)
   }
 
+  /** Shows edges being picked; null hides them. */
+  showEdges(edges: readonly EdgeHighlight[] | null) {
+    this.edges.show(edges)
+  }
+
   /**
    * Draws an item moved by `delta` without changing the plate: the stock carries the design,
    * as its move does. Null draws it where the plate has it.
@@ -624,6 +634,7 @@ export class PlateView {
     this.path.dispose()
     this.markers.dispose()
     this.problems.dispose()
+    this.edges.dispose()
     // Bed and fixture clones share their templates' geometry; release only owned resources.
     disposeObjects(
       this.stock,

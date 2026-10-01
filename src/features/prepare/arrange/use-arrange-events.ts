@@ -11,11 +11,14 @@ import { setupItem } from "@/domain/plate/setup-items"
 import type { SetupItem, SetupItemRef } from "@/domain/plate/setup-items"
 import type { PrepareSearch } from "@/routes/_workspace/prepare"
 import { usePrepareSelection } from "../plate-tree/use-prepare-selection"
+import { withPickedEdge, withPickedStart } from "@/domain/probing/picked-start"
 import {
+  currentPicking,
   dragAtom,
   isArrangeSelection,
   selectSetupItem,
   setMoving,
+  setPicking,
 } from "./arrange-state"
 
 /** The inspector panel with an item's settings; undefined keeps the panel shown. */
@@ -99,5 +102,73 @@ export function useArrangeEvents(handlers: {
     menu: handlers.menu,
     pick: handlers.pick,
     drag: (drag) => dragAtom.set(() => drag),
+    pickPoint: (plateId, point) => {
+      const picked = pickedOperation(workspace, plateId, "point")
+      if (!picked) return
+      const { plate, operation } = picked
+      const source =
+        operation.source.kind === "probing"
+          ? withPickedStart(operation.source, plate, point.position)
+          : null
+      if (!source) {
+        toast.error(
+          "The plate has no anchors to start from: read the device's anchors."
+        )
+        return
+      }
+      const result = workspace.dispatch({
+        type: "operation.source",
+        plateId,
+        operationId: operation.id,
+        source,
+        expectedRevision: operation.revision,
+      })
+      if (!result.ok) toast.error(result.error)
+      setPicking(null)
+    },
+    pickEdge: (plateId, edge) => {
+      const picked = pickedOperation(workspace, plateId, "edges")
+      if (!picked) return
+      const { operation } = picked
+      const source =
+        operation.source.kind === "probing"
+          ? withPickedEdge(operation.source, edge)
+          : null
+      if (!source) {
+        toast.error("The trace follows as many edges as it can.")
+        return
+      }
+      const result = workspace.dispatch({
+        type: "operation.source",
+        plateId,
+        operationId: operation.id,
+        source,
+        expectedRevision: operation.revision,
+      })
+      if (!result.ok) toast.error(result.error)
+    },
   }
+}
+
+/**
+ * The operation a pick is for, as the workspace has it now; null, and picking ends, when it is
+ * gone or another pick is under way.
+ */
+function pickedOperation(
+  workspace: WorkspaceStore,
+  plateId: string,
+  kind: "point" | "edges"
+) {
+  const picking = currentPicking()
+  if (!picking || picking.kind !== kind || picking.plateId !== plateId)
+    return null
+  const plate = workspace.state.plates.find(({ id }) => id === plateId)
+  const operation = plate?.operations.find(
+    ({ id }) => id === picking.operationId
+  )
+  if (!plate || !operation) {
+    setPicking(null)
+    return null
+  }
+  return { plate, operation }
 }

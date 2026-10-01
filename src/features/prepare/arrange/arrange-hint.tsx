@@ -11,6 +11,13 @@ import type {
 import { MOVE_AXES_LABELS } from "@/domain/plate/setup-items"
 import type { SetupItem } from "@/domain/plate/setup-items"
 import { toMicrometre } from "@/domain/primitives"
+import { useWorkspace } from "@/app/workspace/workspace-context"
+import type { Operation } from "@/domain/operations/operation"
+import {
+  PROBE_3D_CORNER_LABELS,
+  PROBE_3D_ROUTINE_LABELS,
+  findsCorner,
+} from "@/domain/probing/tasks/origin/params"
 import { useArrange, useArrangeDrag } from "./arrange-state"
 import type { ArrangeState, ArrangeTarget } from "./arrange-state"
 
@@ -44,6 +51,23 @@ function hintText(
   return `Drag it along ${along}${snapping}, or click one of its points and then another. Right-click for options.`
 }
 
+/** What a click picks for an operation: where it starts, or which edges it traces. */
+function pickingText(kind: "point" | "edges", operation: Operation | null) {
+  if (kind === "edges")
+    return "Click edges of the stock or fixtures to trace them, or click one again to drop it. Esc when done."
+  const source = operation?.source
+  if (source?.kind === "probing" && source.task === "origin") {
+    const { routine, corner } = source.params
+    const what = findsCorner(routine)
+      ? `the ${PROBE_3D_CORNER_LABELS[corner].toLowerCase()} corner for ${PROBE_3D_ROUTINE_LABELS[routine].toLowerCase()}`
+      : `the centre for ${PROBE_3D_ROUTINE_LABELS[routine].toLowerCase()}`
+    return `Click ${what}; its start is set from there. Esc to cancel.`
+  }
+  if (source?.kind === "probing" && source.task === "grid")
+    return "Click where the grid starts. Esc to cancel."
+  return "Click where to touch. Esc to cancel."
+}
+
 /** What is selected in the viewer, and what clicking and dragging will do with it. */
 export function ArrangeHint({
   target,
@@ -54,6 +78,30 @@ export function ArrangeHint({
 }) {
   const state = useArrange()
   const drag = useArrangeDrag()
+  const { picking } = state
+  const operation = useWorkspace(
+    (workspace) =>
+      (picking &&
+        workspace.plates
+          .find(({ id }) => id === picking.plateId)
+          ?.operations.find(({ id }) => id === picking.operationId)) ??
+      null
+  )
+  if (picking)
+    return (
+      <Card
+        size="sm"
+        className="pointer-events-none absolute bottom-4 left-1/2 z-10 w-md max-w-[calc(100%-140px)] -translate-x-1/2"
+        aria-live="polite"
+      >
+        <CardHeader>
+          <CardTitle>{operation?.name ?? "Pick"}</CardTitle>
+          <CardDescription>
+            {pickingText(picking.kind, operation)}
+          </CardDescription>
+        </CardHeader>
+      </Card>
+    )
   if (!target) return null
   return (
     <Card

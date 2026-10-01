@@ -12,6 +12,7 @@ import {
   WorkAreaField,
   probingField,
 } from "@/features/probing/probing-fields"
+import type { ProbingPick } from "@/features/probing/probing-fields"
 import {
   fromWorkOrigin,
   useProbingDraft,
@@ -33,6 +34,8 @@ export type GridSettingsProps = {
   workArea: WorkAreaFit
   /** Receives complete, valid parameters as soon as an edit makes them valid. */
   onChange: (value: GridParams) => void
+  /** Picking its start in the 3D view; null where it cannot be picked. */
+  pick?: ProbingPick | null
   disabled?: boolean
 }
 
@@ -63,6 +66,7 @@ export function GridSettings({
   anchors,
   workArea,
   onChange,
+  pick = null,
   disabled = false,
 }: GridSettingsProps) {
   const draft = useProbingDraft(value, onChange)
@@ -73,6 +77,7 @@ export function GridSettings({
       parameters={parameters}
       anchors={anchors}
       workArea={workArea}
+      pick={pick}
       disabled={disabled}
       onChange={draft.onChange}
     />
@@ -85,6 +90,7 @@ function GridForm({
   anchors,
   workArea,
   onChange,
+  pick,
   disabled,
 }: Required<GridSettingsProps>) {
   const id = useId()
@@ -157,6 +163,7 @@ function GridForm({
         anchors={anchors}
         lastAnchor={lastAnchor}
         setLastAnchor={setLastAnchor}
+        pick={pick}
         disabled={disabled}
       />
       <form.Field name="reviewAfterProbe">

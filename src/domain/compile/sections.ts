@@ -53,6 +53,12 @@ export const machineRetract = (block: Pick<NcBlock, "words">) =>
     (word) => !AXIS_LETTERS.includes(word.letter) || word.letter === "Z"
   )
 
+/** M400 alone in its block: it waits for the moves before it and changes nothing. */
+const isWait = (block: NcBlock) =>
+  block.words.length === 1 &&
+  block.words[0].letter === "M" &&
+  block.words[0].value === 400
+
 /** What sections read of a machine's NC through its kit: its probing and its CAM's markers. */
 export type SectionMachine = Pick<FixtureKit, "probing" | "camMarkers">
 
@@ -309,8 +315,14 @@ export function buildProgramSections(
     }
     const touchName = touchOff(block, activeTool)
     if (touchName !== null) {
-      flush(line - 1)
-      touching = { start: line, end: line, name: touchName }
+      // A wait for the moves before it (M400), with nothing but comments since the last
+      // section, is the touch's own start.
+      const before = blocks.slice(startLine - first, line - first)
+      const waits =
+        before.some(isWait) &&
+        before.every((item) => !item.words.length || isWait(item))
+      if (!waits) flush(line - 1)
+      touching = { start: waits ? startLine : line, end: line, name: touchName }
       continue
     }
     if (block.message !== null) {

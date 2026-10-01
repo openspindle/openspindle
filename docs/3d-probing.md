@@ -39,6 +39,10 @@ The form shows **Corner** for a corner routine and **Axes** for a centre routine
 
 Like a touch-off, the operation takes where it starts: from the **Probe position** it runs the routine where the probe is in X and Y when the job starts (a probe change returns above it at the firmware's clearance height), and from one of the machine's [stored anchors](stored-anchors.md) it rises to machine Z −3 and travels with `G53` to the anchor plus X and Y. With a **Z**, the probe then comes down to that height on the bed, in work coordinates like the rest of the plate's program, so work Z must already be on the plate's work origin. It starts best half the distances in from an outside corner, over its top, as far out over the top from an inside corner, beyond both walls, and over the middle of a boss, whose distances then take the probe past its sides. A pocket's centring touches no top, so it needs a Z: the height on the bed at which the ball touches the pocket's walls.
 
+**Pick in the 3D view**, under **Placement**, starts from what you click instead of typed offsets: the view marks every point of the plate's setup (the stock's corners and centres, the fixtures' points such as the L-bracket's inner corner, the bed's holes and the anchors), and clicking one starts the routine where it is best started from there, for the routine, corner and distances set (choose those first; picking again moves the start after changing them). The start is kept from the operation's anchor, or else the nearest, and has no Z: the probe stays at the clearance the travel leaves it at and the routine searches down for the top, whatever work Z is (a pocket's centring keeps its Z). Escape, or the button again, ends picking. A plate without anchors cannot pick a start.
+
+The firmware reads where a routine starts as `M480` arrives, not after the moves queued before it, so the program waits for them (`M400`) right before the routine: a travel or a descent still under way would otherwise give it the wrong start, and the outside corner's return to its start X with it.
+
 The routine sets the machine's work origin where it finds the corner or centre. The plate's programs run from there, so the plate's work origin, set in its Setup as always, belongs on what the routine finds.
 
 ## Generated program
@@ -57,13 +61,15 @@ A front-left outside corner from the probe position, with the Makera 3D Probe in
 M5
 G21 G90
 M6 T9999
+; Wait for the moves before it: the routine starts from where they end.
+M400
 M480.4 D2 X10 Y10 Z2
 M2
 ```
 
-The title names the probe in the plate's T9999 entry. `M480.n` runs the routine with `D` the probe's ball diameter, `X` and `Y` the distances and `Z` the depth, which a pocket's centring, touching no top, does without; a centring routine skips an axis given as 0. From a stored anchor the travel of a touch-off comes before it (`G53 G0 Z-3`, then `G53 G0 X… Y…`), and with a Z, from either start, the descent to it (`G0 Z…`, its height on the bed less the work origin's).
+The title names the probe in the plate's T9999 entry. `M480.n` runs the routine with `D` the probe's ball diameter, `X` and `Y` the distances and `Z` the depth, which a pocket's centring, touching no top, does without; a centring routine skips an axis given as 0. From a stored anchor the travel of a touch-off comes before it (`G53 G0 Z-3`, then `G53 G0 X… Y…`), and with a Z, from either start, the descent to it (`G0 Z…`, its height on the bed less the work origin's); `M400` follows them.
 
-The routine forms one **3D probing** section in the Plates list, the G-code list and the Job timeline. When a plate combines operations, only a 3D probing operation may run `M480`, with T9999 active, a stopped spindle and `G21 G90`. The 3D view draws the probe's path green as the firmware moves ([firmware-preview.md](firmware-preview.md)), and has the routine find the corner or centre where the plate's work origin is, as it belongs there.
+The wait and the routine form one **3D probing** section in the Plates list, the G-code list and the Job timeline. When a plate combines operations, only a 3D probing operation may run `M480`, with T9999 active, a stopped spindle and `G21 G90`. The 3D view draws the probe's path green as the firmware moves ([firmware-preview.md](firmware-preview.md)), and has the routine find the corner or centre where the plate's work origin is, as it belongs there.
 
 ### In the Job tab
 

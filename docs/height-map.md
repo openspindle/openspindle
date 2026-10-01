@@ -27,6 +27,8 @@ A new height map covers the plate's work area, as **Fit grid** sets it, from a s
 
 **Fit grid**, on the **Work area** row, covers the plate's work area: its [toolpath bounds](outline-trace.md#toolpath-bounds) on the bed, clipped to the stock as placed and rounded outwards to hundredths, or the whole stock when the plate has no machining operations. It sets the width and depth, within their ranges, keeps the point counts and, with stored anchors of the plate's machine, anchors the grid's start at the area's lower-left corner: relative to the current anchor, or else the nearest one. The offset is the corner's distance from the anchor on the bed, so the `G53` travel reaches it in machine coordinates. Without anchors only the size changes, and the row's hint names the corner to position the probe above. With nothing to fit (machining without cutting moves, cuts off the stock, or neither machining operations nor stock) the button says why.
 
+**Pick in the 3D view**, under the placement, starts the grid at a point clicked in the 3D view, which marks every point of the plate's setup (the stock's corners, the fixtures' points, the bed's holes and the anchors): relative to the current anchor, or else the nearest, keeping its size. Escape, or the button again, ends picking. It needs stored anchors of the plate's device.
+
 ## Generated program
 
 Default settings, with the Makera Wired Probe 2.0 in T0, produce:

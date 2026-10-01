@@ -226,6 +226,10 @@ export const ROUTINES: ProbingStrategy<"origin", OriginParams, OriginSpecs> = {
             "; Down to the start's height.",
             `G0 Z${formatMillimetres(height)}`,
           ]),
+      // The firmware reads where the routine starts as it arrives, not after the moves queued
+      // before it: wait for them, so it starts where they end.
+      "; Wait for the moves before it: the routine starts from where they end.",
+      "M400",
       routineBlock(plan.params, ball.value, subcode),
       "M2",
     ]
