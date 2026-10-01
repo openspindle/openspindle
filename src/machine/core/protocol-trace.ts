@@ -51,9 +51,10 @@ export function describeOutbound(frame: OutboundFrame): string {
 export function describeInbound(event: FirmwareEvent): string {
   switch (event.kind) {
     case "status":
+    case "diagnostics":
       return event.raw
     case "identity":
-      return `identity · ${event.identity.model}${event.identity.atc ? " · ATC" : ""}`
+      return `identity · ${event.identity.model}${event.identity.atc ? " · ATC" : ""}${event.state ? ` · ${event.state}` : ""}`
     case "line":
       return `${event.line.text} [${event.line.kind}]`
     case "config-line":
@@ -79,6 +80,7 @@ export function consoleReply(event: FirmwareEvent): Shown | undefined {
     case "config-error":
       return { tone: "failure" }
     case "status":
+    case "diagnostics":
     case "transfer":
       return undefined
   }

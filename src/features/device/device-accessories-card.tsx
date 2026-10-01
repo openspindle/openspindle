@@ -1,20 +1,26 @@
 import { useId } from "react"
 import { Fan, Lightbulb, Power, RotateCw, Volume2 } from "lucide-react"
 import type { ReactNode } from "react"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import {
   Field,
   FieldContent,
   FieldDescription,
   FieldGroup,
   FieldLabel,
+  FieldLegend,
+  FieldSet,
 } from "@/components/ui/field"
 import { Switch } from "@/components/ui/switch"
+import { useWorkLightControl } from "@/components/work-light-control"
 import type {
   AvailabilityKey,
   MachineCommand,
   Telemetry,
 } from "@/machine/contract"
 import { ControlCard } from "./device-control-card"
+import { WorkLightBrightnessFields } from "./work-light-brightness-fields"
+import { DeviceVacuumPowerField } from "./device-vacuum-power-field"
 
 function OutputControl({
   label,
@@ -26,7 +32,7 @@ function OutputControl({
 }: {
   label: string
   description?: string
-  icon: ReactNode
+  icon?: ReactNode
   value: boolean | null | undefined
   disabled: boolean
   onChange: (value: boolean) => void
@@ -38,7 +44,7 @@ function OutputControl({
       data-disabled={disabled}
       className="items-center gap-3"
     >
-      <span className="shrink-0 text-muted-foreground">{icon}</span>
+      {icon && <span className="shrink-0 text-muted-foreground">{icon}</span>}
       <FieldContent>
         <FieldLabel htmlFor={id}>{label}</FieldLabel>
         {description && <FieldDescription>{description}</FieldDescription>}
@@ -66,39 +72,66 @@ export function DeviceAccessoriesCard({
   reason: (key: AvailabilityKey, action?: MachineCommand) => string | null
   execute: (action: MachineCommand) => void
 }) {
+  const light = useWorkLightControl()
+  const busy = pending || light.pending
+  const lightAction = telemetry?.lightOn === true ? "light" : "lightBrightness"
   return (
     <ControlCard title="Accessories" icon={<Power size={16} />}>
       <FieldGroup className="grid gap-4 sm:grid-cols-2">
         <OutputControl
-          label="Work light"
-          icon={<Lightbulb size={19} />}
-          value={telemetry?.lightOn}
-          disabled={pending || reason("light") !== null}
-          onChange={(enabled) => execute({ type: "light", enabled })}
-        />
-        <OutputControl
           label="Beep"
           icon={<Volume2 size={19} />}
           value={telemetry?.beepOn}
-          disabled={pending || reason("beep") !== null}
+          disabled={busy || reason("beep") !== null}
           onChange={(enabled) => execute({ type: "beep", enabled })}
-        />
-        <OutputControl
-          label="Vacuum"
-          description="External extractor"
-          icon={<Fan size={19} />}
-          value={telemetry?.vacuumOn}
-          disabled={pending || reason("vacuum") !== null}
-          onChange={(enabled) => execute({ type: "vacuum", enabled })}
         />
         <OutputControl
           label="Follow spindle"
           icon={<RotateCw size={19} />}
           value={telemetry?.vacuumAuto}
-          disabled={pending || reason("vacuumAuto") !== null}
+          disabled={busy || reason("vacuumAuto") !== null}
           onChange={(enabled) => execute({ type: "vacuumAuto", enabled })}
         />
       </FieldGroup>
+      <FieldSet>
+        <FieldLegend className="flex items-center gap-2">
+          <Lightbulb size={16} />
+          Work light
+        </FieldLegend>
+        <FieldGroup>
+          <OutputControl
+            label="Light"
+            value={telemetry?.lightOn}
+            disabled={busy || reason(lightAction) !== null}
+            onChange={(enabled) => {
+              if (enabled) light.turnOn()
+              else execute({ type: "light", enabled: false })
+            }}
+          />
+          <WorkLightBrightnessFields />
+        </FieldGroup>
+        {light.error && (
+          <Alert variant="destructive">
+            <AlertDescription>{light.error.message}</AlertDescription>
+          </Alert>
+        )}
+      </FieldSet>
+      <FieldSet>
+        <FieldLegend className="flex items-center gap-2">
+          <Fan size={16} />
+          Vacuum
+        </FieldLegend>
+        <FieldGroup>
+          <OutputControl
+            label="Vacuum"
+            description="External extractor"
+            value={telemetry?.vacuumOn}
+            disabled={busy || reason("vacuum") !== null}
+            onChange={(enabled) => execute({ type: "vacuum", enabled })}
+          />
+          <DeviceVacuumPowerField pending={busy} />
+        </FieldGroup>
+      </FieldSet>
     </ControlCard>
   )
 }

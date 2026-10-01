@@ -1,6 +1,6 @@
 # Device controls
 
-One module owns the machine: `MachineController` in `src/machine/core`, hosted in the Electron main process. The renderer and the native menu reach it only through a `MachineGateway` for their principal. Requests are the closed `MachineCommand` union (Zod-validated at the RPC boundary and again in the controller), plus Run, reads, writing the stored anchors, a line typed in the [console](#protocol-trace-and-console) and Stop.
+One module owns the machine: `MachineController` in `src/machine/core`, hosted in the Electron main process. The renderer and the native menu reach it only through a `MachineGateway` for their principal. Requests are the closed `MachineCommand` union (Zod-validated at the RPC boundary and again in the controller), plus Run, reads, writing the stored anchors or firmware configuration, a line typed in the [console](#protocol-trace-and-console) and Stop.
 
 ## Admission and availability
 
@@ -9,7 +9,7 @@ Every request passes one admission chain, the command rules (`contract/command-r
 1. a verified connection, and no lockout (an earlier outcome that is unknown);
 2. fresh status (at most 5 s old);
 3. no other operation in progress (the controller runs one at a time; nothing queues);
-4. while a program streams, only light, beep, overrides, pause, resume and tool confirmation are admitted, reads are **deferred** until the program ends, and writing the anchors or a typed console line is refused;
+4. while a program streams, only light, beep, overrides, pause, resume and tool confirmation are admitted, anchor and height-map reads are **deferred** until the program ends, and configuration transfers, writing the anchors or a typed console line are refused;
 5. the capability is reported by the machine (for example, no tool confirmation on ATC machines);
 6. the firmware's machine-state rules (`firmware/makera/commands.ts`).
 
@@ -30,6 +30,7 @@ A written command is not a successful command. Without a program stream, success
 | Spindle start / speed   | `M3 S10000`                                      | `ok`, spindle on at that target. A running spindle without motion accepts a new speed (**Apply**).                       |
 | Spindle stop            | `M5`                                             | `ok`, spindle off                                                                                                        |
 | Work light              | `M821` / `M822`                                  | `ok`, diagnose G light flag                                                                                              |
+| Work light brightness   | `M821 S…` (1–100% mapped to 3–255)               | `ok`, diagnose G light-on flag; firmware does not report the brightness level                                           |
 | Beep                    | `M861` / `M862`                                  | `ok`, diagnose G beep flag                                                                                               |
 | Vacuum                  | `M851 S100` / `M852`                             | `ok`, diagnose G external-output flag                                                                                    |
 | Follow spindle          | `M331` / `M332`                                  | `ok`, status S vacuum mode                                                                                               |
@@ -40,6 +41,12 @@ A written command is not a successful command. Without a program stream, success
 | Write anchors           | `config-set sd <key> <value>` for each key       | `sd: <key> has been set to <value>`, then every key read back ([stored anchors](stored-anchors.md#changing-the-anchors)) |
 
 A rejection line fails the command. An unverified command reports that its outcome is unknown and never retries; unverified motion (jog, home, spindle) also closes the connection so the machine can be checked. A late acknowledgement of an unverified command is swallowed for two seconds.
+
+The Device tab's **Accessories** card stores separate work-light brightness percentages for the app's Light and Dark appearance, labelled **Daylight brightness** and **Night brightness**. Both start at 100%; System appearance follows the operating system's current light or dark mode. Tooltips explain the theme mapping and the inactivity timer. These preferences belong to the app and persist across launches. Turning the light on applies the active percentage directly. A theme or brightness change while the light is on applies once the device is Idle with no active program or other operation; changes made while busy use the latest preference when it becomes available, even on another tab. A light that is off stays off until turned on explicitly. The first automatic brightness update on each connection also waits for the firmware command channel: the read-only `model` query must itself report Idle, followed by fresh diagnostics and status. Startup can report Idle before automatic homing begins, so status alone is insufficient. The app polls only that read-only query, for up to 30 seconds; it sends brightness once readiness is confirmed. Each brightness command is tied to the connection that requested it and rechecks admission before sending; failed commands are reported without automatic retries. Dimming requires the firmware's work-light switch to support PWM with a maximum value of 255.
+
+The **Work light** fieldset groups the on/off switch, both brightness preferences and the inactivity timer into horizontal fields. The timer accepts whole minutes from 0 to 1440; **0 means Never** and is the default. It belongs to OpenSpindle and works while the app is connected, including on other tabs. It counts continuous machine idle time with no active program and a stopped spindle. Machine activity, turning the light off, reconnecting, changing the timer or a gap in fresh status starts a new countdown. Once the timer expires, the app waits for other operations to finish, confirms the firmware is ready and checks fresh status before sending one verified light-off command to the same connection. Changing the timer or losing the idle condition cancels a request still waiting to send; a sent command always finishes verification. Failed commands are reported without automatic retries. The light stays off until turned on explicitly. This preference applies immediately and does not edit the firmware configuration or restart the machine.
+
+The **Accessories** card starts with **Beep** and **Follow spindle**, followed by the **Work light** and **Vacuum** fieldsets. The Vacuum fieldset groups its on/off switch and **Vacuum power** control in horizontal fields. Vacuum power reads the saved default from the device configuration and accepts whole percentages from 50 to 100. **Save** updates only `switch.vacuum.default_on_value`, preserving the rest of the configuration and verifying the saved file. Saving requires an idle machine with no active program and a confirmed stopped spindle; editing alone sends nothing. The value belongs to the connection and configuration revision from which it was read. A successful save through the firmware configuration dialog refreshes an untouched Vacuum power field; a draft is preserved. If the file changes underneath a draft, reload it before saving. Saving leaves the current output unchanged and shows a reminder to restart the device. After restart, **Follow spindle** uses the saved default when the spindle starts. The manual Vacuum switch turns the output on at 100% or off.
 
 **Reset** (Device, after a confirmation) sends the console command `reset`, which reboots the controller three seconds later ("Rebooting machine in 3 seconds..."). The connection does not outlive a reboot, so the session ends right away and the controller connects to the same device again: first after five seconds, then every three, for up to 90 seconds. Meanwhile `snapshot.connection.restarting` is set and failed attempts are not reported as errors; connecting or disconnecting by hand ends the wait.
 
@@ -60,6 +67,16 @@ Disconnecting never stops a running program, and the app's Stop goes with the co
 ## Camera
 
 The main process opens `ws://<host>:82/ws_video`, sends `start_stream` and forwards binary JPEG frames (at most 4 MiB, SOI/EOI checked, 8 s connect and 15 s frame timeouts) to subscribers. The renderer opens no sockets of its own.
+
+## Firmware configuration
+
+The Device tab's **Firmware configuration** card opens the connected device's saved configuration in a dialog for viewing, editing and saving on both physical devices and localhost simulators. Opening it reads the file; **Reload** reads it again. The editor preserves comments, spacing and the file's LF or CRLF newline convention. Unsaved edits require confirmation before closing the dialog or reloading the file.
+
+**Save** writes the edited file only when the machine is idle, no program is running and fresh diagnostics confirm the spindle is stopped. It first checks the connection and reads the file again: if another change has reached the device since the editor loaded it, saving is refused until it is reloaded. A save uploads once and reads every byte back before reporting success. A failed save keeps the edits visible and reports that the saved file needs to be read again. Saving does not reset the machine; settings loaded at startup take effect after a separate Reset.
+
+Makera stores this file at `/sd/config.txt`. Reads use the B0–B4 download protocol with frame CRC checks and the advertised MD5 when available; writes use the same verified upload/readback as jobs. Configuration transfers own the connection while running, refuse concurrent operations and leave Stop available. The editor accepts nonempty UTF-8 configuration text up to 256 KiB; it does not validate the meaning or physical suitability of individual firmware settings.
+
+The Z1 simulator provides a representative configuration file independent of real-machine data. Saves persist across reconnects until the simulator exits; its `config-get sd` and anchor writes use the same saved file. Anchor values and the vacuum default load on simulator reset; saving a vacuum default leaves the current output and running default unchanged. Other motion behavior retains the simulator's built-in defaults. The simulator's checksum challenge, placeholder checksum and corrupt-upload options also apply to configuration transfers.
 
 ## Protocol trace and console
 

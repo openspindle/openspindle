@@ -6,6 +6,8 @@ import type {
   NetworkDevice,
   PrepareResult,
   WriteAnchorsResult,
+  FirmwareConfiguration,
+  WriteConfigurationResult,
 } from "../contract/index.ts"
 import type { CameraEvent } from "./camera.ts"
 import type { MachineController } from "./controller.ts"
@@ -64,9 +66,9 @@ export class MachineGateway {
     return this.controller.reset()
   }
 
-  execute(command: unknown): Promise<MachineSnapshot> {
+  execute(command: unknown, signal?: AbortSignal): Promise<MachineSnapshot> {
     this.requireApp()
-    return this.controller.execute(command)
+    return this.controller.execute(command, signal)
   }
 
   /** A line typed in the app's console; only the app sends one. */
@@ -113,6 +115,16 @@ export class MachineGateway {
 
   readHeightMap(signal?: AbortSignal): Promise<HeightMap> {
     return this.controller.readHeightMap(signal)
+  }
+
+  readConfiguration(signal?: AbortSignal): Promise<FirmwareConfiguration> {
+    this.requireApp()
+    return this.controller.readConfiguration(signal)
+  }
+
+  writeConfiguration(input: unknown): Promise<WriteConfigurationResult> {
+    this.requireApp()
+    return this.controller.writeConfiguration(input)
   }
 
   private requireApp() {

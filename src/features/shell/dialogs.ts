@@ -6,6 +6,7 @@ import type { SettingsSection } from "@/features/settings/settings-dialog"
 /** Every dialog of the workspace. One is open at a time; the dialog host renders it. */
 export type WorkspaceDialog =
   | { readonly kind: "device" }
+  | { readonly kind: "device-configuration" }
   | { readonly kind: "models" }
   | { readonly kind: "height-map" }
   | { readonly kind: "fusion" }

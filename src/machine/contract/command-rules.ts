@@ -42,6 +42,8 @@ export type AdmissionRequest =
         | "run"
         | "readAnchors"
         | "writeAnchors"
+        | "readConfiguration"
+        | "writeConfiguration"
         | "readHeightMap"
         | "stop"
         | "reset"
@@ -64,6 +66,8 @@ export type AdmissionContext = {
   readonly readAnchors: ((telemetry: Telemetry) => string | null) | null
   /** Machine-state preconditions for changing them; null when they cannot be changed. */
   readonly writeAnchors: ((telemetry: Telemetry) => string | null) | null
+  readonly readConfiguration: ((telemetry: Telemetry) => string | null) | null
+  readonly writeConfiguration: ((telemetry: Telemetry) => string | null) | null
   /** The ranges the machine's manual controls accept. */
   readonly limits: ControlLimits
 }
@@ -118,6 +122,10 @@ function stateReason({ request, context }: CommandSubject): string | null {
       return context.readAnchors?.(telemetry) ?? null
     case "writeAnchors":
       return context.writeAnchors?.(telemetry) ?? null
+    case "readConfiguration":
+      return context.readConfiguration?.(telemetry) ?? null
+    case "writeConfiguration":
+      return context.writeConfiguration?.(telemetry) ?? null
     case "readHeightMap":
       return context.rules.readHeightMap(telemetry, context.job)
     // Stop and Reset recover from any machine state; a typed line goes in any machine state,
@@ -165,6 +173,26 @@ export const COMMAND_RULES: readonly CommandRule[] = [
     test: ({ request, context }) =>
       request.key !== "writeAnchors" || context.writeAnchors !== null,
     explain: () => ({ problem: "This machine's anchors cannot be changed." }),
+  },
+  {
+    id: "machine/configuration-supported",
+    stage: "command",
+    label: "Configuration available",
+    description:
+      "The machine must support reading and writing its saved configuration.",
+    severity: "error",
+    configurable: false,
+    chain: ADMISSION,
+    test: ({ request, context }) => {
+      if (request.key === "readConfiguration")
+        return context.readConfiguration !== null
+      if (request.key === "writeConfiguration")
+        return context.writeConfiguration !== null
+      return true
+    },
+    explain: () => ({
+      problem: "This machine does not support a configuration editor.",
+    }),
   },
   {
     id: "machine/lockout",

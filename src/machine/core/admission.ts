@@ -81,6 +81,24 @@ function representative(
         key,
         command: { type: key, enabled: telemetry?.lightOn !== true },
       }
+    case "lightBrightness":
+      return {
+        key,
+        command: {
+          type: key,
+          percent: 100,
+          // Availability checks state only; execute validates the actual connection id.
+          connectionId: "00000000-0000-4000-8000-000000000000",
+        },
+      }
+    case "lightOffWhenIdle":
+      return {
+        key,
+        command: {
+          type: key,
+          connectionId: "00000000-0000-4000-8000-000000000000",
+        },
+      }
     case "beep":
       return {
         key,
@@ -115,6 +133,8 @@ function representative(
     case "run":
     case "readAnchors":
     case "writeAnchors":
+    case "readConfiguration":
+    case "writeConfiguration":
     case "readHeightMap":
     case "stop":
     case "reset":

@@ -1,11 +1,13 @@
 import { COMMAND_LABELS } from "../../contract/index.ts"
 import type { MachineCommand } from "../../contract/index.ts"
-import { MachineError } from "../errors.ts"
+import { MachineError, abortError } from "../errors.ts"
 import {
   expectAcknowledgement,
+  freshDiagnosticStatus,
   freshStatus,
   remaining,
   requireAdmission,
+  waitForAutomaticCommandReady,
 } from "./context.ts"
 import type { OperationContext } from "./context.ts"
 
@@ -19,19 +21,51 @@ const LATE_ACK_DRAIN_MS = 2000
  */
 export async function executeCommand(
   context: OperationContext,
-  command: MachineCommand
+  command: MachineCommand,
+  preflightSignal?: AbortSignal
 ): Promise<void> {
   const { session, adapter, clock, signal } = context
   const label = COMMAND_LABELS[command.type].toLowerCase()
-  const before = await freshStatus(
-    context,
+  const brightness = command.type === "lightBrightness"
+  const automaticOff = command.type === "lightOffWhenIdle"
+  const guardedLight = brightness || automaticOff
+  // A renderer may invalidate its idle cycle while preflight waits. Once sent, only
+  // the controller's original signal may stop acknowledgement and state verification.
+  const preflight =
+    automaticOff && preflightSignal
+      ? {
+          ...context,
+          signal: AbortSignal.any([signal, preflightSignal]),
+        }
+      : context
+  if (automaticOff && preflight.signal.aborted)
+    throw abortError(preflight.signal)
+  if (automaticOff || (brightness && command.onlyIfOn))
+    await waitForAutomaticCommandReady(preflight, label)
+  let before = await (guardedLight ? freshDiagnosticStatus : freshStatus)(
+    preflight,
     "Timed out waiting for fresh device status. No command was sent."
   )
+  if (guardedLight) {
+    if (preflight.signal.aborted) throw abortError(preflight.signal)
+    // A later report in the same received chunk may already have switched the light off.
+    // Recheck the latest diagnostic and machine state immediately before the command leaves.
+    before = {
+      ...(session.store.telemetry ?? before),
+      lightOn: session.diagnostics?.telemetry.lightOn ?? null,
+      ...(automaticOff
+        ? { spindleOn: session.diagnostics?.telemetry.spindleOn ?? null }
+        : {}),
+    }
+  }
   requireAdmission(context, { key: command.type, command }, before)
   const plan = adapter.plan(command, before)
   const streaming = context.streaming()
   const deadline = clock.now() + plan.timeoutMs
   const sent = session.store.sequence
+  // No await separates this final cancellation check, the reply lease and sending.
+  if (automaticOff && preflight.signal.aborted)
+    throw abortError(preflight.signal)
   const acknowledgement =
     plan.acknowledged && !streaming
       ? expectAcknowledgement(context, label, plan.timeoutMs)

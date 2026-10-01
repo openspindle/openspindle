@@ -1,4 +1,5 @@
 import { DevicePicker } from "@/features/device/device-picker"
+import { DeviceConfigurationDialog } from "@/features/device/device-configuration"
 import { FusionSource } from "@/features/fusion360/fusion-source"
 import { FusionPairingDialog } from "@/features/fusion360/fusion-pairing-dialog"
 import { useFusionPairing } from "@/features/fusion360/use-fusion-pairing"
@@ -48,6 +49,8 @@ function OpenDialog({ dialog }: { dialog: WorkspaceDialog }) {
       )
     case "models":
       return <ModelsDialog onClose={closeDialog} />
+    case "device-configuration":
+      return <DeviceConfigurationDialog onClose={closeDialog} />
     case "height-map":
       return <HeightMapDialog onClose={closeDialog} />
     case "stock":

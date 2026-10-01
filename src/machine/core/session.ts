@@ -1,11 +1,13 @@
 import type {
   ConnectTarget,
   ConnectedDevice,
+  MachineState,
   Telemetry,
 } from "../contract/index.ts"
 import { ProtocolError } from "../firmware/adapter.ts"
 import type {
   FirmwareAdapter,
+  FirmwareDiagnostics,
   FirmwareEvent,
   FirmwareInterpreter,
   Identity,
@@ -76,7 +78,14 @@ export type SessionEvents = {
  */
 export class MachineSession {
   readonly store: TelemetryStore
+  /** Latest diagnostic reply and its order, independent of cached ordinary status. */
+  diagnostics: {
+    readonly sequence: number
+    readonly telemetry: FirmwareDiagnostics
+  } | null = null
   identity: Identity | null = null
+  /** State from the controller's model reply, rather than a bridge status report. */
+  identityReplyState: MachineState | null = null
   device: ConnectedDevice | null = null
   closed = false
   /** The job monitor wants the fast rate (starting, finishing, cleaning). */
@@ -365,6 +374,12 @@ export class MachineSession {
   private route(event: FirmwareEvent) {
     this.trace.record("received", describeInbound(event), consoleReply(event))
     switch (event.kind) {
+      case "diagnostics":
+        this.diagnostics = {
+          sequence: (this.diagnostics?.sequence ?? 0) + 1,
+          telemetry: event.telemetry,
+        }
+        return
       case "status":
         this.silentMs = 0
         this.outstandingSince = null
@@ -374,7 +389,9 @@ export class MachineSession {
         })
         return
       case "identity":
-        this.identify(event.identity)
+        if (this.identify(event.identity)) {
+          this.identityReplyState = event.state
+        }
         return
       case "line":
         if (!this.offer(event)) this.events.line(event.line)

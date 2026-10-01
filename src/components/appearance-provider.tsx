@@ -25,6 +25,7 @@ import {
 
 const AppearanceContext = createContext<{
   appearance: Appearance
+  resolvedAppearance: "light" | "dark" | null
   setAppearance: (appearance: Appearance) => void
   fonts: Fonts
   setFont: (role: FontRole, font: FontId) => void
@@ -39,6 +40,9 @@ const SAVED_KEYS = new Set([
 
 export function AppearanceProvider({ children }: { children: ReactNode }) {
   const [appearance, setPreference] = useState<Appearance | null>(null)
+  const [systemDark, setSystemDark] = useState(
+    () => window.matchMedia(SYSTEM_DARK_QUERY).matches
+  )
   const [fonts, setFonts] = useState<Fonts>(DEFAULT_FONTS)
   const [saveError, setSaveError] = useState<string | null>(null)
 
@@ -63,7 +67,10 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (appearance === null) return
     const system = window.matchMedia(SYSTEM_DARK_QUERY)
-    const update = () => applyAppearance(appearance, system.matches)
+    const update = () => {
+      setSystemDark(system.matches)
+      applyAppearance(appearance, system.matches)
+    }
     update()
     system.addEventListener("change", update)
     return () => system.removeEventListener("change", update)
@@ -72,7 +79,9 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
   const setAppearance = useCallback((value: Appearance) => {
     if (!isAppearance(value)) return
     setPreference(value)
-    applyAppearance(value, window.matchMedia(SYSTEM_DARK_QUERY).matches)
+    const dark = window.matchMedia(SYSTEM_DARK_QUERY).matches
+    setSystemDark(dark)
+    applyAppearance(value, dark)
     try {
       localStorage.setItem(APPEARANCE_STORAGE_KEY, value)
       setSaveError(null)
@@ -99,10 +108,16 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
     [fonts]
   )
 
+  let resolvedAppearance: "light" | "dark" | null = null
+  if (appearance === "system")
+    resolvedAppearance = systemDark ? "dark" : "light"
+  else if (appearance !== null) resolvedAppearance = appearance
+
   return (
     <AppearanceContext.Provider
       value={{
         appearance: appearance ?? "system",
+        resolvedAppearance,
         setAppearance,
         fonts,
         setFont,

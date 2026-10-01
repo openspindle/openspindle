@@ -59,7 +59,8 @@ export function createHostHandlers(
       "machine.connect": (request) => machine(() => gateway.connect(request)),
       "machine.disconnect": (request) =>
         machine(() => gateway.disconnect(request)),
-      "machine.execute": (command) => machine(() => gateway.execute(command)),
+      "machine.execute": (command, { signal }) =>
+        machine(() => gateway.execute(command, signal)),
       "machine.simulateBed": (bed) => machine(() => gateway.simulateBed(bed)),
       "machine.sendConsoleLine": ({ line }) =>
         machine(() => gateway.sendConsoleLine(line)),
@@ -72,6 +73,10 @@ export function createHostHandlers(
         machine(() => gateway.readAnchors(signal)),
       "machine.writeAnchors": (request) =>
         machine(() => gateway.writeAnchors(request)),
+      "machine.readConfiguration": (_params, { signal }) =>
+        machine(() => gateway.readConfiguration(signal)),
+      "machine.writeConfiguration": (request) =>
+        machine(() => gateway.writeConfiguration(request)),
       "machine.readHeightMap": (_params, { signal }) =>
         machine(() => gateway.readHeightMap(signal)),
       "storage.read": ({ key }) => storage.read(key),

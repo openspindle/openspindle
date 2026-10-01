@@ -2,7 +2,12 @@ import { ProtocolError } from "../adapter.ts"
 import type { FirmwareEvent, FirmwareInterpreter } from "../adapter.ts"
 import { FRAME_TYPES, FrameDecoder, FrameError } from "./codec.ts"
 import { classifyLine } from "./lines.ts"
-import { parseDiagnostics, parseModelLine, parseStatus } from "./status.ts"
+import {
+  parseDiagnostics,
+  parseModelLine,
+  parseModelState,
+  parseStatus,
+} from "./status.ts"
 import type { Diagnostics } from "./status.ts"
 
 /** An unterminated text line longer than this is not a Makera reply. */
@@ -48,11 +53,15 @@ export class MakeraInterpreter implements FirmwareInterpreter {
           if (parsed) events.push({ kind: "status", ...parsed, raw })
           break
         }
-        case FRAME_TYPES.diagnostics:
-          this.diagnostics =
-            parseDiagnostics(this.text.decode(frame.payload), now) ??
-            this.diagnostics
+        case FRAME_TYPES.diagnostics: {
+          const raw = this.text.decode(frame.payload)
+          const diagnostics = parseDiagnostics(raw, now)
+          if (diagnostics) {
+            this.diagnostics = diagnostics
+            events.push({ kind: "diagnostics", telemetry: diagnostics, raw })
+          }
           break
+        }
         case FRAME_TYPES.loadInfo:
           for (const text of this.config.push(frame.payload))
             events.push({ kind: "config-line", text })
@@ -65,7 +74,12 @@ export class MakeraInterpreter implements FirmwareInterpreter {
             const identity = parseModelLine(text)
             if (identity === "unsupported")
               throw new ProtocolError("Unsupported device model.")
-            if (identity) events.push({ kind: "identity", identity })
+            if (identity)
+              events.push({
+                kind: "identity",
+                identity,
+                state: parseModelState(text),
+              })
             else if (text.trim())
               events.push({ kind: "line", line: classifyLine(text) })
           }

@@ -1,5 +1,10 @@
 import { useEffect, useMemo, useState } from "react"
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import {
+  skipToken,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query"
 import type { QueryClient } from "@tanstack/react-query"
 import { createAtom, useSelector } from "@tanstack/react-store"
 import { RpcError } from "@openspindle/rpc"
@@ -13,6 +18,7 @@ import type {
   ConnectRequest,
   ConsoleEntry,
   DisconnectRequest,
+  FirmwareConfiguration,
   MachineCommand,
   MachineErrorCode,
   MachineSnapshot,
@@ -20,6 +26,7 @@ import type {
   SimulatedBed,
   Telemetry,
   WriteAnchorsRequest,
+  WriteConfigurationRequest,
 } from "@/machine/contract"
 import { useHost } from "./host-context"
 import type { MachineHost } from "./host"
@@ -27,6 +34,8 @@ import type { MachineHost } from "./host"
 export const machineKeys = {
   snapshot: ["machine", "snapshot"] as const,
   discovery: ["machine", "discovery"] as const,
+  configuration: (connectionId: string | null) =>
+    ["machine", "configuration", connectionId] as const,
   program: (key: string) => ["machine", "program", key] as const,
 }
 
@@ -144,6 +153,15 @@ export const useMachineCommand = () =>
   useMachineMutation("execute", (machine, command: MachineCommand) =>
     machine.execute(command)
   )
+/** Cancels an invalidated idle cycle only until its automatic off command is sent. */
+export const useWorkLightIdleOff = () =>
+  useMachineMutation(
+    "lightOffWhenIdle",
+    (
+      machine,
+      { connectionId, signal }: { connectionId: string; signal: AbortSignal }
+    ) => machine.execute({ type: "lightOffWhenIdle", connectionId }, signal)
+  )
 export const useStopMachine = () =>
   useMachineMutation("stop", (machine, _: void) => machine.stop())
 export const useResetMachine = () =>
@@ -180,6 +198,45 @@ export const useReadHeightMap = () =>
   useMachineMutation("readHeightMap", (machine, _: void) =>
     machine.readHeightMap()
   )
+/** Share successful configuration reads and writes only with the connection they came from. */
+function storeConfiguration(client: QueryClient, next: FirmwareConfiguration) {
+  client.setQueryData<FirmwareConfiguration>(
+    machineKeys.configuration(next.connectionId),
+    (current) =>
+      current && current.fetchedAt > next.fetchedAt ? current : next
+  )
+}
+
+/** Subscribe to known results without starting a device operation. */
+export function useCachedConfiguration(connectionId: string | null) {
+  const { data } = useQuery<FirmwareConfiguration>({
+    queryKey: machineKeys.configuration(connectionId),
+    queryFn: skipToken,
+    staleTime: Infinity,
+  })
+  return data ?? null
+}
+
+export const useReadConfiguration = () => {
+  const client = useQueryClient()
+  return useMachineMutation("readConfiguration", async (machine, _: void) => {
+    const result = await machine.readConfiguration()
+    storeConfiguration(client, result)
+    return result
+  })
+}
+
+export const useWriteConfiguration = () => {
+  const client = useQueryClient()
+  return useMachineMutation(
+    "writeConfiguration",
+    async (machine, request: WriteConfigurationRequest) => {
+      const result = await machine.writeConfiguration(request)
+      storeConfiguration(client, result.configuration)
+      return result
+    }
+  )
+}
 
 /** 53-bit string fingerprint (cyrb53) for cache keys over large program text. */
 function fingerprint(text: string): string {
