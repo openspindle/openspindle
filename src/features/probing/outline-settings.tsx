@@ -24,7 +24,7 @@ export type OutlineSettingsProps = {
   value: OutlineParams
   /** The trace's parameters with its strategy on the plate's machine: defaults, ranges and descriptions. */
   parameters: OutlineSpecs
-  /** What the scan traces: the plate's toolpath bounds, or why there are none. */
+  /** What the trace follows: the plate's toolpath bounds, or why there are none. */
   outline: ToolpathBoundsResult
   /** Receives complete, valid parameters as soon as an edit makes them valid. */
   onChange: (value: OutlineParams) => void

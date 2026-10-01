@@ -102,7 +102,7 @@ const unsupported = (
 const INVALID: { readonly [TTask in ProbingTask]: string } = {
   grid: "the probe grid is invalid.",
   "touch-off": "the touch-off is invalid.",
-  outline: "the scan is invalid.",
+  outline: "the trace is invalid.",
   origin: "the probing is invalid.",
 }
 

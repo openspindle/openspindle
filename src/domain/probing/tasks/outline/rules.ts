@@ -9,7 +9,7 @@ import { editOperation } from "../../rules"
 
 /**
  * Where an outline operation's outline, the plate's cuts, leaves the stock as placed, at the
- * stock top where the scan traces it; null for another operation, without stock or cuts, or
+ * stock top where the trace follows it; null for another operation, without stock or cuts, or
  * with the outline on the stock.
  */
 function outlineBeyondStock({
@@ -45,7 +45,7 @@ const outlineOffStock: StageRule<"operation"> = {
   stage: "operation",
   label: "Outline on the stock",
   description:
-    "Cuts that reach beyond the stock as placed are worth checking, which is what the scan is for.",
+    "Cuts that reach beyond the stock as placed are worth checking, which is what an outline trace is for.",
   severity: "warning",
   configurable: false,
   test: (subject) => !outlineBeyondStock(subject),
@@ -53,7 +53,7 @@ const outlineOffStock: StageRule<"operation"> = {
     const outline = outlineBeyondStock(first)
     return {
       problem:
-        "The cuts reach beyond the stock as placed; the scan traces where they go.",
+        "The cuts reach beyond the stock as placed; the trace follows where they go.",
       about: operationSubject(first.operation.id),
       ...(outline && { places: [outline] }),
     }
@@ -66,7 +66,7 @@ const afterMachining: StageRule<"operation"> = {
   stage: "operation",
   label: "Outline before machining",
   description:
-    "A scan after machining has started checks the outline too late.",
+    "A trace after machining has started checks the outline too late.",
   severity: "warning",
   configurable: false,
   test: ({ operation, plate }) => {
@@ -78,8 +78,7 @@ const afterMachining: StageRule<"operation"> = {
       .every((item) => operationPhase(item) === "setup")
   },
   explain: ({ first }) => ({
-    problem:
-      "The scan runs after machining operations. Move it before them to check the outline first.",
+    problem: `${first.operation.name} runs after machining operations. Move it before them to check the outline first.`,
     about: operationSubject(first.operation.id),
   }),
   fixes: editOperation,
