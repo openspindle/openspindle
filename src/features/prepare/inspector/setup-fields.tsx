@@ -116,7 +116,7 @@ export function WorkOriginFields({
     <FieldSet aria-label="Work origin">
       <FieldLegend className="flex w-full items-baseline justify-between">
         <span>Work origin</span>
-        <span title="The plate's NC zero. Set the physical work zero on Device, or keep X and Y relative to an anchor: Run then sets them.">
+        <span title="The plate's NC zero. Run sets its X and Y once the plate's anchors are read from its device; until then, set the physical work zero on Device.">
           NC zero
         </span>
       </FieldLegend>

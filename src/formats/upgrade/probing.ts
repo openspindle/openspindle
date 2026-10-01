@@ -61,8 +61,8 @@ function withoutBall(params: JsonObject): JsonObject {
 }
 
 /**
- * Whether a plate's work X and Y are set from one of its stored anchors, as its program sets them
- * (`workOriginOnMachine`): its work origin is kept relative to an anchor its snapshot holds.
+ * Whether a plate's work X and Y were set from one of its stored anchors, as format 5's program
+ * set them: its work origin is kept relative to an anchor its snapshot holds.
  */
 function keepsWorkOriginAtAnchor(setup: unknown): boolean {
   if (!isJsonObject(setup) || !isJsonObject(setup.anchors)) return false

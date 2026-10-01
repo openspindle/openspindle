@@ -4,8 +4,11 @@ import { plateMachining } from "../../../compile/toolpath-bounds"
 import { translation } from "../../../geometry/frame"
 import { boxRect, contains, mapRect, rectAt } from "../../../geometry/rect"
 import { operationPhase } from "../../../operations/kinds"
+import type { Operation } from "../../../operations/operation"
+import { workOriginOnMachine } from "../../../plate/work-origin"
 import type { OperationRuleSubject, StageRule } from "../../../rules/stages"
 import { editOperation } from "../../rules"
+import { setsWorkXY } from "../origin/params"
 
 /**
  * Where an outline operation's outline, the plate's cuts, leaves the stock as placed, at the
@@ -84,8 +87,63 @@ const afterMachining: StageRule<"operation"> = {
   fixes: editOperation,
 }
 
+/**
+ * The 3D probing after an outline operation, and before the plate's machining, that sets work X
+ * or Y while the program sets neither before the trace: the trace runs where the machine's work
+ * X and Y were left, and the cuts go where the probing sets them. Null for another operation,
+ * for a plate whose program sets work X and Y before everything (`workOriginOnMachine`), or
+ * without such probing.
+ */
+function originAfterOutline({
+  operation,
+  plate,
+}: OperationRuleSubject): Operation | null {
+  const { source } = operation
+  if (source.kind !== "probing" || source.task !== "outline") return null
+  if (workOriginOnMachine(plate.setup)) return null
+  const index = plate.operations.findIndex((item) => item.id === operation.id)
+  if (index < 0) return null
+  const later = plate.operations.slice(index + 1)
+  const machining = later.findIndex((item) => operationPhase(item) !== "setup")
+  return (
+    later
+      .slice(0, machining < 0 ? later.length : machining)
+      .find(
+        ({ source: next }) =>
+          next.kind === "probing" &&
+          next.task === "origin" &&
+          setsWorkXY(next.params.routine, next.params.axes).some(Boolean)
+      ) ?? null
+  )
+}
+
+const beforeOrigin: StageRule<"operation"> = {
+  id: "outline/before-origin",
+  stage: "operation",
+  label: "Outline at the work origin",
+  description:
+    "A trace before 3D probing that sets work X or Y follows where the machine's work origin was left, not where the cuts go, unless the program sets the work origin first, which it does once the plate's anchors are read from its device.",
+  severity: "warning",
+  configurable: false,
+  test: (subject) => !originAfterOutline(subject),
+  explain: ({ first }) => {
+    const origin = originAfterOutline(first)?.name ?? "3D probing"
+    return {
+      problem: `${first.operation.name} runs before ${origin} sets work X and Y, so it traces where the machine's work origin was left, not where the cuts go. Use Read anchors so the program sets the work origin first, or move it after ${origin}.`,
+      about: operationSubject(first.operation.id),
+    }
+  },
+  fixes: {
+    offer: ({ first }) => [
+      { kind: "read-anchors" },
+      { kind: "edit-operation", operationId: first.operation.id },
+    ],
+  },
+}
+
 /** The advice for an outline operation: its outline against the stock, and its order. */
 export const OUTLINE_RULES: readonly StageRule<"operation">[] = [
   outlineOffStock,
   afterMachining,
+  beforeOrigin,
 ]

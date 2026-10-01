@@ -23,7 +23,7 @@ const Z_PROBE_PARAMETERS: TouchOffSpecs = {
   probeTravel: {
     ...TOUCH_PARAMETERS.probeTravel,
     description:
-      "How far the probe searches down before the machine alarms. After a probe change it starts near the top of Z travel. The machine's own Z probe, run from a stored anchor with the work origin kept relative to one, searches to its tool rack Z instead.",
+      "How far the probe searches down before the machine alarms. After a probe change it starts near the top of Z travel. The machine's own Z probe, run from a stored anchor on a plate whose program sets work X and Y, searches to its tool rack Z instead.",
   },
 }
 
@@ -56,7 +56,7 @@ const PRECAUTIONS = [
 /** The firmware's Z probe goes to its X Y in work coordinates, which only an anchored start has. */
 const NOT_ANCHORED = issueOf<"work-origin-not-anchored">("error")(
   "work-origin-not-anchored",
-  "The firmware's Z probe touches only at a stored anchor, on a plate whose work origin is kept relative to an anchor. Touch at an anchor and keep the work origin on one, or use Surface touch."
+  "The firmware's Z probe touches only at a stored anchor, on a plate whose program sets work X and Y from its anchors. Touch at an anchor and read the plate's anchors from its device, or use Surface touch."
 )
 
 /**
@@ -77,8 +77,8 @@ function firmwareLift({ clearance }: Pick<TouchOffParams, "clearance">) {
 
 /**
  * The Z1 firmware's own Z probe with a Z touch probe in T0, which reports the touch as it goes:
- * from a stored anchor on a plate that keeps its work origin relative to an anchor, where the
- * touch point has work coordinates. M495 switches the probe's laser itself.
+ * from a stored anchor on a plate whose program sets work X and Y (`workOriginOnMachine`), where
+ * the touch point has work coordinates. M495 switches the probe's laser itself.
  */
 export const Z_PROBE: ProbingStrategy<
   "touch-off",
@@ -97,7 +97,7 @@ export const Z_PROBE: ProbingStrategy<
     if (!placementAnchors(plate.setup).length)
       return "The firmware's Z probe touches only at a stored anchor: select an anchor snapshot for this plate's device."
     if (!workOriginOnMachine(plate.setup))
-      return "The firmware's Z probe touches only on a plate whose work origin is kept relative to an anchor."
+      return "The firmware's Z probe touches only on a plate whose program sets work X and Y from its anchors: read them from the plate's device, or keep the work origin relative to one."
     return null
   },
   parameters: () => Z_PROBE_PARAMETERS,

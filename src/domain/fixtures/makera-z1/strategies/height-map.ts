@@ -143,8 +143,8 @@ function firmwareBlock(
 /**
  * Rectangular auto-leveling with the Z1 firmware's G32 R1, with a Z touch probe in T0: the
  * firmware measures the grid and applies Z compensation. The job starts from the probe's
- * position, or travels to a stored anchor first; from there, on a plate that keeps its work
- * origin relative to an anchor, the firmware's own auto-leveling (M495) runs it in work
+ * position, or travels to a stored anchor first; from there, on a plate whose program sets work
+ * X and Y (`workOriginOnMachine`), the firmware's own auto-leveling (M495) runs it in work
  * coordinates, reporting as it goes.
  */
 export const HEIGHT_MAP: ProbingStrategy<"grid", GridParams, GridSpecs> = {
