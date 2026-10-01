@@ -9,8 +9,12 @@ import {
 import type { FixtureInstance } from "@/domain/fixtures/definitions"
 import { kitForSetup } from "../fixtures/catalog"
 import { defaultPlateCoordinates } from "./placement"
-import { StoredAnchorSetupSchema } from "@/domain/anchors/stored-anchors"
+import {
+  StoredAnchorSetupSchema,
+  bedAnchors,
+} from "@/domain/anchors/stored-anchors"
 import type { StoredAnchorSetup } from "@/domain/anchors/stored-anchors"
+import type { StockPlacement } from "@/domain/nc/stock-markers"
 import { StockSchema } from "@/domain/stock/stock"
 import type { Stock } from "@/domain/stock/stock"
 import { OperationSchema } from "../operations/operation"
@@ -21,6 +25,7 @@ import {
   TextSchema,
   ToolNumberSchema,
   newId,
+  toMicrometre,
   toolNumberText,
 } from "../primitives"
 
@@ -220,6 +225,58 @@ export function createPlateSetup(options: {
     fixtures,
     deviceId: options.deviceId ?? null,
     anchors: options.anchors ?? null,
+  }
+}
+
+/**
+ * The setup with its stock where its program puts it (`placement`, read from its markers): its
+ * front-left bottom corner at the offsets from its anchor, where the plate's anchors, else
+ * `machine.anchors`, have that anchor and the stock then overlaps the work area; else where it
+ * is. It rests on what carries it there, with the work origin at the program's zero on it, else
+ * on its top front-left corner. A setup without stock stays as it is.
+ */
+export function withStockPlacement(
+  setup: PlateSetup,
+  placement: StockPlacement,
+  machine: {
+    readonly workArea: readonly number[]
+    readonly anchors: StoredAnchorSetup
+  }
+): PlateSetup {
+  const { stock } = setup
+  if (!stock) return setup
+  const { anchor } = placement
+  const position = anchor
+    ? bedAnchors(setup.anchors ?? machine.anchors).find(
+        (bed) => bed.id === anchor.id
+      )?.position
+    : undefined
+  const corner =
+    anchor && position
+      ? [position[0] + anchor.offset[0], position[1] + anchor.offset[1]]
+      : null
+  const [width, depth] = machine.workArea
+  const overlaps =
+    corner !== null &&
+    corner[0] < width &&
+    corner[0] + stock.width > 0 &&
+    corner[1] < depth &&
+    corner[1] + stock.depth > 0
+  const [x, y] = overlaps ? corner : setup.stockAnchor
+  const supportHeight = stockSupportHeight(setup.fixtures, [x, y], stock)
+  const [originX, originY, originZ] = placement.workOrigin ?? [
+    0,
+    0,
+    stock.height,
+  ]
+  return {
+    ...setup,
+    stockAnchor: [toMicrometre(x), toMicrometre(y), supportHeight],
+    workOrigin: [
+      toMicrometre(x + originX),
+      toMicrometre(y + originY),
+      toMicrometre(supportHeight + originZ),
+    ],
   }
 }
 

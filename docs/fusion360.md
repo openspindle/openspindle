@@ -23,7 +23,25 @@ Each operation keeps the document and NC program it came from. After changing a 
 
 Each post takes the program's current state. Finish any active edit or command in Fusion first. To post a program from another open document, the add-in temporarily activates that document and restores the previous one afterward. A failed post leaves the workspace unchanged.
 
-Tools are matched to your tool library by what the post writes of them: name, diameter, flute length and kind. The T number alone never picks a tool, so a tool without a matching description stays unassigned. Tool geometry, stock, fixtures, CAM parameters and model geometry are not transferred. The tool library separately supports Fusion library imports.
+Tools are matched to your tool library by what the post writes of them: name, diameter, flute length and kind. The T number alone never picks a tool, so a tool without a matching description stays unassigned. A new plate takes the stock the post describes ([Stock](#stock)). Tool geometry, fixtures, CAM parameters and model geometry are not transferred. The tool library separately supports Fusion library imports.
+
+## Stock
+
+A post can describe the setup's stock in comments OpenSpindle reads, in millimetres along the work coordinate system's axes:
+
+```text
+;@OPENSPINDLE|STOCK|width=100|depth=100|height=5.25
+;@OPENSPINDLE|WORK_ORIGIN|x=0|y=0|z=5.25
+;@OPENSPINDLE|STOCK_ANCHOR|relative_to=anchor-1|x=0|y=0
+```
+
+- `STOCK`: the stock box's size along X, Y and Z.
+- `WORK_ORIGIN`: the program's zero from the stock's front-left bottom corner; here on its top.
+- `STOCK_ANCHOR`: that corner's X and Y from a stored anchor, by its id (`anchor-1` is the Z1's Anchor 1, the L-bracket's inner corner).
+
+The Makera Z1 post (`Z1.cps`) writes them from the setup: the stock box, the WCS origin, and the setup's part position on the Makera Z1 machine (**Setup › Machine › Part position**), assuming the machine model attaches parts at Anchor 1. Its **Part attach point X/Y from Anchor 1** properties move that point; **Write stock for OpenSpindle** turns the markers off. A setup without a machine model gets no `STOCK_ANCHOR`.
+
+A plate that a program starts, dropped as a file or imported from Fusion, takes that stock with its front-left bottom corner at the anchor plus the offsets, on what carries it there (the bed, or a wasteboard under it), and its work origin at the program's zero on it. Without `STOCK_ANCHOR`, with an anchor the plate does not store, or where the stock would lie outside the work area, the stock is centred instead. Without `WORK_ORIGIN`, the work origin is on the stock's top front-left corner. The stock and the work origin are in bed coordinates: nothing keeps them relative to the anchor, and Run does not set the machine's work offset from them. A stock that is not a valid size or is larger than the work area is left out. A program that goes to an existing plate, or replaces an empty plate whose stock was set up, keeps that plate's setup.
 
 ## Post compatibility
 

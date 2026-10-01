@@ -133,4 +133,6 @@ operationId, fileName, contents }`.
   demonstrates signaling the main thread from a worker thread.
 
 This integration imports posted machine instructions. It does not transfer
-editable Fusion CAM operations, native toolpath geometry, stock, or fixtures.
+editable Fusion CAM operations, native toolpath geometry, or fixtures. A plate
+gets the stock only as the post describes it in OpenSpindle's stock markers
+([docs/fusion360.md](../../docs/fusion360.md#stock)).
