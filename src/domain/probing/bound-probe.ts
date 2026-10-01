@@ -57,7 +57,7 @@ export function boundProbe(
     })
   if (!strategy.accepts(profile, machine))
     return fail({
-      message: `${strategy.label} cannot run with ${tool.name} in ${toolNumberText(table)}: assign a probe it runs with.`,
+      message: `${named} holds ${tool.name}, which this strategy cannot probe with: assign a probe it runs with.`,
       toolNumber,
     })
   const slot = machine.slot(profile)

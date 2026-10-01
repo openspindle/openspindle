@@ -53,7 +53,7 @@ function touchOff(
 }
 
 /**
- * OpenSpindle's own touch-off with any touch probe: from the probe position, or from an anchored
+ * OpenSpindle's own touch-off with a Z touch probe: from the probe position, or from an anchored
  * start the machine travels to, a fast G38.2 touch down, a back-off and a slow touch, then work
  * Z0 at the contact (G10 L20) and up to the clearance. It always touches with G38.2, also from an
  * anchored start in work coordinates, where a machine's firmware may have a Z probe of its own
@@ -68,8 +68,10 @@ export const SURFACE_TOUCH: ProbingStrategy<
   task: "touch-off",
   label: "Surface touch",
   description: "Touch the stock top with the probe and set work Z there.",
-  // Every touch probe touches along Z, a 3D probe as well; its pointer is not used.
-  accepts: (_probe, machine) => hasSpecs(machine, "surface-touch"),
+  // A probe that touches along Z only: a 3D probe finds origins, in the number a machine's
+  // firmware keeps for that. Its pointer is not used.
+  accepts: (probe, machine) =>
+    probe.touch === "z" && hasSpecs(machine, "surface-touch"),
   parameters: (machine) => specsOf(machine, "surface-touch"),
   defaults: plateTouchOffParams,
   generate: ({ params, plate, probe, machine }) => {
