@@ -193,6 +193,8 @@ export const TouchMeasurementSchema = z.object({
   /** The tool a tool-sensor touch measured, when reported. */
   tool: z.int().nullable(),
   machine: MachineXyzSchema,
+  /** Its work X and Y, from the work origin the machine reported with it; null without one. */
+  work: z.tuple([z.number(), z.number()]).nullable().default(null),
   /** The program line the machine reported while measuring; null when it reported none. */
   line: z.int().nonnegative().nullable(),
   at: z.number(),

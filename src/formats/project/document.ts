@@ -1,13 +1,10 @@
 import { z } from "zod"
 import { HeightMapSchema } from "@/machine/contract"
-import {
-  DesignRulesSchema,
-  defaultDesignRules,
-} from "@/domain/design-rules/rules"
 import { MODEL_LIMITS, ModelRecordSchema } from "@/domain/models/model"
 import type { ModelId } from "@/domain/models/model"
 import { PlateSchema } from "@/domain/plate/plate"
 import { EntityIdSchema, TextSchema } from "@/domain/primitives"
+import { RuleSettingsSchema } from "@/domain/rules/settings"
 import type { WorkspaceState } from "@/domain/workspace/workspace"
 import { libraryModelId } from "@/domain/fixtures/definitions"
 import { validateGlb } from "@/formats/models/glb"
@@ -18,8 +15,8 @@ import { fromBase64 } from "../base64-json"
 import { upgradeTool } from "../tool-library/upgrade"
 import { PROJECT_LIMITS } from "./step-nc"
 
-/** Version 6: PCB is a built-in source and project files have no plugin references. */
-export const PROJECT_SCHEMA_VERSION = 6
+/** Version 7: PCB is built in, with rule settings and no plugin references. */
+export const PROJECT_SCHEMA_VERSION = 7
 
 /** The workspace fields a project stores exactly as the workspace holds them. */
 type WorkspaceData = Pick<
@@ -31,7 +28,7 @@ type WorkspaceData = Pick<
   | "defaultToolId"
   | "defaultStockId"
   | "heightMaps"
-  | "designRules"
+  | "ruleSettings"
 >
 
 /** A model the project's fixtures use: its record and display mesh (base64), never its uploaded file. */
@@ -196,8 +193,8 @@ export const ProjectDocumentSchema = z
         (maps) => Object.keys(maps).length <= PROJECT_LIMITS.heightMaps,
         `A project holds at most ${PROJECT_LIMITS.heightMaps} height maps.`
       ),
-    /** The limits its plates are checked against; projects saved without them open with the defaults. */
-    designRules: DesignRulesSchema.default(defaultDesignRules),
+    /** How it reports its rules, and their limits; a project saved without them sets none. */
+    ruleSettings: RuleSettingsSchema.default(() => ({})),
     models: z.array(ProjectModelSchema).max(PROJECT_LIMITS.models),
   })
   .superRefine((document, context) => {
@@ -221,7 +218,7 @@ export function projectDocument(
     defaultToolId,
     defaultStockId,
     heightMaps,
-    designRules,
+    ruleSettings,
   } = state
   return {
     schemaVersion: PROJECT_SCHEMA_VERSION,
@@ -233,7 +230,7 @@ export function projectDocument(
     defaultToolId,
     defaultStockId,
     heightMaps,
-    designRules,
+    ruleSettings,
     models,
   }
 }

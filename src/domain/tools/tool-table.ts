@@ -1,13 +1,15 @@
 import { readNcBlock } from "@/machine/contract"
+import type { RuleFixes } from "@/machine/contract"
 import type { ProgramTool } from "@/domain/nc/cam-markers"
 import { toolKindKey } from "@/domain/tools/tool"
 import type { Tool } from "@/domain/tools/tool"
-import { error, toolSubject } from "../diagnostics"
-import type { Diagnostic } from "../diagnostics"
+import { toolSubject } from "../diagnostics"
+import type { QuickFix } from "../diagnostics"
 import type { Binding, Operation } from "../operations/operation"
 import type { Plate, PlateTool } from "../plate/plate"
 import { capitalize, fail, ok, toolNumberText } from "../primitives"
 import type { Result } from "../primitives"
+import type { StageRule, ToolRuleSubject } from "../rules/stages"
 
 /** The firmware's probe slot. */
 export const PROBE_TOOL = 0
@@ -20,7 +22,7 @@ export const isProbeSlot = (number: number | null) =>
   number === PROBE_TOOL || number === PROBE_3D_TOOL
 
 /** What a probe slot holds, as messages name it. */
-const slotName = (number: number) =>
+const slotName = (number: number | null) =>
   number === PROBE_3D_TOOL ? "3D probe" : "probe"
 
 /** Whether a tool is the probe, compared loosely like any other kind ({@link toolKindKey}). */
@@ -415,60 +417,106 @@ export function renumberTool(
   )
 }
 
-/**
- * Unassigned, dangling and misplaced-probe entries block Run: only a probe fills a probe slot
- * (T0, the 3D probe's), and a probe fills nothing else. The table itself never changes on its
- * own.
- */
-export function toolDiagnostics(
+/** Each entry of a plate's tool table, with the library tool it names, as the tool rules test them. */
+export function toolRuleSubjects(
   plate: Plate,
   library: readonly Tool[]
-): Diagnostic[] {
-  const diagnostics: Diagnostic[] = []
-  for (const entry of plate.tools) {
-    const details = {
-      subject: toolSubject(entry.number),
-      fix: { kind: "assign-tool", toolNumber: entry.number } as const,
-    }
-    if (entry.toolId === null) {
-      diagnostics.push(
-        error(
-          "tool-unassigned",
-          `${capitalize(toolNumberText(entry.number))} has no tool assigned.`,
-          details
-        )
-      )
-      continue
-    }
-    const tool = library.find((item) => item.id === entry.toolId)
-    if (!tool)
-      diagnostics.push(
-        error(
-          "tool-missing",
-          `${capitalize(toolNumberText(entry.number))} uses a tool that is no longer in the library.`,
-          details
-        )
-      )
-    else if (
-      entry.number !== null &&
-      isProbeSlot(entry.number) &&
-      !isProbe(tool)
-    )
-      diagnostics.push(
-        error(
-          "tool-probe-slot",
-          `T${entry.number} is the ${slotName(entry.number)} slot; assign a probe.`,
-          details
-        )
-      )
-    else if (!isProbeSlot(entry.number) && isProbe(tool))
-      diagnostics.push(
-        error(
-          "tool-probe-elsewhere",
-          `${capitalize(toolNumberText(entry.number))} would cut with the probe; assign a cutting tool.`,
-          details
-        )
-      )
-  }
-  return diagnostics
+): ToolRuleSubject[] {
+  return plate.tools.map((entry) => ({
+    entry,
+    tool:
+      entry.toolId === null
+        ? null
+        : (library.find((item) => item.id === entry.toolId) ?? null),
+  }))
 }
+
+/** An entry's gates: once one fails, the later ones do not apply to it. */
+const TOOL_CHAIN = "tool"
+
+/** What each entry's failure offers: putting another library tool in it. */
+const assignToolFix: RuleFixes<ToolRuleSubject, QuickFix> = {
+  offer: ({ first }) => [
+    { kind: "assign-tool", toolNumber: first.entry.number },
+  ],
+}
+
+const toolUnassigned: StageRule<"tool"> = {
+  id: "tool-unassigned",
+  stage: "tool",
+  label: "Tool assigned",
+  description: "Every entry of the plate's tool table needs a library tool.",
+  severity: "error",
+  configurable: false,
+  chain: TOOL_CHAIN,
+  test: ({ entry }) => entry.toolId !== null,
+  explain: ({ first: { entry } }) => ({
+    problem: `${capitalize(toolNumberText(entry.number))} has no tool assigned.`,
+    about: toolSubject(entry.number),
+  }),
+  fixes: assignToolFix,
+}
+
+const toolMissing: StageRule<"tool"> = {
+  id: "tool-missing",
+  stage: "tool",
+  label: "Tool in the library",
+  description:
+    "The library tool an entry names must still be in the library: removing it there leaves the entry as it is.",
+  severity: "error",
+  configurable: false,
+  chain: TOOL_CHAIN,
+  test: ({ entry, tool }) => entry.toolId === null || tool !== null,
+  explain: ({ first: { entry } }) => ({
+    problem: `${capitalize(toolNumberText(entry.number))} uses a tool that is no longer in the library.`,
+    about: toolSubject(entry.number),
+  }),
+  fixes: assignToolFix,
+}
+
+const toolProbeSlot: StageRule<"tool"> = {
+  id: "tool-probe-slot",
+  stage: "tool",
+  label: "Probe in its slot",
+  description: "Only a probe fills a probe slot: T0, and the 3D probe's.",
+  severity: "error",
+  configurable: false,
+  chain: TOOL_CHAIN,
+  test: ({ entry, tool }) =>
+    !tool || !isProbeSlot(entry.number) || isProbe(tool),
+  explain: ({ first: { entry } }) => ({
+    problem: `${toolNumberText(entry.number)} is the ${slotName(entry.number)} slot; assign a probe.`,
+    about: toolSubject(entry.number),
+  }),
+  fixes: assignToolFix,
+}
+
+const toolProbeElsewhere: StageRule<"tool"> = {
+  id: "tool-probe-elsewhere",
+  stage: "tool",
+  label: "Probe only in its slot",
+  description:
+    "A probe fills nothing but a probe slot; anywhere else, the machine would cut with it.",
+  severity: "error",
+  configurable: false,
+  chain: TOOL_CHAIN,
+  test: ({ entry, tool }) =>
+    !tool || isProbeSlot(entry.number) || !isProbe(tool),
+  explain: ({ first: { entry } }) => ({
+    problem: `${capitalize(toolNumberText(entry.number))} would cut with the probe; assign a cutting tool.`,
+    about: toolSubject(entry.number),
+  }),
+  fixes: assignToolFix,
+}
+
+/**
+ * What each entry of a plate's tool table needs, which blocks Run: a library tool that is still
+ * in the library, and a probe exactly in a probe's slot (T0, the 3D probe's). The table itself
+ * never changes on its own.
+ */
+export const TOOL_RULES: readonly StageRule<"tool">[] = [
+  toolUnassigned,
+  toolMissing,
+  toolProbeSlot,
+  toolProbeElsewhere,
+]

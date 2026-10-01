@@ -3,7 +3,6 @@ import type { FixtureDefinition } from "@/domain/fixtures/definitions"
 import type { CamMarkers } from "@/domain/nc/cam-markers"
 import type { Point3 } from "@/domain/nc/gcode"
 import type { NcGlossaryEntry } from "@/domain/nc/glossary"
-import type { ProgramRule } from "@/domain/design-rules/program-rules"
 import type { StoredAnchorSetup } from "@/domain/anchors/stored-anchors"
 import type { NcBlockEffect, NcUnitState } from "../compile/nc-unit"
 import type { FirmwareModel } from "../firmware/firmware-model"
@@ -40,6 +39,8 @@ export type KitRecolor = {
  * up with the kit's versions: each version adds fixtures or corrects them.
  */
 export abstract class FixtureKit {
+  /** Unique among kits, and never changes: rules name the machines they hold for by it (`Rule.machines`). */
+  abstract readonly id: string
   abstract readonly name: string
   /** The device models it is for, as devices announce them. */
   abstract readonly deviceModels: readonly string[]
@@ -58,6 +59,11 @@ export abstract class FixtureKit {
    * tool changes); null when the preview does not follow it.
    */
   abstract readonly firmware: FirmwareModel | null
+  /**
+   * Where its camera looks at the bed from, as a direction from the bed's middle, for a view
+   * like the camera's; null when it has none.
+   */
+  abstract readonly cameraView: Point3 | null
   /** Its fixtures, in the order profiles list them. */
   abstract readonly fixtures: readonly KitFixture[]
   /**
@@ -71,11 +77,6 @@ export abstract class FixtureKit {
   abstract readonly camMarkers: CamMarkers | null
   /** The codes of the machine's NC, as the G-code glossary lists them. */
   abstract readonly glossary: readonly NcGlossaryEntry[]
-  /**
-   * What the machine does not run as written: its design rules for programs, which importing a
-   * program asks to resolve and the design rule check reports.
-   */
-  abstract readonly programRules: readonly ProgramRule[]
 
   /**
    * The NC that puts the machine's work X and Y on a work origin kept relative to one of its

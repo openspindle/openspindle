@@ -83,6 +83,31 @@ function position(
   }
 }
 
+/**
+ * Work zero in machine coordinates. Robot.cpp mcs2wcs reports WPos as MPos less the work
+ * offset, plus G92, less the tool offset, of which T carries Z. In laser mode the tool offset
+ * holds the laser's X and Y too, which the status leaves out; without a laser module (no L)
+ * there is none.
+ */
+function workOrigin(
+  machine: Position | null,
+  work: Position | null,
+  toolOffset: number | null,
+  laserMode: boolean | null
+): Position | null {
+  if (!machine || !work || toolOffset === null || laserMode === true)
+    return null
+  const angle = (m: number | null, w: number | null) =>
+    m === null || w === null ? null : m - w
+  return {
+    x: machine.x - work.x,
+    y: machine.y - work.y,
+    z: machine.z - work.z - toolOffset,
+    a: angle(machine.a, work.a),
+    b: angle(machine.b, work.b),
+  }
+}
+
 export function modelById(id: number): MachineModel | null {
   if (id === 3) return "Z1"
   if (id === 4) return "Z1 Pro"
@@ -154,6 +179,11 @@ export function parseStatus(
       : null
   // Manual tool-change machines append the requested tool: T:active,offset,target.
   const manualTool = f.T?.length === 3
+  const machine = position(f.MPos, scale)
+  const work = position(f.WPos, scale)
+  // Kernel.cpp prints the tool offset in millimetres whatever the unit mode.
+  const toolOffset = n("T", 1)
+  const laserMode = flag(f.L?.[0])
   return {
     identity: { model, atc: (funcSetting & ATC_FLAG) !== 0 },
     telemetry: {
@@ -161,8 +191,9 @@ export function parseStatus(
       state,
       units: inch ? "in" : "mm",
       absolute,
-      machine: position(f.MPos, scale),
-      work: position(f.WPos, scale),
+      machine,
+      work,
+      workOrigin: workOrigin(machine, work, toolOffset, laserMode),
       feed: scaled("F"),
       requestedFeed: scaled("F", 1),
       feedOverride: n("F", 2),
@@ -174,9 +205,9 @@ export function parseStatus(
       controllerTemperature: f.S?.length === 10 ? n("S", 5) : null,
       // Kernel.cpp prints tool numbers as integers ("T:%d,%1.3f,%d").
       tool: integer(f.T?.[0]),
-      toolOffset: n("T", 1),
+      toolOffset,
       requestedTool: manualTool ? integer(f.T?.[2]) : null,
-      laserMode: flag(f.L?.[0]),
+      laserMode,
       vacuumAuto: flag(f.S?.[3]),
       blowingAuto: flag(assists?.[0]),
       bedCleanAuto: flag(assists?.[1]),

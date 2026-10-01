@@ -8,6 +8,7 @@ import { describePath, readOptimistically } from "../optimistic-read"
 import { PROJECT_SCHEMA_VERSION, ProjectDocumentSchema } from "./document"
 import type { ProjectDocument } from "./document"
 import { retainedSourceField, upgradeWorkspaceSources } from "./upgrade"
+import { ruleSettingsFromDesignRules } from "./rule-settings"
 import { decodeStepNc, encodeStepNc } from "./step-nc"
 import type {
   RestoredPayload,
@@ -82,6 +83,18 @@ const VersionSchema = z.looseObject({ schemaVersion: z.int().positive() })
 /** The oldest format that can be upgraded on opening. */
 const MINIMUM_SCHEMA_VERSION = 4
 
+/** Earlier projects keep their rule settings, converting named design rules when needed. */
+function currentPayload(payload: Record<string, unknown>) {
+  const { designRules, ...data } = payload
+  return {
+    ...data,
+    schemaVersion: PROJECT_SCHEMA_VERSION,
+    ruleSettings: Object.hasOwn(data, "ruleSettings")
+      ? data.ruleSettings
+      : ruleSettingsFromDesignRules(designRules),
+  }
+}
+
 /**
  * Projects of this version and compatible earlier versions are read; `saved` is the NC the file attaches
  * to each instruction. The document is read optimistically: what the schema upgrades or
@@ -104,6 +117,11 @@ function readPayload(
     throw new Error(
       `This project was saved by an earlier version of OpenSpindle (project format ${schemaVersion}), which this version cannot open.`
     )
+  // Rule settings move to different paths: read the converted fields optimistically there.
+  const current =
+    schemaVersion < PROJECT_SCHEMA_VERSION
+      ? currentPayload(payload as Record<string, unknown>)
+      : payload
   const schema =
     schemaVersion < PROJECT_SCHEMA_VERSION
       ? z.preprocess((value) => {
@@ -111,13 +129,10 @@ function readPayload(
             string,
             unknown
           >
-          return upgradeWorkspaceSources({
-            ...data,
-            schemaVersion: PROJECT_SCHEMA_VERSION,
-          })
+          return upgradeWorkspaceSources(data)
         }, ProjectDocumentSchema)
       : ProjectDocumentSchema
-  const read = readOptimistically(schema, payload)
+  const read = readOptimistically(schema, current)
   if (!read.success)
     throw new Error(
       `The project data is invalid: ${z.prettifyError(read.error)}`
@@ -138,7 +153,7 @@ function readPayload(
             path.slice(2)
           )
         })
-        .map((path) => describePath(payload, path)),
+        .map((path) => describePath(current, path)),
     },
     archive: projectArchive(read.data, saved),
   }

@@ -54,7 +54,7 @@ export function useFusionUpdate() {
         operation,
         origin,
         context(),
-        workspace.state.designRules
+        workspace.state.ruleSettings
       )
     },
     onSuccess: (plan) => {

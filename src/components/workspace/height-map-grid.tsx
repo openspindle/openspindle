@@ -49,8 +49,10 @@ export function HeightMapFacts({
     <dl className="grid grid-cols-2 gap-4 text-xs/relaxed sm:grid-cols-4 [&_dd]:font-numeric [&_dt]:mb-1 [&_dt]:text-muted-foreground">
       {facts.map(({ label, value }) => (
         <div key={label}>
-          <dt>{label}</dt>
-          <dd>{value}</dd>
+          <dt className="text-[0.65rem] text-muted-foreground uppercase">
+            {label}
+          </dt>
+          <dd className="text-sm font-medium tabular-nums">{value}</dd>
         </div>
       ))}
     </dl>

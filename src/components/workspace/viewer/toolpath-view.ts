@@ -392,8 +392,28 @@ export class ToolpathView {
     const run = index >= 0 ? this.tools[index] : null
     // Before a tool change the spindle holds a tool the program does not know: none shows.
     if (!run || (run.tool === null && !run.shape && !run.model)) return
-    const model = run.model ? this.meshModel(run.model) : null
-    const tool = model ?? (run.shape ? this.toolModel(run.shape) : this.marker)
+    this.placeTool(run, position)
+  }
+
+  /**
+   * Shows the tool the machine reports in its spindle with its tip at `position` (in the
+   * program's coordinates): the program's tool of that number, else a plain marker. Null hides
+   * it.
+   */
+  showLiveTool(live: { tool: number | null; position: Point3 } | null) {
+    if (this.shownTool) this.shownTool.visible = false
+    this.shownTool = null
+    if (!live) return
+    const run = [...this.tools]
+      .reverse()
+      .find((item) => item.tool === live.tool)
+    this.placeTool(run ?? null, live.position)
+  }
+
+  /** A run's tool (its model, else its shape, else the marker) with its tip at `position`. */
+  private placeTool(run: ViewerToolRun | null, position: Point3) {
+    const model = run?.model ? this.meshModel(run.model) : null
+    const tool = model ?? (run?.shape ? this.toolModel(run.shape) : this.marker)
     const [x, y, z] = position
     // The marker is a centred cylinder; a model's origin is its tip.
     tool.position.set(

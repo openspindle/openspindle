@@ -31,7 +31,7 @@ export function useNativeImport() {
         [new File([opened.contents], opened.fileName)],
         context(),
         importKit(workspace.state),
-        workspace.state.designRules
+        workspace.state.ruleSettings
       )
     },
     onSuccess: (plan) => {

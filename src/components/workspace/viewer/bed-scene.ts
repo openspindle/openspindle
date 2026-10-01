@@ -26,7 +26,8 @@ import { ViewerAssets } from "./viewer-assets"
 import type { ModelMeshes } from "./viewer-assets"
 import { ViewerStage } from "./viewer-stage"
 
-export type ViewMode = "perspective" | "top" | "front"
+/** The preset views; "camera" looks from where the machine's camera does (`cameraView`). */
+export type ViewMode = "perspective" | "top" | "front" | "camera"
 
 /** Viewer-wide display state; only the selected plate follows playback and selection. */
 export type ViewerPresentation = {
@@ -42,6 +43,23 @@ export type ViewerPresentation = {
   /** Problems to mark where they are on their plates' beds, and the one shown. */
   problems?: readonly ViewerProblem[]
   shownProblem?: ViewerProblemRef | null
+  /** Where the connected machine keeps work zero, on one plate's bed. */
+  machineOrigin?: MachineOrigin | null
+  /** The tool the machine reports in its spindle, on one plate's bed (the simulator's camera). */
+  liveTool?: LiveTool | null
+}
+
+/** A tool number and its tip, in that plate's bed coordinates. */
+export type LiveTool = {
+  readonly plateId: string
+  readonly tool: number | null
+  readonly position: Point3
+}
+
+/** A position on a plate's bed, in that plate's bed coordinates. */
+export type MachineOrigin = {
+  readonly plateId: string
+  readonly position: Point3
 }
 
 export type BedSceneEvents = {
@@ -57,7 +75,7 @@ const NO_PROBLEMS: readonly ViewerProblem[] = []
 /** A shown problem whose marker is this far from the view's middle, or farther, is panned to. */
 const REVEAL_REACH = 0.8
 /** Camera offset from the orbit target for each preset view. */
-const VIEW_DIRECTIONS: Record<ViewMode, Point3> = {
+const VIEW_DIRECTIONS: Record<Exclude<ViewMode, "camera">, Point3> = {
   perspective: [0, -540, 430],
   top: [0, -0.01, 650],
   front: [0, -650, 110],
@@ -298,8 +316,18 @@ export class BedScene {
   setView(view: ViewMode) {
     this.camera.position
       .copy(this.controls.target)
-      .add(new THREE.Vector3(...VIEW_DIRECTIONS[view]))
+      .add(new THREE.Vector3(...this.viewDirection(view)))
     this.center()
+  }
+
+  /** A preset's direction; the camera's is its first plate's machine's, else the perspective. */
+  private viewDirection(view: ViewMode): Point3 {
+    if (view !== "camera") return VIEW_DIRECTIONS[view]
+    const plate = this.plates.at(0)
+    const kit = plate
+      ? plateKit(plate)
+      : kitForSetup({ deviceId: null, fixtures: [] })
+    return kit.cameraView ?? VIEW_DIRECTIONS.perspective
   }
 
   /**
@@ -370,9 +398,16 @@ export class BedScene {
       this.presentation
     const { problems = NO_PROBLEMS, shownProblem } = this.presentation
     const hidden = this.presentation.hiddenLineRanges?.[id] ?? NO_RANGES
+    const { machineOrigin, liveTool } = this.presentation
     const marked = {
       problems: problems.filter((problem) => problem.plateId === id),
       shownProblem: shownProblem?.plateId === id ? shownProblem.key : null,
+      machineOrigin:
+        machineOrigin?.plateId === id ? machineOrigin.position : null,
+      liveTool:
+        liveTool?.plateId === id
+          ? { tool: liveTool.tool, position: liveTool.position }
+          : null,
     }
     if (id !== selectedPlateId)
       return {

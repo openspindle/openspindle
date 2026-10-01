@@ -72,13 +72,13 @@ Once, when the repository is created on GitHub (`OWNER/REPO` below), with the Gi
 
 The `release` environment needs five secrets:
 
-| Secret | Value |
-| --- | --- |
-| `MAC_CERTIFICATE_P12` | The Developer ID Application certificate and its private key, exported as `.p12`, base64-encoded |
-| `MAC_CERTIFICATE_PASSWORD` | The password the `.p12` was exported with |
-| `APPLE_API_KEY_P8` | The App Store Connect API key file (`AuthKey_<key id>.p8`), as text |
-| `APPLE_API_KEY_ID` | That key's ID |
-| `APPLE_API_ISSUER` | The issuer ID shown above the list of keys |
+| Secret                     | Value                                                                                            |
+| -------------------------- | ------------------------------------------------------------------------------------------------ |
+| `MAC_CERTIFICATE_P12`      | The Developer ID Application certificate and its private key, exported as `.p12`, base64-encoded |
+| `MAC_CERTIFICATE_PASSWORD` | The password the `.p12` was exported with                                                        |
+| `APPLE_API_KEY_P8`         | The App Store Connect API key file (`AuthKey_<key id>.p8`), as text                              |
+| `APPLE_API_KEY_ID`         | That key's ID                                                                                    |
+| `APPLE_API_ISSUER`         | The issuer ID shown above the list of keys                                                       |
 
 To make them with the GitHub CLI:
 

@@ -1,15 +1,20 @@
 import type { AutoLevelIssue } from "../auto-level/issues"
-import { resolveAnchorStart } from "../auto-level/rules"
-import { autoLevelOrderIssues } from "../auto-z-height/rules"
-import type { LaterAutoLevel, TouchOffStart } from "../auto-z-height/rules"
+import { editOperation, resolveAnchorStart } from "../auto-level/rules"
+import { touchesGridStarts } from "../auto-z-height/rules"
+import type { TouchOffStart } from "../auto-z-height/rules"
 import type { BedXY } from "../compile/toolpath-bounds"
-import { issueOf } from "../diagnostics"
+import { issueOf, operationSubject } from "../diagnostics"
 import type { Issue } from "../diagnostics"
 import { cornerInward, probe3dParamsSchema, setsWorkZ } from "./params"
 import type { Probe3dParameters, Probe3dParams } from "./params"
 import { roundMillimetres } from "../auto-level/params"
-import { placementHeight } from "../probing/placement"
+import {
+  laterAutoLevels,
+  placementContext,
+  placementHeight,
+} from "../probing/placement"
 import type { PlacementContext } from "../probing/placement"
+import type { OperationRuleSubject, StageRule } from "../rules/stages"
 
 export type Probe3dIssueCode =
   // Parameters
@@ -18,15 +23,11 @@ export type Probe3dIssueCode =
   | "anchor-snapshot-missing"
   | "anchor-unavailable"
   | "anchor-point-out-of-range"
-  | "factory-anchors"
-  // The plate's other operations
-  | "before-auto-level"
 
-/** Errors block NC generation or Run; warnings inform without blocking. */
+/** What blocks generating a 3D probing's NC; the compiler reports it. */
 export type Probe3dIssue = Issue<Probe3dIssueCode>
 
 const probeError = issueOf<Probe3dIssueCode>("error")
-const probeWarning = issueOf<Probe3dIssueCode>("warning")
 
 type Checked<TValue> =
   ({ ok: true } & TValue) | { ok: false; issues: Probe3dIssue[] }
@@ -93,45 +94,6 @@ export function probe3dStartOffset(
   }
 }
 
-/** Issues to show while editing: generation blockers and anchor provenance. */
-export function validateProbe3d(
-  params: Probe3dParams,
-  plate: PlacementContext,
-  parameters: Probe3dParameters
-): Probe3dIssue[] {
-  const plan = planProbe3d(params, plate, parameters)
-  if (!plan.ok) return plan.issues
-  const { start } = plan
-  if (start.kind !== "machine" || start.source !== "factory") return []
-  return [
-    probeWarning(
-      "factory-anchors",
-      "The anchor positions are factory defaults. Use Read anchors to verify them against the device before Run."
-    ),
-  ]
-}
-
-/**
- * A routine that sets work Z does so as auto Z-height does, from the position without height
- * compensation, while a later auto-level measures heights from its grid's first point: work Z is
- * exact after auto-level, and before it only where the grid starts. A grid from the probe
- * position does not start there even right after it, as the routine leaves the probe over what
- * it found rather than over the top it touched.
- */
-export function probe3dOrderIssues(
-  params: Pick<Probe3dParams, "routine" | "placement">,
-  later: readonly LaterAutoLevel[]
-): Probe3dIssue[] {
-  if (!setsWorkZ(params.routine)) return []
-  const moved = later.map((grid) => ({ ...grid, adjacent: false }))
-  return autoLevelOrderIssues(params, moved).map(() =>
-    probeWarning(
-      "before-auto-level",
-      "A later auto-level measures heights from its grid's first point, so work Z is off by any height difference between that point and the top this probing touches. Move 3D probing after Auto-level, or probe where the grid starts."
-    )
-  )
-}
-
 function anchorIssue(issue: AutoLevelIssue): Probe3dIssue {
   switch (issue.code) {
     case "anchor-snapshot-missing":
@@ -144,3 +106,83 @@ function anchorIssue(issue: AutoLevelIssue): Probe3dIssue {
       )
   }
 }
+
+/**
+ * A 3D probing operation's start as its advice reads it; null for another kind, a machine
+ * without a 3D probe, or parameters or an anchored start that do not resolve (the compiler
+ * reports those).
+ */
+function probingStart({
+  operation,
+  plate,
+  kit,
+}: OperationRuleSubject): TouchOffStart | null {
+  const { source } = operation
+  const probing = kit.probe?.probe3d
+  if (source.kind !== "probe-3d" || !probing) return null
+  const plan = planProbe3d(
+    source.params,
+    placementContext(plate),
+    probing.parameters
+  )
+  return plan.ok ? plan.start : null
+}
+
+const probe3dFactoryAnchors: StageRule<"operation"> = {
+  id: "probe-3d/factory-anchors",
+  stage: "operation",
+  label: "3D probing anchors read",
+  description:
+    "A start placed from the machine's factory default anchor positions lands wherever the device's own anchors differ from them.",
+  severity: "warning",
+  configurable: false,
+  test: (subject) => {
+    const start = probingStart(subject)
+    return start?.kind !== "machine" || start.source !== "factory"
+  },
+  explain: ({ first }) => ({
+    problem:
+      "The anchor positions are factory defaults. Use Read anchors to verify them against the device before Run.",
+    about: operationSubject(first.operation.id),
+  }),
+  fixes: editOperation,
+}
+
+/**
+ * A routine that sets work Z does so as auto Z-height does, from the position without height
+ * compensation, while a later auto-level measures heights from its grid's first point: work Z is
+ * exact after auto-level, and before it only where the grid starts. A grid from the probe
+ * position does not start there even right after it, as the routine leaves the probe over what
+ * it found rather than over the top it touched.
+ */
+const probe3dBeforeAutoLevel: StageRule<"operation"> = {
+  id: "probe-3d/before-auto-level",
+  stage: "operation",
+  label: "3D probing after auto-level",
+  description:
+    "Work Z set by 3D probing before an auto-level is exact only where the auto-level's grid starts.",
+  severity: "warning",
+  configurable: false,
+  test: ({ operation, plate, kit }) => {
+    const { source } = operation
+    if (source.kind !== "probe-3d" || !kit.probe?.probe3d) return true
+    const { routine, placement } = source.params
+    const moved = laterAutoLevels(plate, operation).map((grid) => ({
+      ...grid,
+      adjacent: false,
+    }))
+    return !setsWorkZ(routine) || touchesGridStarts(placement, moved)
+  },
+  explain: ({ first }) => ({
+    problem:
+      "A later auto-level measures heights from its grid's first point, so work Z is off by any height difference between that point and the top this probing touches. Move 3D probing after Auto-level, or probe where the grid starts.",
+    about: operationSubject(first.operation.id),
+  }),
+  fixes: editOperation,
+}
+
+/** The advice for a 3D probing operation: its anchors, and its order. */
+export const PROBE_3D_RULES: readonly StageRule<"operation">[] = [
+  probe3dFactoryAnchors,
+  probe3dBeforeAutoLevel,
+]

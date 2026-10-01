@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import type { QueryClient } from "@tanstack/react-query"
+import { createAtom, useSelector } from "@tanstack/react-store"
 import { RpcError } from "@openspindle/rpc"
 import { z } from "zod"
 import {
   MachineErrorCodeSchema,
   disconnectedSnapshot,
+  isFresh,
 } from "@/machine/contract"
 import type {
   ConnectRequest,
@@ -15,6 +17,8 @@ import type {
   MachineErrorCode,
   MachineSnapshot,
   RunRequest,
+  SimulatedBed,
+  Telemetry,
   WriteAnchorsRequest,
 } from "@/machine/contract"
 import { useHost } from "./host-context"
@@ -72,12 +76,28 @@ export function useMachineSnapshot(): MachineSnapshot {
   return data
 }
 
+/** The connected machine's live status, while it is fresh. */
+export function useFreshTelemetry(): Telemetry | null {
+  const { telemetry } = useMachineSnapshot()
+  return isFresh(telemetry, Date.now()) ? telemetry : null
+}
+
 /** As many as the main process keeps. */
 const CONSOLE_LIMIT = 1000
 
-/** The machine console while mounted: its backlog, then new entries as they arrive. */
-export function useMachineConsole(): ConsoleEntry[] {
+/** The last console entry cleared from view: the main process keeps them, the view does not. */
+const consoleCleared = createAtom(-1)
+
+/**
+ * The machine console while mounted: its backlog, then new entries as they arrive, without those
+ * cleared from view; `clear` clears what is shown now.
+ */
+export function useMachineConsole(): {
+  readonly entries: ConsoleEntry[]
+  readonly clear: () => void
+} {
   const machine = useHost().machine
+  const cleared = useSelector(consoleCleared)
   const [entries, setEntries] = useState<ConsoleEntry[]>([])
   useEffect(() => {
     setEntries([])
@@ -91,7 +111,17 @@ export function useMachineConsole(): ConsoleEntry[] {
       })
     )
   }, [machine])
-  return entries
+  const shown = useMemo(
+    () => entries.filter((entry) => entry.sequence > cleared),
+    [entries, cleared]
+  )
+  const last = entries.at(-1)?.sequence
+  return {
+    entries: shown,
+    clear: () => {
+      if (last !== undefined) consoleCleared.set(() => last)
+    },
+  }
 }
 
 /** Machine requests as mutations; the controller refuses concurrent work, so nothing queues here. */
@@ -132,6 +162,14 @@ export const useRunProgram = () =>
   )
 export const useDismissJob = () =>
   useMachineMutation("dismissJob", (machine, _: void) => machine.dismissJob())
+export const useSimulateBed = () =>
+  useMachineMutation("simulateBed", (machine, bed: SimulatedBed) =>
+    machine.simulateBed(bed)
+  )
+export const useSendConsoleLine = () =>
+  useMachineMutation("sendConsoleLine", (machine, line: string) =>
+    machine.sendConsoleLine(line)
+  )
 export const useReadAnchors = () =>
   useMachineMutation("readAnchors", (machine, _: void) => machine.readAnchors())
 export const useWriteAnchors = () =>

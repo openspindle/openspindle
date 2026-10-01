@@ -6,6 +6,9 @@
 
 import { z } from "zod"
 import type { StoredAnchorSetup } from "../anchors/stored-anchors"
+import type { Operation } from "../operations/operation"
+import type { Plate } from "../plate/plate"
+import { workOriginOnMachine } from "../plate/work-origin"
 import { COORDINATE_LIMIT } from "../primitives"
 
 function coordinateSchema(label: string) {
@@ -73,4 +76,38 @@ export type PlacementContext = {
   machineWorkOrigin?: readonly [number, number] | null
   /** The plate's work origin's height on the bed, which work Z0 is on. */
   workOriginZ: number
+}
+
+/** Where a plate's probing operations are placed: its device, its anchor snapshot and its work origin. */
+export const placementContext = (plate: Plate): PlacementContext => ({
+  deviceId: plate.setup.deviceId,
+  anchorSetup: plate.setup.anchors ?? undefined,
+  machineWorkOrigin: workOriginOnMachine(plate.setup)?.position ?? null,
+  workOriginZ: plate.setup.workOrigin[2],
+})
+
+/** An auto-level that runs after an operation, and whether it follows it directly. */
+export type LaterAutoLevel = {
+  readonly placement: ProbePlacement
+  /** Next in the plate without a Pause before, so the probe has not moved in between. */
+  readonly adjacent: boolean
+}
+
+/** The auto-levels after an operation, which measure their heights from their own grid start. */
+export function laterAutoLevels(
+  plate: Plate,
+  operation: Operation
+): LaterAutoLevel[] {
+  const index = plate.operations.findIndex((item) => item.id === operation.id)
+  if (index < 0) return []
+  return plate.operations.slice(index + 1).flatMap((later, offset) =>
+    later.source.kind === "auto-level"
+      ? [
+          {
+            placement: later.source.params.placement,
+            adjacent: offset === 0 && !later.stopBefore,
+          },
+        ]
+      : []
+  )
 }

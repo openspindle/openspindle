@@ -8,7 +8,7 @@ export type QuickFix =
   | { readonly kind: "assign-tool"; readonly toolNumber: number | null }
   | { readonly kind: "read-anchors" }
   | { readonly kind: "edit-operation"; readonly operationId: string }
-  /** Changes an operation's NC as one of its machine's program rules suggests (`ProgramRule`). */
+  /** Changes an operation's NC as one of its machine's program rules offers (`ProgramFix`). */
   | {
       readonly kind: "resolve-rule"
       readonly operationId: string
@@ -162,8 +162,8 @@ export function keyDiagnostics<TDiagnostic extends Diagnostic>(
 }
 
 /**
- * What a check finds before it is known what the finding is about: a rule module's findings,
- * which the operation kind that asked makes the operation's diagnostics (`OperationKind`).
+ * What a check finds before it is known what the finding is about, such as what stops an
+ * operation's NC being generated, which its caller makes a diagnostic.
  */
 export type Issue<TCode extends string = string> = {
   readonly severity: Severity

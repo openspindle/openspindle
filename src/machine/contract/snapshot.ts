@@ -71,6 +71,8 @@ export const AVAILABILITY_KEYS = [
   "readHeightMap",
   "stop",
   "reset",
+  /** A line typed in the console. */
+  "console",
 ] as const
 export const AvailabilityKeySchema = z.enum(AVAILABILITY_KEYS)
 export type AvailabilityKey = z.infer<typeof AvailabilityKeySchema>

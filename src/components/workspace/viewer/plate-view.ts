@@ -55,6 +55,8 @@ export type PlatePresentation = PathPresentation & {
   /** The plate's problems with a place on its bed, and the key of the one shown. */
   problems: readonly ViewerProblem[]
   shownProblem: string | null
+  /** Where the connected machine keeps work zero, on this plate's bed; null to leave it out. */
+  machineOrigin: Point3 | null
 }
 
 /** A setup item under the pointer: which, how far along the ray, and where it was hit. */
@@ -78,6 +80,7 @@ const BARE_ORIGIN: ViewerBounds = { min: [-2, -2, -2], max: [2, 2, 2] }
 const WORK_AXIS_LINE_WIDTH = 1.5
 /** A device anchor's solid dot; its border reaches out to STORED_ANCHOR_RADIUS. */
 const ANCHOR_DOT_RADIUS = 1.2
+const MACHINE_ORIGIN_RADIUS = 2.2
 
 const plus = (point: Point3, delta: Point3): Point3 => [
   point[0] + delta[0],
@@ -138,6 +141,14 @@ const PRESENTATION_EQUALITY: FieldEquality<PlatePresentation> = {
     (!!a && !!b && a.segment === b.segment && a.fraction === b.fraction),
   problems: sameProblems,
   shownProblem: Object.is,
+  machineOrigin: (a, b) =>
+    a === b || (!!a && !!b && a.every((value, index) => value === b[index])),
+  liveTool: (a, b) =>
+    a === b ||
+    (!!a &&
+      !!b &&
+      a.tool === b.tool &&
+      a.position.every((value, index) => value === b.position[index])),
 }
 
 /** Scene services a plate keeps using after construction. */
@@ -323,6 +334,32 @@ function stockObjects(plate: ViewerPlate): THREE.Object3D[] {
   return [block, edges]
 }
 
+/** The machine's work zero: a dot in a half-opaque shell, seen through the stock and fixtures. */
+function machineOriginMarker(color: THREE.Color) {
+  const layer = (radius: number, opacity: number, renderOrder: number) => {
+    const mesh = new THREE.Mesh(
+      new THREE.SphereGeometry(radius, 24, 16),
+      new THREE.MeshBasicMaterial({
+        color,
+        transparent: true,
+        opacity,
+        depthTest: false,
+        depthWrite: false,
+        toneMapped: false,
+      })
+    )
+    mesh.renderOrder = renderOrder
+    return mesh
+  }
+  const marker = new THREE.Group()
+  marker.add(
+    layer(MACHINE_ORIGIN_RADIUS, 0.5, 12),
+    layer(ANCHOR_DOT_RADIUS, 1, 13)
+  )
+  marker.visible = false
+  return marker
+}
+
 /**
  * Orange device anchors: a dot in a half-opaque border of its color. Each marker disc spans
  * the border too and carries its hover title.
@@ -439,6 +476,7 @@ export class PlateView {
   private readonly outline = new THREE.Group()
   private readonly markers: SetupMarkers
   private readonly problems: ProblemView
+  private readonly machineOrigin: THREE.Group
   private selectedItem: SetupItemRef | null = null
   /** An item drawn moved by a delta, while it is dragged or until its move arrives. */
   private preview: { item: SetupItemRef; delta: Point3 } | null = null
@@ -465,6 +503,7 @@ export class PlateView {
     this.selection = selectionOutline(context.palette.primary, machineBed)
     this.markers = new SetupMarkers(context.palette.primary, context.pixelRatio)
     this.problems = new ProblemView(context.palette)
+    this.machineOrigin = machineOriginMarker(context.palette.primary)
     this.decoration.add(
       this.axes,
       this.anchors,
@@ -485,6 +524,7 @@ export class PlateView {
       this.outline,
       this.markers.object,
       this.problems.group,
+      this.machineOrigin,
       this.pick
     )
     this.buildSetup(plate)
@@ -579,7 +619,13 @@ export class PlateView {
     this.markers.dispose()
     this.problems.dispose()
     // Bed and fixture clones share their templates' geometry; release only owned resources.
-    disposeObjects(this.stock, this.decoration, this.outline, this.pick)
+    disposeObjects(
+      this.stock,
+      this.decoration,
+      this.outline,
+      this.machineOrigin,
+      this.pick
+    )
     disposeMaterials(this.fixtureMaterials)
     for (const geometry of this.fixtureGeometries) geometry.dispose()
     this.root.clear()
@@ -739,5 +785,8 @@ export class PlateView {
     this.stock.visible = presentation.showStock
     this.path.present(presentation)
     this.problems.show(presentation.problems, presentation.shownProblem)
+    const { machineOrigin } = presentation
+    this.machineOrigin.visible = machineOrigin !== null
+    if (machineOrigin) this.machineOrigin.position.set(...machineOrigin)
   }
 }

@@ -26,6 +26,7 @@ const { values } = parseArgs({
     tool: { type: "string", default: "1" },
     anchors: { type: "string", default: "-192.4,-194.3,88.5,45" },
     "line-ms": { type: "string", default: "40" },
+    speed: { type: "string", default: "1" },
     "no-done-snapshot": { type: "boolean", default: false },
     "fail-at-line": { type: "string" },
     "drop-acks": { type: "string" },
@@ -50,6 +51,7 @@ if (values.help) {
   --tool <n>               active tool at start (default 1; 0 is the probe, --tool=-1 none)
   --anchors <x,y,dx,dy>    anchor 1 and anchor 2's offset from it (default -192.4,-194.3,88.5,45)
   --line-ms <n>            milliseconds per played line (default 40)
+  --speed <n>              move this many times faster than the machine (default 1)
   --no-done-snapshot       P disappears without the completion snapshot
   --fail-at-line <n>       halt with a probe failure at this program line
   --drop-acks <regexp>     never acknowledge matching commands
@@ -84,6 +86,7 @@ const device = new SimulatedZ1(
     tool: Number(values.tool),
     anchors: [anchors[0], anchors[1], anchors[2], anchors[3]],
     lineMs: Number(values["line-ms"]),
+    speed: Math.max(Number(values.speed) || 1, 0.01),
     noDoneSnapshot: values["no-done-snapshot"],
     failAtLine: values["fail-at-line"] ? Number(values["fail-at-line"]) : null,
     dropAcks: values["drop-acks"] ? new RegExp(values["drop-acks"]) : null,
