@@ -13,7 +13,7 @@ electron/main/        the main process: window, app:// protocol, menus, services
 electron/preload/     a generic bridge that hands the renderer one RPC MessagePort
 packages/rpc          typed RPC: Zod contracts, endpoints, cancellation, subscriptions, transports
 src/machine/          the machine domain (host-agnostic; runs in Electron main and the simulator)
-src/domain/           the workspace domain: plates, operations, tools, stock, fixtures and machine kits, stored anchors, NC reading, compile, auto-level, auto Z-height, auto-scan, 3D probing, the rules and design rules (pure)
+src/domain/           the workspace domain: plates, operations, tools, stock, fixtures and machine kits, stored anchors, NC reading, compile, probing, geometry, the rules and design rules (pure)
 src/formats/          file formats: plate envelope, STEP-NC project, shared base64 JSON, GLB models, the tool library
 src/lib/              generic building blocks with no domain knowledge: zip reading, three.js helpers, appearance and fonts
 src/persistence/      versioned repositories: the tool and stock libraries, the fixture library; the Models library
@@ -49,9 +49,11 @@ The workspace is plain immutable data (`WorkspaceState`) held in a TanStack Stor
 
 Compiling a plate is pure and cached per plate object (a WeakMap), and so are its diagnostics (`plateDiagnostics`), so any component can ask for a compiled program without coordinating. Problems are `Diagnostic`s, never exceptions: errors block Run and export (a design rule's only Run), warnings inform, and each says what it is about (the plate, its setup, an operation or a tool) and, when it has one, its place on the bed or its lines in the program, which the 3D view marks; each can carry a quick fix ([workspace-model.md](workspace-model.md#diagnostics)).
 
-A plate is compiled for its machine: the kit of the device it is set up for, else the kit its fixtures come from, else the default kit a new workspace starts from (`kitForPlate`, `src/domain/fixtures/catalog.ts`). Compiling and the operation kinds ask the kit for what is the machine's own: its clearance retract, the NC that sets a work offset, which of its blocks an operation may hold beyond plain three-axis machining, the park its CAM ends programs with, its probe's grids and touch-offs, its CAM's toolpath and tool markers and its G-code glossary. Rules that hold only for some machines name their kits by id (`FixtureKit.id`), so the Z1's program rules, in its kit's folder, hold only for the Z1. The 3D view draws each plate on its own machine's bed, with its probe's grids and touches. Every reader of NC, the preview, combining and Run's dialect, takes a line's words from one lexer in the machine contract (`readNcBlock`, `src/machine/contract/nc-block.ts`), so they refuse the same lines.
+A plate is compiled for its machine: the kit of the device it is set up for, else the kit its fixtures come from, else the default kit a new workspace starts from (`kitForPlate`, `src/domain/fixtures/catalog.ts`). Compiling and the operation kinds ask the kit for what is the machine's own: its clearance retract, the NC that sets a work offset, which of its blocks an operation may hold beyond plain three-axis machining, the park its CAM ends programs with, its probing (below), its CAM's toolpath and tool markers and its G-code glossary. Rules that hold only for some machines name their kits by id (`FixtureKit.id`), so the Z1's program rules, in its kit's folder, hold only for the Z1. The 3D view draws each plate on its own machine's bed, with the grids and touches its probing reads in the program. Every reader of NC, the preview, combining and Run's dialect, takes a line's words from one lexer in the machine contract (`readNcBlock`, `src/machine/contract/nc-block.ts`), so they refuse the same lines.
 
-Operation kinds form a registry (Strategy): how a kind becomes NC, its phase and whether a lone operation may be emitted byte for byte; rules check operations while editing and before Run. Auto-level, auto Z-height, auto-scan and 3D probing are kinds whose NC is generated from their parameters (and, for auto-scan, the plate's toolpath bounds) when compiling. They plan in machine-neutral terms and ask the machine's `Probe` (Strategy, `src/domain/probing/probe.ts`), which its fixture kit provides, for their defaults, ranges and NC; the Makera Z1's wired Probe 2.0 is in `src/domain/fixtures/makera-z1/wired-probe/` and its 3D Probe's routines in `src/domain/fixtures/makera-z1/3d-probe/`. A machine without a probe offers no probing operations.
+Operation kinds form a registry (Strategy): how a kind becomes NC, its phase and whether a lone operation may be emitted byte for byte; rules check operations while editing and before Run. Kinds resolve with the plate's machine's kit and the tool library (`ResolveContext`), so compiling takes the library too (`compilePlate(plate, tools)`) and keeps a plate's result while the library tools its table holds stay the same.
+
+Probing is one of those kinds: a probe tool from the library and a strategy doing a task (`src/domain/probing/`). The task (a height grid, a touch-off, an outline or a work origin, `tasks/`) decides the parameters, how they fit a plate, the rules that check them and how the job reads what they measure. The strategy (`ProbingStrategy`, Strategy, `strategy.ts`) writes the NC when compiling, from the parameters, the plate (for an outline, its toolpath bounds) and the probe the plate's tool table holds in the number the operation selects (`boundProbe`). Generic strategies are OpenSpindle's own toolpaths (Surface touch and Outline trace, `generic/`), made of NC the machine gives them; a machine's firmware routines are strategies of its own, offered besides them (`strategiesFor` lists those a probe's profile can run, generic first). How a machine probes is its kit's `MachineProbing` (`FixtureKit.probing`): which probes its firmware lets do which task and the tool number it needs each in (`probes`, `slot`), the NC generic strategies are made of (`ProbingNc`: readying the probe, its pointer and indicator, travel to an anchor, the touch feeds), their ranges on it, its firmware's strategies, and how its NC reads as probing in program sections and in previews of any NC file. The Makera Z1's is in `src/domain/fixtures/makera-z1/`: its probing NC in `probing-nc.ts`, its firmware's Height map, Z probe and 3D probing routines in `strategies/`, and how its blocks read in `wired-probe/` and `3d-probe/`. A machine without probing offers no probing operations ([probing.md](probing.md)).
 
 The compiled program is the NC as written, in work coordinates. How the machine's firmware moves for what the NC leaves to it (tool changes, probing routines, machine coordinates) is its kit's `FirmwareModel` (Strategy, `src/domain/firmware/firmware-model.ts`); the 3D view draws each plate's machine program, the NC parsed with it and placed by the plate's setup ([firmware-preview.md](firmware-preview.md)).
 
@@ -91,14 +93,14 @@ The typed `host.pcb` service invokes the local conversion service in `electron/m
 
 ## Patterns at a glance
 
-| Pattern                 | Where                                                                  |
-| ----------------------- | ---------------------------------------------------------------------- |
-| Facade                  | `MachineController`                                                    |
-| Protection Proxy        | `MachineGateway` principals                   |
-| Strategy                | firmware adapters; operation kinds; machine probes and firmware models |
-| Chain of Responsibility | machine admission, a chain of command rules                            |
-| Command                 | machine operations; workspace commands (`applyCommand`)                |
-| Observer                | telemetry store; TanStack stores and atoms                             |
-| Rules                   | one `Rule` type, one list (`RULES`), one runner (`runRules`)           |
-| State                   | the job view (`deriveJobView`)                                         |
-| Repository              | persisted documents                                                    |
+| Pattern                 | Where                                                                   |
+| ----------------------- | ----------------------------------------------------------------------- |
+| Facade                  | `MachineController`                                                     |
+| Protection Proxy        | `MachineGateway` principals                                             |
+| Strategy                | firmware adapters; operation kinds; probing strategies; firmware models |
+| Chain of Responsibility | machine admission, a chain of command rules                             |
+| Command                 | machine operations; workspace commands (`applyCommand`)                 |
+| Observer                | telemetry store; TanStack stores and atoms                              |
+| Rules                   | one `Rule` type, one list (`RULES`), one runner (`runRules`)            |
+| State                   | the job view (`deriveJobView`)                                          |
+| Repository              | persisted documents                                                     |
