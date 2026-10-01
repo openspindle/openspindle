@@ -30,36 +30,47 @@ export type OpenedProject = {
 type ReadProject = Pick<OpenedProject, "document" | "leftOut">
 
 /**
+ * What a file documents of the project as saved, which opening an earlier one may have changed:
+ * the NC it attaches to each procedural instruction (it documents the NC when saved, and newer
+ * versions may generate it differently), and the names of operations upgrading renamed, both
+ * by instruction id.
+ */
+type Saved = {
+  readonly nc: ReadonlyMap<string, string>
+  readonly names: ReadonlyMap<string, string>
+}
+
+/**
  * An operation's instruction: the exact NC it contributes (stored, or derived from its
  * parameters and the project's tool library `tools` for procedural kinds), or a pending entry
- * until it has NC. Opening a file takes procedural kinds' NC as the file attaches it (`saved`):
- * it documents the NC when saved, and newer versions may generate it differently.
+ * until it has NC. Opening a file documents the project as the file saved it (`saved`).
  */
 function instruction(
   plate: Plate,
   operation: Operation,
   tools: readonly Tool[],
-  saved?: ReadonlyMap<string, string>
+  saved?: Saved
 ): StepNcInstruction {
   const id = `${plate.id}/${operation.id}`
+  const name = saved?.names.get(id) ?? operation.name
   if (saved && kindOf(operation).generated) {
-    const nc = saved.get(id)
+    const nc = saved.nc.get(id)
     return nc === undefined
-      ? { kind: "pending", id, name: operation.name }
-      : { kind: "source", id, name: operation.name, nc }
+      ? { kind: "pending", id, name }
+      : { kind: "source", id, name, nc }
   }
   const resolved = resolveOperation(operation, plate, {
     kit: kitForPlate(plate),
     tools,
   })
-  if (!resolved.ok) return { kind: "pending", id, name: operation.name }
-  return { kind: "source", id, name: operation.name, nc: resolved.value.nc }
+  if (!resolved.ok) return { kind: "pending", id, name }
+  return { kind: "source", id, name, nc: resolved.value.nc }
 }
 
 /** One workplan per plate and one instruction per operation, in order. */
 function projectArchive(
   document: ProjectDocument,
-  saved?: ReadonlyMap<string, string>
+  saved?: Saved
 ): StepNcArchive {
   return {
     name: document.name,
@@ -105,21 +116,27 @@ function currentPayload(payload: Record<string, unknown>) {
 
 /**
  * An earlier project's plates in the current format: upgraded (`upgradePlate`, with the
- * project's tool library), each with the notices that brings. What it still does not recognize
- * (such as format 4's travel Z) is left for reading to leave out and report, rather than
- * rewritten field by field.
+ * project's tool library), each with the notices that brings, and the names of the operations
+ * it renamed as saved, by instruction id. What it still does not recognize (such as format 4's
+ * travel Z) is left for reading to leave out and report, rather than rewritten field by field.
  */
-function withUpgradedPlates(payload: Record<string, unknown>) {
+function withUpgradedPlates(payload: Record<string, unknown>): {
+  readonly payload: Record<string, unknown>
+  readonly savedNames: ReadonlyMap<string, string>
+} {
   const library = Array.isArray(payload.tools) ? payload.tools : []
-  if (!Array.isArray(payload.plates)) return payload
+  const savedNames = new Map<string, string>()
+  if (!Array.isArray(payload.plates)) return { payload, savedNames }
   const plates = payload.plates.map((item: unknown) => {
     if (!isJsonObject(item)) return item
-    const { plate, notices } = upgradePlate(item, library)
+    const { plate, notices, savedNames: names } = upgradePlate(item, library)
+    for (const [operationId, name] of names)
+      savedNames.set(`${String(item.id)}/${operationId}`, name)
     return notices.length && Array.isArray(plate.notices)
       ? { ...plate, notices: withNotices(plate.notices, notices) }
       : plate
   })
-  return { ...payload, plates }
+  return { payload: { ...payload, plates }, savedNames }
 }
 
 /**
@@ -146,10 +163,10 @@ function readPayload(
     )
   // Rule settings move to different paths, and probing operations take their current shape:
   // read the converted fields optimistically there.
-  const current =
+  const { payload: current, savedNames } =
     schemaVersion < PROJECT_SCHEMA_VERSION
       ? withUpgradedPlates(currentPayload(payload as Record<string, unknown>))
-      : payload
+      : { payload, savedNames: new Map<string, string>() }
   const schema =
     schemaVersion < PROJECT_SCHEMA_VERSION
       ? z.preprocess((value) => {
@@ -183,7 +200,7 @@ function readPayload(
         })
         .map((path) => describePath(current, path)),
     },
-    archive: projectArchive(read.data, saved),
+    archive: projectArchive(read.data, { nc: saved, names: savedNames }),
   }
 }
 

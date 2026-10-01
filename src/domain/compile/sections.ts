@@ -128,9 +128,10 @@ function standingHeading(
 /**
  * Ordered sections of a program (or of one line range of it). The toolpath markers of the
  * machine's CAM have priority; named CAM comments, headings standing as Fusion 360's posts
- * write them, and actual M6 blocks provide fallback boundaries. The machine's probe names its grids and touch-offs. Rapids stay with their path
- * except preparation moves immediately before a tool change. No section is inferred from
- * individual retracts, layers or feed changes.
+ * write them, and actual M6 blocks provide fallback boundaries. The machine's probing names its
+ * grids and touch-offs (`MachineProbing.sections`). Rapids stay with their path except
+ * preparation moves immediately before a tool change. No section is inferred from individual
+ * retracts, layers or feed changes.
  *
  * `keyTool` gives the number a tool change's key uses for a tool the program selects: a
  * compiled plate rewrites T words through its tool table, and keys follow the operation's own
@@ -355,7 +356,7 @@ export function buildProgramSections(
       const segmentStart = lowerSegment(line)
       push(
         "probe",
-        "Auto-level probing",
+        "Height map probing",
         line,
         line,
         activeTool,

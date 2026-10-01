@@ -60,12 +60,12 @@ function touchOnStock(subject: OperationRuleSubject): {
 }
 
 /** The stock checks of a touch point: without stock, it cannot be placed on it. */
-const AUTO_Z_HEIGHT_STOCK_CHAIN = "auto-z-height/stock"
+const AUTO_Z_HEIGHT_STOCK_CHAIN = "touch-off/stock"
 
 const zHeightFactoryAnchors: StageRule<"operation"> = {
-  id: "auto-z-height/factory-anchors",
+  id: "touch-off/factory-anchors",
   stage: "operation",
-  label: "Auto Z-height anchors read",
+  label: "Touch-off anchors read",
   description:
     "A touch point placed from the machine's factory default anchor positions lands wherever the device's own anchors differ from them.",
   severity: "warning",
@@ -83,9 +83,9 @@ const zHeightFactoryAnchors: StageRule<"operation"> = {
 }
 
 const zHeightStockUnspecified: StageRule<"operation"> = {
-  id: "auto-z-height/stock-unspecified",
+  id: "touch-off/stock-unspecified",
   stage: "operation",
-  label: "Auto Z-height stock size",
+  label: "Touch-off stock size",
   description:
     "A touch point is checked against the stock, which needs its size.",
   severity: "warning",
@@ -102,9 +102,9 @@ const zHeightStockUnspecified: StageRule<"operation"> = {
 }
 
 const pointOutsideStock: StageRule<"operation"> = {
-  id: "auto-z-height/point-outside-stock",
+  id: "touch-off/outside-stock",
   stage: "operation",
-  label: "Auto Z-height point on the stock",
+  label: "Touch-off point on the stock",
   description:
     "An anchored touch point off the stock sets work Z on another surface.",
   severity: "warning",
@@ -124,11 +124,11 @@ const pointOutsideStock: StageRule<"operation"> = {
 }
 
 const zHeightBeforeAutoLevel: StageRule<"operation"> = {
-  id: "auto-z-height/before-auto-level",
+  id: "touch-off/before-grid",
   stage: "operation",
-  label: "Auto Z-height after auto-level",
+  label: "Touch-off after the probe grid",
   description:
-    "Work Z set before an auto-level is exact only where the auto-level's grid starts.",
+    "Work Z set before a probe grid is exact only where the grid starts.",
   severity: "warning",
   configurable: false,
   test: ({ operation, plate, kit }) => {
@@ -142,7 +142,7 @@ const zHeightBeforeAutoLevel: StageRule<"operation"> = {
   },
   explain: ({ first }) => ({
     problem:
-      "A later auto-level measures heights from its grid's first point, so work Z is off by any height difference between that point and this one. Move Auto Z-height after Auto-level, or probe where the grid starts.",
+      "A later probe grid measures heights from its first point, so work Z is off by any height difference between that point and this one. Move the touch-off after the probe grid, or probe where the grid starts.",
     about: operationSubject(first.operation.id),
   }),
   fixes: editOperation,

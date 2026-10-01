@@ -359,7 +359,7 @@ function checkProbe(
   tool: { kind: string; probe: ProbeProfile | null },
   context: z.RefinementCtx
 ) {
-  if (tool.probe !== null && !isProbeKind(tool.kind))
+  if (tool.probe !== null && !isProbe(tool))
     context.addIssue({
       code: "custom",
       path: ["probe"],
@@ -433,22 +433,23 @@ export const toolKindKey = (kind: string) =>
     .replace(/[-_\s]+/g, " ")
     .trim()
 
-/** Whether a tool type is the probe's, compared loosely ({@link toolKindKey}). */
-const isProbeKind = (kind: string) => toolKindKey(kind) === "probe"
+/** Whether a tool is a probe, its type compared loosely like any other ({@link toolKindKey}). */
+export const isProbe = (tool: { readonly kind: string }) =>
+  toolKindKey(tool.kind) === "probe"
 
 /**
  * The profile a tool of a type starts with: a probe touches along Z only and carries no
  * pointer, which any touch probe can do; any other tool has none.
  */
 export function defaultProbeProfile(kind: string): ProbeProfile | null {
-  return isProbeKind(kind) ? { touch: "z", pointer: false } : null
+  return isProbe({ kind }) ? { touch: "z", pointer: false } : null
 }
 
 /** A probe's profile; null for any other tool, and for a probe of unknown profile. */
 export function probeProfile(
   tool: Pick<ToolDraft, "kind" | "probe">
 ): ProbeProfile | null {
-  return isProbeKind(tool.kind) ? tool.probe : null
+  return isProbe(tool) ? tool.probe : null
 }
 
 /** Structural problems if there are any, otherwise physical inconsistencies. */

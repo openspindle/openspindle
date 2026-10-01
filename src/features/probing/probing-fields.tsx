@@ -202,7 +202,7 @@ export function SwitchField({
   )
 }
 
-/** A numeric field of a probing form on its own row, as the machine's probe describes it. */
+/** A numeric field of a probing form on its own row, as its strategy's parameter describes it. */
 export function ParameterField({
   id,
   parameter,

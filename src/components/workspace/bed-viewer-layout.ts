@@ -94,7 +94,7 @@ export function plateStockBounds(plate: ViewerPlate): ViewerBounds | null {
 export const plateKit = (plate: Pick<ViewerPlate, "deviceId" | "fixtures">) =>
   kitForSetup({ deviceId: plate.deviceId, fixtures: plate.fixtures ?? [] })
 
-/** The grids a plate's program probes, as its machine's probe reads them, on the bed. */
+/** The grids a plate's program probes, as its machine's probing reads them, on the bed. */
 export function plateProbeGrids(
   plate: Pick<ViewerPlate, "program" | "anchorSetup" | "deviceId" | "fixtures">
 ): ProbeGrid<"probe" | "bed">[] {

@@ -1,7 +1,7 @@
 import { readNcBlock } from "@/machine/contract"
 import type { RuleFixes } from "@/machine/contract"
 import type { ProgramTool } from "@/domain/nc/cam-markers"
-import { toolKindKey } from "@/domain/tools/tool"
+import { isProbe, toolKindKey } from "@/domain/tools/tool"
 import type { Tool } from "@/domain/tools/tool"
 import { toolSubject } from "../diagnostics"
 import type { QuickFix } from "../diagnostics"
@@ -25,10 +25,8 @@ export const isProbeSlot = (number: number | null) =>
 const slotName = (number: number | null) =>
   number === PROBE_3D_TOOL ? "3D probe" : "probe"
 
-/** Whether a tool is the probe, compared loosely like any other kind ({@link toolKindKey}). */
-export function isProbe(tool: { readonly kind: string }): boolean {
-  return toolKindKey(tool.kind) === toolKindKey("probe")
-}
+// Which tools fill a probe slot (`isProbeSlot`), asked of the tool itself.
+export { isProbe }
 
 /** Distinct tool numbers an NC program selects. Comments and M117 text never count. */
 export function collectToolWords(nc: string): number[] {
@@ -54,7 +52,8 @@ export function localTools(nc: string): (number | null)[] {
   return words.length ? words : [null]
 }
 
-function lowestFree(used: ReadonlySet<number | null>): number {
+/** The lowest tool number from 1 that `used` does not hold. */
+export function lowestFree(used: ReadonlySet<number | null>): number {
   let number = 1
   while (used.has(number)) number++
   return number

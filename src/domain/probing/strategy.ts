@@ -9,7 +9,6 @@
 import type { PlateMachining } from "../compile/toolpath-bounds"
 import type { Issue } from "../diagnostics"
 import type { GCodeProgram } from "../nc/gcode"
-import type { ResolveContext } from "../operations/kinds"
 import type { ProbingSource, ProbingSourceOf } from "../operations/operation"
 import type { Plate } from "../plate/plate"
 import type { ProbeProfile, Tool } from "../tools/tool"
@@ -17,6 +16,7 @@ import type { ParameterSpecs, SpecReads } from "./parameters"
 import type { AnchorStart } from "./placement"
 import type { ProbeGrid, ProbeTouch } from "./preview"
 import type { ProbeProgram, ProbingSections } from "./probe"
+import type { GenericSpecs } from "./generic/specs"
 import type { GridSpecs } from "./tasks/grid/params"
 import type { OriginSpecs } from "./tasks/origin/params"
 import type { OutlineSpecs } from "./tasks/outline/params"
@@ -58,7 +58,6 @@ export type StrategyInput<TParams> = {
   readonly plate: Plate
   readonly probe: BoundProbe
   readonly machine: MachineProbing
-  readonly context: ResolveContext
   /** Where the plate's other operations cut, measured only if the strategy reads it. */
   readonly machining: PlateMachining
 }
@@ -88,6 +87,12 @@ export interface ProbingStrategy<
    * (`MachineProbing.probes`).
    */
   accepts: (probe: ProbeProfile, machine: MachineProbing) => boolean
+  /**
+   * Why it cannot probe with a probe tool it accepts, such as a ball it does not take, naming the
+   * tool and `number`, the plate's table entry that holds it; null where it can. Assigning another
+   * tool there, or correcting this one in the tool library, fixes it.
+   */
+  refuses?: (tool: Tool, number: number | null) => string | null
   /**
    * Why it cannot run on this plate, whatever its settings, as picking it shows; null where it
    * can. Not a rule: generating its NC still fails on its own where it cannot.
@@ -152,8 +157,8 @@ export interface MachineProbing {
   /** The T number the firmware needs a probe with this profile in; null where any number goes. */
   slot: (profile: ProbeProfile) => number | null
   readonly nc: ProbingNc
-  /** The machine's ranges and defaults for the generic strategies, by strategy id. */
-  readonly specs: Readonly<Record<string, ParameterSpecs>>
+  /** The machine's ranges and defaults for the generic strategies it runs, by strategy id. */
+  readonly specs: Partial<GenericSpecs>
   /** Strategies of the machine's firmware, offered besides the generic ones. */
   readonly strategies: readonly TaskStrategy[]
   /** How its NC reads as probing in a program's sections. */

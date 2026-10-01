@@ -11,7 +11,7 @@ import { jobSessionStore } from "./job-session"
 import type { JobViewOf } from "./job-view"
 
 /**
- * The auto-level review: reads the probed height map once per pause, keeps it in the
+ * The height map review: reads the probed height map once per pause, keeps it in the
  * workspace, and hands the result to the presentational panel. Resume and Stop are in the
  * job's toolbar.
  */

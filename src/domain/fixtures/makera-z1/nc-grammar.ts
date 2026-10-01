@@ -160,11 +160,11 @@ function probeGrid(
     !absolute
   )
     return fail(
-      "Rectangular probing requires an auto-level operation, active T0, a stopped spindle and G21 G90."
+      "Rectangular probing requires a height-map operation, active T0, a stopped spindle and G21 G90."
     )
   if (gCodes.length !== 1 || grids >= 1)
     return fail(
-      "An auto-level operation must contain one explicit rectangular G32 grid."
+      "A height-map operation must contain one explicit rectangular G32 grid."
     )
   const values = probeFields(words, [
     "N",
@@ -227,7 +227,7 @@ function touchProbe(
     absolute
   )
     return fail(
-      "Touch probing requires an auto Z-height operation, active T0, a stopped spindle and G21 G91."
+      "Touch probing requires a touch-off operation, active T0, a stopped spindle and G21 G91."
     )
   const values = probeFields(words, ["N", "G", "Z", "F"])
   if (!values) return fail(FIELDS)
@@ -271,7 +271,7 @@ function firmwareProbe(
     mCodes.length !== 1
   )
     return fail(
-      "The firmware's probing (M495) requires an auto-level or auto Z-height operation, active T0, a stopped spindle and G21 G90."
+      "The firmware's probing (M495) requires a height-map or touch-off operation, active T0, a stopped spindle and G21 G90."
     )
   const values = probeFields(
     words,
@@ -367,7 +367,7 @@ function workZ(
     !absolute
   )
     return fail(
-      "Setting work Z requires an auto Z-height operation that has touched the surface with active T0, and G21 G90."
+      "Setting work Z requires a touch-off operation that has touched the surface with active T0, and G21 G90."
     )
   const values = probeFields(words, ["N", "G", "L", "P", "Z"])
   if (!values) return fail(FIELDS)

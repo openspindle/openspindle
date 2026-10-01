@@ -9,6 +9,7 @@ import type {
 } from "../operations/operation"
 import type { Plate } from "../plate/plate"
 import { probeProfile } from "../tools/tool"
+import { lowestFree } from "../tools/tool-table"
 import type { ProbeProfile, Tool } from "../tools/tool"
 import { OUTLINE_TRACE } from "./generic/outline-trace"
 import { SURFACE_TOUCH } from "./generic/surface-touch"
@@ -172,13 +173,6 @@ export function strategyReads<TTask extends ProbingTask>(
   >
 }
 
-/** The lowest tool number from 1 the plate's table does not hold. */
-function lowestFree(plate: Plate): number {
-  let number = 1
-  while (plate.tools.some((tool) => tool.number === number)) number++
-  return number
-}
-
 /**
  * A new probing operation with a library probe and one of the strategies it runs on the plate's
  * machine: named after the strategy, with its defaults fitted to the plate, selecting the probe
@@ -199,7 +193,7 @@ export function newProbingOperation(
   const probe =
     (profile && machine.slot(profile)) ??
     tool.postProcess.number ??
-    lowestFree(plate)
+    lowestFree(new Set(plate.tools.map((entry) => entry.number)))
   const source = {
     kind: "probing" as const,
     task: strategy.task,
@@ -215,32 +209,4 @@ export function newProbingOperation(
     operation: createOperation(strategy.label, source),
     preferredTools: new Map([[probe, tool.id]]),
   }
-}
-
-/**
- * The library probe a new operation of a strategy would probe with: one it runs with on the
- * machine (`runsWith`), preferring the probe the plate's table already holds where the machine
- * needs it; null when the library has none.
- */
-export function preferredProbe(
-  strategy: TaskStrategy,
-  machine: MachineProbing,
-  library: readonly Tool[],
-  plate: Plate | null
-): Tool | null {
-  const runs = library.filter((tool) => {
-    const profile = probeProfile(tool)
-    return profile !== null && runsWith(strategy, profile, machine)
-  })
-  const held = (tool: Tool) => {
-    const profile = probeProfile(tool)
-    const slot = profile && machine.slot(profile)
-    return (
-      slot !== null &&
-      !!plate?.tools.some(
-        (entry) => entry.number === slot && entry.toolId === tool.id
-      )
-    )
-  }
-  return runs.find(held) ?? runs.at(0) ?? null
 }

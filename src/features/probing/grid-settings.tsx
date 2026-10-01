@@ -25,7 +25,7 @@ import type { AnchorPlacement } from "@/domain/probing/placement"
 
 export type GridSettingsProps = {
   value: GridParams
-  /** The grid's parameters on the machine's probe: defaults, ranges and descriptions. */
+  /** The grid's parameters with its strategy on the plate's machine: defaults, ranges and descriptions. */
   parameters: GridSpecs
   /** Stored anchors of the plate's device that the grid can start from. */
   anchors: readonly ProbingAnchorOption[]

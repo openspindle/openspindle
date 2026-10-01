@@ -40,7 +40,7 @@ export type CompiledSection = ProgramSection & {
 export type PausePoint = {
   readonly line: number
   readonly operationId: string
-  /** stop-before: the operation's Stop before; review: an auto-level review; program: M0/M1 in the NC. */
+  /** stop-before: the operation's Stop before; review: a height map review; program: M0/M1 in the NC. */
   readonly reason: "stop-before" | "review" | "program"
 }
 

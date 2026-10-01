@@ -30,7 +30,7 @@ function probingStart({
 }
 
 const probe3dFactoryAnchors: StageRule<"operation"> = {
-  id: "probe-3d/factory-anchors",
+  id: "origin/factory-anchors",
   stage: "operation",
   label: "3D probing anchors read",
   description:
@@ -50,18 +50,18 @@ const probe3dFactoryAnchors: StageRule<"operation"> = {
 }
 
 /**
- * A routine that sets work Z does so as auto Z-height does, from the position without height
- * compensation, while a later auto-level measures heights from its grid's first point: work Z is
- * exact after auto-level, and before it only where the grid starts. A grid from the probe
+ * A routine that sets work Z does so as a touch-off does, from the position without height
+ * compensation, while a later probe grid measures heights from its first point: work Z is exact
+ * after the grid, and before it only where the grid starts. A grid from the probe
  * position does not start there even right after it, as the routine leaves the probe over what
  * it found rather than over the top it touched.
  */
 const probe3dBeforeAutoLevel: StageRule<"operation"> = {
-  id: "probe-3d/before-auto-level",
+  id: "origin/before-grid",
   stage: "operation",
-  label: "3D probing after auto-level",
+  label: "3D probing after the probe grid",
   description:
-    "Work Z set by 3D probing before an auto-level is exact only where the auto-level's grid starts.",
+    "Work Z set by 3D probing before a probe grid is exact only where the grid starts.",
   severity: "warning",
   configurable: false,
   test: ({ operation, plate, kit }) => {
@@ -81,7 +81,7 @@ const probe3dBeforeAutoLevel: StageRule<"operation"> = {
   },
   explain: ({ first }) => ({
     problem:
-      "A later auto-level measures heights from its grid's first point, so work Z is off by any height difference between that point and the top this probing touches. Move 3D probing after Auto-level, or probe where the grid starts.",
+      "A later probe grid measures heights from its first point, so work Z is off by any height difference between that point and the top this probing touches. Move the 3D probing after the probe grid, or probe where the grid starts.",
     about: operationSubject(first.operation.id),
   }),
   fixes: editOperation,

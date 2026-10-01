@@ -185,7 +185,7 @@ export function workOriginOnMachine(setup: PlateSetup): MachineOrigin | null {
 /**
  * The NC that puts the machine's work X and Y on a work origin kept relative to an anchor, run
  * before the program's operations: its machine kit's (`FixtureKit.workOffsetNc`). Z stays: the
- * work zero set on Device, or an auto Z-height touch-off, sets it. Empty in bed coordinates.
+ * work zero set on Device, or a probing touch-off, sets it. Empty in bed coordinates.
  */
 export function workOriginNc(
   setup: PlateSetup,
