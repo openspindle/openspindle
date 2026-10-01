@@ -16,15 +16,15 @@ import {
   PROBE_3D_ROUTINES,
   PROBE_3D_ROUTINE_LABELS,
   findsCorner,
-  probe3dFields,
-  probe3dParamsSchema,
-} from "@/domain/probe-3d/params"
+  originFields,
+  originParamsSchema,
+} from "@/domain/probing/tasks/origin/params"
 import type {
   Probe3dAxes,
-  Probe3dSpecs,
-  Probe3dParams,
+  OriginSpecs,
+  OriginParams,
   Probe3dRoutine,
-} from "@/domain/probe-3d/params"
+} from "@/domain/probing/tasks/origin/params"
 import {
   ParameterField,
   PlacementFields,
@@ -39,14 +39,14 @@ import type { ProbingAnchorOption } from "@/features/probing/probing-form"
 import type { ParameterSpec } from "@/domain/probing/parameters"
 import type { AnchorPlacement } from "@/domain/probing/placement"
 
-export type Probe3dSettingsProps = {
-  value: Probe3dParams
+export type OriginSettingsProps = {
+  value: OriginParams
   /** The routine's parameters on the machine's 3D probe: defaults, ranges and descriptions. */
-  parameters: Probe3dSpecs
+  parameters: OriginSpecs
   /** Stored anchors of the plate's device that the start can be relative to. */
   anchors: readonly ProbingAnchorOption[]
   /** Receives complete, valid parameters as soon as an edit makes them valid. */
-  onChange: (value: Probe3dParams) => void
+  onChange: (value: OriginParams) => void
   disabled?: boolean
 }
 
@@ -67,7 +67,7 @@ const AXES_OPTIONS = PROBE_3D_AXES.map((value) => ({
 type NumericPath = "ballDiameter" | "distance[0]" | "distance[1]" | "depth"
 
 /** What the routine touches and sets. */
-function routineDescription({ routine }: Probe3dParams) {
+function routineDescription({ routine }: OriginParams) {
   switch (routine) {
     case "outside-corner":
       return "Touches the top, then the two sides at the corner, of the stock or anything else on the bed, and sets work X0 Y0 at the corner and Z0 on the top."
@@ -84,16 +84,16 @@ function routineDescription({ routine }: Probe3dParams) {
  * Parameters of a built-in 3D probing operation. Edits apply as soon as the parameters are
  * valid; invalid input stays in the form with its errors and is never passed on.
  */
-export function Probe3dSettings({
+export function OriginSettings({
   value,
   parameters,
   anchors,
   onChange,
   disabled = false,
-}: Probe3dSettingsProps) {
+}: OriginSettingsProps) {
   const draft = useProbingDraft(value, onChange)
   return (
-    <Probe3dForm
+    <OriginForm
       key={draft.key}
       value={value}
       parameters={parameters}
@@ -104,22 +104,22 @@ export function Probe3dSettings({
   )
 }
 
-function Probe3dForm({
+function OriginForm({
   value,
   parameters,
   anchors,
   onChange,
   disabled,
-}: Required<Probe3dSettingsProps>) {
+}: Required<OriginSettingsProps>) {
   const id = useId()
-  const schema = probe3dParamsSchema(parameters)
+  const schema = originParamsSchema(parameters)
   // Switching back from the probe position restores the anchor settings.
   const [lastAnchor, setLastAnchor] = useState<AnchorPlacement | null>(null)
   const form = useProbingForm(value, schema, onChange)
   // A field the routine or its axes hide takes back its last valid value, as the form passes on
   // only valid parameters: a hidden error would hold back every later edit.
   const hide = (routine: Probe3dRoutine, axes: Probe3dAxes) => {
-    const shown = probe3dFields(routine, axes)
+    const shown = originFields(routine, axes)
     const restore = (
       path: NumericPath,
       { min, max }: ParameterSpec,
@@ -141,7 +141,7 @@ function Probe3dForm({
     <FieldGroup>
       <form.Subscribe selector={(state) => state.values}>
         {(values) => {
-          const shown = probe3dFields(values.routine, values.axes)
+          const shown = originFields(values.routine, values.axes)
           return (
             <FieldSet>
               <FieldLegend>Routine</FieldLegend>

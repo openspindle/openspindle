@@ -23,11 +23,11 @@ import type { OperationOf } from "@/domain/operations/kinds"
 import type { NcOrigin, OperationSource } from "@/domain/operations/operation"
 import type { Plate } from "@/domain/plate/plate"
 import { localTools } from "@/domain/tools/tool-table"
-import { AutoLevelSettings } from "@/features/auto-level/auto-level-settings"
-import { AutoScanSettings } from "@/features/auto-scan/auto-scan-settings"
-import { AutoZHeightSettings } from "@/features/auto-z-height/auto-z-height-settings"
+import { GridSettings } from "@/features/probing/grid-settings"
+import { OutlineSettings } from "@/features/probing/outline-settings"
+import { TouchOffSettings } from "@/features/probing/touch-off-settings"
 import { useFusionUpdate } from "@/features/fusion360/use-fusion-update"
-import { Probe3dSettings } from "@/features/probe-3d/probe-3d-settings"
+import { OriginSettings } from "@/features/probing/origin-settings"
 import type { WorkAreaFit } from "@/features/probing/probing-form"
 import { PluginFrame } from "@/features/plugins/plugin-frame"
 import { TemplateForm } from "@/features/plugins/template-form"
@@ -282,7 +282,7 @@ function AutoLevelEditor({ plate, operation }: EditorProps<"auto-level">) {
   // Without a probe the operation has no settings; its diagnostic above says why.
   if (!grid) return null
   return (
-    <AutoLevelSettings
+    <GridSettings
       key={operation.id}
       value={operation.source.params}
       parameters={grid.parameters}
@@ -300,7 +300,7 @@ function AutoZHeightEditor({ plate, operation }: EditorProps<"auto-z-height">) {
   // Without a probe the operation has no settings; its diagnostic above says why.
   if (!touchOff) return null
   return (
-    <AutoZHeightSettings
+    <TouchOffSettings
       key={operation.id}
       value={operation.source.params}
       parameters={touchOff.parameters}
@@ -318,7 +318,7 @@ function AutoScanEditor({ plate, operation }: EditorProps<"auto-scan">) {
   // Without a pointer the operation has no settings; its diagnostic above says why.
   if (!trace) return null
   return (
-    <AutoScanSettings
+    <OutlineSettings
       key={operation.id}
       value={operation.source.params}
       parameters={trace.parameters}
@@ -335,7 +335,7 @@ function Probe3dEditor({ plate, operation }: EditorProps<"probe-3d">) {
   // Without a 3D probe the operation has no settings; its diagnostic above says why.
   if (!probing) return null
   return (
-    <Probe3dSettings
+    <OriginSettings
       key={operation.id}
       value={operation.source.params}
       parameters={probing.parameters}

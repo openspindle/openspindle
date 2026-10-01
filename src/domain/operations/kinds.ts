@@ -1,24 +1,30 @@
 import type { AnchorConfiguration } from "@/machine/contract"
-import { plateAutoLevelParams } from "../auto-level/fit"
-import { generateAutoLevelNc } from "../auto-level/generate"
-import type { AutoLevelIssueCode } from "../auto-level/issues"
-import { autoLevelRunIssues, validateAutoLevel } from "../auto-level/rules"
-import { generateAutoScanNc } from "../auto-scan/generate"
-import { outlineStockIssues, scanOrderIssues } from "../auto-scan/rules"
-import { plateAutoZHeightParams } from "../auto-z-height/fit"
-import { generateAutoZHeightNc } from "../auto-z-height/generate"
+import { plateGridParams } from "../probing/tasks/grid/fit"
+import { generateGridNc } from "../probing/tasks/grid/generate"
+import type { GridIssueCode } from "../probing/tasks/grid/issues"
+import { gridRunIssues, validateGrid } from "../probing/tasks/grid/rules"
+import { generateOutlineNc } from "../probing/tasks/outline/generate"
 import {
-  autoLevelOrderIssues,
-  validateAutoZHeight,
-} from "../auto-z-height/rules"
+  outlineStockIssues,
+  outlineOrderIssues,
+} from "../probing/tasks/outline/rules"
+import { plateTouchOffParams } from "../probing/tasks/touch-off/fit"
+import { generateTouchOffNc } from "../probing/tasks/touch-off/generate"
+import {
+  gridOrderIssues,
+  validateTouchOff,
+} from "../probing/tasks/touch-off/rules"
 import type {
-  AutoZHeightIssueCode,
-  LaterAutoLevel,
-} from "../auto-z-height/rules"
-import { generateProbe3dNc } from "../probe-3d/generate"
-import { defaultProbe3dParams } from "../probe-3d/params"
-import { probe3dOrderIssues, validateProbe3d } from "../probe-3d/rules"
-import type { Probe3dIssueCode } from "../probe-3d/rules"
+  TouchOffIssueCode,
+  LaterGrid,
+} from "../probing/tasks/touch-off/rules"
+import { generateOriginNc } from "../probing/tasks/origin/generate"
+import { defaultOriginParams } from "../probing/tasks/origin/params"
+import {
+  originOrderIssues,
+  validateOrigin,
+} from "../probing/tasks/origin/rules"
+import type { OriginIssueCode } from "../probing/tasks/origin/rules"
 import { error, operationSubject } from "../diagnostics"
 import type { Diagnostic, Issue, QuickFix } from "../diagnostics"
 import { kitForPlate } from "../fixtures/catalog"
@@ -205,7 +211,7 @@ const unsupported = (operation: Operation, what: string): Diagnostic =>
   )
 
 /** Issues that block generating the NC; the compiler reports those already. */
-const GENERATION_BLOCKERS: ReadonlySet<AutoLevelIssueCode> = new Set([
+const GENERATION_BLOCKERS: ReadonlySet<GridIssueCode> = new Set([
   "invalid-parameters",
   "anchor-snapshot-missing",
   "anchor-unavailable",
@@ -352,13 +358,13 @@ const autoLevelKind = probingKind({
   lacking: "probe",
   invalid: "the probe grid is invalid.",
   anchored: ({ source }) => source.params.placement.kind === "anchor",
-  defaults: (plate, grid) => plateAutoLevelParams(plate, grid.parameters),
+  defaults: (plate, grid) => plateGridParams(plate, grid.parameters),
   generate: ({ source }, plate, grid) =>
-    generateAutoLevelNc(source.params, placementContext(plate), grid),
+    generateGridNc(source.params, placementContext(plate), grid),
   validate: (operation, plate, kit) => {
     const grid = offering(kit.probes, "grid")?.capability
     if (!grid) return []
-    return validateAutoLevel(
+    return validateGrid(
       operation.source.params,
       {
         ...placementContext(plate),
@@ -371,7 +377,7 @@ const autoLevelKind = probingKind({
       .map((issue) => issueDiagnostic("auto-level", issue, operation))
   },
   runChecks: (operation, plate, machine) =>
-    autoLevelRunIssues(
+    gridRunIssues(
       operation.source.params,
       placementContext(plate),
       machine
@@ -379,7 +385,7 @@ const autoLevelKind = probingKind({
 })
 
 /** Issues that block generating the touch-off NC; the compiler reports those already. */
-const TOUCH_OFF_BLOCKERS: ReadonlySet<AutoZHeightIssueCode> = new Set([
+const TOUCH_OFF_BLOCKERS: ReadonlySet<TouchOffIssueCode> = new Set([
   "invalid-parameters",
   "anchor-snapshot-missing",
   "anchor-unavailable",
@@ -387,7 +393,7 @@ const TOUCH_OFF_BLOCKERS: ReadonlySet<AutoZHeightIssueCode> = new Set([
 ])
 
 /** The auto-levels after an operation, which measure their heights from their own grid start. */
-function laterAutoLevels(plate: Plate, operation: Operation): LaterAutoLevel[] {
+function laterAutoLevels(plate: Plate, operation: Operation): LaterGrid[] {
   const index = plate.operations.findIndex((item) => item.id === operation.id)
   if (index < 0) return []
   return plate.operations.slice(index + 1).flatMap((later, offset) =>
@@ -409,14 +415,14 @@ const autoZHeightKind = probingKind({
   lacking: "probe",
   invalid: "the touch-off is invalid.",
   defaults: (plate, touchOff) =>
-    plateAutoZHeightParams(plate, touchOff.parameters),
+    plateTouchOffParams(plate, touchOff.parameters),
   generate: ({ source }, plate, touchOff) =>
-    generateAutoZHeightNc(source.params, placementContext(plate), touchOff),
+    generateTouchOffNc(source.params, placementContext(plate), touchOff),
   validate: (operation, plate, kit) => {
     const touchOff = offering(kit.probes, "touch-off")?.capability
     if (!touchOff) return []
     return [
-      ...validateAutoZHeight(
+      ...validateTouchOff(
         operation.source.params,
         {
           ...placementContext(plate),
@@ -425,14 +431,14 @@ const autoZHeightKind = probingKind({
         },
         touchOff.parameters
       ).filter((issue) => !TOUCH_OFF_BLOCKERS.has(issue.code)),
-      ...autoLevelOrderIssues(
+      ...gridOrderIssues(
         operation.source.params,
         laterAutoLevels(plate, operation)
       ),
     ].map((issue) => issueDiagnostic("auto-z-height", issue, operation))
   },
   runChecks: (operation, plate, machine) =>
-    autoLevelRunIssues(
+    gridRunIssues(
       operation.source.params,
       placementContext(plate),
       machine
@@ -451,7 +457,7 @@ const autoScanKind = probingKind({
   }),
   // The outline is the plate's other operations' toolpath bounds, so it never goes stale.
   generate: ({ source }, plate, trace, { kit }) =>
-    generateAutoScanNc(
+    generateOutlineNc(
       source.params,
       toolpathBoundsOf(machiningPrograms(plate, kit)),
       trace
@@ -465,13 +471,13 @@ const autoScanKind = probingKind({
       .some((item) => operationPhase(item) !== "setup")
     return [
       ...(toolpath.ok ? outlineStockIssues(toolpath.bounds, plate.setup) : []),
-      ...scanOrderIssues(machiningBefore),
+      ...outlineOrderIssues(machiningBefore),
     ].map((issue) => issueDiagnostic("auto-scan", issue, operation))
   },
 })
 
 /** Issues that block generating the 3D probing NC; the compiler reports those already. */
-const PROBE_3D_BLOCKERS: ReadonlySet<Probe3dIssueCode> = new Set([
+const PROBE_3D_BLOCKERS: ReadonlySet<OriginIssueCode> = new Set([
   "invalid-parameters",
   "anchor-snapshot-missing",
   "anchor-unavailable",
@@ -484,24 +490,24 @@ const probe3dKind = probingKind({
   capability: "origin",
   lacking: "3D probe",
   invalid: "the probing is invalid.",
-  defaults: (_plate, probing) => defaultProbe3dParams(probing.parameters),
+  defaults: (_plate, probing) => defaultOriginParams(probing.parameters),
   generate: ({ source }, plate, probing) =>
-    generateProbe3dNc(source.params, placementContext(plate), probing),
+    generateOriginNc(source.params, placementContext(plate), probing),
   validate: (operation, plate, kit) => {
     const probing = offering(kit.probes, "origin")?.capability
     if (!probing) return []
     const { params } = operation.source
     return [
-      ...validateProbe3d(
+      ...validateOrigin(
         params,
         placementContext(plate),
         probing.parameters
       ).filter((issue) => !PROBE_3D_BLOCKERS.has(issue.code)),
-      ...probe3dOrderIssues(params, laterAutoLevels(plate, operation)),
+      ...originOrderIssues(params, laterAutoLevels(plate, operation)),
     ].map((issue) => issueDiagnostic("probe-3d", issue, operation))
   },
   runChecks: (operation, plate, machine) =>
-    autoLevelRunIssues(
+    gridRunIssues(
       operation.source.params,
       placementContext(plate),
       machine

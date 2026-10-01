@@ -1,16 +1,16 @@
-import { autoLevelOrderIssues } from "../auto-z-height/rules"
-import type { LaterAutoLevel } from "../auto-z-height/rules"
-import { issueOf } from "../diagnostics"
-import type { Issue } from "../diagnostics"
-import { cornerInward, probe3dParamsSchema, setsWorkZ } from "./params"
-import type { Probe3dSpecs, Probe3dParams } from "./params"
-import type { Vec2 } from "../geometry/frame"
-import { roundMillimetres } from "../geometry/millimetres"
-import { placementHeight, resolvePlacement } from "../probing/placement"
-import type { PlacementContext, PlacementFailure } from "../probing/placement"
-import type { OriginPlan } from "../probing/probe"
+import { gridOrderIssues } from "../touch-off/rules"
+import type { LaterGrid } from "../touch-off/rules"
+import { issueOf } from "../../../diagnostics"
+import type { Issue } from "../../../diagnostics"
+import { cornerInward, originParamsSchema, setsWorkZ } from "./params"
+import type { OriginSpecs, OriginParams } from "./params"
+import type { Vec2 } from "../../../geometry/frame"
+import { roundMillimetres } from "../../../geometry/millimetres"
+import { placementHeight, resolvePlacement } from "../../placement"
+import type { PlacementContext, PlacementFailure } from "../../placement"
+import type { OriginPlan } from "../../probe"
 
-export type Probe3dIssueCode =
+export type OriginIssueCode =
   // Parameters
   | "invalid-parameters"
   // Anchor placement against the plate's anchor snapshot
@@ -22,26 +22,26 @@ export type Probe3dIssueCode =
   | "before-auto-level"
 
 /** Errors block NC generation or Run; warnings inform without blocking. */
-export type Probe3dIssue = Issue<Probe3dIssueCode>
+export type OriginIssue = Issue<OriginIssueCode>
 
-const probeError = issueOf<Probe3dIssueCode>("error")
-const probeWarning = issueOf<Probe3dIssueCode>("warning")
+const probeError = issueOf<OriginIssueCode>("error")
+const probeWarning = issueOf<OriginIssueCode>("warning")
 
 type Checked<TValue> =
-  ({ ok: true } & TValue) | { ok: false; issues: Probe3dIssue[] }
+  ({ ok: true } & TValue) | { ok: false; issues: OriginIssue[] }
 /** Parameters and start that generation can render, or what blocks it. */
-export type Probe3dPlan = Checked<OriginPlan>
+export type PlannedOrigin = Checked<OriginPlan>
 
 /**
  * Everything that prevents generating NC: the parameters, within the ranges of the machine's
  * 3D probe (`parameters`), then the anchored start.
  */
-export function planProbe3d(
-  params: Probe3dParams,
+export function planOrigin(
+  params: OriginParams,
   plate: PlacementContext,
-  parameters: Probe3dSpecs
-): Probe3dPlan {
-  const parsed = probe3dParamsSchema(parameters).safeParse(params)
+  parameters: OriginSpecs
+): PlannedOrigin {
+  const parsed = originParamsSchema(parameters).safeParse(params)
   if (!parsed.success)
     return {
       ok: false,
@@ -64,8 +64,8 @@ export function planProbe3d(
  * the distance in from an outside corner, over its top, as far out over the top from an inside
  * corner, and over the middle of a pocket or boss.
  */
-export function probe3dStartOffset(
-  params: Pick<Probe3dParams, "routine" | "corner" | "distance">
+export function originStartOffset(
+  params: Pick<OriginParams, "routine" | "corner" | "distance">
 ): Vec2 {
   const [inX, inY] = cornerInward(params.corner)
   const [halfX, halfY] = params.distance.map((value) =>
@@ -82,12 +82,12 @@ export function probe3dStartOffset(
 }
 
 /** Issues to show while editing: generation blockers and anchor provenance. */
-export function validateProbe3d(
-  params: Probe3dParams,
+export function validateOrigin(
+  params: OriginParams,
   plate: PlacementContext,
-  parameters: Probe3dSpecs
-): Probe3dIssue[] {
-  const plan = planProbe3d(params, plate, parameters)
+  parameters: OriginSpecs
+): OriginIssue[] {
+  const plan = planOrigin(params, plate, parameters)
   if (!plan.ok) return plan.issues
   const { start } = plan
   if (start.kind !== "anchor" || start.source !== "factory") return []
@@ -106,13 +106,13 @@ export function validateProbe3d(
  * position does not start there even right after it, as the routine leaves the probe over what
  * it found rather than over the top it touched.
  */
-export function probe3dOrderIssues(
-  params: Pick<Probe3dParams, "routine" | "placement">,
-  later: readonly LaterAutoLevel[]
-): Probe3dIssue[] {
+export function originOrderIssues(
+  params: Pick<OriginParams, "routine" | "placement">,
+  later: readonly LaterGrid[]
+): OriginIssue[] {
   if (!setsWorkZ(params.routine)) return []
   const moved = later.map((grid) => ({ ...grid, adjacent: false }))
-  return autoLevelOrderIssues(params, moved).map(() =>
+  return gridOrderIssues(params, moved).map(() =>
     probeWarning(
       "before-auto-level",
       "A later auto-level measures heights from its grid's first point, so work Z is off by any height difference between that point and the top this probing touches. Move 3D probing after Auto-level, or probe where the grid starts."
@@ -120,7 +120,7 @@ export function probe3dOrderIssues(
   )
 }
 
-const PLACEMENT_ISSUES: Readonly<Record<PlacementFailure, Probe3dIssue>> = {
+const PLACEMENT_ISSUES: Readonly<Record<PlacementFailure, OriginIssue>> = {
   "anchor-snapshot-missing": probeError(
     "anchor-snapshot-missing",
     "Select an anchor snapshot for this plate's device."

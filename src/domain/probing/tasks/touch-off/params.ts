@@ -1,13 +1,13 @@
 import { z } from "zod"
-import { COORDINATE_LIMIT } from "../primitives"
-import type { SpecsOf } from "../probing/parameters"
-import { ProbePlacementSchema } from "../probing/placement"
+import { COORDINATE_LIMIT } from "../../../primitives"
+import type { SpecsOf } from "../../parameters"
+import { ProbePlacementSchema } from "../../placement"
 
 /** The touch-off parameters that a machine's probe gives ranges and defaults. */
-export type AutoZHeightField = "probeTravel" | "clearance"
+export type TouchOffField = "probeTravel" | "clearance"
 
 /** A machine's touch-off parameters, which its probe defines (`TouchOff.parameters`). */
-export type AutoZHeightSpecs = SpecsOf<AutoZHeightParams, AutoZHeightField>
+export type TouchOffSpecs = SpecsOf<TouchOffParams, TouchOffField>
 
 const storedLength = z.number().positive().max(COORDINATE_LIMIT)
 
@@ -15,7 +15,7 @@ const storedLength = z.number().positive().max(COORDINATE_LIMIT)
  * A built-in auto Z-height operation, as stored for any machine. Its NC is derived from these
  * parameters at compile time, within the ranges of the machine's probe (`rangedSchema`).
  */
-export const AutoZHeightParamsSchema = z.strictObject({
+export const TouchOffParamsSchema = z.strictObject({
   /** Longest downward search of the touch, mm. */
   probeTravel: storedLength,
   /** Lift above the probed surface once work Z is set, mm. */
@@ -24,4 +24,4 @@ export const AutoZHeightParamsSchema = z.strictObject({
   placement: ProbePlacementSchema,
 })
 
-export type AutoZHeightParams = z.infer<typeof AutoZHeightParamsSchema>
+export type TouchOffParams = z.infer<typeof TouchOffParamsSchema>

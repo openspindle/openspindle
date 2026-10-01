@@ -1,14 +1,14 @@
 import type { BedAnchor } from "@/domain/anchors/stored-anchors"
-import type { XY } from "../geometry/frame"
-import { roundMillimetres } from "../geometry/millimetres"
-import { rectCenter } from "../geometry/rect"
-import { plateWorkArea } from "../compile/toolpath-bounds"
-import type { WorkArea } from "../compile/toolpath-bounds"
-import type { Plate } from "../plate/plate"
-import type { AutoZHeightSpecs, AutoZHeightParams } from "./params"
-import { defaultsOf } from "../probing/parameters"
-import { anchorPlacementAt, placementAnchors } from "../probing/placement"
-import type { AnchorPlacement, ProbePlacement } from "../probing/placement"
+import type { XY } from "../../../geometry/frame"
+import { roundMillimetres } from "../../../geometry/millimetres"
+import { rectCenter } from "../../../geometry/rect"
+import { plateWorkArea } from "../../../compile/toolpath-bounds"
+import type { WorkArea } from "../../../compile/toolpath-bounds"
+import type { Plate } from "../../../plate/plate"
+import type { TouchOffSpecs, TouchOffParams } from "./params"
+import { defaultsOf } from "../../parameters"
+import { anchorPlacementAt, placementAnchors } from "../../placement"
+import type { AnchorPlacement, ProbePlacement } from "../../placement"
 
 /** The middle of the work area on the bed. */
 export function workAreaMiddle(area: WorkArea): XY<"bed"> {
@@ -17,7 +17,7 @@ export function workAreaMiddle(area: WorkArea): XY<"bed"> {
 }
 
 /** The touch point in the middle of the work area, anchored; null when the plate has no anchors. */
-export function centerAutoZHeight(
+export function centerTouchOff(
   area: WorkArea,
   anchors: readonly BedAnchor[],
   current: ProbePlacement,
@@ -31,17 +31,17 @@ export function centerAutoZHeight(
  * the area its job cuts (its stock when it machines nothing), relative to a stored anchor.
  * Without anchors or a work area it touches at the probe position.
  */
-export function plateAutoZHeightParams(
+export function plateTouchOffParams(
   plate: Plate,
-  parameters: AutoZHeightSpecs
-): AutoZHeightParams {
-  const params: AutoZHeightParams = {
+  parameters: TouchOffSpecs
+): TouchOffParams {
+  const params: TouchOffParams = {
     ...defaultsOf(parameters),
     placement: { kind: "probe-position" },
   }
   const area = plateWorkArea(plate)
   if (!area.ok) return params
-  const placement = centerAutoZHeight(
+  const placement = centerTouchOff(
     area.area,
     placementAnchors(plate.setup),
     params.placement,

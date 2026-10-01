@@ -9,39 +9,39 @@ import type { Point3 } from "@/domain/nc/gcode"
 import type { Stock } from "@/domain/stock/stock"
 import { isAnchorConfiguration } from "@/machine/contract"
 import type { AnchorConfiguration } from "@/machine/contract"
-import { autoLevelError, autoLevelWarning } from "./issues"
-import type { AutoLevelIssue } from "./issues"
-import { EPSILON, formatMillimetres } from "../geometry/millimetres"
-import { boxRect, contains, rectAt } from "../geometry/rect"
-import { AutoLevelParamsSchema } from "./params"
-import type { AutoLevelSpecs, AutoLevelParams } from "./params"
-import { rangedSchema } from "../probing/parameters"
-import { resolvePlacement } from "../probing/placement"
+import { gridError, gridWarning } from "./issues"
+import type { GridIssue } from "./issues"
+import { EPSILON, formatMillimetres } from "../../../geometry/millimetres"
+import { boxRect, contains, rectAt } from "../../../geometry/rect"
+import { GridParamsSchema } from "./params"
+import type { GridSpecs, GridParams } from "./params"
+import { rangedSchema } from "../../parameters"
+import { resolvePlacement } from "../../placement"
 import type {
   PlacementContext,
   PlacementFailure,
   ProbeStart,
-} from "../probing/placement"
+} from "../../placement"
 
 /** The plate an auto-level operation belongs to. `Plate` satisfies it. */
-export type AutoLevelPlateContext = PlacementContext & {
+export type GridPlateContext = PlacementContext & {
   stock: Pick<Stock, "width" | "depth" | "height"> | null
   /** Bed position of the stock's minimum corner. */
   stockAnchor: Point3
 }
 
 /** The connected machine, as far as running an anchored grid depends on it. */
-export type AutoLevelMachineContext = {
+export type GridMachineContext = {
   connectedDeviceId: string | null
   /** Stored anchors from the connected device's latest successful read. */
   anchors?: AnchorConfiguration | null
 }
 
 type Checked<TValue> =
-  ({ ok: true } & TValue) | { ok: false; issues: AutoLevelIssue[] }
+  ({ ok: true } & TValue) | { ok: false; issues: GridIssue[] }
 /** Parameters and grid start that generation can render, or what blocks it. */
-export type AutoLevelPlan = Checked<{
-  params: AutoLevelParams
+export type PlannedGrid = Checked<{
+  params: GridParams
   start: ProbeStart
 }>
 
@@ -49,11 +49,11 @@ export type AutoLevelPlan = Checked<{
  * Everything that prevents generating NC: the parameters, within the ranges of the machine's
  * probe (`parameters`), and the grid start.
  */
-export function planAutoLevel(
-  params: AutoLevelParams,
+export function planGrid(
+  params: GridParams,
   plate: PlacementContext,
-  parameters: AutoLevelSpecs
-): AutoLevelPlan {
+  parameters: GridSpecs
+): PlannedGrid {
   const checked = checkParams(params, parameters)
   if (!checked.ok) return checked
   const resolved = resolveStart(checked.params, plate)
@@ -62,11 +62,11 @@ export function planAutoLevel(
 }
 
 /** Issues to show while editing: generation blockers, anchor provenance and the stock fit. */
-export function validateAutoLevel(
-  params: AutoLevelParams,
-  plate: AutoLevelPlateContext,
-  parameters: AutoLevelSpecs
-): AutoLevelIssue[] {
+export function validateGrid(
+  params: GridParams,
+  plate: GridPlateContext,
+  parameters: GridSpecs
+): GridIssue[] {
   const checked = checkParams(params, parameters)
   if (!checked.ok) return checked.issues
   const resolved = resolveStart(checked.params, plate)
@@ -75,7 +75,7 @@ export function validateAutoLevel(
     ...(resolved.ok ? [] : resolved.issues),
     ...(start?.kind === "anchor" && start.source === "factory"
       ? [
-          autoLevelWarning(
+          gridWarning(
             "factory-anchors",
             "The anchor positions are factory defaults. Use Read anchors to verify them against the device before Run."
           ),
@@ -85,16 +85,16 @@ export function validateAutoLevel(
   ]
 }
 
-const PLACEMENT_ISSUES: Readonly<Record<PlacementFailure, AutoLevelIssue>> = {
-  "anchor-snapshot-missing": autoLevelError(
+const PLACEMENT_ISSUES: Readonly<Record<PlacementFailure, GridIssue>> = {
+  "anchor-snapshot-missing": gridError(
     "anchor-snapshot-missing",
     "Select an anchor snapshot for this plate's device."
   ),
-  "anchor-unavailable": autoLevelError(
+  "anchor-unavailable": gridError(
     "anchor-unavailable",
     "The selected probe anchor is unavailable."
   ),
-  "out-of-range": autoLevelError(
+  "out-of-range": gridError(
     "anchor-grid-out-of-range",
     "The anchored probe grid exceeds the supported coordinate range."
   ),
@@ -103,13 +103,13 @@ const PLACEMENT_ISSUES: Readonly<Record<PlacementFailure, AutoLevelIssue>> = {
 /**
  * Whether an anchored grid may run on the connected machine: the plate's snapshot must be a
  * firmware read from that device that still matches its stored anchors. Generation blockers
- * (validateAutoLevel errors) block Run as well. At most one issue, the first failed gate.
+ * (validateGrid errors) block Run as well. At most one issue, the first failed gate.
  */
-export function autoLevelRunIssues(
-  params: Pick<AutoLevelParams, "placement">,
+export function gridRunIssues(
+  params: Pick<GridParams, "placement">,
   plate: PlacementContext,
-  machine: AutoLevelMachineContext
-): AutoLevelIssue[] {
+  machine: GridMachineContext
+): GridIssue[] {
   const { placement } = params
   if (placement.kind === "probe-position") return []
   const setup = plate.anchorSetup
@@ -122,14 +122,14 @@ export function autoLevelRunIssues(
     setup.deviceId !== connected
   )
     return [
-      autoLevelError(
+      gridError(
         "anchors-not-read",
         "Use Read anchors to load this plate's connected device settings before Run."
       ),
     ]
   if (!isAnchorConfiguration(machine.anchors))
     return [
-      autoLevelError(
+      gridError(
         "live-anchors-unavailable",
         "Use Read anchors to load the connected device's current stored anchors before Run."
       ),
@@ -147,7 +147,7 @@ export function autoLevelRunIssues(
     !live.every(saved)
   )
     return [
-      autoLevelError(
+      gridError(
         "anchors-changed",
         "Stored anchors changed. Use Read anchors before Run."
       ),
@@ -156,24 +156,22 @@ export function autoLevelRunIssues(
 }
 
 function checkParams(
-  params: AutoLevelParams,
-  parameters: AutoLevelSpecs
-): Checked<{ params: AutoLevelParams }> {
-  const parsed = rangedSchema(AutoLevelParamsSchema, parameters).safeParse(
-    params
-  )
+  params: GridParams,
+  parameters: GridSpecs
+): Checked<{ params: GridParams }> {
+  const parsed = rangedSchema(GridParamsSchema, parameters).safeParse(params)
   if (!parsed.success)
     return {
       ok: false,
       issues: parsed.error.issues.map((issue) =>
-        autoLevelError("invalid-parameters", issue.message)
+        gridError("invalid-parameters", issue.message)
       ),
     }
   return { ok: true, params: parsed.data }
 }
 
 function resolveStart(
-  params: AutoLevelParams,
+  params: GridParams,
   plate: PlacementContext
 ): Checked<{ start: ProbeStart }> {
   const resolved = resolvePlacement(
@@ -191,8 +189,8 @@ function resolveStart(
  * position, which the plate does not know.
  */
 function gridArea(
-  params: AutoLevelParams,
-  plate: AutoLevelPlateContext,
+  params: GridParams,
+  plate: GridPlateContext,
   top: number,
   start: ProbeStart | null
 ): Area | null {
@@ -207,14 +205,14 @@ function gridArea(
 }
 
 function stockIssues(
-  params: AutoLevelParams,
-  plate: AutoLevelPlateContext,
+  params: GridParams,
+  plate: GridPlateContext,
   start: ProbeStart | null
-): AutoLevelIssue[] {
+): GridIssue[] {
   const { stock } = plate
   if (!stock)
     return [
-      autoLevelWarning(
+      gridWarning(
         "stock-unspecified",
         "The stock size is unspecified, so the probe grid cannot be checked against it."
       ),
@@ -225,7 +223,7 @@ function stockIssues(
   const [width, depth] = params.size
   if (width > stock.width + EPSILON || depth > stock.depth + EPSILON)
     return [
-      autoLevelError(
+      gridError(
         "grid-exceeds-stock",
         `The ${formatMillimetres(width)} × ${formatMillimetres(depth)} mm probe grid is larger than the ${formatMillimetres(stock.width)} × ${formatMillimetres(stock.depth)} mm stock.`,
         places
@@ -240,7 +238,7 @@ function stockIssues(
   )
     return []
   return [
-    autoLevelWarning(
+    gridWarning(
       "grid-outside-stock",
       "The anchored probe grid extends beyond the stock as placed on the bed.",
       places

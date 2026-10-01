@@ -1,5 +1,5 @@
 import { formatMillimetres } from "../../../geometry/millimetres"
-import type { AutoLevelSpecs } from "../../../auto-level/params"
+import type { GridSpecs } from "../../../probing/tasks/grid/params"
 import { plus } from "../../../geometry/frame"
 import type { Frame, Vec2, XY } from "../../../geometry/frame"
 import type { AnchorStart } from "../../../probing/placement"
@@ -17,7 +17,7 @@ import { CLEARANCE_Z } from "./travel"
  * limits, not a clearance check; the included firmware configuration allows at most 15 × 15
  * points.
  */
-const GRID_PARAMETERS: AutoLevelSpecs = {
+const GRID_PARAMETERS: GridSpecs = {
   size: [
     {
       label: "Width",

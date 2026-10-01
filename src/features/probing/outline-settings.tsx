@@ -2,8 +2,11 @@ import { useId } from "react"
 import { FieldGroup, FieldLegend, FieldSet } from "@/components/ui/field"
 import { Hint } from "@/components/workspace/hint"
 import { formatMillimetres } from "@/domain/geometry/millimetres"
-import { AutoScanParamsSchema } from "@/domain/auto-scan/params"
-import type { AutoScanParams, AutoScanSpecs } from "@/domain/auto-scan/params"
+import { OutlineParamsSchema } from "@/domain/probing/tasks/outline/params"
+import type {
+  OutlineParams,
+  OutlineSpecs,
+} from "@/domain/probing/tasks/outline/params"
 import { roundOutward } from "@/domain/compile/toolpath-bounds"
 import type { ToolpathBoundsResult } from "@/domain/compile/toolpath-bounds"
 import { rangedSchema } from "@/domain/probing/parameters"
@@ -17,14 +20,14 @@ import {
   useProbingForm,
 } from "@/features/probing/probing-form"
 
-export type AutoScanSettingsProps = {
-  value: AutoScanParams
+export type OutlineSettingsProps = {
+  value: OutlineParams
   /** The trace's parameters on the machine's probe: defaults, ranges and descriptions. */
-  parameters: AutoScanSpecs
+  parameters: OutlineSpecs
   /** What the scan traces: the plate's toolpath bounds, or why there are none. */
   outline: ToolpathBoundsResult
   /** Receives complete, valid parameters as soon as an edit makes them valid. */
-  onChange: (value: AutoScanParams) => void
+  onChange: (value: OutlineParams) => void
   disabled?: boolean
 }
 
@@ -42,16 +45,16 @@ function outlineDescription(outline: ToolpathBoundsResult) {
  * Parameters of a built-in auto-scan operation. Edits apply as soon as the parameters are valid;
  * invalid input stays in the form with its errors and is never passed on.
  */
-export function AutoScanSettings({
+export function OutlineSettings({
   value,
   parameters,
   outline,
   onChange,
   disabled = false,
-}: AutoScanSettingsProps) {
+}: OutlineSettingsProps) {
   const draft = useProbingDraft(value, onChange)
   return (
-    <AutoScanForm
+    <OutlineForm
       key={draft.key}
       value={value}
       parameters={parameters}
@@ -62,15 +65,15 @@ export function AutoScanSettings({
   )
 }
 
-function AutoScanForm({
+function OutlineForm({
   value,
   parameters,
   outline,
   onChange,
   disabled,
-}: Required<AutoScanSettingsProps>) {
+}: Required<OutlineSettingsProps>) {
   const id = useId()
-  const schema = rangedSchema(AutoScanParamsSchema, parameters)
+  const schema = rangedSchema(OutlineParamsSchema, parameters)
   const form = useProbingForm(value, schema, onChange)
 
   return (

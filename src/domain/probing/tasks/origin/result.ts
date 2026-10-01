@@ -1,9 +1,9 @@
-import type { XYZ } from "../geometry/frame"
+import type { XYZ } from "../../../geometry/frame"
 import { cornerInward, findsCorner, setsWorkXY, setsWorkZ } from "./params"
-import type { Probe3dParams } from "./params"
+import type { OriginParams } from "./params"
 
 /** What a 3D probing routine found, from the contacts it reported, in machine coordinates. */
-export type Probe3dResult = {
+export type OriginResult = {
   /** Machine X and Y where it set work X0 and Y0; null for an axis it has not set. */
   readonly origin: readonly [x: number | null, y: number | null]
   /** Machine Z of the top it set work Z0 on; null when it sets none, or has not yet. */
@@ -21,10 +21,10 @@ export type Probe3dResult = {
  * boss first; then, per axis it centres (X before Y), the side towards minus and the side towards
  * plus.
  */
-export function probe3dResult(
-  params: Pick<Probe3dParams, "routine" | "corner" | "axes" | "ballDiameter">,
+export function originResult(
+  params: Pick<OriginParams, "routine" | "corner" | "axes" | "ballDiameter">,
   contacts: readonly XYZ<"machine">[]
-): Probe3dResult {
+): OriginResult {
   const radius = params.ballDiameter / 2
   // A touch counts from its second contact.
   const pair = (index: number): XYZ<"machine"> | null =>

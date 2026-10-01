@@ -1,13 +1,13 @@
 import { z } from "zod"
-import { COORDINATE_LIMIT } from "../primitives"
-import type { SpecsOf } from "../probing/parameters"
-import { ProbePlacementSchema } from "../probing/placement"
+import { COORDINATE_LIMIT } from "../../../primitives"
+import type { SpecsOf } from "../../parameters"
+import { ProbePlacementSchema } from "../../placement"
 
 /** The grid's numeric parameters, in form and plugin-manifest order. */
-export type AutoLevelField = "size" | "points" | "clearance"
+export type GridField = "size" | "points" | "clearance"
 
 /** A machine's grid parameters, which its probe defines (`GridProbing.parameters`). */
-export type AutoLevelSpecs = SpecsOf<AutoLevelParams, AutoLevelField>
+export type GridSpecs = SpecsOf<GridParams, GridField>
 
 const storedLength = z.number().positive().max(COORDINATE_LIMIT)
 const storedCount = z.int().min(2).max(COORDINATE_LIMIT)
@@ -15,9 +15,9 @@ const storedCount = z.int().min(2).max(COORDINATE_LIMIT)
 /**
  * A built-in auto-level operation, as stored for any machine. Its NC is derived from these
  * parameters at compile time, within the ranges of the machine's probe
- * (`rangedSchema(AutoLevelParamsSchema, parameters)`).
+ * (`rangedSchema(GridParamsSchema, parameters)`).
  */
-export const AutoLevelParamsSchema = z.strictObject({
+export const GridParamsSchema = z.strictObject({
   /** Grid extent from its start along X and along Y, mm. */
   size: z.tuple([storedLength, storedLength]),
   /** Endpoint-inclusive probe points along X and along Y. */
@@ -29,4 +29,4 @@ export const AutoLevelParamsSchema = z.strictObject({
   reviewAfterProbe: z.boolean(),
 })
 
-export type AutoLevelParams = z.infer<typeof AutoLevelParamsSchema>
+export type GridParams = z.infer<typeof GridParamsSchema>

@@ -31,7 +31,7 @@ import type { DesignRules, RuleSeverity } from "@/domain/design-rules/rules"
 import { COMMON_PROGRAM_RULES } from "@/domain/design-rules/common-rules"
 import type { ProgramRule } from "@/domain/design-rules/program-rules"
 import { FIXTURE_KITS } from "@/domain/fixtures/catalog"
-import { visibleErrors } from "@/features/auto-level/auto-level-settings"
+import { visibleErrors } from "@/features/probing/grid-settings"
 
 const SEVERITY_OPTIONS: ReadonlyArray<{ value: RuleSeverity; label: string }> =
   [

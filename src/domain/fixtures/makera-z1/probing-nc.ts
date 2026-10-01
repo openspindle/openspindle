@@ -1,5 +1,5 @@
-import type { AutoScanSpecs } from "../../auto-scan/params"
-import type { AutoZHeightSpecs } from "../../auto-z-height/params"
+import type { OutlineSpecs } from "../../probing/tasks/outline/params"
+import type { TouchOffSpecs } from "../../probing/tasks/touch-off/params"
 import type { GenericSpecs } from "../../probing/generic/specs"
 import type { ProbingNc } from "../../probing/strategy"
 import { CLEARANCE_Z, MACHINE_Z, anchorTravel } from "./wired-probe/travel"
@@ -9,7 +9,7 @@ import { CLEARANCE_Z, MACHINE_Z, anchorTravel } from "./wired-probe/travel"
  * Z probe uses on the Z1 (`coordinate.toolrack_z`): a probe change ends at the firmware's
  * clearance Z near the top of travel, and the search has to reach the stock from there.
  */
-export const TOUCH_PARAMETERS: AutoZHeightSpecs = {
+export const TOUCH_PARAMETERS: TouchOffSpecs = {
   probeTravel: {
     label: "Probe travel",
     axis: "Z",
@@ -49,7 +49,7 @@ export const TOUCH_OFF_MOTION = {
  * (`coordinate.clearance_z`) and trace speed (`atc.margin_rate_mm_m`). The trace stays within
  * the Z the machine moves in; the feeds are application limits. Neither is a clearance check.
  */
-export const TRACE_PARAMETERS: AutoScanSpecs = {
+export const TRACE_PARAMETERS: OutlineSpecs = {
   travelZ: {
     label: "Machine Z",
     axis: "Z",

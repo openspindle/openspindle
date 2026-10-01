@@ -1,12 +1,9 @@
 import { useId, useState } from "react"
 import { Scan } from "lucide-react"
 import { FieldGroup, FieldLegend, FieldSet } from "@/components/ui/field"
-import { fitAutoLevelGrid } from "@/domain/auto-level/fit"
-import { AutoLevelParamsSchema } from "@/domain/auto-level/params"
-import type {
-  AutoLevelSpecs,
-  AutoLevelParams,
-} from "@/domain/auto-level/params"
+import { fitGrid } from "@/domain/probing/tasks/grid/fit"
+import { GridParamsSchema } from "@/domain/probing/tasks/grid/params"
+import type { GridSpecs, GridParams } from "@/domain/probing/tasks/grid/params"
 import { rangedSchema } from "@/domain/probing/parameters"
 import {
   ParameterField,
@@ -26,16 +23,16 @@ import type {
 } from "@/features/probing/probing-form"
 import type { AnchorPlacement } from "@/domain/probing/placement"
 
-export type AutoLevelSettingsProps = {
-  value: AutoLevelParams
+export type GridSettingsProps = {
+  value: GridParams
   /** The grid's parameters on the machine's probe: defaults, ranges and descriptions. */
-  parameters: AutoLevelSpecs
+  parameters: GridSpecs
   /** Stored anchors of the plate's device that the grid can start from. */
   anchors: readonly ProbingAnchorOption[]
   /** Where the plate cuts, or its stock without machining: what Fit grid covers. */
   workArea: WorkAreaFit
   /** Receives complete, valid parameters as soon as an edit makes them valid. */
-  onChange: (value: AutoLevelParams) => void
+  onChange: (value: GridParams) => void
   disabled?: boolean
 }
 
@@ -60,17 +57,17 @@ function gridFitDescription({ result, origin, anchors }: WorkAreaFit) {
  * Parameters of a built-in auto-level operation. Edits apply as soon as the parameters are valid;
  * invalid input stays in the form with its errors and is never passed on.
  */
-export function AutoLevelSettings({
+export function GridSettings({
   value,
   parameters,
   anchors,
   workArea,
   onChange,
   disabled = false,
-}: AutoLevelSettingsProps) {
+}: GridSettingsProps) {
   const draft = useProbingDraft(value, onChange)
   return (
-    <AutoLevelForm
+    <GridForm
       key={draft.key}
       value={value}
       parameters={parameters}
@@ -82,22 +79,22 @@ export function AutoLevelSettings({
   )
 }
 
-function AutoLevelForm({
+function GridForm({
   value,
   parameters,
   anchors,
   workArea,
   onChange,
   disabled,
-}: Required<AutoLevelSettingsProps>) {
+}: Required<GridSettingsProps>) {
   const id = useId()
-  const schema = rangedSchema(AutoLevelParamsSchema, parameters)
+  const schema = rangedSchema(GridParamsSchema, parameters)
   // Switching back from the probe position restores the anchor settings.
   const [lastAnchor, setLastAnchor] = useState<AnchorPlacement | null>(null)
   const form = useProbingForm(value, schema, onChange)
-  const fitGrid = () => {
+  const fitToWorkArea = () => {
     if (!workArea.result.ok) return
-    const fitted = fitAutoLevelGrid(
+    const fitted = fitGrid(
       workArea.result.area,
       workArea.anchors,
       form.state.values.placement,
@@ -121,7 +118,7 @@ function AutoLevelForm({
             icon={<Scan data-icon="inline-start" />}
             reason={workArea.result.ok ? null : workArea.result.reason}
             disabled={disabled}
-            onApply={fitGrid}
+            onApply={fitToWorkArea}
           />
           <ParameterField
             id={`${id}-width`}

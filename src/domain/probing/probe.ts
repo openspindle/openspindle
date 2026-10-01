@@ -1,14 +1,14 @@
 import type { NcBlock } from "@/machine/contract"
 import type { GCodeProgram } from "@/domain/nc/gcode"
-import type { AutoLevelSpecs, AutoLevelParams } from "../auto-level/params"
-import type { AutoScanParams, AutoScanSpecs } from "../auto-scan/params"
+import type { GridSpecs, GridParams } from "./tasks/grid/params"
+import type { OutlineParams, OutlineSpecs } from "./tasks/outline/params"
 import type {
-  AutoZHeightField,
-  AutoZHeightSpecs,
-  AutoZHeightParams,
-} from "../auto-z-height/params"
+  TouchOffField,
+  TouchOffSpecs,
+  TouchOffParams,
+} from "./tasks/touch-off/params"
 import type { Rect } from "../geometry/rect"
-import type { Probe3dSpecs, Probe3dParams } from "../probe-3d/params"
+import type { OriginSpecs, OriginParams } from "./tasks/origin/params"
 import type { ParameterSpecs } from "./parameters"
 import type { ProbeStart } from "./placement"
 import type { ProbeGrid, ProbeTouch } from "./preview"
@@ -44,10 +44,10 @@ export interface Capability<
  * A planned auto-level grid: its size, points and clearance and whether the job pauses to review
  * what it measured, checked, and where it starts.
  */
-export type GridPlan = ProbingPlan<Omit<AutoLevelParams, "placement">>
+export type GridPlan = ProbingPlan<Omit<GridParams, "placement">>
 
 /** How a machine probes a height grid, which auto-level compensates with. */
-export interface GridProbing extends Capability<GridPlan, AutoLevelSpecs> {
+export interface GridProbing extends Capability<GridPlan, GridSpecs> {
   /**
    * The grids a program probes, as this machine's NC writes them: previews of any file, from
    * where the probe starts or in machine coordinates.
@@ -60,8 +60,8 @@ export interface GridProbing extends Capability<GridPlan, AutoLevelSpecs> {
  * program never pauses for a review.
  */
 export interface TouchOff extends Capability<
-  ProbingPlan<Pick<AutoZHeightParams, AutoZHeightField>>,
-  AutoZHeightSpecs
+  ProbingPlan<Pick<TouchOffParams, TouchOffField>>,
+  TouchOffSpecs
 > {
   /**
    * The touch-offs a program makes where this machine's NC puts the probe, which its `grids`
@@ -78,7 +78,7 @@ export interface TouchOff extends Capability<
  * outwards.
  */
 export type TracePlan = {
-  readonly params: AutoScanParams
+  readonly params: OutlineParams
   readonly outline: Rect<"work">
 }
 
@@ -86,10 +86,10 @@ export type TracePlan = {
  * How a machine traces an outline with a pointer, such as its probe's laser. Its program neither
  * probes nor reviews a measurement, so it has no review line.
  */
-export type OutlineTrace = Capability<TracePlan, AutoScanSpecs>
+export type OutlineTrace = Capability<TracePlan, OutlineSpecs>
 
 /** A planned 3D probing. */
-export type OriginPlan = ProbingPlan<Probe3dParams> & {
+export type OriginPlan = ProbingPlan<OriginParams> & {
   /** The work Z the probe comes down to over the start first; null when the placement has none. */
   readonly height: number | null
 }
@@ -99,7 +99,7 @@ export type OriginPlan = ProbingPlan<Probe3dParams> & {
  * a pocket, or both sides of a pocket or boss, from the plan's start, and sets the work origin
  * there. Its program's probing block is the routine's, which reports each contact.
  */
-export type OriginProbing = Capability<OriginPlan, Probe3dSpecs>
+export type OriginProbing = Capability<OriginPlan, OriginSpecs>
 
 /** How a program's sections see a machine's probing NC, in any NC file. */
 export interface ProbingSections {

@@ -2,12 +2,15 @@ import { useId, useState } from "react"
 import { LocateFixed } from "lucide-react"
 import { FieldGroup, FieldLegend, FieldSet } from "@/components/ui/field"
 import { Hint } from "@/components/workspace/hint"
-import { centerAutoZHeight, workAreaMiddle } from "@/domain/auto-z-height/fit"
-import { AutoZHeightParamsSchema } from "@/domain/auto-z-height/params"
+import {
+  centerTouchOff,
+  workAreaMiddle,
+} from "@/domain/probing/tasks/touch-off/fit"
+import { TouchOffParamsSchema } from "@/domain/probing/tasks/touch-off/params"
 import type {
-  AutoZHeightSpecs,
-  AutoZHeightParams,
-} from "@/domain/auto-z-height/params"
+  TouchOffSpecs,
+  TouchOffParams,
+} from "@/domain/probing/tasks/touch-off/params"
 import {
   ParameterField,
   PlacementFields,
@@ -26,16 +29,16 @@ import type {
 import { rangedSchema } from "@/domain/probing/parameters"
 import type { AnchorPlacement } from "@/domain/probing/placement"
 
-export type AutoZHeightSettingsProps = {
-  value: AutoZHeightParams
+export type TouchOffSettingsProps = {
+  value: TouchOffParams
   /** The touch-off's parameters on the machine's probe: defaults, ranges and descriptions. */
-  parameters: AutoZHeightSpecs
+  parameters: TouchOffSpecs
   /** Stored anchors of the plate's device that the touch point can be relative to. */
   anchors: readonly ProbingAnchorOption[]
   /** Where the plate cuts, or its stock without machining: Center touches its middle. */
   workArea: WorkAreaFit
   /** Receives complete, valid parameters as soon as an edit makes them valid. */
-  onChange: (value: AutoZHeightParams) => void
+  onChange: (value: TouchOffParams) => void
   disabled?: boolean
 }
 
@@ -64,17 +67,17 @@ function centerReason({ result, anchors }: WorkAreaFit) {
  * Parameters of a built-in auto Z-height operation. Edits apply as soon as the parameters are
  * valid; invalid input stays in the form with its errors and is never passed on.
  */
-export function AutoZHeightSettings({
+export function TouchOffSettings({
   value,
   parameters,
   anchors,
   workArea,
   onChange,
   disabled = false,
-}: AutoZHeightSettingsProps) {
+}: TouchOffSettingsProps) {
   const draft = useProbingDraft(value, onChange)
   return (
-    <AutoZHeightForm
+    <TouchOffForm
       key={draft.key}
       value={value}
       parameters={parameters}
@@ -86,16 +89,16 @@ export function AutoZHeightSettings({
   )
 }
 
-function AutoZHeightForm({
+function TouchOffForm({
   value,
   parameters,
   anchors,
   workArea,
   onChange,
   disabled,
-}: Required<AutoZHeightSettingsProps>) {
+}: Required<TouchOffSettingsProps>) {
   const id = useId()
-  const schema = rangedSchema(AutoZHeightParamsSchema, parameters)
+  const schema = rangedSchema(TouchOffParamsSchema, parameters)
   // Switching back from the probe position restores the anchor settings.
   const [lastAnchor, setLastAnchor] = useState<AnchorPlacement | null>(null)
   const form = useProbingForm(value, schema, onChange)
@@ -138,7 +141,7 @@ function AutoZHeightForm({
             disabled={disabled}
             onApply={() => {
               if (!workArea.result.ok) return
-              const next = centerAutoZHeight(
+              const next = centerTouchOff(
                 workArea.result.area,
                 workArea.anchors,
                 placement,

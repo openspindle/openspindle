@@ -1,5 +1,5 @@
-import type { AutoScanParams, AutoScanSpecs } from "../../auto-scan/params"
-import { planAutoScan } from "../../auto-scan/rules"
+import type { OutlineParams, OutlineSpecs } from "../tasks/outline/params"
+import { planOutline } from "../tasks/outline/rules"
 import { roundOutward, toolpathBoundsOf } from "../../compile/cutting-bounds"
 import { issueOf } from "../../diagnostics"
 import { formatMillimetres } from "../../geometry/millimetres"
@@ -33,8 +33,8 @@ const NO_POINTER = issueOf<"no-pointer">("error")(
  */
 export const OUTLINE_TRACE: ProbingStrategy<
   "outline",
-  AutoScanParams,
-  AutoScanSpecs
+  OutlineParams,
+  OutlineSpecs
 > = {
   id: "outline-trace",
   task: "outline",
@@ -51,7 +51,7 @@ export const OUTLINE_TRACE: ProbingStrategy<
   generate: ({ params, plate, probe, machine, context }) => {
     const { pointer } = machine.nc
     if (!pointer) return { ok: false, issues: [NO_POINTER] }
-    const plan = planAutoScan(
+    const plan = planOutline(
       params,
       toolpathBoundsOf(machiningPrograms(plate, context.kit)),
       specsOf(machine, "outline-trace")

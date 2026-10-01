@@ -1,8 +1,8 @@
 import { formatMillimetres } from "../../../geometry/millimetres"
 import type {
-  AutoZHeightField,
-  AutoZHeightParams,
-} from "../../../auto-z-height/params"
+  TouchOffField,
+  TouchOffParams,
+} from "../../../probing/tasks/touch-off/params"
 import type { XY } from "../../../geometry/frame"
 import type { TouchOff } from "../../../probing/probe"
 import { PROBE_START } from "../../../probing/preview"
@@ -18,7 +18,7 @@ import { FIRMWARE_ROUTINE, GRID, TOUCH_CODES } from "./blocks"
 import { scanBlocks, travelTarget } from "./scan"
 import { anchorTravel } from "./travel"
 
-type Touch = Pick<AutoZHeightParams, AutoZHeightField>
+type Touch = Pick<TouchOffParams, TouchOffField>
 
 const INTRODUCTION = [
   "; Makera wired Probe 2.0 - auto Z-height",

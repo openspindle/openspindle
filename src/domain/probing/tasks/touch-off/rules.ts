@@ -2,22 +2,22 @@ import { machineToBed } from "@/domain/anchors/stored-anchors"
 import { issueOf } from "@/domain/diagnostics"
 import type { Issue } from "@/domain/diagnostics"
 import type { Stock } from "@/domain/stock/stock"
-import type { XYZ } from "../geometry/frame"
-import { EPSILON } from "../geometry/millimetres"
-import { contains, rectAt } from "../geometry/rect"
-import { AutoZHeightParamsSchema } from "./params"
-import type { AutoZHeightSpecs, AutoZHeightParams } from "./params"
-import { rangedSchema } from "../probing/parameters"
-import { resolvePlacement } from "../probing/placement"
+import type { XYZ } from "../../../geometry/frame"
+import { EPSILON } from "../../../geometry/millimetres"
+import { contains, rectAt } from "../../../geometry/rect"
+import { TouchOffParamsSchema } from "./params"
+import type { TouchOffSpecs, TouchOffParams } from "./params"
+import { rangedSchema } from "../../parameters"
+import { resolvePlacement } from "../../placement"
 import type {
   PlacementContext,
   PlacementFailure,
   ProbePlacement,
   ProbeStart,
-} from "../probing/placement"
-import type { ProbingPlan } from "../probing/probe"
+} from "../../placement"
+import type { ProbingPlan } from "../../probe"
 
-export type AutoZHeightIssueCode =
+export type TouchOffIssueCode =
   // Parameters
   | "invalid-parameters"
   // Anchor placement against the plate's anchor snapshot
@@ -31,33 +31,33 @@ export type AutoZHeightIssueCode =
   | "before-auto-level"
 
 /** Errors block NC generation or Run; warnings inform without blocking. */
-export type AutoZHeightIssue = Issue<AutoZHeightIssueCode>
+export type TouchOffIssue = Issue<TouchOffIssueCode>
 
-const zHeightError = issueOf<AutoZHeightIssueCode>("error")
-const zHeightWarning = issueOf<AutoZHeightIssueCode>("warning")
+const zHeightError = issueOf<TouchOffIssueCode>("error")
+const zHeightWarning = issueOf<TouchOffIssueCode>("warning")
 
 /** The plate an auto Z-height operation belongs to. */
-export type AutoZHeightPlateContext = PlacementContext & {
+export type TouchOffPlateContext = PlacementContext & {
   stock: Pick<Stock, "width" | "depth" | "height"> | null
   /** Bed position of the stock's minimum corner. */
   stockAnchor: XYZ<"bed">
 }
 
 type Checked<TValue> =
-  ({ ok: true } & TValue) | { ok: false; issues: AutoZHeightIssue[] }
+  ({ ok: true } & TValue) | { ok: false; issues: TouchOffIssue[] }
 /** Parameters and touch point that generation can render, or what blocks it. */
-export type AutoZHeightPlan = Checked<ProbingPlan<AutoZHeightParams>>
+export type PlannedTouchOff = Checked<ProbingPlan<TouchOffParams>>
 
 /**
  * Everything that prevents generating NC: the parameters, within the ranges of the machine's
  * probe (`parameters`), then the anchored touch point.
  */
-export function planAutoZHeight(
-  params: AutoZHeightParams,
+export function planTouchOff(
+  params: TouchOffParams,
   plate: PlacementContext,
-  parameters: AutoZHeightSpecs
-): AutoZHeightPlan {
-  const parsed = rangedSchema(AutoZHeightParamsSchema, parameters).safeParse(
+  parameters: TouchOffSpecs
+): PlannedTouchOff {
+  const parsed = rangedSchema(TouchOffParamsSchema, parameters).safeParse(
     params
   )
   if (!parsed.success)
@@ -74,12 +74,12 @@ export function planAutoZHeight(
 }
 
 /** Issues to show while editing: generation blockers, anchor provenance and the stock. */
-export function validateAutoZHeight(
-  params: AutoZHeightParams,
-  plate: AutoZHeightPlateContext,
-  parameters: AutoZHeightSpecs
-): AutoZHeightIssue[] {
-  const plan = planAutoZHeight(params, plate, parameters)
+export function validateTouchOff(
+  params: TouchOffParams,
+  plate: TouchOffPlateContext,
+  parameters: TouchOffSpecs
+): TouchOffIssue[] {
+  const plan = planTouchOff(params, plate, parameters)
   if (
     !plan.ok &&
     plan.issues.some((issue) => issue.code === "invalid-parameters")
@@ -101,7 +101,7 @@ export function validateAutoZHeight(
 }
 
 /** An auto-level that runs after this operation, and whether it follows it directly. */
-export type LaterAutoLevel = {
+export type LaterGrid = {
   placement: ProbePlacement
   /** Next in the plate without a Pause before, so the probe has not moved in between. */
   adjacent: boolean
@@ -112,10 +112,10 @@ export type LaterAutoLevel = {
  * from the position without compensation. Work Z set after auto-level is therefore exact
  * anywhere; set before it, only where the grid starts.
  */
-export function autoLevelOrderIssues(
-  params: Pick<AutoZHeightParams, "placement">,
-  later: readonly LaterAutoLevel[]
-): AutoZHeightIssue[] {
+export function gridOrderIssues(
+  params: Pick<TouchOffParams, "placement">,
+  later: readonly LaterGrid[]
+): TouchOffIssue[] {
   if (later.every((grid) => probesGridStart(params.placement, grid))) return []
   return [
     zHeightWarning(
@@ -127,7 +127,7 @@ export function autoLevelOrderIssues(
 
 function probesGridStart(
   touch: ProbePlacement,
-  { placement, adjacent }: LaterAutoLevel
+  { placement, adjacent }: LaterGrid
 ): boolean {
   // A grid from the probe's position starts where the probe is: above the point just touched.
   if (placement.kind === "probe-position") return adjacent
@@ -139,7 +139,7 @@ function probesGridStart(
   )
 }
 
-const PLACEMENT_ISSUES: Readonly<Record<PlacementFailure, AutoZHeightIssue>> = {
+const PLACEMENT_ISSUES: Readonly<Record<PlacementFailure, TouchOffIssue>> = {
   "anchor-snapshot-missing": zHeightError(
     "anchor-snapshot-missing",
     "Select an anchor snapshot for this plate's device."
@@ -155,9 +155,9 @@ const PLACEMENT_ISSUES: Readonly<Record<PlacementFailure, AutoZHeightIssue>> = {
 }
 
 function stockIssues(
-  plate: AutoZHeightPlateContext,
+  plate: TouchOffPlateContext,
   start: ProbeStart | null
-): AutoZHeightIssue[] {
+): TouchOffIssue[] {
   const { stock } = plate
   if (!stock)
     return [

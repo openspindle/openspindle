@@ -1,5 +1,5 @@
 import type { HeightMap } from "@/machine/contract"
-import { plural } from "../primitives"
+import { plural } from "../../../primitives"
 
 export type GridSize = { columns: number; rows: number }
 

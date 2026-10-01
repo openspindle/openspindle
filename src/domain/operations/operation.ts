@@ -1,9 +1,9 @@
 import { z } from "zod"
 import { utf8ByteLength } from "@/machine/contract"
-import { AutoLevelParamsSchema } from "../auto-level/params"
-import { AutoScanParamsSchema } from "../auto-scan/params"
-import { AutoZHeightParamsSchema } from "../auto-z-height/params"
-import { Probe3dParamsSchema } from "../probe-3d/params"
+import { GridParamsSchema } from "../probing/tasks/grid/params"
+import { OutlineParamsSchema } from "../probing/tasks/outline/params"
+import { TouchOffParamsSchema } from "../probing/tasks/touch-off/params"
+import { OriginParamsSchema } from "../probing/tasks/origin/params"
 import {
   EntityIdSchema,
   TextSchema,
@@ -130,25 +130,25 @@ export const PluginSourceSchema = z.object({
 /** Built-in auto-level: the probing NC is derived from these parameters when compiling. */
 export const AutoLevelSourceSchema = z.object({
   kind: z.literal("auto-level"),
-  params: AutoLevelParamsSchema,
+  params: GridParamsSchema,
 })
 
 /** Built-in auto Z-height: the touch-off NC is derived from these parameters when compiling. */
 export const AutoZHeightSourceSchema = z.object({
   kind: z.literal("auto-z-height"),
-  params: AutoZHeightParamsSchema,
+  params: TouchOffParamsSchema,
 })
 
 /** Built-in auto-scan: traces the plate's toolpath bounds, derived when compiling. */
 export const AutoScanSourceSchema = z.object({
   kind: z.literal("auto-scan"),
-  params: AutoScanParamsSchema,
+  params: OutlineParamsSchema,
 })
 
 /** Built-in 3D probing: the routine's NC is derived from these parameters when compiling. */
 export const Probe3dSourceSchema = z.object({
   kind: z.literal("probe-3d"),
-  params: Probe3dParamsSchema,
+  params: OriginParamsSchema,
 })
 
 export const OperationSourceSchema = z.discriminatedUnion("kind", [

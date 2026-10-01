@@ -1,12 +1,12 @@
 import { z } from "zod"
-import { COORDINATE_LIMIT } from "../primitives"
-import type { SpecsOf } from "../probing/parameters"
+import { COORDINATE_LIMIT } from "../../../primitives"
+import type { SpecsOf } from "../../parameters"
 
 /** The trace's numeric parameters. */
-export type AutoScanField = "travelZ" | "feed"
+export type OutlineField = "travelZ" | "feed"
 
 /** A machine's trace parameters, which its probe defines (`OutlineTrace.parameters`). */
-export type AutoScanSpecs = SpecsOf<AutoScanParams, AutoScanField>
+export type OutlineSpecs = SpecsOf<OutlineParams, OutlineField>
 
 /** A sanity bound for stored feeds, mm/min; the machine's probe sets the usable range. */
 const storedFeed = z.number().positive().max(100_000)
@@ -15,7 +15,7 @@ const storedFeed = z.number().positive().max(100_000)
  * A built-in auto-scan operation, as stored for any machine. Its NC traces the plate's toolpath
  * bounds at compile time, within the ranges of the machine's probe (`rangedSchema`).
  */
-export const AutoScanParamsSchema = z.strictObject({
+export const OutlineParamsSchema = z.strictObject({
   /** Machine Z of the trace (G53), mm. */
   travelZ: z.number().min(-COORDINATE_LIMIT).max(COORDINATE_LIMIT),
   /** Feed of the traced edges, mm/min. */
@@ -24,4 +24,4 @@ export const AutoScanParamsSchema = z.strictObject({
   pauseAfterScan: z.boolean(),
 })
 
-export type AutoScanParams = z.infer<typeof AutoScanParamsSchema>
+export type OutlineParams = z.infer<typeof OutlineParamsSchema>

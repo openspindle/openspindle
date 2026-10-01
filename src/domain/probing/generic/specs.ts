@@ -1,11 +1,11 @@
-import type { AutoScanSpecs } from "../../auto-scan/params"
-import type { AutoZHeightSpecs } from "../../auto-z-height/params"
+import type { OutlineSpecs } from "../tasks/outline/params"
+import type { TouchOffSpecs } from "../tasks/touch-off/params"
 import type { MachineProbing } from "../strategy"
 
 /** A machine's ranges and defaults for the generic strategies, by strategy id. */
 export type GenericSpecs = {
-  readonly "surface-touch": AutoZHeightSpecs
-  readonly "outline-trace": AutoScanSpecs
+  readonly "surface-touch": TouchOffSpecs
+  readonly "outline-trace": OutlineSpecs
 }
 
 /** Whether a machine gives a generic strategy the ranges and defaults it runs with. */

@@ -24,12 +24,12 @@ import {
   analyzeHeightMap,
   formatHeight,
   formatSpan,
-} from "@/domain/auto-level/analysis"
+} from "@/domain/probing/tasks/grid/analysis"
 import type {
   FlatnessVerdict,
   GridSize,
   HeightMapAnalysis,
-} from "@/domain/auto-level/analysis"
+} from "@/domain/probing/tasks/grid/analysis"
 import type { HeightMap } from "@/machine/contract"
 import {
   HeightMapFacts,

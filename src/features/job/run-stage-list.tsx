@@ -19,9 +19,12 @@ import {
 import { Spinner } from "@/components/ui/spinner"
 import { formatMillimetres } from "@/domain/geometry/millimetres"
 import type { Operation } from "@/domain/operations/operation"
-import { PROBE_3D_CORNER_LABELS, findsCorner } from "@/domain/probe-3d/params"
-import type { Probe3dParams } from "@/domain/probe-3d/params"
-import { probe3dResult } from "@/domain/probe-3d/result"
+import {
+  PROBE_3D_CORNER_LABELS,
+  findsCorner,
+} from "@/domain/probing/tasks/origin/params"
+import type { OriginParams } from "@/domain/probing/tasks/origin/params"
+import { originResult } from "@/domain/probing/tasks/origin/result"
 import { placementHeight } from "@/domain/probing/placement"
 import { PROBE_3D_TOOL, PROBE_TOOL } from "@/domain/tools/tool-table"
 import { programParts } from "@/machine/contract"
@@ -209,7 +212,7 @@ function gridText(grid: GridMeasurement): string {
 }
 
 /** What a 3D probing operation finds, in words. */
-function probe3dTarget({ routine, corner, axes }: Probe3dParams): string {
+function probe3dTarget({ routine, corner, axes }: OriginParams): string {
   const at = PROBE_3D_CORNER_LABELS[corner].toLowerCase()
   const across = axes === "xy" ? "X and Y" : axes.toUpperCase()
   switch (routine) {
@@ -225,7 +228,7 @@ function probe3dTarget({ routine, corner, axes }: Probe3dParams): string {
 }
 
 /** What a 3D probing routine that has not found what it probes did, by its stage's status. */
-function probe3dUnfinished(params: Probe3dParams, status: StageStatus) {
+function probe3dUnfinished(params: OriginParams, status: StageStatus) {
   const target = probe3dTarget(params)
   switch (status) {
     case "failed":
@@ -240,11 +243,11 @@ function probe3dUnfinished(params: Probe3dParams, status: StageStatus) {
 
 /** Where a 3D probing routine set the work origin, from the contacts it reported. */
 function probe3dFacts(
-  params: Probe3dParams,
+  params: OriginParams,
   { contacts }: ContactsMeasurement,
   status: StageStatus
 ): { description: string; facts: { label: string; value: string }[] } {
-  const result = probe3dResult(params, contacts)
+  const result = originResult(params, contacts)
   const set = (["X", "Y"] as const).flatMap((axis, index) => {
     const value = result.origin[index]
     return value === null ? [] : [{ axis, value }]

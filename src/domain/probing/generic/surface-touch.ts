@@ -1,10 +1,10 @@
-import { plateAutoZHeightParams } from "../../auto-z-height/fit"
+import { plateTouchOffParams } from "../tasks/touch-off/fit"
 import type {
-  AutoZHeightField,
-  AutoZHeightParams,
-  AutoZHeightSpecs,
-} from "../../auto-z-height/params"
-import { planAutoZHeight } from "../../auto-z-height/rules"
+  TouchOffField,
+  TouchOffParams,
+  TouchOffSpecs,
+} from "../tasks/touch-off/params"
+import { planTouchOff } from "../tasks/touch-off/rules"
 import { formatMillimetres } from "../../geometry/millimetres"
 import { placementContext } from "../../operations/kinds"
 import type { ProbingNc, ProbingStrategy } from "../strategy"
@@ -35,7 +35,7 @@ function precautions(travel: string) {
  * so for every reader.
  */
 function touchOff(
-  { probeTravel, clearance }: Pick<AutoZHeightParams, AutoZHeightField>,
+  { probeTravel, clearance }: Pick<TouchOffParams, TouchOffField>,
   { fastFeed, slowFeed, backOff }: ProbingNc["touch"]
 ) {
   const mm = formatMillimetres
@@ -61,8 +61,8 @@ function touchOff(
  */
 export const SURFACE_TOUCH: ProbingStrategy<
   "touch-off",
-  AutoZHeightParams,
-  AutoZHeightSpecs
+  TouchOffParams,
+  TouchOffSpecs
 > = {
   id: "surface-touch",
   task: "touch-off",
@@ -71,9 +71,9 @@ export const SURFACE_TOUCH: ProbingStrategy<
   // Every touch probe touches along Z, a 3D probe as well; its pointer is not used.
   accepts: (_probe, machine) => hasSpecs(machine, "surface-touch"),
   parameters: (machine) => specsOf(machine, "surface-touch"),
-  defaults: plateAutoZHeightParams,
+  defaults: plateTouchOffParams,
   generate: ({ params, plate, probe, machine }) => {
-    const plan = planAutoZHeight(
+    const plan = planTouchOff(
       params,
       placementContext(plate),
       specsOf(machine, "surface-touch")

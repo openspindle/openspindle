@@ -1,9 +1,9 @@
 import { z } from "zod"
-import type { Vec2 } from "../geometry/frame"
-import { COORDINATE_LIMIT } from "../primitives"
-import { defaultsOf, rangedSchema } from "../probing/parameters"
-import type { SpecsOf } from "../probing/parameters"
-import { ProbePlacementSchema } from "../probing/placement"
+import type { Vec2 } from "../../../geometry/frame"
+import { COORDINATE_LIMIT } from "../../../primitives"
+import { defaultsOf, rangedSchema } from "../../parameters"
+import type { SpecsOf } from "../../parameters"
+import { ProbePlacementSchema } from "../../placement"
 
 /**
  * What a 3D probing operation finds: a corner of the stock (outside) or of a pocket (inside),
@@ -55,19 +55,19 @@ export const PROBE_3D_AXES_LABELS: Readonly<Record<Probe3dAxes, string>> = {
 }
 
 /** The routine's numeric parameters, in form order. */
-export type Probe3dField = "ballDiameter" | "distance" | "depth"
+export type OriginField = "ballDiameter" | "distance" | "depth"
 
 /** A machine's 3D probing parameters, which its probe defines (`OriginProbing.parameters`). */
-export type Probe3dSpecs = SpecsOf<Probe3dParams, Probe3dField>
+export type OriginSpecs = SpecsOf<OriginParams, OriginField>
 
 const storedLength = z.number().positive().max(COORDINATE_LIMIT)
 
 /**
  * A built-in 3D probing operation, as stored for any machine. Its NC is derived from these
  * parameters at compile time, within the ranges of the machine's 3D probe
- * (`probe3dParamsSchema`). Every routine keeps every field; each reads those it needs.
+ * (`originParamsSchema`). Every routine keeps every field; each reads those it needs.
  */
-export const Probe3dParamsSchema = z.strictObject({
+export const OriginParamsSchema = z.strictObject({
   routine: Probe3dRoutineSchema,
   /** The corner an outside or inside corner routine finds. */
   corner: Probe3dCornerSchema,
@@ -89,15 +89,15 @@ export const Probe3dParamsSchema = z.strictObject({
   placement: ProbePlacementSchema,
 })
 
-export type Probe3dParams = z.infer<typeof Probe3dParamsSchema>
+export type OriginParams = z.infer<typeof OriginParamsSchema>
 
 /** The parameters within the ranges of a machine's 3D probe, as its form and its NC take them. */
-export function probe3dParamsSchema(parameters: Probe3dSpecs) {
-  return rangedSchema(Probe3dParamsSchema, parameters)
+export function originParamsSchema(parameters: OriginSpecs) {
+  return rangedSchema(OriginParamsSchema, parameters)
 }
 
 /** A new operation's parameters: an outside corner at the front left, with the probe's defaults. */
-export function defaultProbe3dParams(parameters: Probe3dSpecs): Probe3dParams {
+export function defaultOriginParams(parameters: OriginSpecs): OriginParams {
   return {
     routine: "outside-corner",
     corner: "front-left",
@@ -131,7 +131,7 @@ export function setsWorkXY(
 }
 
 /** Which of its numeric parameters a routine reads, and of the distance, in which axes. */
-export type Probe3dFields = {
+export type OriginFields = {
   readonly ballDiameter: boolean
   readonly distance: readonly [x: boolean, y: boolean]
   readonly depth: boolean
@@ -141,10 +141,10 @@ export type Probe3dFields = {
  * The parameters a routine reads: the ball, the distance in the axes it touches sides in
  * (`setsWorkXY`), and the depth below the top it touches (`setsWorkZ`).
  */
-export function probe3dFields(
+export function originFields(
   routine: Probe3dRoutine,
   axes: Probe3dAxes
-): Probe3dFields {
+): OriginFields {
   return {
     ballDiameter: true,
     distance: setsWorkXY(routine, axes),

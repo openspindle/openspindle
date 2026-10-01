@@ -5,12 +5,15 @@ import {
   PROBE_3D_ROUTINE_LABELS,
   cornerInward,
   findsCorner,
-  probe3dFields,
+  originFields,
   setsWorkXY,
   setsWorkZ,
-} from "../../../probe-3d/params"
-import type { Probe3dSpecs, Probe3dParams } from "../../../probe-3d/params"
-import { probe3dStartOffset } from "../../../probe-3d/rules"
+} from "../../../probing/tasks/origin/params"
+import type {
+  OriginSpecs,
+  OriginParams,
+} from "../../../probing/tasks/origin/params"
+import { originStartOffset } from "../../../probing/tasks/origin/rules"
 import type { ParameterSpec } from "../../../probing/parameters"
 import type { OriginProbing } from "../../../probing/probe"
 import { PROBE_3D_TOOL } from "../../../tools/tool-table"
@@ -33,7 +36,7 @@ const distance = (axis: "X" | "Y"): ParameterSpec => ({
  * Application limits, not a clearance check. The ball's default is the Makera 3D Probe's; the
  * firmware's own defaults are 20 mm distances and a 2 mm depth.
  */
-const PROBE_3D_PARAMETERS: Probe3dSpecs = {
+const PROBE_3D_PARAMETERS: OriginSpecs = {
   ballDiameter: {
     label: "Ball diameter",
     unit: "mm",
@@ -62,7 +65,7 @@ const PROBE_3D_PARAMETERS: Probe3dSpecs = {
 const mm = (value: number) => String(Number(value.toFixed(3)) + 0)
 
 /** What the routine touches, and what it sets. */
-function introduction(params: Probe3dParams, subcode: number): string[] {
+function introduction(params: OriginParams, subcode: number): string[] {
   const { routine, corner, axes } = params
   const [inX, inY] = cornerInward(corner)
   const sideX = inX > 0 ? "left" : "right"
@@ -106,8 +109,8 @@ function introduction(params: Probe3dParams, subcode: number): string[] {
 }
 
 /** Where to put the probe before Run, when the program does not travel there itself. */
-function positioning(params: Probe3dParams): string[] {
-  const [x, y] = probe3dStartOffset(params).map((value) =>
+function positioning(params: OriginParams): string[] {
+  const [x, y] = originStartOffset(params).map((value) =>
     formatMillimetres(Math.abs(value))
   )
   const where = {
@@ -123,7 +126,7 @@ function positioning(params: Probe3dParams): string[] {
 }
 
 /** What the program replaces, and what alarms. */
-function precautions({ routine, axes }: Probe3dParams): string[] {
+function precautions({ routine, axes }: OriginParams): string[] {
   const [x, y] = setsWorkXY(routine, axes)
   const set = [
     ...(x ? ["X"] : []),
@@ -140,11 +143,11 @@ function precautions({ routine, axes }: Probe3dParams): string[] {
 
 /**
  * The firmware's routine (ATCHandler's M480): D the ball, X and Y the distances, Z the depth,
- * less what the routine does not read (`probe3dFields`): a pocket's centring, touching no top,
+ * less what the routine does not read (`originFields`): a pocket's centring, touching no top,
  * does without the depth, and a centring routine skips an axis given as 0.
  */
-function routineBlock(params: Probe3dParams, subcode: number): string {
-  const read = probe3dFields(params.routine, params.axes)
+function routineBlock(params: OriginParams, subcode: number): string {
+  const read = originFields(params.routine, params.axes)
   const [x, y] = params.distance.map((value, axis) =>
     read.distance[axis] ? value : 0
   )

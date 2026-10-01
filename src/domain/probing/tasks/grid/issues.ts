@@ -1,7 +1,7 @@
-import { issueOf } from "../diagnostics"
-import type { Issue } from "../diagnostics"
+import { issueOf } from "../../../diagnostics"
+import type { Issue } from "../../../diagnostics"
 
-export type AutoLevelIssueCode =
+export type GridIssueCode =
   // Parameters, within the ranges of the machine's probe
   | "invalid-parameters"
   // Anchor placement against the plate's anchor snapshot
@@ -19,7 +19,7 @@ export type AutoLevelIssueCode =
   | "anchors-changed"
 
 /** Errors block NC generation or Run; warnings inform without blocking. */
-export type AutoLevelIssue = Issue<AutoLevelIssueCode>
+export type GridIssue = Issue<GridIssueCode>
 
-export const autoLevelError = issueOf<AutoLevelIssueCode>("error")
-export const autoLevelWarning = issueOf<AutoLevelIssueCode>("warning")
+export const gridError = issueOf<GridIssueCode>("error")
+export const gridWarning = issueOf<GridIssueCode>("warning")
