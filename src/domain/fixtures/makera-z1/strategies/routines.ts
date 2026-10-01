@@ -199,6 +199,7 @@ export const ROUTINES: ProbingStrategy<"origin", OriginParams, OriginSpecs> = {
     "Find a corner or center with the 3D probe and set the work origin there.",
   accepts: ({ touch }) => touch === "xyz",
   parameters: () => ROUTINE_PARAMETERS,
+  reads: (params) => originFields(params.routine, params.axes),
   defaults: (_plate, parameters) => defaultOriginParams(parameters),
   generate: ({ params, plate, probe, machine }) => {
     const plan = planOrigin(params, placementContext(plate), ROUTINE_PARAMETERS)

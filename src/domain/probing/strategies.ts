@@ -1,3 +1,5 @@
+import { plateMachining } from "../compile/toolpath-bounds"
+import type { PlateMachining } from "../compile/toolpath-bounds"
 import { FIXTURE_KITS } from "../fixtures/catalog"
 import { createOperation } from "../operations/operation"
 import type {
@@ -10,11 +12,15 @@ import { probeProfile } from "../tools/tool"
 import type { ProbeProfile, Tool } from "../tools/tool"
 import { OUTLINE_TRACE } from "./generic/outline-trace"
 import { SURFACE_TOUCH } from "./generic/surface-touch"
+import { readsAll } from "./parameters"
+import type { ParameterSpecs, SpecReads } from "./parameters"
 import type {
   Generation,
   MachineProbing,
   ProbingTask,
   StrategyInput,
+  TaskParams,
+  TaskSpecs,
   TaskStrategy,
 } from "./strategy"
 
@@ -114,10 +120,16 @@ export function strategyFor<TTask extends ProbingTask>(
  */
 type AnyTaskStrategy = {
   readonly task: ProbingTask
-  defaults: (plate: Plate, parameters: unknown) => ProbingSource["params"]
+  parameters: (machine: MachineProbing) => ParameterSpecs
+  reads?: (params: ProbingSource["params"]) => SpecReads<ParameterSpecs>
+  defaults: (
+    plate: Plate,
+    parameters: unknown,
+    machining: PlateMachining
+  ) => ProbingSource["params"]
   generate: (input: StrategyInput<ProbingSource["params"]>) => Generation
 }
-const anyTask = (strategy: TaskStrategy) =>
+const anyTask = <TTask extends ProbingTask>(strategy: TaskStrategy<TTask>) =>
   strategy as unknown as AnyTaskStrategy
 
 /**
@@ -131,6 +143,21 @@ export function generateProbing(
 ): Generation | null {
   if (strategy.task !== source.task) return null
   return anyTask(strategy).generate({ ...input, params: source.params })
+}
+
+/**
+ * Which of its task's numeric parameters a strategy reads with an operation's parameters, as its
+ * form shows them (`ProbingStrategy.reads`): all of them where it does not say.
+ */
+export function strategyReads<TTask extends ProbingTask>(
+  strategy: TaskStrategy<TTask>,
+  params: TaskParams<TTask>,
+  machine: MachineProbing
+): SpecReads<TaskSpecs[TTask]> {
+  const { reads, parameters } = anyTask(strategy)
+  return (reads?.(params) ?? readsAll(parameters(machine))) as SpecReads<
+    TaskSpecs[TTask]
+  >
 }
 
 /** The lowest tool number from 1 the plate's table does not hold. */
@@ -166,7 +193,11 @@ export function newProbingOperation(
     task: strategy.task,
     strategy: strategy.id,
     probe,
-    params: anyTask(strategy).defaults(plate, strategy.parameters(machine)),
+    params: anyTask(strategy).defaults(
+      plate,
+      strategy.parameters(machine),
+      plateMachining(plate)
+    ),
   } as ProbingSource
   return {
     operation: createOperation(strategy.label, source),

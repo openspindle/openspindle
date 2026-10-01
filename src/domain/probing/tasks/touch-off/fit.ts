@@ -2,8 +2,7 @@ import type { BedAnchor } from "@/domain/anchors/stored-anchors"
 import type { XY } from "../../../geometry/frame"
 import { roundMillimetres } from "../../../geometry/millimetres"
 import { rectCenter } from "../../../geometry/rect"
-import { plateWorkArea } from "../../../compile/toolpath-bounds"
-import type { WorkArea } from "../../../compile/toolpath-bounds"
+import type { PlateMachining, WorkArea } from "../../../compile/toolpath-bounds"
 import type { Plate } from "../../../plate/plate"
 import type { TouchOffSpecs, TouchOffParams } from "./params"
 import { defaultsOf } from "../../parameters"
@@ -33,13 +32,14 @@ export function centerTouchOff(
  */
 export function plateTouchOffParams(
   plate: Plate,
-  parameters: TouchOffSpecs
+  parameters: TouchOffSpecs,
+  machining: PlateMachining
 ): TouchOffParams {
   const params: TouchOffParams = {
     ...defaultsOf(parameters),
     placement: { kind: "probe-position" },
   }
-  const area = plateWorkArea(plate)
+  const area = machining.workArea()
   if (!area.ok) return params
   const placement = centerTouchOff(
     area.area,

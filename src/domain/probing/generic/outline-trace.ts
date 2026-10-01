@@ -1,10 +1,9 @@
 import type { OutlineParams, OutlineSpecs } from "../tasks/outline/params"
 import { planOutline } from "../tasks/outline/rules"
-import { roundOutward, toolpathBoundsOf } from "../../compile/cutting-bounds"
+import { roundOutward } from "../../compile/cutting-bounds"
 import { issueOf } from "../../diagnostics"
 import { formatMillimetres } from "../../geometry/millimetres"
 import { boxRect } from "../../geometry/rect"
-import { machiningPrograms } from "../../operations/kinds"
 import { defaultsOf } from "../parameters"
 import type { ProbingStrategy } from "../strategy"
 import { hasSpecs, specsOf } from "./specs"
@@ -52,12 +51,12 @@ export const OUTLINE_TRACE: ProbingStrategy<
     pauseAfterScan: true,
   }),
   // The outline is the plate's other operations' toolpath bounds, so it never goes stale.
-  generate: ({ params, plate, probe, machine, context }) => {
+  generate: ({ params, probe, machine, machining }) => {
     const { pointer } = machine.nc
     if (!pointer) return { ok: false, issues: [NO_POINTER] }
     const plan = planOutline(
       params,
-      toolpathBoundsOf(machiningPrograms(plate, context.kit)),
+      machining.toolpath(),
       specsOf(machine, "outline-trace")
     )
     if (!plan.ok) return plan
