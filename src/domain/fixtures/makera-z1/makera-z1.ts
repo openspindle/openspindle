@@ -80,8 +80,8 @@ export class MakeraZ1 extends FixtureKit {
    * stream's 640 × 480 picture. Measured from a picture of the L-bracket and the bed's holes.
    */
   readonly camera: MachineCamera = {
-    position: [-52, 0, 96],
-    target: [58, 0, 0],
+    position: [-64, 0, 90],
+    target: [46, 0, -6],
     fov: 45,
     aspect: 4 / 3,
   }

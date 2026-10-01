@@ -188,7 +188,11 @@ export function importProgram(
           }),
           marked.fixtures,
           context.fixtureProfiles
-            ? deviceDefinitions(context.fixtureProfiles, setup.deviceId)
+            ? deviceDefinitions(
+                context.fixtureProfiles,
+                setup.deviceId,
+                setup.bedSetupId
+              )
             : []
         )
       : { setup, notices: [] }

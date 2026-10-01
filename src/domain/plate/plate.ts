@@ -340,6 +340,7 @@ export function withProgramFixtures(
   const { stock } = setup
   if (!stock || !fixtures.length) return { setup, notices: [] }
   const [x, y, rest] = setup.stockAnchor
+  const { tableTop } = kitForSetup(setup)
   const notices: string[] = []
   const placed = [...setup.fixtures]
   const held: {
@@ -404,7 +405,8 @@ export function withProgramFixtures(
     const support = stockSupportHeight(
       setup.fixtures.filter((item) => item !== own),
       corner,
-      { width: size[0], depth: size[1] }
+      { width: size[0], depth: size[1] },
+      tableTop
     )
     const under =
       corner[0] < x + stock.width &&
