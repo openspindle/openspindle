@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { useIsMutating } from "@tanstack/react-query"
 import { Crosshair } from "lucide-react"
 import { toast } from "sonner"
 import { ReasonButton } from "@/components/workspace/reason-button"
@@ -11,6 +12,10 @@ import {
   profileAnchors,
   selectedProfile,
 } from "@/app/fixtures/fixture-library-store"
+import {
+  retryStoredAnchors,
+  useStoredAnchorsFailure,
+} from "@/app/fixtures/use-stored-anchors-sync"
 import { followDeviceAnchors } from "@/app/workspace/project-session"
 import { deviceAnchorsOf } from "@/domain/anchors/stored-anchors"
 import { bedSetupOf } from "@/domain/fixtures/profiles"
@@ -49,6 +54,10 @@ export function DevicePage() {
   const workspace = useWorkspaceStore()
   const { map } = useDeviceHeightMap()
   const probeAnchor = useProbeAnchor()
+  const storedAnchorsFailure = useStoredAnchorsFailure()
+  // The bed setups' anchors are written in the background too (`useStoredAnchorsSync`).
+  const writingAnchors =
+    useIsMutating({ mutationKey: ["machine", "writeAnchors"] }) > 0
   // The bed setup shown, the profile's default one until another is chosen.
   const [shownBedSetup, setShownBedSetup] = useState<string | null>(null)
   const bedSetup = bedSetupOf(profile, shownBedSetup)
@@ -96,7 +105,7 @@ export function DevicePage() {
     reason = "Read the anchors first."
   const writing: AnchorWriting = {
     reason,
-    writing: writeAnchors.isPending,
+    writing: writingAnchors,
     current,
     onWrite: (anchors, done) =>
       writeAnchors.mutate(
@@ -156,6 +165,21 @@ export function DevicePage() {
                 </>
               }
               writing={storesAnchors ? writing : undefined}
+              storing={
+                storesAnchors && deviceId
+                  ? {
+                      enabled: !!profile.storeAnchors,
+                      onChange: (enabled) => {
+                        retryStoredAnchors()
+                        fixtures.setStoreAnchors(enabled)
+                      },
+                      failed: storedAnchorsFailure && {
+                        error: storedAnchorsFailure.error,
+                        onRetry: retryStoredAnchors,
+                      },
+                    }
+                  : undefined
+              }
               onAlign={(bedOffset) => {
                 if (!profile.anchors) return
                 fixtures.setAnchors({ ...profile.anchors, bedOffset })

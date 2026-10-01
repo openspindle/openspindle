@@ -1,6 +1,7 @@
 import { HEIGHT_MAP_LIMITS } from "../../contract/index.ts"
 import type { AnchorConfiguration, HeightMap } from "../../contract/index.ts"
 import { FAILURE_LINES, excerpt } from "../../firmware/adapter.ts"
+import type { AddedSlot } from "../../firmware/adapter.ts"
 import { MachineError } from "../errors.ts"
 import type { ReplyEvent } from "../session.ts"
 import { freshStatus, requireAdmission } from "./context.ts"
@@ -49,8 +50,11 @@ export async function readAnchorConfiguration(
   )
   requireAdmission(context, { key: "readAnchors" }, before)
   const values = await readAnchorValues(context, anchors)
+  const slots = anchors.added
+    ? await readAddedSlots(context, anchors)
+    : undefined
   try {
-    return anchors.build(values, clock.now())
+    return withAdded(anchors.build(values, clock.now()), slots)
   } catch {
     throw new MachineError(
       "rejected",
@@ -117,6 +121,82 @@ export async function readAnchorValues(
     drainAnchorReplies(session, anchors)
   }
   return values
+}
+
+/** The anchors a machine's places hold, each with its place; the first of an id counts. */
+export function withAdded(
+  configuration: AnchorConfiguration,
+  slots: readonly AddedSlot[] | undefined
+): AnchorConfiguration {
+  if (!slots) return configuration
+  const added: NonNullable<AnchorConfiguration["added"]> = []
+  for (const [slot, anchor] of slots.entries())
+    if (
+      anchor &&
+      anchor !== "other" &&
+      !added.some((item) => item.id === anchor.id)
+    )
+      added.push({ ...anchor, slot })
+  return { ...configuration, added }
+}
+
+/**
+ * What each place for anchors the user added holds, in order, up to the first that is not there
+ * (or the adapter's limit), while the device stays idle.
+ */
+export async function readAddedSlots(
+  context: OperationContext,
+  anchors: AnchorSettings
+): Promise<AddedSlot[]> {
+  const { session, signal } = context
+  const added = anchors.added
+  if (!added) return []
+  const slots: AddedSlot[] = []
+  try {
+    for (let slot = 0; slot < added.limit; slot += 1) {
+      const current = session.store.telemetry
+      if (current?.state !== "Idle" || current.job !== null)
+        throw new MachineError(
+          "cancelled",
+          "Anchor retrieval stopped because the device is no longer idle. Retry when it is idle."
+        )
+      const held = await session.request<AddedSlot | "absent">(
+        [added.query(slot)],
+        (event) => {
+          if (event.kind === "config-error")
+            return {
+              fail: new MachineError(
+                "rejected",
+                "Firmware could not read anchor settings."
+              ),
+            }
+          const text = replyText(event)
+          if (text === null) return "ignored"
+          if (event.kind === "line" && FAILURE_LINES.has(event.line.kind))
+            return {
+              fail: new MachineError(
+                "rejected",
+                `Firmware rejected anchor retrieval: ${excerpt(text)}`
+              ),
+            }
+          const value = added.parse(text, slot)
+          if (value === undefined)
+            return anchors.isReply(text) ? "consumed" : "ignored"
+          return { done: value }
+        },
+        {
+          timeoutMs: ANCHOR_KEY_MS,
+          timeoutMessage: "Timed out reading the device's added anchors.",
+          signal,
+        }
+      )
+      if (held === "absent") break
+      slots.push(held)
+    }
+  } finally {
+    drainAnchorReplies(session, anchors)
+  }
+  return slots
 }
 
 /** Read-only grid display (M375.1), never the command that loads and enables compensation. */

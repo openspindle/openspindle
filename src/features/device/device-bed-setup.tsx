@@ -39,6 +39,17 @@ const DEFAULT_HINT = "New plates for this device start on this bed setup."
 const ANCHORS_HINT =
   "Points of this bed setup, such as a jig's corner, kept as X and Y from the device's first anchor, so they move with it. Placements and probing can start from them like from the device's anchors."
 
+/** "Anchor N" with the first number from `first` that no anchor's name has. */
+function nextAnchorName(
+  first: number,
+  anchors: readonly { readonly name: string }[]
+) {
+  const names = new Set(anchors.map((anchor) => anchor.name))
+  let number = first
+  while (names.has(`Anchor ${number}`)) number += 1
+  return `Anchor ${number}`
+}
+
 /**
  * Which device's profile the Device tab shows, and the bed setup of it whose fixtures it edits:
  * adding one (a copy of the shown one), naming, removing and making it the default for new
@@ -193,7 +204,10 @@ export function DeviceBedSetup({
                       ...anchors,
                       {
                         id: crypto.randomUUID(),
-                        name: `Anchor ${device.length + anchors.length + 1}`,
+                        name: nextAnchorName(device.length + 1, [
+                          ...device,
+                          ...anchors,
+                        ]),
                         offset: here ?? [0, 0],
                       },
                     ])

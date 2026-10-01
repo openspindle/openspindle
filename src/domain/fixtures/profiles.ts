@@ -7,7 +7,7 @@ import {
 } from "../anchors/stored-anchors"
 import type { StoredAnchorSetup } from "../anchors/stored-anchors"
 import type { BedSetupAnchors } from "../plate/bed-setup"
-import { machineId } from "@/machine/contract"
+import { AddedAnchorSchema, machineId } from "@/machine/contract"
 import type { ConnectedDevice } from "@/machine/contract"
 import { DEFAULT_KIT, kitForDevice, kitOf } from "@/domain/fixtures/catalog"
 import type { FixtureKit } from "@/domain/fixtures/fixture-kit"
@@ -67,6 +67,23 @@ export const FixtureProfileSchema = z
       .max(BED_SETUP_LIMIT)
       .refine(uniqueIds, "Bed setup ids repeat."),
     defaultBedSetupId: EntityIdSchema,
+    /**
+     * Whether its device stores its bed setups' anchors in its configuration besides its own,
+     * which the app reads and writes (`storedAnchorsMerged`, `anchorsToStore`).
+     */
+    storeAnchors: z.boolean().optional(),
+    /**
+     * Its bed setups' anchors as its device stored them when they were last read or written, by
+     * the read's time: what the app's edits since are told from. Only while `storeAnchors`.
+     */
+    storedAnchors: z
+      .object({
+        fetchedAt: z.number().min(0),
+        anchors: z
+          .array(AddedAnchorSchema)
+          .max(BED_SETUP_LIMIT * BED_SETUP_ANCHOR_LIMIT),
+      })
+      .optional(),
     /** The version of the kit its fixtures come from (`FixtureKit`); absent before version 2. */
     bundle: z.int().min(1).optional(),
   })

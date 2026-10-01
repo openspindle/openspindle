@@ -1,4 +1,5 @@
 import type {
+  AddedAnchor,
   AnchorConfiguration,
   AnchorPosition,
   AssistKey,
@@ -27,6 +28,12 @@ export type InboundFrame = {
   readonly type: number
   readonly payload: Uint8Array
 }
+/**
+ * What a machine's place for an anchor its user added holds: the anchor, null when it is free,
+ * or "other" when it holds what is no anchor, which stays.
+ */
+export type AddedSlot = AddedAnchor | null | "other"
+
 export type OutboundFrame = {
   readonly type: number
   readonly payload: Uint8Array | string
@@ -332,6 +339,30 @@ export interface FirmwareAdapter {
       ) => true | string | undefined
       /** The machine's own moves use stored anchors as it loaded them when it started. */
       readonly afterRestart: boolean
+    }
+    /**
+     * Stores anchors its user added besides its own, one numbered place (slot) each, read and
+     * written one keyed setting at a time; absent when it cannot. A place that is not there yet
+     * comes after the last; one an anchor left stays, free for another. A place that holds what
+     * is no anchor is left as it is.
+     */
+    readonly added?: {
+      /** The most places it reads, from 0. */
+      readonly limit: number
+      query: (slot: number) => OutboundFrame
+      /**
+       * What a place holds (`AddedSlot`), "absent" when there is no such place, undefined for
+       * unrelated text.
+       */
+      parse: (text: string, slot: number) => AddedSlot | "absent" | undefined
+      /** Stores an anchor in a place, or frees it (null). */
+      command: (slot: number, anchor: AddedAnchor | null) => OutboundFrame
+      /** True when `text` confirms the place holds it, why not when it refuses, undefined for unrelated text. */
+      confirm: (
+        text: string,
+        slot: number,
+        anchor: AddedAnchor | null
+      ) => true | string | undefined
     }
   }
   readonly heightMap: {

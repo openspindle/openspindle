@@ -63,26 +63,33 @@ export function savedSetting(bytes: Uint8Array, key: string) {
   return undefined
 }
 
-/** Change one saved value while retaining the full file's comments and line endings. */
+/**
+ * `config-set sd`, as FileConfigSource::write does it: the first line that sets the key is
+ * overwritten from its start with `key value #`, the rest of the line left after it, when that
+ * fits in the line's length less four; otherwise nothing changes (null). A key no line sets is
+ * appended on a line of its own.
+ */
 export function withSavedSetting(
   bytes: Uint8Array,
   key: string,
   value: string
-) {
+): Uint8Array | null {
   const text = new TextDecoder().decode(bytes)
-  let replaced = false
-  const parts = text.split(/(\r?\n)/)
-  for (let index = 0; index < parts.length; index += 2) {
-    const setting = settingLine(parts[index])
-    if (setting?.[2] !== key) continue
-    parts[index] = `${setting[1]}${key}${setting[3]}${value}${setting[5]}`
-    replaced = true
-    break
+  let start = 0
+  while (start < text.length) {
+    const newline = text.indexOf("\n", start)
+    const end = newline < 0 ? text.length : newline + 1
+    const setting = settingLine(text.slice(start, end).replace(/\r?\n$/, ""))
+    if (setting?.[2] === key) {
+      if (key.length + value.length + 3 > end - start - 4) return null
+      const written = `${key} ${value} #`
+      return new TextEncoder().encode(
+        text.slice(0, start) + written + text.slice(start + written.length)
+      )
+    }
+    start = end
   }
-  if (!replaced) {
-    const newline = text.includes("\r\n") ? "\r\n" : "\n"
-    if (text.length && !text.endsWith("\n")) parts.push(newline)
-    parts.push(`${key} ${value}${newline}`)
-  }
-  return new TextEncoder().encode(parts.join(""))
+  return new TextEncoder().encode(
+    `${text}\n${key}         ${value}         # added\n`
+  )
 }

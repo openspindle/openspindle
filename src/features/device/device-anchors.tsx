@@ -18,11 +18,16 @@ import {
   CardContent,
 } from "@/components/ui/card"
 import {
+  Field,
+  FieldContent,
   FieldError,
   FieldGroup,
+  FieldLabel,
   FieldLegend,
   FieldSet,
 } from "@/components/ui/field"
+import { Button } from "@/components/ui/button"
+import { Switch } from "@/components/ui/switch"
 import {
   Table,
   TableHeader,
@@ -40,6 +45,51 @@ const coordinateFormat = new Intl.NumberFormat("en-US", {
   minimumFractionDigits: 3,
   maximumFractionDigits: 3,
 })
+
+const STORE_HINT =
+  "The device keeps every bed setup's anchors in its configuration too, besides its own (openspindle.anchor3 and on, each X and Y from the first anchor). OpenSpindle reads them with the device's anchors, and writes them when they change while the device is idle. Their names and bed setups stay in OpenSpindle."
+
+/** Whether the device stores the bed setups' anchors too, and why it did not store them. */
+export type AnchorStoring = {
+  readonly enabled: boolean
+  onChange: (enabled: boolean) => void
+  /** Why the device did not store them when last written, with writing them again. */
+  readonly failed: { readonly error: string; onRetry: () => void } | null
+}
+
+function StoreAnchors({ storing }: { storing: AnchorStoring }) {
+  return (
+    <FieldGroup className="gap-2">
+      <Field orientation="horizontal">
+        <FieldContent>
+          <FieldLabel htmlFor="device-store-anchors">
+            <Hint text={STORE_HINT}>Store bed setup anchors on the device</Hint>
+          </FieldLabel>
+        </FieldContent>
+        <Switch
+          id="device-store-anchors"
+          aria-description={STORE_HINT}
+          checked={storing.enabled}
+          onCheckedChange={storing.onChange}
+        />
+      </Field>
+      {storing.enabled && storing.failed && (
+        <Field orientation="horizontal">
+          <FieldError className="flex items-start gap-2">
+            <CircleAlert
+              className="mt-0.5 size-4 shrink-0"
+              aria-hidden="true"
+            />
+            <span>{storing.failed.error}</span>
+          </FieldError>
+          <Button variant="outline" size="sm" onClick={storing.failed.onRetry}>
+            Write again
+          </Button>
+        </Field>
+      )}
+    </FieldGroup>
+  )
+}
 
 const BED_OFFSET_HINT =
   "How far the bed and its holes sit from where the machine's kit places them from the first anchor. Only the 3D view uses it; the device is not changed."
@@ -88,6 +138,7 @@ export function DeviceAnchors({
   onAlign,
   action,
   writing,
+  storing,
 }: {
   setup?: StoredAnchorSetup
   loading: boolean
@@ -98,6 +149,8 @@ export function DeviceAnchors({
   action?: ReactNode
   /** Changes the machine positions the device stores; absent when it stores none. */
   writing?: AnchorWriting
+  /** Whether the device stores the bed setups' anchors too; absent where it cannot. */
+  storing?: AnchorStoring
 }) {
   const [editing, setEditing] = useState(false)
   if (!setup && !loading && !error && !action) return null
@@ -191,6 +244,11 @@ export function DeviceAnchors({
             />
           )}
           {onAlign && <BedOffset offset={setup.bedOffset} onAlign={onAlign} />}
+        </CardContent>
+      )}
+      {storing && (
+        <CardContent>
+          <StoreAnchors storing={storing} />
         </CardContent>
       )}
       {error && (

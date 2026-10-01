@@ -19,8 +19,10 @@ import type {
 import type { BedSetupAnchors } from "@/domain/plate/bed-setup"
 import { defaultFixtureInstances } from "@/domain/fixtures/definitions"
 import type { FixtureDefinition } from "@/domain/fixtures/definitions"
+import { storedAnchorsMerged } from "@/domain/fixtures/stored-anchors"
 import {
   anchorsFromDevice,
+  deviceAnchorsOf,
   isStoredAnchorSetup,
 } from "@/domain/anchors/stored-anchors"
 import type {
@@ -211,7 +213,8 @@ export class FixtureLibraryStore implements DocumentTarget<FixtureLibrary> {
   }
 
   /**
-   * Records anchors read from a device's configuration. Returns the stored setup when it
+   * Records anchors read from a device's configuration, and the bed setups' anchors it stores
+   * when its profile has it store them (`storedAnchorsMerged`). Returns the stored setup when it
    * changed, so plates bound to the device can follow; null when nothing changed.
    */
   recordDeviceAnchors(
@@ -225,22 +228,24 @@ export class FixtureLibraryStore implements DocumentTarget<FixtureLibrary> {
       const profile = Object.hasOwn(library.profiles, id)
         ? library.profiles[id]
         : defaultFixtureProfile(device)
-      if (
+      const read =
         profile.anchors?.source === "firmware-config" &&
         profile.anchors.fetchedAt === configuration.fetchedAt
-      )
-        return library
       // The bed stays where the profile aligned it; a profile saved without anchors has the
       // bed where its machine's kit places it.
-      const anchors = anchorsFromDevice(
+      const anchors = read
+        ? profile.anchors
+        : anchorsFromDevice(configuration, id, profile.anchors?.bedOffset)
+      if (!anchors || !isStoredAnchorSetup(anchors)) return library
+      const recorded = storedAnchorsMerged(
+        read ? profile : { ...profile, anchors },
         configuration,
-        id,
-        profile.anchors?.bedOffset
+        deviceAnchorsOf(anchors).length
       )
-      if (!isStoredAnchorSetup(anchors)) return library
+      if (recorded === profile) return library
       return {
         ...library,
-        profiles: { ...library.profiles, [id]: { ...profile, anchors } },
+        profiles: { ...library.profiles, [id]: recorded },
       }
     })
     return this.state === before
@@ -259,6 +264,24 @@ export class FixtureLibraryStore implements DocumentTarget<FixtureLibrary> {
         return library
       return this.withSelected(library, { anchors })
     }, `anchors:${this.state.selectedId}`)
+  }
+
+  /**
+   * Whether the selected profile's device stores its bed setups' anchors; what it stored is
+   * forgotten when it no longer does, and read again when it does.
+   */
+  setStoreAnchors(storeAnchors: boolean) {
+    this.edit((library) => {
+      if (!Object.hasOwn(library.profiles, library.selectedId)) return library
+      const { storedAnchors: _, ...profile } = selectedProfile(library)
+      return this.withSelected(
+        {
+          ...library,
+          profiles: { ...library.profiles, [library.selectedId]: profile },
+        },
+        { storeAnchors }
+      )
+    }, null)
   }
 
   /** Replaces the fixture definitions of one of the selected profile's bed setups. */

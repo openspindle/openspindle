@@ -39,6 +39,7 @@ A written command is not a successful command. Without a program stream, success
 | Tool installed          | `M490.2` (manual tool change only)               | status leaves Tool. On ATC machines M490.2 loosens the tool, so it is never offered there.                               |
 | Stop                    | realtime `0x18` in an `0xa1` frame               | Alarm                                                                                                                    |
 | Write anchors           | `config-set sd <key> <value>` for each key       | `sd: <key> has been set to <value>`, then every key read back ([stored anchors](stored-anchors.md#changing-the-anchors)) |
+| Store bed setup anchors | `config-set sd openspindle.anchor<n> …`          | each place as above ([stored anchors](stored-anchors.md#bed-setup-anchors-on-the-device))                                |
 
 A rejection line fails the command. An unverified command reports that its outcome is unknown and never retries; unverified motion (jog, home, spindle) also closes the connection so the machine can be checked. A late acknowledgement of an unverified command is swallowed for two seconds.
 
@@ -76,7 +77,7 @@ The Device tab's **Firmware configuration** card opens the connected device's sa
 
 Makera stores this file at `/sd/config.txt`. Reads use the B0–B4 download protocol with frame CRC checks and the advertised MD5 when available; writes use the same verified upload/readback as jobs. Configuration transfers own the connection while running, refuse concurrent operations and leave Stop available. The editor accepts nonempty UTF-8 configuration text up to 256 KiB; it does not validate the meaning or physical suitability of individual firmware settings.
 
-The Z1 simulator provides a representative configuration file independent of real-machine data. Saves persist across reconnects until the simulator exits; its `config-get sd` and anchor writes use the same saved file. Anchor values and the vacuum default load on simulator reset; saving a vacuum default leaves the current output and running default unchanged. Other motion behavior retains the simulator's built-in defaults. The simulator's checksum challenge, placeholder checksum and corrupt-upload options also apply to configuration transfers.
+The Z1 simulator provides a representative configuration file independent of real-machine data. Saves persist across reconnects until the simulator exits; its `config-get sd` and anchor writes use the same saved file. Its `config-set sd` writes as the firmware does: over the first line of the key, from its start, when the line has room (else `not enough space to overwrite existing key/value`), or on a new line at the end. Anchor values and the vacuum default load on simulator reset; saving a vacuum default leaves the current output and running default unchanged. Other motion behavior retains the simulator's built-in defaults. The simulator's checksum challenge, placeholder checksum and corrupt-upload options also apply to configuration transfers.
 
 ## Protocol trace and console
 

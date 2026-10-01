@@ -16,11 +16,27 @@ Device profiles retain the last successful configuration and the bed offset. Pla
 
 A device's profile holds one or more bed setups (Device → **Bed setup**; `BedSetup` in `src/domain/fixtures/profiles.ts`): the fixtures new plates on it start from (each definition with whether it is on them and where, **Device → Fixtures**) and anchors of its own, such as a jig's corner. A profile starts with **Default**, which holds what the profile held before; **+** adds a copy of the bed setup shown, the bin removes it (a profile keeps at least one), **Name** renames it, and **Default for new plates** makes it the one new plates for the device start on. A profile holds up to 20 bed setups.
 
-A bed setup's anchors (**Anchors from Anchor 1**, up to 16) are X and Y from the device's first anchor, typed, or taken from where the connected machine is (the locate button). They are kept in the app, not on the device, and move with the first anchor: recalibrating Anchor 1 moves them with it. A plate set up on a bed setup (`bedSetupId`) keeps its anchors in its snapshot after the device's, each at the first anchor plus its offset (`withBedSetupAnchors`, marked `bedSetup`), so **Relative to**, probing placements and the 3D view's markers offer them like the device's. Editing a bed setup's anchors moves the plates on it as a read of the device's anchors does: what is kept relative to one of them follows it.
+A bed setup's anchors (**Anchors from Anchor 1**, up to 16) are X and Y from the device's first anchor, typed, or taken from where the connected machine is (the locate button). They are kept in the app, and on the device too when it stores them ([below](#bed-setup-anchors-on-the-device)), and move with the first anchor: recalibrating Anchor 1 moves them with it. A plate set up on a bed setup (`bedSetupId`) keeps its anchors in its snapshot after the device's, each at the first anchor plus its offset (`withBedSetupAnchors`, marked `bedSetup`), so **Relative to**, probing placements and the 3D view's markers offer them like the device's. Editing a bed setup's anchors moves the plates on it as a read of the device's anchors does: what is kept relative to one of them follows it.
 
 Prepare → Fixtures → **Bed setup** sets the plate up on another of its device's bed setups: its fixtures (the plate's locked fixtures stay) and its anchors. **Apply bed setup** does it again after the bed setup's fixtures changed. A plate whose bed setup this computer does not have, such as one set up on another, keeps its own anchors and offers **Add bed setup**, which adds one with its fixtures and anchors to its device's profile.
 
 Before Run, a placement or work origin kept relative to a bed setup's anchor needs the device's first anchor, which it is kept from, to match the device's current stored anchors (`probing/anchors-changed`, `work-origin/anchors-changed`).
+
+### Bed setup anchors on the device
+
+**Store bed setup anchors on the device**, on the Device page's **Anchors** card (off by default, for each device: `storeAnchors` in its profile), has the device keep every bed setup's anchors in its configuration besides its own, so they stay with the machine. Their names and bed setups stay in the app. A read of the device's anchors reads them too, and the app writes them a second after they change, while the device is connected, idle and running no program; quick edits write once.
+
+Makera's adapter keeps them after Anchor 1 and 2, one setting each from `openspindle.anchor3` on: the anchor's id and its X and Y from Anchor 1 to 0.001 mm (`openspindle.anchor3 <id>,45.500,19.000`), or `-` once the place is free. The firmware reads none of them (no setting it reads shares their keys' checksums). `config-set sd` cannot remove a setting, and overwrites one in place only while the new value is at most 19 characters longer than the one it was added with, so places stay: an anchor keeps its place, a new one takes the first free place, else a new setting after the last, and the place of a removed anchor is freed with `-`. A place that holds anything else is left alone. A read goes through the places up to the first `is not in config`, at most 32 (`ADDED_ANCHOR_LIMIT`); a write reads them first, sends each changed setting, requires each `sd: <key> has been set to <value>` reply and reads them back (`writeAnchorConfiguration` with `added`). The device stores at most 32.
+
+What the device stored when last read or written (`storedAnchors`) tells the app's edits since from changes made on the device, such as by another computer (`storedAnchorsMerged`):
+
+- An anchor the app has not changed since takes the device's position, and so does one the app has but the device never stored before: the device's is the one measured.
+- An anchor changed in the app, such as one edited while the device was not connected, keeps the app's position, which is written next.
+- An anchor removed in the app stays removed, and its place is freed.
+- An anchor the device stores that the app has never had, such as one added on another computer, joins the profile's default bed setup, named by its place (`openspindle.anchor5` is **Anchor 5**).
+- An anchor the app has that the device no longer stores, such as after its configuration was restored, stays, and is written again.
+
+Switching it on reads nothing new: what the last read found is merged, and a write follows when the app's anchors differ. Switching it off forgets what the device stored; the settings stay on the device. A write that fails shows why on the **Anchors** card with **Write again**; the same anchors are not written again until they change. It leaves the device's own anchors as they were read.
 
 ## Changing the anchors
 

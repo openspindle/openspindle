@@ -1,4 +1,5 @@
 import {
+  ADDED_ANCHOR_LIMIT,
   ASSIST_KEYS,
   AnchorConfigurationSchema,
   COORDINATE_LIMIT,
@@ -6,6 +7,7 @@ import {
   isLocalIPv4,
 } from "../../contract/index.ts"
 import type {
+  AddedAnchor,
   AnchorPosition,
   AssistKey,
   NetworkDevice,
@@ -13,6 +15,7 @@ import type {
   Telemetry,
 } from "../../contract/index.ts"
 import type {
+  AddedSlot,
   AssistStep,
   FirmwareAdapter,
   JobProtocol,
@@ -125,6 +128,47 @@ const ANCHOR_SET_REPLY =
 /** An anchor setting as it is written: to three decimals, a micrometre. */
 const settingText = (value: number) => value.toFixed(3)
 const toSetting = (value: number) => Number(settingText(value))
+
+/**
+ * Anchors the user added, after the Z1's own two: `openspindle.anchor3` and on, each one setting
+ * that holds the anchor's id and its X and Y from Anchor 1 (`id,x,y`), or `-` once it is free.
+ * `config-set` appends a setting it does not find and overwrites one it finds in place, as long
+ * as the new value is at most 19 characters longer than the value it was added with; it cannot
+ * remove one. Every value here is at most 8 characters longer than another, and the key with
+ * its value stays within the 130 characters of a line the firmware reads.
+ */
+const addedKey = (slot: number) => `openspindle.anchor${slot + 3}`
+const ADDED_REPLY =
+  /^(sd|cached): (openspindle\.anchor\d+) is (?:set to (.*)|not in config)$/
+const ADDED_SET_REPLY =
+  /^sd: (openspindle\.anchor\d+) (?:has been set to (.*)|not enough space to overwrite existing key\/value)$/
+const NUMBER = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/
+/** A free place's value. */
+const FREE = "-"
+
+/** A place's value: its anchor's id, X and Y to a micrometre (never "-0.000"), or free. */
+const addedText = (anchor: AddedAnchor | null) =>
+  anchor
+    ? [
+        anchor.id,
+        ...anchor.offset.map((part) => settingText(toSetting(part) + 0)),
+      ].join(",")
+    : FREE
+
+/**
+ * What a place's value holds: its anchor, null when it is free, "other" for what is no anchor;
+ * a place's line has room for an anchor only when it held one.
+ */
+function parseAdded(value: string): AddedSlot {
+  if (value === FREE) return null
+  const [id = "", x = "", y = "", ...rest] = value.split(",")
+  if (rest.length || !/^[A-Za-z0-9-]{1,64}$/.test(id)) return "other"
+  if (!NUMBER.test(x) || !NUMBER.test(y)) return "other"
+  const offset = [Number(x) + 0, Number(y) + 0] as const
+  return offset.every((part) => Math.abs(part) <= COORDINATE_LIMIT)
+    ? { id, offset: [...offset] }
+    : "other"
+}
 
 /** Anchor 1's position, then Anchor 2's offset from it, as the configuration keeps them. */
 function anchorValues(anchors: readonly AnchorPosition[]): number[] {
@@ -258,7 +302,9 @@ export const makeraAdapter: FirmwareAdapter = {
         : null
     },
     isReply: (text) =>
-      ANCHOR_REPLY.test(text.trim()) || ANCHOR_SET_REPLY.test(text.trim()),
+      [ANCHOR_REPLY, ANCHOR_SET_REPLY, ADDED_REPLY, ADDED_SET_REPLY].some(
+        (reply) => reply.test(text.trim())
+      ),
     // Plates keep positions relative to these ids, and so does the Z1 fixture kit's defaults.
     build: ([x, y, offsetX, offsetY], fetchedAt) =>
       AnchorConfigurationSchema.parse({
@@ -293,6 +339,38 @@ export const makeraAdapter: FirmwareAdapter = {
           : `The device stored ${key} as ${stored}.`
       },
       afterRestart: true,
+    },
+    added: {
+      limit: ADDED_ANCHOR_LIMIT,
+      query: (slot) => command(`config-get sd ${addedKey(slot)}`),
+      parse(text, slot) {
+        if (text.length > 256) return undefined
+        const match = ADDED_REPLY.exec(text.trim())
+        if (!match || match[1] !== "sd" || match[2] !== addedKey(slot))
+          return undefined
+        // Group 3 is absent for "is not in config": no such place yet.
+        const value = match.at(3)?.trim()
+        return value === undefined ? "absent" : parseAdded(value)
+      },
+      command: (slot, anchor) =>
+        command(`config-set sd ${addedKey(slot)} ${addedText(anchor)}`),
+      confirm(text, slot, anchor) {
+        if (text.length > 256) return undefined
+        const reply = text.trim()
+        if (reply === "sd source does not exist")
+          return "The device has no saved configuration to store anchors in."
+        if (reply.startsWith("Usage: config-set"))
+          return "The device did not take the anchor setting."
+        const key = addedKey(slot)
+        const match = ADDED_SET_REPLY.exec(reply)
+        if (!match || match[1] !== key) return undefined
+        const stored = match.at(2)?.trim()
+        if (stored === undefined)
+          return `The device has no room to store ${key}.`
+        return stored === addedText(anchor)
+          ? true
+          : `The device stored ${key} as ${stored}.`
+      },
     },
   },
   heightMap: {

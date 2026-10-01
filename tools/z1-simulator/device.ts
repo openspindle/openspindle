@@ -467,7 +467,8 @@ export class SimulatedZ1 {
         return
       }
       case "config-set": {
-        // Configurator::config_set_command: the value is stored as it was sent.
+        // Configurator::config_set_command: the value is stored as it was sent, where its line
+        // has room for it (`withSavedSetting`).
         const [source = "", key = "", value = ""] = argument.split(/\s+/)
         if (!source || !key || !value)
           return this.lines(
@@ -475,10 +476,12 @@ export class SimulatedZ1 {
           )
         if (source !== "sd")
           return this.lines(`${source} source does not exist`)
-        this.transfer.files.set(
-          CONFIGURATION_PATH,
-          withSavedSetting(this.configuration, key, value)
-        )
+        const saved = withSavedSetting(this.configuration, key, value)
+        if (!saved)
+          return this.lines(
+            `${source}: ${key} not enough space to overwrite existing key/value`
+          )
+        this.transfer.files.set(CONFIGURATION_PATH, saved)
         this.log(`config-set ${key} ${value} (loaded at the next reboot)`)
         this.lines(`${source}: ${key} has been set to ${value}`)
         return
