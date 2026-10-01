@@ -7,6 +7,7 @@ import type {
   StoredAnchorSetup,
 } from "@/domain/anchors/stored-anchors"
 import { CoordinateInput } from "@/components/workspace/coordinate-input"
+import { Hint } from "@/components/workspace/hint"
 import { ReasonButton } from "@/components/workspace/reason-button"
 import {
   Card,
@@ -17,7 +18,6 @@ import {
   CardContent,
 } from "@/components/ui/card"
 import {
-  FieldDescription,
   FieldError,
   FieldGroup,
   FieldLegend,
@@ -41,42 +41,41 @@ const coordinateFormat = new Intl.NumberFormat("en-US", {
   maximumFractionDigits: 3,
 })
 
+const BED_OFFSET_HINT =
+  "How far the bed and its holes sit from where the machine's kit places them from the first anchor. Only the 3D view uses it; the device is not changed."
+
 /**
- * Where the first anchor sits on the bed model. It registers the machine's anchor coordinates
- * to the bed for display only; it never writes the firmware configuration.
+ * Where the machine's bed model sits from where its kit places it, from the first anchor, the
+ * bed's origin. It aligns the bed's holes with the anchors for display only; it never writes the
+ * firmware configuration.
  */
-function AnchorAlignment({
-  name,
-  position,
+function BedOffset({
+  offset,
   onAlign,
 }: {
-  /** The first anchor's name. */
-  name: string
-  position: AnchorXY
-  onAlign: (position: AnchorXY) => void
+  offset: AnchorXY
+  onAlign: (offset: AnchorXY) => void
 }) {
   return (
     <FieldSet>
-      <FieldLegend>{name} on bed</FieldLegend>
-      <FieldDescription>
-        Aligns the anchors with the bed for the viewer; the device is not
-        changed.
-      </FieldDescription>
+      <FieldLegend>
+        <Hint text={BED_OFFSET_HINT}>Bed offset</Hint>
+      </FieldLegend>
       <FieldGroup className="grid grid-cols-2 gap-3">
-        {(["X", "Y"] as const).map((axis, index) => (
-          <CoordinateInput
-            key={axis}
-            axis={axis}
-            unit="mm"
-            label={`${name} bed ${axis}`}
-            value={position[index]}
-            onCommit={(value) => {
-              const next: AnchorXY = [...position]
-              next[index] = value
-              onAlign(next)
-            }}
-          />
-        ))}
+        <CoordinateInput
+          axis="X"
+          unit="mm"
+          label="Bed offset X"
+          value={offset[0]}
+          onCommit={(value) => onAlign([value, offset[1]])}
+        />
+        <CoordinateInput
+          axis="Y"
+          unit="mm"
+          label="Bed offset Y"
+          value={offset[1]}
+          onCommit={(value) => onAlign([offset[0], value])}
+        />
       </FieldGroup>
     </FieldSet>
   )
@@ -93,8 +92,8 @@ export function DeviceAnchors({
   setup?: StoredAnchorSetup
   loading: boolean
   error?: string
-  /** Moves the first anchor on the bed; absent when the alignment cannot be edited. */
-  onAlign?: (position: AnchorXY) => void
+  /** Moves the machine's bed from where its kit places it; absent when it cannot be edited. */
+  onAlign?: (offset: AnchorXY) => void
   /** Shown in the header, such as reading the anchors again. */
   action?: ReactNode
   /** Changes the machine positions the device stores; absent when it stores none. */
@@ -191,13 +190,7 @@ export function DeviceAnchors({
               onClose={() => setEditing(false)}
             />
           )}
-          {onAlign && (
-            <AnchorAlignment
-              name={setup.anchors[0].name}
-              position={setup.anchor1BedPosition}
-              onAlign={onAlign}
-            />
-          )}
+          {onAlign && <BedOffset offset={setup.bedOffset} onAlign={onAlign} />}
         </CardContent>
       )}
       {error && (

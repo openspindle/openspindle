@@ -443,25 +443,32 @@ export function withSingleDefaultBed(
   )
 }
 
-/** Support layers stack only on designated beds; clamps/rotary modules never lift the stock. */
+/**
+ * The top of the plate's highest bed, else `floor`, the machine's own bed top
+ * (`FixtureKit.tableTop`). Support layers stack only on designated beds; clamps/rotary modules
+ * never lift the stock.
+ */
 export function fixtureSupportHeight(
-  fixtures: readonly FixtureInstance[] = []
+  fixtures: readonly FixtureInstance[],
+  floor: number
 ) {
   return fixtures.reduce((height, instance) => {
     if (!isBedKind(instance.definition.kind)) return height
-    return Math.max(height, fixtureBounds(instance)?.max[2] ?? 0)
-  }, 0)
+    return Math.max(height, fixtureBounds(instance)?.max[2] ?? floor)
+  }, floor)
 }
 
 /**
  * The height stock rests on where it lies (from `corner`, its front-left X and Y, over its
- * footprint): the top of the plate's bed, or of the highest wasteboard under it. A bed covers
- * the table, so it carries the stock wherever it is.
+ * footprint): the top of the plate's bed, or of the highest wasteboard under it, else `floor`,
+ * the machine's own bed top (`FixtureKit.tableTop`). A bed covers the table, so it carries the
+ * stock wherever it is.
  */
 export function stockSupportHeight(
   fixtures: readonly FixtureInstance[],
   corner: readonly number[],
-  footprint: { readonly width: number; readonly depth: number } | null
+  footprint: { readonly width: number; readonly depth: number } | null,
+  floor: number
 ) {
   const [x, y] = corner
   const width = footprint?.width ?? 0
@@ -478,5 +485,5 @@ export function stockSupportHeight(
         box.min[1] < y + depth &&
         y < box.max[1])
     return under ? Math.max(height, box.max[2]) : height
-  }, 0)
+  }, floor)
 }

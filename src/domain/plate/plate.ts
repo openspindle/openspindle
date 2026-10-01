@@ -18,6 +18,7 @@ import type {
 import { formatMillimetres } from "@/domain/geometry/millimetres"
 import { kitForSetup } from "../fixtures/catalog"
 import { defaultPlateCoordinates } from "./placement"
+import type { WorkAreaXY } from "./placement"
 import {
   StoredAnchorSetupSchema,
   bedAnchors,
@@ -214,17 +215,13 @@ export function createPlateSetup(options: {
   })
   const fixtures =
     options.fixtures ?? defaultFixtureInstances(kit.definitions())
-  const { workArea } = kit
   const supportHeight = stockSupportHeight(
     fixtures,
-    defaultPlateCoordinates(options.stock, workArea).stockAnchor,
-    options.stock
-  )
-  const coordinates = defaultPlateCoordinates(
+    defaultPlateCoordinates(options.stock, kit, kit.tableTop).stockAnchor,
     options.stock,
-    workArea,
-    supportHeight
+    kit.tableTop
   )
+  const coordinates = defaultPlateCoordinates(options.stock, kit, supportHeight)
   return {
     stock: options.stock,
     stockSource: options.stockSource,
@@ -250,9 +247,10 @@ export function createPlateSetup(options: {
 export function withStockPlacement(
   setup: PlateSetup,
   placement: StockPlacement,
-  machine: {
-    readonly workArea: readonly number[]
+  machine: WorkAreaXY & {
     readonly anchors: StoredAnchorSetup
+    /** The bed Z of the machine's own bed top (`FixtureKit.tableTop`). */
+    readonly tableTop: number
   }
 ): PlateSetup {
   const { stock } = setup
@@ -267,14 +265,20 @@ export function withStockPlacement(
       ? [position[0] + anchor.offset[0], position[1] + anchor.offset[1]]
       : null
   const [width, depth] = machine.workArea
+  const [left, front] = machine.workAreaOrigin
   const overlaps =
     corner !== null &&
-    corner[0] < width &&
-    corner[0] + stock.width > 0 &&
-    corner[1] < depth &&
-    corner[1] + stock.depth > 0
+    corner[0] < left + width &&
+    corner[0] + stock.width > left &&
+    corner[1] < front + depth &&
+    corner[1] + stock.depth > front
   const [x, y] = overlaps ? corner : setup.stockAnchor
-  const supportHeight = stockSupportHeight(setup.fixtures, [x, y], stock)
+  const supportHeight = stockSupportHeight(
+    setup.fixtures,
+    [x, y],
+    stock,
+    machine.tableTop
+  )
   const [originX, originY, originZ] = placement.workOrigin ?? [
     0,
     0,

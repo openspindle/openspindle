@@ -18,7 +18,7 @@ export class Z1FourthAxis extends Fixture {
   readonly name = "4th axis module"
   readonly kind = "rotary"
   readonly color = "#737b85"
-  readonly defaultPosition: Point3 = [100, 100, 6]
+  readonly defaultPosition: Point3 = [88, 88, 0]
   readonly model: FixtureModel = {
     source: { kind: "bundled", url: "/models/makera-z1-fourth-axis.glb" },
     bounds: {

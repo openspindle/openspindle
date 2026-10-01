@@ -105,9 +105,9 @@ export function DevicePage() {
                 )
               }
               writing={storesAnchors ? writing : undefined}
-              onAlign={(anchor1BedPosition) => {
+              onAlign={(bedOffset) => {
                 if (!profile.anchors) return
-                const anchors = { ...profile.anchors, anchor1BedPosition }
+                const anchors = { ...profile.anchors, bedOffset }
                 fixtures.setAnchors(anchors)
                 followDeviceAnchors(workspace, deviceId, anchors)
               }}

@@ -8,10 +8,15 @@ import {
 import type { FixtureInstance } from "@/domain/fixtures/definitions"
 import { boxMountPoints } from "@/domain/fixtures/mount-points"
 import type { MountPoint } from "@/domain/fixtures/mount-points"
-import { anchorDisplayName, bedAnchors } from "@/domain/anchors/stored-anchors"
+import {
+  anchorDisplayName,
+  bedAnchors,
+  bedOffsetOf,
+} from "@/domain/anchors/stored-anchors"
 import type { StoredAnchorSetup } from "@/domain/anchors/stored-anchors"
 import type { Stock } from "@/domain/stock/stock"
 import { fixtureModelMountPoints, kitForSetup } from "../fixtures/catalog"
+import { bedAt } from "../fixtures/machine-bed"
 import { fail, ok } from "../primitives"
 import type { Point3, Result } from "../primitives"
 import type { PlateSetup } from "./plate"
@@ -191,11 +196,12 @@ function ownMountPoints(
 ): readonly MountPoint[] {
   const fixtures = subject.fixtures ?? []
   switch (ref.kind) {
-    case "bed":
+    case "bed": {
       // Under a bed fixture, only that bed's own holes are reachable.
       if (coversMachineBed(fixtures)) return []
-      return kitForSetup({ deviceId: subject.deviceId ?? null, fixtures }).bed
-        .mountPoints
+      const kit = kitForSetup({ deviceId: subject.deviceId ?? null, fixtures })
+      return bedAt(kit.bed, bedOffsetOf(subject.anchors)).mountPoints
+    }
     case "fixture": {
       const instance = fixtures.find((item) => item.id === ref.id)
       const model = instance?.definition.model
@@ -238,7 +244,11 @@ export function setupPoints(
       position: point.position,
     }))
   )
-  const z = fixtureSupportHeight(subject.fixtures ?? [])
+  const fixtures = subject.fixtures ?? []
+  const z = fixtureSupportHeight(
+    fixtures,
+    kitForSetup({ deviceId: subject.deviceId ?? null, fixtures }).tableTop
+  )
   const factory = subject.anchors?.source === "factory"
   for (const anchor of bedAnchors(subject.anchors ?? undefined))
     points.push({

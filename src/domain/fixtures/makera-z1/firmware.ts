@@ -68,16 +68,15 @@ type Style = Omit<FirmwareMove, "end">
 /** Machine coordinates on a plate's bed, in the preview's coordinates, and what probing meets. */
 class Z1Frame {
   private readonly setup: FirmwareSetup
-  /** Anchor 1 in machine coordinates, and from there to the bed. */
+  /** Anchor 1 in machine coordinates, and from there to the bed, whose origin it is. */
   private readonly anchor: XY
   private readonly shift: XY
 
   constructor(setup: FirmwareSetup) {
     this.setup = setup
     const [first] = setup.anchors.anchors
-    const [bedX, bedY] = setup.anchors.anchor1BedPosition
     this.anchor = first.machinePosition
-    this.shift = [bedX - this.anchor[0], bedY - this.anchor[1]]
+    this.shift = [-this.anchor[0], -this.anchor[1]]
   }
 
   /** Machine X and Y in the preview's coordinates. */

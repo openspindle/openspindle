@@ -10,19 +10,29 @@ export const fitsWorkArea = (
   workArea: readonly number[]
 ) => width <= workArea[0] && depth <= workArea[1] && height <= workArea[2]
 
+/** A machine's work area: its X and Y size, from its front-left corner on the bed (`origin`). */
+export type WorkAreaXY = {
+  readonly workArea: readonly number[]
+  readonly workAreaOrigin: readonly [number, number]
+}
+
 /**
- * Default placement: the stock centred in the machine's work area (its X and Y size) on its
- * support, the work origin at the stock's top front-left corner. Physical coordinates, without
- * the viewer's drawing offsets.
+ * Default placement: the stock centred in the machine's work area on its support, the work
+ * origin at the stock's top front-left corner; without stock, both at the work area's front-left
+ * corner. Physical coordinates, without the viewer's drawing offsets.
  */
 export function defaultPlateCoordinates(
   stock: Pick<Stock, "width" | "depth" | "height"> | null,
-  [width, depth]: readonly number[],
-  supportHeight = 0
+  { workArea: [width, depth], workAreaOrigin: [x, y] }: WorkAreaXY,
+  supportHeight: number
 ): PlateCoordinates {
   const stockAnchor: Point3 = stock
-    ? [width / 2 - stock.width / 2, depth / 2 - stock.depth / 2, supportHeight]
-    : [0, 0, supportHeight]
+    ? [
+        x + width / 2 - stock.width / 2,
+        y + depth / 2 - stock.depth / 2,
+        supportHeight,
+      ]
+    : [x, y, supportHeight]
   return {
     stockAnchor,
     workOrigin: [

@@ -37,7 +37,7 @@ export function useReadAnchorsFix(plateId: string | null) {
       readAnchors.mutate(undefined, {
         onSuccess: (configuration) => {
           if (device && plateId) {
-            // Recorded as the device sync records it, with its bed alignment, for the plate.
+            // Recorded as the device sync records it, with its bed offset, for the plate.
             fixtures.recordDeviceAnchors(device, configuration)
             const deviceId = machineId(device)
             const { profiles } = fixtures.state

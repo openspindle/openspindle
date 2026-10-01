@@ -291,12 +291,14 @@ export function DeviceFixtures({
               )
               // New fixtures start in the middle of the machine's bed, on the top of the bed
               // new plates have, where the anchors are drawn too.
-              const [x, y] = kitForSetup({
+              const kit = kitForSetup({
                 deviceId: profileDeviceId(selectedId),
                 fixtures: definitions.map((definition) => ({ definition })),
-              }).bed.topCenter
+              })
+              const [x, y] = kit.bed.topCenter
               const top = fixtureSupportHeight(
-                defaultFixtureInstances(definitions)
+                defaultFixtureInstances(definitions),
+                kit.tableTop
               )
               onChange([
                 ...definitions,

@@ -55,7 +55,7 @@ export class Z1MdfBed extends Fixture {
   readonly kind = "bed"
   readonly color = "#303332"
   override readonly defaultEnabled = true
-  readonly defaultPosition: Point3 = [100, 100, 0]
+  readonly defaultPosition: Point3 = [88, 88, -6]
   readonly model: FixtureModel = {
     source: { kind: "bundled", url: "/models/makera-z1-mdf-bed.glb" },
     bounds: { min: [-103, -103, 0], max: [103, 103, 6] },

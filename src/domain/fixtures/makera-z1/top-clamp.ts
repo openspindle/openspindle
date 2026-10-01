@@ -30,7 +30,7 @@ export class Z1TopClamp extends Fixture {
   readonly color = MACHINED_ALUMINIUM.color
   override readonly finish = MACHINED_ALUMINIUM
   /** On the MDF bed along its back edge, its slot centred on the rightmost M5 hole there. */
-  readonly defaultPosition: Point3 = [167, 193, 6]
+  readonly defaultPosition: Point3 = [155, 181, 0]
   readonly model: FixtureModel = {
     source: { kind: "bundled", url: "/models/makera-z1-top-clamp.glb" },
     bounds: { min: [-32.5, -10, 0], max: [32.5, 10, 5] },

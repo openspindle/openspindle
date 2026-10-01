@@ -24,7 +24,7 @@ function firmwareSetup(plate: Plate, kit: FixtureKit): FirmwareSetup {
           ],
         }
       : null,
-    supportZ: fixtureSupportHeight(fixtures),
+    supportZ: fixtureSupportHeight(fixtures, kit.tableTop),
   }
 }
 

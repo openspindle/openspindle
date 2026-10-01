@@ -182,6 +182,8 @@ export function importProgram(
       ? withProgramFixtures(
           withStockPlacement(setup, marked.placement, {
             workArea: kit.workArea,
+            workAreaOrigin: kit.workAreaOrigin,
+            tableTop: kit.tableTop,
             anchors: kit.factoryAnchors(setup.deviceId),
           }),
           marked.fixtures,

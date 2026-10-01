@@ -25,16 +25,20 @@ export const ANCHOR_LIMIT = 32
 
 /**
  * A snapshot of a machine's anchors, as plates and device profiles keep it: the kit's factory
- * defaults, or a read of the device, which names the device and when it was read.
+ * defaults, or a read of the device, which names the device and when it was read. Its first
+ * anchor is the bed's origin (`machineToBed`).
  */
 export const StoredAnchorSetupSchema = z
   .object({
-    version: z.literal(1),
+    version: z.literal(2),
     deviceId: EntityIdSchema.nullable(),
     source: z.enum(["factory", "firmware-config"]),
     fetchedAt: z.number().min(0).optional(),
-    /** The first anchor's physical XY in the bundled bed's coordinate frame. */
-    anchor1BedPosition: AnchorXYSchema,
+    /**
+     * How far the machine's bed (its model and holes) sits from where its kit places it from the
+     * first anchor, in X and Y; [0, 0] where the kit has it.
+     */
+    bedOffset: AnchorXYSchema,
     anchors: z.array(StoredAnchorSchema).min(1).max(ANCHOR_LIMIT),
   })
   .superRefine((setup, context) => {
@@ -59,7 +63,7 @@ export const StoredAnchorSetupSchema = z
       context.addIssue({
         code: "custom",
         message: `The anchors lie more than ${COORDINATE_LIMIT} mm from the bed's origin.`,
-        path: ["anchor1BedPosition"],
+        path: ["anchors"],
       })
   })
 export type StoredAnchorSetup = z.infer<typeof StoredAnchorSetupSchema>
@@ -73,21 +77,18 @@ export const isStoredAnchorSetup = (
 ): value is StoredAnchorSetup =>
   StoredAnchorSetupSchema.safeParse(value).success
 
-/**
- * The anchors read from a device, placed on the bed by where its first anchor is there; without
- * that position, the first anchor is at the bed's origin.
- */
+/** The anchors read from a device, with its bed `bedOffset` from where its kit places it. */
 export function anchorsFromDevice(
   configuration: AnchorConfiguration,
   deviceId: string,
-  anchor1BedPosition: AnchorXY = [0, 0]
+  bedOffset: AnchorXY = [0, 0]
 ): StoredAnchorSetup {
   return {
-    version: 1,
+    version: 2,
     deviceId,
     source: "firmware-config",
     fetchedAt: configuration.fetchedAt,
-    anchor1BedPosition: [...anchor1BedPosition],
+    bedOffset: [...bedOffset],
     anchors: configuration.anchors.map((anchor) => ({
       id: anchor.id,
       name: anchor.name,
@@ -97,19 +98,22 @@ export function anchorsFromDevice(
 }
 
 /**
- * Machine XY on the bed, through the setup's registration: its first anchor is at its machine
- * position there and at `anchor1BedPosition` on the bed.
+ * Machine XY on the bed: the bed's origin is the setup's first anchor (Anchor 1 on the Z1), so a
+ * bed position is its distance from that anchor.
  */
 export function machineToBed(
-  setup: Pick<StoredAnchorSetup, "anchors" | "anchor1BedPosition">
+  setup: Pick<StoredAnchorSetup, "anchors">
 ): Transform<"machine", "bed"> {
   const reference = setup.anchors[0].machinePosition
-  const bed = setup.anchor1BedPosition
   return (point) => [
-    Number((point[0] - reference[0] + bed[0]).toFixed(6)),
-    Number((point[1] - reference[1] + bed[1]).toFixed(6)),
+    Number((point[0] - reference[0]).toFixed(6)) + 0,
+    Number((point[1] - reference[1]).toFixed(6)) + 0,
   ]
 }
+
+/** How far a plate's or profile's machine bed sits from where its kit places it; none without anchors. */
+export const bedOffsetOf = (setup?: StoredAnchorSetup | null): AnchorXY =>
+  setup?.bedOffset ?? [0, 0]
 
 export function bedAnchors(setup?: StoredAnchorSetup): BedAnchor[] {
   if (!setup?.anchors.length) return []

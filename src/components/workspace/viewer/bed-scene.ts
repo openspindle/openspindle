@@ -11,6 +11,7 @@ import type {
 import {
   fitOrthographicBounds,
   layoutPlates,
+  plateBed,
   plateKit,
   problemAnchor,
   problemMarkerId,
@@ -290,9 +291,9 @@ export class BedScene {
     for (const placement of this.layout.placements) {
       const plate = next[placement.index]
       const view = this.views.get(plate.id)
-      // A view keeps the bed it was made on; a plate set up on another machine is drawn anew.
-      if (view?.machineBed === plateKit(plate).bed)
-        view.update(plate, placement)
+      // A view keeps the bed it was made on; a plate set up on another machine, or with its bed
+      // moved, is drawn anew.
+      if (view?.machineBed === plateBed(plate)) view.update(plate, placement)
       else {
         view?.dispose()
         this.addView(plate, placement)

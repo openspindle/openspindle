@@ -60,11 +60,10 @@ export abstract class FixtureKit {
   abstract readonly deviceModels: readonly string[]
   /** A picture of the machine, bundled with the app. */
   abstract readonly imageUrl: string
-  /**
-   * How far the tool reaches in X, Y and Z, in millimetres, from the origin of bed coordinates:
-   * the work area's front-left corner, on the bed's top.
-   */
+  /** How far the tool reaches in X, Y and Z, in millimetres, from `workAreaOrigin`. */
   abstract readonly workArea: Point3
+  /** Where the work area's front-left corner is, in bed coordinates. */
+  abstract readonly workAreaOrigin: readonly [number, number]
   abstract readonly bed: MachineBed
   /**
    * How it probes with the probes of the tool library: the tool numbers its firmware needs them
@@ -118,6 +117,11 @@ export abstract class FixtureKit {
 
   /** The anchors a profile starts with, until they are read from its device. */
   abstract factoryAnchors(deviceId: string | null): StoredAnchorSetup
+
+  /** The bed Z of its own bed's top, which carries what no bed fixture does. */
+  get tableTop(): number {
+    return this.bed.bounds.max[2]
+  }
 
   /** The latest version: the last in which a fixture was added, corrected or recoloured. */
   get version() {

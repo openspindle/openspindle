@@ -31,8 +31,16 @@ export type RepositoryOptions<TValue> = {
   readonly key: StorageKey
   /** Shown in messages: "the workspace", "the fixture library". */
   readonly title: string
-  /** The only version this store reads; data of any other version is refused. */
+  /** The version this store writes; data of a newer one is refused. */
   readonly version: number
+  /**
+   * Data of earlier versions, from `oldest`, in the current version's shape; absent where only
+   * the current version is read.
+   */
+  readonly upgrade?: {
+    readonly oldest: number
+    readonly from: (data: unknown, version: number) => unknown
+  }
   /** Items that cannot be restored are dropped and named; anything fatal throws. */
   readonly decode: (data: unknown) => Decoded<TValue>
   readonly encode: (value: TValue) => unknown
@@ -51,7 +59,8 @@ const message = (error: unknown) =>
 
 /**
  * One versioned JSON document in host storage: `{version, data}`, decoded item by item, so
- * one bad item never discards the rest. Data of an earlier version is not read.
+ * one bad item never discards the rest. Data of an earlier version is read only through the
+ * store's `upgrade`.
  */
 export class Repository<TValue> {
   readonly key: StorageKey
@@ -92,12 +101,20 @@ export class Repository<TValue> {
           },
         ],
       }
-    if (envelope.version < version)
+    const { upgrade } = this.options
+    if (
+      envelope.version < version &&
+      (!upgrade || envelope.version < upgrade.oldest)
+    )
       return failed(
         `${title} is from an earlier version of OpenSpindle, which this version cannot read.`
       )
     try {
-      const decoded = this.options.decode(envelope.data)
+      const data =
+        upgrade && envelope.version < version
+          ? upgrade.from(envelope.data, envelope.version)
+          : envelope.data
+      const decoded = this.options.decode(data)
       return {
         status: "loaded",
         value: decoded.value,

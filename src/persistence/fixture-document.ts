@@ -9,6 +9,7 @@ import { EntityIdSchema, plural } from "@/domain/primitives"
 import { describePath, readOptimistically } from "@/formats/optimistic-read"
 import type { ValuePath } from "@/formats/optimistic-read"
 import type { StoragePort } from "@/platform/host"
+import { upgradeProfileBedFrame } from "@/formats/upgrade/bed-frame"
 import { Repository } from "./repository"
 import type { Decoded } from "./repository"
 
@@ -87,11 +88,30 @@ function decodeFixtures(data: unknown): Decoded<FixtureLibrary> {
   return { value: { selectedId, profiles }, dropped }
 }
 
+/**
+ * A fixture library of version 2, whose positions had the work area's front-left corner at the
+ * origin, with each profile in bed coordinates from Anchor 1 (`upgradeProfileBedFrame`).
+ */
+function upgradeFixtures(data: unknown): unknown {
+  if (!record(data) || !record(data.profiles)) return data
+  return {
+    ...data,
+    profiles: Object.fromEntries(
+      Object.entries(data.profiles).map(([id, profile]) => [
+        id,
+        upgradeProfileBedFrame(profile),
+      ])
+    ),
+  }
+}
+
+/** Version 3: bed coordinates are from Anchor 1, with Z 0 on the MDF bed's top. */
 export function fixtureRepository(storage: StoragePort) {
   return new Repository<FixtureLibrary>(storage, {
     key: "fixtures",
     title: "The fixture library",
-    version: 2,
+    version: 3,
+    upgrade: { oldest: 2, from: upgradeFixtures },
     decode: decodeFixtures,
     encode: (value) => value,
     schema: FixtureLibrarySchema,

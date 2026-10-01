@@ -38,6 +38,14 @@ const LIGHTER_ALUMINIUM: KitRecolor = { in: 6, from: ["#a2aab3"] }
 export const MAKERA_Z1_ID = "makera-z1"
 
 /**
+ * Bed coordinates before project format 9 (plate exports before version 8): the work area's
+ * front-left corner at the origin and Z 0 on the aluminium bed, with Anchor 1 at `anchor1` unless
+ * the device's alignment put it elsewhere, and the MDF bed's top at `z`. Bed coordinates are now
+ * from Anchor 1, with Z 0 on the MDF bed's top.
+ */
+export const LEGACY_BED_FRAME = { anchor1: [12, 12], z: 6 } as const
+
+/**
  * The Makera Z1 and Z1 Pro: the aluminium bed, probing with the wired probe and the 3D probe,
  * the fixtures Makera makes for it and its anchors.
  */
@@ -48,6 +56,7 @@ export class MakeraZ1 extends FixtureKit {
   readonly imageUrl = "/images/makera_z1.png"
   /** The official three-axis work envelope, not the bed's size. */
   readonly workArea: Point3 = [200, 200, 100]
+  readonly workAreaOrigin = [-12, -12] as const
   readonly bed = new Z1Bed()
   /**
    * The firmware selects a Z touch probe, such as Makera's wired Probe 2.0, as T0 and the 3D
@@ -136,15 +145,15 @@ export class MakeraZ1 extends FixtureKit {
   }
 
   /**
-   * Makera's factory anchor positions, in machine coordinates. Anchor 1 is the L-bracket's inner
-   * corner on the bed: the bracket's outer corner is at X -3, Y -3 and its arms are 15 mm wide.
+   * Makera's factory anchor positions, in machine coordinates. Anchor 1, the bed's origin, is the
+   * L-bracket's inner corner on the MDF bed: the bracket's outer corner is at X -15, Y -15.
    */
   factoryAnchors(deviceId: string | null): StoredAnchorSetup {
     return {
-      version: 1,
+      version: 2,
       deviceId,
       source: "factory",
-      anchor1BedPosition: [12, 12],
+      bedOffset: [0, 0],
       anchors: [
         { id: "anchor-1", name: "Anchor 1", machinePosition: [-192.4, -194.3] },
         { id: "anchor-2", name: "Anchor 2", machinePosition: [-103.9, -149.3] },

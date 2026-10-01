@@ -59,7 +59,7 @@ const SLOW = 100
 const RETRACT = 1
 /**
  * The machine Z at which the probe meets stock until the app sends its plate's bed: a 1 mm PCB
- * on the MDF bed (bed Z 7.02).
+ * on the MDF bed (bed Z 1.02).
  */
 export const DEFAULT_SURFACE_Z = -82.35
 

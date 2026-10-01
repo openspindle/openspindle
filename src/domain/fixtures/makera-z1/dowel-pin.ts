@@ -14,7 +14,7 @@ export class Z1DowelPin extends Fixture {
   readonly name = "Dowel pin · 4 × 11 mm"
   readonly kind = "other"
   readonly color = "#c3c8ce"
-  readonly defaultPosition: Point3 = [4.5, 93, 6]
+  readonly defaultPosition: Point3 = [-7.5, 81, 0]
   readonly model: FixtureModel = {
     source: { kind: "bundled", url: "/models/makera-z1-dowel-pin.glb" },
     bounds: { min: [-2, -2, -7], max: [2, 2, 4] },

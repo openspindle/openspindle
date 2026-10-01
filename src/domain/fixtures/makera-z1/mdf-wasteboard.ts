@@ -12,7 +12,7 @@ export class Z1MdfWasteboard extends Fixture {
   readonly name = "MDF wasteboard"
   readonly kind = "wasteboard"
   readonly color = "#c7a477"
-  readonly defaultPosition: Point3 = [100, 100, 6]
+  readonly defaultPosition: Point3 = [88, 88, 0]
   readonly model = boxModel(100, 100, 2)
   readonly mountPoints = boxMountPoints(this.model.bounds)
 }

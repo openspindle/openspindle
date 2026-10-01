@@ -12,6 +12,7 @@ import { isProbe, isTool, probeProfile } from "@/domain/tools/tool"
 import type { Tool } from "@/domain/tools/tool"
 import { libraryPreferences } from "@/domain/tools/tool-table"
 import { upgradeTool } from "../tool-library/upgrade"
+import { upgradeBedFrame } from "./bed-frame"
 import { isJsonObject } from "./json"
 import type { JsonObject } from "./json"
 import { upgradeProbingSource } from "./probing"
@@ -165,9 +166,23 @@ function upgradeGroups(groups: unknown): unknown {
 }
 
 /**
- * A plate's saved data as earlier formats saved it (projects before format 8, exports before
- * version 7), in the current one: a project's plate, or an export's payload, which holds the
- * plate's setup, tool table and operations alike. Its
+ * A plate's saved data as earlier formats saved it (projects before format 9, exports before
+ * version 8), in the current one: a project's plate, or an export's payload, which holds the
+ * plate's setup, tool table and operations alike. Its operations take their current shape
+ * (`upgradeOperations`), then its bed positions move to bed coordinates from Anchor 1
+ * (`upgradeBedFrame`).
+ */
+export function upgradePlate(
+  saved: JsonObject,
+  library: readonly unknown[]
+): UpgradedPlate {
+  const upgraded = upgradeOperations(saved, library)
+  return { ...upgraded, plate: upgradeBedFrame(upgraded.plate) }
+}
+
+/**
+ * A plate's saved data with operations of earlier formats (projects before format 8, exports
+ * before version 7) in their current shape. Its
  * auto-level, auto Z-height, auto-scan and 3D probing operations become probing operations
  * (`upgradeProbingSource`), and one still named after its kind is named after its strategy, as
  * a new one is; one that does not bind its probe binds it to the entry of that number. Where the
@@ -178,7 +193,7 @@ function upgradeGroups(groups: unknown): unknown {
  * probe from the library. Its groups hold its grids' sections by their current name. What it
  * does not recognize stays as it is, for reading to leave out and report.
  */
-export function upgradePlate(
+function upgradeOperations(
   saved: JsonObject,
   library: readonly unknown[]
 ): UpgradedPlate {

@@ -8,6 +8,8 @@ import type { WorkspaceState } from "@/domain/workspace/workspace"
 import { ruleSettingsFromDesignRules } from "@/formats/project/rule-settings"
 import { PROJECT_LIMITS } from "@/formats/project/step-nc"
 import { upgradeWorkspaceSources } from "@/formats/project/upgrade"
+import { upgradeBedFrame } from "@/formats/upgrade/bed-frame"
+import { isJsonObject } from "@/formats/upgrade/json"
 import { KEPT_WORKSPACE_MAX_LENGTH } from "@/platform/contract/window"
 import type { WindowHost } from "@/platform/host"
 import { log } from "@/app/errors/log"
@@ -17,6 +19,29 @@ import {
   markProjectSaved,
 } from "./project-session"
 import type { WorkspaceStore } from "./store"
+
+/** The kept workspace's version; a page before bed coordinates were from Anchor 1 kept none. */
+const KEPT_VERSION = 2
+
+/**
+ * What a page kept, with its plates in bed coordinates from Anchor 1: a page that kept no version
+ * kept them in the earlier frame (`upgradeBedFrame`).
+ */
+function inBedFrame(kept: unknown): unknown {
+  if (
+    !isJsonObject(kept) ||
+    Object.hasOwn(kept, "version") ||
+    !Array.isArray(kept.plates)
+  )
+    return kept
+  return {
+    ...kept,
+    version: KEPT_VERSION,
+    plates: kept.plates.map((plate: unknown) =>
+      isJsonObject(plate) ? upgradeBedFrame(plate) : plate
+    ),
+  }
+}
 
 /** What a page kept, with rule settings: the design rules a page before them kept become them. */
 function withRuleSettings(kept: unknown): unknown {
@@ -38,8 +63,9 @@ function withRuleSettings(kept: unknown): unknown {
  * refuse it.
  */
 const KeptSchema = z.preprocess(
-  withRuleSettings,
+  (kept) => inBedFrame(withRuleSettings(kept)),
   z.object({
+    version: z.literal(KEPT_VERSION),
     plates: z.array(PlateSchema).max(PROJECT_LIMITS.plates),
     selectedPlateId: EntityIdSchema.nullable(),
     heightMaps: z
@@ -59,6 +85,7 @@ const KeptSchema = z.preprocess(
 )
 
 const keptOf = (state: WorkspaceState) => ({
+  version: KEPT_VERSION,
   plates: state.plates,
   selectedPlateId: state.selectedPlateId,
   heightMaps: state.heightMaps,
@@ -85,7 +112,7 @@ function restore(workspace: WorkspaceStore, text: string): boolean {
     )
     return false
   }
-  const { unsaved, selectedPlateId, ...kept } = read.data
+  const { unsaved, selectedPlateId, version: _version, ...kept } = read.data
   const selected = kept.plates.some((plate) => plate.id === selectedPlateId)
   workspace.dispatch({
     type: "workspace.replace",

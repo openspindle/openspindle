@@ -26,8 +26,9 @@ export const carriesPlate = (source: string) =>
  * The envelope version exports write.
  * Version 6 keeps PCB as a built-in operation source.
  * Version 7 makes probing one kind of operation: a strategy doing a task with a probe tool.
+ * Version 8 has bed coordinates from Anchor 1, with Z 0 on the MDF bed's top.
  */
-export const PLATE_ENVELOPE_VERSION = 7
+export const PLATE_ENVELOPE_VERSION = 8
 
 /** The oldest envelope version that can be upgraded on import. */
 export const OLDEST_PLATE_ENVELOPE_VERSION = 4

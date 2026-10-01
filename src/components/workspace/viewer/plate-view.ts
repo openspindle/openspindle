@@ -30,7 +30,7 @@ import {
   WORK_AXIS_LENGTH,
   bedArea,
   plateAnchorPoints,
-  plateKit,
+  plateBed,
   plateStockBounds,
 } from "../bed-viewer-layout"
 import type { PlatePlacement, ViewerBounds } from "../bed-viewer-layout"
@@ -171,13 +171,19 @@ function replaceChildren(group: THREE.Group, children: THREE.Object3D[]) {
   if (children.length) group.add(...children)
 }
 
-/** The reference grid below a bed, in 10 mm squares. */
+/** The reference grid below a bed, in 10 mm squares whose lines run through the bed's origin. */
 export function bedGrid(bed: MachineBed) {
   const { min, max } = bedArea(bed)
-  const size = Math.max(max[0] - min[0], max[1] - min[1])
-  const grid = new THREE.GridHelper(size, Math.round(size / 10), ...GRID_COLORS)
+  const [left, front] = [min[0], min[1]].map(
+    (value) => Math.floor(value / 10) * 10
+  )
+  const [right, back] = [max[0], max[1]].map(
+    (value) => Math.ceil(value / 10) * 10
+  )
+  const size = Math.max(right - left, back - front)
+  const grid = new THREE.GridHelper(size, size / 10, ...GRID_COLORS)
   grid.rotation.x = Math.PI / 2
-  grid.position.set((min[0] + max[0]) / 2, (min[1] + max[1]) / 2, min[2])
+  grid.position.set(left + size / 2, front + size / 2, min[2])
   return grid
 }
 
@@ -491,7 +497,7 @@ export class PlateView {
     this.presentation = presentation
     this.context = context
     this.root.userData.plateId = plate.id
-    const machineBed = plateKit(plate).bed
+    const machineBed = plateBed(plate)
     this.machineBed = machineBed
     this.bed.add(context.assets.bed(machineBed).clone(true))
     this.bed.userData.setupItem = { kind: "bed" } satisfies SetupItemRef

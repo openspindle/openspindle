@@ -159,9 +159,9 @@ export type MachineOrigin = {
 
 /**
  * The anchor a work origin is placed from on the machine: the one it is kept relative to, or for
- * a custom position (bed coordinates) the anchor the bed is aligned to, once the anchors are read
- * from the plate's device. Null for a custom position on factory or another device's anchors:
- * its work X and Y are set on Device.
+ * the bed origin (bed coordinates) the first anchor, once the anchors are read from the plate's
+ * device. Null at the bed origin on factory or another device's anchors: its work X and Y are set
+ * on Device.
  */
 function machineReference(setup: PlateSetup): AnchorReference | null {
   if (setup.workOriginAnchor) return workOriginReference(setup)
@@ -177,7 +177,7 @@ function machineReference(setup: PlateSetup): AnchorReference | null {
 
 /**
  * Where a work origin is on the machine: its anchor's stored machine position plus the offsets.
- * Null for a custom position whose anchors were not read from the plate's device.
+ * Null at the bed origin when its anchors were not read from the plate's device.
  */
 export function workOriginOnMachine(setup: PlateSetup): MachineOrigin | null {
   const reference = machineReference(setup)

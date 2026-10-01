@@ -99,7 +99,7 @@ function definitionsKey(
 
 /**
  * Fixture profiles per device: fixture definitions and the anchors plates are placed against.
- * Edits of definitions and alignment are recorded for Undo and Redo on the Device tab; what a
+ * Edits of definitions and the bed offset are recorded for Undo and Redo on the Device tab; what a
  * device reports and the selected profile are not edits, and stay when steps are undone.
  */
 export class FixtureLibraryStore implements DocumentTarget<FixtureLibrary> {
@@ -172,7 +172,7 @@ export class FixtureLibraryStore implements DocumentTarget<FixtureLibrary> {
   ): StoredAnchorSetup | null {
     const id = machineId(device)
     const before = this.state
-    // Read from the library it applies to, so replayed after an undo it keeps that alignment.
+    // Read from the library it applies to, so replayed after an undo it keeps that bed offset.
     this.change((library) => {
       const profile = Object.hasOwn(library.profiles, id)
         ? library.profiles[id]
@@ -182,12 +182,12 @@ export class FixtureLibraryStore implements DocumentTarget<FixtureLibrary> {
         profile.anchors.fetchedAt === configuration.fetchedAt
       )
         return library
-      // A profile saved without anchors takes where its machine's kit puts the first one.
+      // The bed stays where the profile aligned it; a profile saved without anchors has the
+      // bed where its machine's kit places it.
       const anchors = anchorsFromDevice(
         configuration,
         id,
-        profile.anchors?.anchor1BedPosition ??
-          defaultFixtureProfile(device).anchors?.anchor1BedPosition
+        profile.anchors?.bedOffset
       )
       if (!isStoredAnchorSetup(anchors)) return library
       return {

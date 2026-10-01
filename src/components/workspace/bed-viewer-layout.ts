@@ -1,3 +1,4 @@
+import { bedAt } from "@/domain/fixtures/machine-bed"
 import type { MachineBed } from "@/domain/fixtures/machine-bed"
 import { setupPoints } from "@/domain/plate/setup-items"
 import type { SetupPoint, SetupSubject } from "@/domain/plate/setup-items"
@@ -20,7 +21,7 @@ import type {
   ViewerProblem,
   ViewerProblemRef,
 } from "@/components/workspace/viewer/viewer-input"
-import { ANCHOR_LIMIT } from "@/domain/anchors/stored-anchors"
+import { ANCHOR_LIMIT, bedOffsetOf } from "@/domain/anchors/stored-anchors"
 import { COORDINATE_LIMIT } from "@/domain/primitives"
 
 export type ViewerBounds = { min: Point3; max: Point3 }
@@ -94,6 +95,11 @@ export function plateStockBounds(plate: ViewerPlate): ViewerBounds | null {
 export const plateKit = (plate: Pick<ViewerPlate, "deviceId" | "fixtures">) =>
   kitForSetup({ deviceId: plate.deviceId, fixtures: plate.fixtures ?? [] })
 
+/** The bed a plate is drawn on: its machine's, where the plate's bed offset puts it. */
+export const plateBed = (
+  plate: Pick<ViewerPlate, "deviceId" | "fixtures" | "anchorSetup">
+) => bedAt(plateKit(plate).bed, bedOffsetOf(plate.anchorSetup))
+
 /** The grids a plate's program probes, as its machine's probing reads them, on the bed. */
 export function plateProbeGrids(
   plate: Pick<ViewerPlate, "program" | "anchorSetup" | "deviceId" | "fixtures">
@@ -114,9 +120,9 @@ export function plateProbeTouches(
 
 /** Device anchor positions stay in bed coordinates, independent of stock and NC zero. */
 export function plateAnchorPoints(
-  plate: Pick<ViewerPlate, "storedAnchors" | "fixtures">
+  plate: Pick<ViewerPlate, "storedAnchors" | "fixtures" | "deviceId">
 ) {
-  const z = fixtureSupportHeight(plate.fixtures)
+  const z = fixtureSupportHeight(plate.fixtures ?? [], plateKit(plate).tableTop)
   return (plate.storedAnchors ?? [])
     .slice(0, ANCHOR_LIMIT)
     .filter((anchor) =>
@@ -246,7 +252,7 @@ export function layoutPlates(
     max: [-Infinity, -Infinity, -Infinity],
   }
   const placements = plates.map((plate, index): PlatePlacement => {
-    const area = bedArea(plateKit(plate).bed)
+    const area = bedArea(plateBed(plate))
     const local = plateEnvelope(plate, area)
     const offsetX = (cursor ?? area.min[0]) - local.min[0]
     const placed: ViewerBounds = {

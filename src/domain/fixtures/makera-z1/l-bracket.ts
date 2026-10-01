@@ -30,7 +30,7 @@ abstract class Z1LBracket extends Fixture {
   readonly kind = "clamp"
   readonly color = MACHINED_ALUMINIUM.color
   override readonly finish = MACHINED_ALUMINIUM
-  readonly defaultPosition: Point3 = [-3, -3, 6]
+  readonly defaultPosition: Point3 = [-15, -15, 0]
   readonly mountPoints: readonly MountPoint[] = [
     { id: "inner-corner", name: "Inner corner", position: [15, 15, 0] },
     { id: "outer-corner", name: "Outer corner", position: [0, 0, 0] },

@@ -81,21 +81,34 @@ export const Z1_DOWEL_HOLES: readonly HoleXY[] = [
 ]
 
 /**
- * The Z1's aluminium bed: its STEP moved by +100 mm in X and Y, so the 200 × 200 mm work area
- * starts at the origin. Its top is Z 0.
+ * The Z1's aluminium bed: its STEP moved by +88 mm in X and Y, so Anchor 1 (the L-bracket's inner
+ * corner, 12 mm in from the 200 × 200 mm work area's front-left corner) is the origin. Its top is
+ * 6 mm under the MDF bed's, which is Z 0.
  */
 export class Z1Bed extends MachineBed {
   readonly modelUrl = "/models/makera-z1-bed.glb"
-  readonly modelOrigin: Point3 = [100, 100, 0]
+  readonly modelOrigin: Point3 = [88, 88, -6]
   readonly bounds: FixtureBounds = {
-    min: [-3, -3, -10.2],
-    max: [203, 203, 0],
+    min: [-15, -15, -16.2],
+    max: [191, 191, -6],
   }
   readonly finish = { color: "#a9afb6", metalness: 0.48, roughness: 0.59 }
   readonly mountPoints: readonly MountPoint[] = [
     ...boxTopPoints(this.bounds),
-    ...holePoints("m5", "M5 hole", M5_HOLES, 0, this.stepOnBed()),
-    ...holePoints("dowel", "Dowel hole", Z1_DOWEL_HOLES, 0, this.stepOnBed()),
+    ...holePoints(
+      "m5",
+      "M5 hole",
+      M5_HOLES,
+      this.bounds.max[2],
+      this.stepOnBed()
+    ),
+    ...holePoints(
+      "dowel",
+      "Dowel hole",
+      Z1_DOWEL_HOLES,
+      this.bounds.max[2],
+      this.stepOnBed()
+    ),
   ]
 
   /** Where the STEP's origin, which its holes are measured from, is on the bed. */
