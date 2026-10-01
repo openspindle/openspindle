@@ -6,7 +6,7 @@ import { ProbePlacementSchema } from "../../placement"
 /** The touch-off parameters that a machine's probe gives ranges and defaults. */
 export type TouchOffField = "probeTravel" | "clearance"
 
-/** A machine's touch-off parameters, which its probe defines (`TouchOff.parameters`). */
+/** A strategy's touch-off parameters on a machine (`ProbingStrategy.parameters`). */
 export type TouchOffSpecs = SpecsOf<TouchOffParams, TouchOffField>
 
 const storedLength = z.number().positive().max(COORDINATE_LIMIT)

@@ -41,7 +41,7 @@ import type { AnchorPlacement } from "@/domain/probing/placement"
 
 export type OriginSettingsProps = {
   value: OriginParams
-  /** The routine's parameters on the machine's 3D probe: defaults, ranges and descriptions. */
+  /** The routine's parameters with its strategy on the machine: defaults, ranges and descriptions. */
   parameters: OriginSpecs
   /** Stored anchors of the plate's device that the start can be relative to. */
   anchors: readonly ProbingAnchorOption[]
@@ -64,7 +64,7 @@ const AXES_OPTIONS = PROBE_3D_AXES.map((value) => ({
 }))
 
 /** Where the form keeps each numeric input: a field, or one axis of the distance. */
-type NumericPath = "ballDiameter" | "distance[0]" | "distance[1]" | "depth"
+type NumericPath = "distance[0]" | "distance[1]" | "depth"
 
 /** What the routine touches and sets. */
 function routineDescription({ routine }: OriginParams) {
@@ -129,8 +129,6 @@ function OriginForm({
       if (!(current >= min && current <= max))
         form.setFieldValue(path, last, { dontRunListeners: true })
     }
-    if (!shown.ballDiameter)
-      restore("ballDiameter", parameters.ballDiameter, value.ballDiameter)
     if (!shown.distance[0])
       restore("distance[0]", parameters.distance[0], value.distance[0])
     if (!shown.distance[1])
@@ -217,14 +215,6 @@ function OriginForm({
                       />
                     ))}
                   </Field>
-                )}
-                {shown.ballDiameter && (
-                  <ParameterField
-                    id={`${id}-ballDiameter`}
-                    parameter={parameters.ballDiameter}
-                    field={probingField(form, "ballDiameter")}
-                    disabled={disabled}
-                  />
                 )}
                 {shown.distance[0] && (
                   <ParameterField

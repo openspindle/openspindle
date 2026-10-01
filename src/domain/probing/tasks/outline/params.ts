@@ -5,7 +5,7 @@ import type { SpecsOf } from "../../parameters"
 /** The trace's numeric parameters. */
 export type OutlineField = "travelZ" | "feed"
 
-/** A machine's trace parameters, which its probe defines (`OutlineTrace.parameters`). */
+/** A strategy's trace parameters on a machine (`ProbingStrategy.parameters`). */
 export type OutlineSpecs = SpecsOf<OutlineParams, OutlineField>
 
 /** A sanity bound for stored feeds, mm/min; the machine's probe sets the usable range. */

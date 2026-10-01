@@ -1,3 +1,5 @@
+import { issueOf } from "../../../diagnostics"
+import type { Issue } from "../../../diagnostics"
 import { formatMillimetres } from "../../../geometry/millimetres"
 import {
   PROBE_3D_AXES_LABELS,
@@ -18,9 +20,12 @@ import {
   originStartOffset,
   planOrigin,
 } from "../../../probing/tasks/origin/rules"
+import { fail, ok } from "../../../primitives"
+import type { Result } from "../../../primitives"
 import type { ParameterSpec } from "../../../probing/parameters"
 import { placementContext } from "../../../probing/placement"
 import type { ProbingStrategy } from "../../../probing/strategy"
+import type { Tool } from "../../../tools/tool"
 import { ORIGIN_ROUTINE, routineSubcode } from "../3d-probe/blocks"
 import { anchorTravel } from "../wired-probe/travel"
 
@@ -37,20 +42,10 @@ const distance = (axis: "X" | "Y"): ParameterSpec => ({
 })
 
 /**
- * Application limits, not a clearance check. The ball's default is the Makera 3D Probe's; the
- * firmware's own defaults are 20 mm distances and a 2 mm depth.
+ * Application limits, not a clearance check. The firmware's own defaults are 20 mm distances and
+ * a 2 mm depth.
  */
 const ROUTINE_PARAMETERS: OriginSpecs = {
-  ballDiameter: {
-    label: "Ball diameter",
-    unit: "mm",
-    default: 2,
-    min: 0.5,
-    max: 10,
-    step: 0.1,
-    description:
-      "The stylus's ball: each side it touches is set half of it beyond the ball's centre. The Makera 3D Probe's is 2 mm.",
-  },
   distance: [distance("X"), distance("Y")],
   depth: {
     label: "Probe depth",
@@ -65,8 +60,35 @@ const ROUTINE_PARAMETERS: OriginSpecs = {
   },
 }
 
+/**
+ * The balls the routines take, mm: application limits. Each side the probe touches is set half
+ * the ball beyond the ball's centre.
+ */
+const BALL = { min: 0.5, max: 10 } as const
+
 /** Numbers as the firmware prints its own routines' values: three decimals at most. */
 const mm = (value: number) => String(Number(value.toFixed(3)) + 0)
+
+const ballError = issueOf<"ball-unknown" | "ball-out-of-range">("error")
+
+/** A probe's ball, its diameter, when the routines take it; why they do not otherwise. */
+function ballOf({ name, diameter }: Tool): Result<number, Issue> {
+  if (diameter === null)
+    return fail(
+      ballError(
+        "ball-unknown",
+        `${name} has no ball diameter. Set it in the tool library.`
+      )
+    )
+  if (diameter < BALL.min || diameter > BALL.max)
+    return fail(
+      ballError(
+        "ball-out-of-range",
+        `${name}'s ball is ${formatMillimetres(diameter)} mm; the 3D probing routines take a ball from ${BALL.min} to ${BALL.max} mm.`
+      )
+    )
+  return ok(diameter)
+}
 
 /** What the routine touches, and what it sets. */
 function introduction(params: OriginParams, subcode: number): string[] {
@@ -150,19 +172,23 @@ function precautions({ routine, axes }: OriginParams): string[] {
  * less what the routine does not read (`originFields`): a pocket's centring, touching no top,
  * does without the depth, and a centring routine skips an axis given as 0.
  */
-function routineBlock(params: OriginParams, subcode: number): string {
+function routineBlock(
+  params: OriginParams,
+  ball: number,
+  subcode: number
+): string {
   const read = originFields(params.routine, params.axes)
   const [x, y] = params.distance.map((value, axis) =>
     read.distance[axis] ? value : 0
   )
   const z = read.depth ? ` Z${mm(params.depth)}` : ""
-  return `M${ORIGIN_ROUTINE}.${subcode} D${mm(params.ballDiameter)} X${mm(x)} Y${mm(y)}${z}`
+  return `M${ORIGIN_ROUTINE}.${subcode} D${mm(ball)} X${mm(x)} Y${mm(y)}${z}`
 }
 
 /**
  * The Z1 firmware's 3D probing routines (ATCHandler's M480), with a 3D touch probe in T9999, the
- * firmware's tool number for it: corners and centres found from where the probe starts, which
- * set the work origin there and report each contact.
+ * firmware's tool number for it, and its ball: corners and centres found from where the probe
+ * starts, which set the work origin there and report each contact.
  */
 export const ROUTINES: ProbingStrategy<"origin", OriginParams, OriginSpecs> = {
   id: "makera-z1/routines",
@@ -176,6 +202,8 @@ export const ROUTINES: ProbingStrategy<"origin", OriginParams, OriginSpecs> = {
   generate: ({ params, plate, probe, machine }) => {
     const plan = planOrigin(params, placementContext(plate), ROUTINE_PARAMETERS)
     if (!plan.ok) return plan
+    const ball = ballOf(probe.tool)
+    if (!ball.ok) return { ok: false, issues: [ball.error] }
     const { start, height } = plan
     const subcode = routineSubcode(plan.params.routine, plan.params.corner)
     const lines = [
@@ -190,7 +218,7 @@ export const ROUTINES: ProbingStrategy<"origin", OriginParams, OriginSpecs> = {
             "; Down to the start's height.",
             `G0 Z${formatMillimetres(height)}`,
           ]),
-      routineBlock(plan.params, subcode),
+      routineBlock(plan.params, ball.value, subcode),
       "M2",
     ]
     return {

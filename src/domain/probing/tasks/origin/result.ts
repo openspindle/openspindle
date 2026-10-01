@@ -15,17 +15,19 @@ export type OriginResult = {
 }
 
 /**
- * What the routine found from its contacts, in the order the routine makes them: two touches on
- * a top, and on each side a touch and a slower one, the second of each counting. A corner
+ * What the routine found from its contacts with a ball of `ballDiameter`, in the order the
+ * routine makes them: two touches on a top, and on each side a touch and a slower one, the second
+ * of each counting. A corner
  * routine touches the top, then its X side and its Y side. A centre routine touches the top of a
  * boss first; then, per axis it centres (X before Y), the side towards minus and the side towards
  * plus.
  */
 export function originResult(
-  params: Pick<OriginParams, "routine" | "corner" | "axes" | "ballDiameter">,
+  params: Pick<OriginParams, "routine" | "corner" | "axes">,
+  ballDiameter: number,
   contacts: readonly XYZ<"machine">[]
 ): OriginResult {
-  const radius = params.ballDiameter / 2
+  const radius = ballDiameter / 2
   // A touch counts from its second contact.
   const pair = (index: number): XYZ<"machine"> | null =>
     index + 1 < contacts.length ? contacts[index + 1] : null

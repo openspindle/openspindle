@@ -26,7 +26,11 @@ import {
 import type { OriginParams } from "@/domain/probing/tasks/origin/params"
 import { originResult } from "@/domain/probing/tasks/origin/result"
 import { placementHeight } from "@/domain/probing/placement"
-import { PROBE_3D_TOOL, PROBE_TOOL } from "@/domain/tools/tool-table"
+import {
+  PROBE_3D_TOOL,
+  PROBE_TOOL,
+  boundTools,
+} from "@/domain/tools/tool-table"
 import { programParts } from "@/machine/contract"
 import type {
   ContactsMeasurement,
@@ -245,10 +249,11 @@ function probe3dUnfinished(params: OriginParams, status: StageStatus) {
 /** Where a 3D probing routine set the work origin, from the contacts it reported. */
 function probe3dFacts(
   params: OriginParams,
+  ball: number,
   { contacts }: ContactsMeasurement,
   status: StageStatus
 ): { description: string; facts: { label: string; value: string }[] } {
-  const result = originResult(params, contacts)
+  const result = originResult(params, ball, contacts)
   const set = (["X", "Y"] as const).flatMap((axis, index) => {
     const value = result.origin[index]
     return value === null ? [] : [{ axis, value }]
@@ -294,8 +299,19 @@ function operationResults(
   const facts: { label: string; value: string }[] = []
   let description: string | null = null
   const { source } = operation
-  if (contacts && source.kind === "probing" && source.task === "origin") {
-    const probed = probe3dFacts(source.params, contacts, status)
+  // The probe's ball, as the plate's table held it when the job ran.
+  const probeId =
+    source.kind === "probing"
+      ? boundTools(subject.plate, operation).get(source.probe)
+      : undefined
+  const ball = tools.find((tool) => tool.id === probeId)?.diameter ?? null
+  if (
+    contacts &&
+    source.kind === "probing" &&
+    source.task === "origin" &&
+    ball !== null
+  ) {
+    const probed = probe3dFacts(source.params, ball, contacts, status)
     description = probed.description
     facts.push(...probed.facts)
   }

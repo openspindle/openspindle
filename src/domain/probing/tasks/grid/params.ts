@@ -6,7 +6,7 @@ import { ProbePlacementSchema } from "../../placement"
 /** The grid's numeric parameters, in form and plugin-manifest order. */
 export type GridField = "size" | "points" | "clearance"
 
-/** A machine's grid parameters, which its probe defines (`GridProbing.parameters`). */
+/** A strategy's grid parameters on a machine (`ProbingStrategy.parameters`). */
 export type GridSpecs = SpecsOf<GridParams, GridField>
 
 const storedLength = z.number().positive().max(COORDINATE_LIMIT)

@@ -55,17 +55,17 @@ export const PROBE_3D_AXES_LABELS: Readonly<Record<Probe3dAxes, string>> = {
 }
 
 /** The routine's numeric parameters, in form order. */
-export type OriginField = "ballDiameter" | "distance" | "depth"
+export type OriginField = "distance" | "depth"
 
-/** A machine's 3D probing parameters, which its probe defines (`OriginProbing.parameters`). */
+/** A strategy's 3D probing parameters on a machine (`ProbingStrategy.parameters`). */
 export type OriginSpecs = SpecsOf<OriginParams, OriginField>
 
 const storedLength = z.number().positive().max(COORDINATE_LIMIT)
 
 /**
  * A built-in 3D probing operation, as stored for any machine. Its NC is derived from these
- * parameters at compile time, within the ranges of the machine's 3D probe
- * (`originParamsSchema`). Every routine keeps every field; each reads those it needs.
+ * parameters at compile time, within the ranges of its strategy (`originParamsSchema`), and from
+ * the ball of the probe it selects. Every routine keeps every field; each reads those it needs.
  */
 export const OriginParamsSchema = z.strictObject({
   routine: Probe3dRoutineSchema,
@@ -73,8 +73,6 @@ export const OriginParamsSchema = z.strictObject({
   corner: Probe3dCornerSchema,
   /** The axes a centre routine centres. */
   axes: Probe3dAxesSchema,
-  /** The probe's ball, whose radius the routine sets each touched side apart by, mm. */
-  ballDiameter: storedLength,
   /**
    * How far the probe moves out from where it starts before it comes down beside a side and
    * touches back (corners and bosses), or searches for each wall (pockets), in X and in Y, mm.
@@ -91,7 +89,7 @@ export const OriginParamsSchema = z.strictObject({
 
 export type OriginParams = z.infer<typeof OriginParamsSchema>
 
-/** The parameters within the ranges of a machine's 3D probe, as its form and its NC take them. */
+/** The parameters within the ranges of a strategy, as its form and its NC take them. */
 export function originParamsSchema(parameters: OriginSpecs) {
   return rangedSchema(OriginParamsSchema, parameters)
 }
@@ -132,21 +130,19 @@ export function setsWorkXY(
 
 /** Which of its numeric parameters a routine reads, and of the distance, in which axes. */
 export type OriginFields = {
-  readonly ballDiameter: boolean
   readonly distance: readonly [x: boolean, y: boolean]
   readonly depth: boolean
 }
 
 /**
- * The parameters a routine reads: the ball, the distance in the axes it touches sides in
- * (`setsWorkXY`), and the depth below the top it touches (`setsWorkZ`).
+ * The parameters a routine reads besides the probe's ball: the distance in the axes it touches
+ * sides in (`setsWorkXY`), and the depth below the top it touches (`setsWorkZ`).
  */
 export function originFields(
   routine: Probe3dRoutine,
   axes: Probe3dAxes
 ): OriginFields {
   return {
-    ballDiameter: true,
     distance: setsWorkXY(routine, axes),
     depth: setsWorkZ(routine),
   }
