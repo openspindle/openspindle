@@ -8,7 +8,7 @@ import type { Result } from "@/domain/primitives"
 import type { Tool } from "@/domain/tools/tool"
 import { describePath, readOptimistically } from "../optimistic-read"
 import { isJsonObject } from "../upgrade/json"
-import { upgradeOperations } from "../upgrade/operations"
+import { upgradePlate, withNotices } from "../upgrade/plate"
 import { PROJECT_SCHEMA_VERSION, ProjectDocumentSchema } from "./document"
 import type { ProjectDocument } from "./document"
 import { missingPlugins } from "./plugin-reference"
@@ -100,20 +100,24 @@ const VersionSchema = z.looseObject({ schemaVersion: z.int().positive() })
 const OLDEST_SCHEMA_VERSION = 4
 
 /**
- * A project of an earlier format, in the current one: its probing operations upgraded
- * (`upgradeOperations`). What it still does not recognize (such as format 4's travel Z) is left
- * for reading to leave out and report, rather than rewritten field by field.
+ * A project of an earlier format, in the current one: its plates upgraded (`upgradePlate`, with
+ * the project's tool library), each with the notices that brings. What it still does not
+ * recognize (such as format 4's travel Z) is left for reading to leave out and report, rather
+ * than rewritten field by field.
  */
 function upgradePayload(payload: unknown): unknown {
-  const project = payload as Record<string, unknown>
-  const plates = Array.isArray(project.plates)
-    ? project.plates.map((plate: unknown) =>
-        isJsonObject(plate)
-          ? { ...plate, operations: upgradeOperations(plate.operations) }
+  if (!isJsonObject(payload)) return payload
+  const library = Array.isArray(payload.tools) ? payload.tools : []
+  const plates = Array.isArray(payload.plates)
+    ? payload.plates.map((item: unknown) => {
+        if (!isJsonObject(item)) return item
+        const { plate, notices } = upgradePlate(item, library)
+        return notices.length && Array.isArray(plate.notices)
+          ? { ...plate, notices: withNotices(plate.notices, notices) }
           : plate
-      )
-    : project.plates
-  return { ...project, schemaVersion: PROJECT_SCHEMA_VERSION, plates }
+      })
+    : payload.plates
+  return { ...payload, schemaVersion: PROJECT_SCHEMA_VERSION, plates }
 }
 
 /**
