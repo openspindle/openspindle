@@ -2,9 +2,8 @@ import type { Operation, ProbingSource } from "../operations/operation"
 import type { Plate } from "../plate/plate"
 import { capitalize, fail, ok, toolNumberText } from "../primitives"
 import type { Result } from "../primitives"
-import { probeProfile } from "../tools/tool"
+import { isProbe, probeProfile } from "../tools/tool"
 import type { Tool } from "../tools/tool"
-import { isProbe } from "../tools/tool-table"
 import type {
   BoundProbe,
   MachineProbing,

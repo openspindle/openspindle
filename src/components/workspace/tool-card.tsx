@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/item"
 import { useToolThumbnail } from "@/app/tools/tool-picture-cache"
 import type { ToolPictureSource } from "@/app/tools/tool-picture-cache"
-import { isProbe } from "@/domain/tools/tool-table"
+import { isProbe } from "@/domain/tools/tool"
 import { formatToolNumber } from "@/domain/tools/format"
 import type { Tool } from "@/domain/tools/tool"
 import { ToolImage } from "./tool-image"

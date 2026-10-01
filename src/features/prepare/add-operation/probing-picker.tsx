@@ -14,9 +14,8 @@ import {
   strategyBlocked,
 } from "@/domain/probing/strategies"
 import type { MachineProbing, TaskStrategy } from "@/domain/probing/strategy"
-import { probeProfile } from "@/domain/tools/tool"
+import { isProbe, probeProfile } from "@/domain/tools/tool"
 import type { ProbeProfile, Tool } from "@/domain/tools/tool"
-import { isProbe } from "@/domain/tools/tool-table"
 import { probingIcon } from "@/features/prepare/operation-icon"
 import {
   entryText,
