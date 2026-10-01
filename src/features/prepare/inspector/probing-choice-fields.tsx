@@ -34,6 +34,8 @@ import {
   profileText,
   sharedReplacement,
   sharedReplacementText,
+  strandedBy,
+  strandedText,
 } from "@/features/probing/probe-tools"
 
 const ROW = "grid grid-cols-2 items-center gap-3"
@@ -93,10 +95,20 @@ export function ProbingChoiceFields({
         ]),
     ...probes.map((item) => {
       const replaced = sharedReplacement(plate, operation, item, machine)
+      const stranded =
+        replaced &&
+        strandedText(
+          strandedBy(plate, replaced.entry.number, item, machine, operation.id)
+        )
       return {
         value: item.id,
         label: item.name,
-        replaces: replaced && sharedReplacementText(replaced, library),
+        replaces:
+          replaced &&
+          [
+            sharedReplacementText(replaced, library),
+            ...(stranded ? [`${stranded}.`] : []),
+          ].join(" "),
       }
     }),
   ]

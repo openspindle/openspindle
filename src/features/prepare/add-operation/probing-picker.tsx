@@ -22,6 +22,8 @@ import {
   heldEntry,
   profileText,
   replacedEntry,
+  strandedBy,
+  strandedText,
 } from "@/features/probing/probe-tools"
 import { AppDialog } from "@/features/shell/app-dialog"
 import { openDialog } from "@/features/shell/dialogs"
@@ -101,6 +103,8 @@ function ProbeChoice({
   const reason = probeReason(profile, kit, machine)
   const held = heldEntry(plate, tool)
   const replaced = reason === null && replacedEntry(plate, tool, machine)
+  const stranded =
+    replaced && strandedText(strandedBy(plate, replaced.number, tool, machine))
   const senses = profile ? profileText(profile) : "Profile unknown"
   return (
     <Unavailable label={tool.name} reason={reason}>
@@ -108,7 +112,11 @@ function ProbeChoice({
         tool={tool}
         details={
           replaced
-            ? `${senses} · replaces ${entryText(replaced, library)}`
+            ? [
+                senses,
+                `replaces ${entryText(replaced, library)}`,
+                ...(stranded ? [stranded] : []),
+              ].join(" · ")
             : senses
         }
         slotLabel={held && `In T${held.number}`}

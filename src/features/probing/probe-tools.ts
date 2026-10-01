@@ -1,5 +1,6 @@
 import type { ProbingOperation } from "@/domain/operations/kinds"
 import type { Plate, PlateTool } from "@/domain/plate/plate"
+import { runsWith, strategyOf } from "@/domain/probing/strategies"
 import type { MachineProbing } from "@/domain/probing/strategy"
 import { probeProfile } from "@/domain/tools/tool"
 import type { ProbeProfile, Tool } from "@/domain/tools/tool"
@@ -51,6 +52,34 @@ export function entryText(
     "a tool missing from the library"
   return `${name} in T${entry.number}`
 }
+
+/**
+ * The other probing operations bound to a table number whose strategy could not probe with a
+ * tool there, by name: those that putting the tool in that number leaves without a probe they
+ * run with.
+ */
+export function strandedBy(
+  plate: Plate,
+  number: number,
+  tool: Tool,
+  machine: MachineProbing,
+  except?: string
+): string[] {
+  const profile = probeProfile(tool)
+  return plate.operations.flatMap((operation) => {
+    const { source } = operation
+    if (source.kind !== "probing" || operation.id === except) return []
+    if (!operation.tools.some((binding) => binding.plate === number)) return []
+    const strategy = strategyOf(source.strategy, machine)
+    return strategy && !(profile && runsWith(strategy, profile, machine))
+      ? [operation.name]
+      : []
+  })
+}
+
+/** "Outline trace cannot use it": the operations a replacement strands (`strandedBy`). */
+export const strandedText = (names: readonly string[]) =>
+  names.length ? `${names.join(", ")} cannot use it` : null
 
 /** The number a probing operation selects a probe by: where the machine needs it, else its own. */
 export const probeNumber = (
