@@ -8,7 +8,11 @@ import { selectedPlate, useWorkspace } from "@/app/workspace/workspace-context"
 import { DEFAULT_KIT, kitForPlate } from "@/domain/fixtures/catalog"
 import type { FixtureKit } from "@/domain/fixtures/fixture-kit"
 import type { Plate } from "@/domain/plate/plate"
-import { newProbingOperation, strategiesFor } from "@/domain/probing/strategies"
+import {
+  newProbingOperation,
+  strategiesFor,
+  strategyBlocked,
+} from "@/domain/probing/strategies"
 import type { MachineProbing, TaskStrategy } from "@/domain/probing/strategy"
 import { probeProfile } from "@/domain/tools/tool"
 import type { ProbeProfile, Tool } from "@/domain/tools/tool"
@@ -20,7 +24,6 @@ import {
   replacedEntry,
   replacesText,
 } from "@/features/probing/probe-tools"
-import { strategyBlocked } from "@/features/probing/strategy-stand-ins"
 import { AppDialog } from "@/features/shell/app-dialog"
 import { openDialog } from "@/features/shell/dialogs"
 import { useImportContext } from "@/features/shell/use-import"

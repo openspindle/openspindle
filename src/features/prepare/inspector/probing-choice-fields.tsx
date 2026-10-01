@@ -10,13 +10,12 @@ import {
 } from "@/app/workspace/workspace-context"
 import type { ProbingOperation } from "@/domain/operations/kinds"
 import type { Plate } from "@/domain/plate/plate"
-import { strategiesFor } from "@/domain/probing/strategies"
+import { strategiesFor, strategyBlocked } from "@/domain/probing/strategies"
 import type { MachineProbing, TaskStrategy } from "@/domain/probing/strategy"
 import { probeProfile } from "@/domain/tools/tool"
 import { boundTools } from "@/domain/tools/tool-table"
 import type { WorkspaceCommand } from "@/domain/workspace/workspace"
 import { profileText } from "@/features/probing/probe-tools"
-import { strategyBlocked } from "@/features/probing/strategy-stand-ins"
 
 const ROW = "grid grid-cols-2 items-center gap-3"
 
