@@ -23,6 +23,10 @@ import {
   readEnvelope,
 } from "@/formats/plate-envelope"
 import { describePath, readOptimistically } from "@/formats/optimistic-read"
+import {
+  retainedSourceField,
+  upgradePlateSources,
+} from "@/formats/project/upgrade"
 
 /**
  * Where plates created from plain programs are set up: the selected fixture profile, or the
@@ -111,7 +115,7 @@ function filePlate(
  * Builds a plate from an NC file: a plain program, or an export with its setup and editable
  * operations. A plain program keeps the setup made on the empty plate it replaces, if any. An
  * export whose NC body was edited keeps its setup and becomes a single program, with a
- * notice. Exports of the previous version open as the current one; other versions are
+ * notice. Exports of compatible earlier versions open as the current one; other versions are
  * refused.
  */
 export function importProgram(
@@ -171,21 +175,29 @@ export function importProgram(
     return fail(
       "It was exported by an earlier version of OpenSpindle, which this version cannot read."
     )
-  // A previous-version payload becomes the current version before reading it optimistically:
-  // what it still does not recognize (such as format 4's travel Z) is left out and reported,
-  // rather than rewritten field by field.
-  const rawPayload =
-    envelope.version === PREVIOUS_PLATE_ENVELOPE_VERSION
-      ? {
-          ...(envelope.payload as Record<string, unknown>),
-          schemaVersion: PLATE_ENVELOPE_VERSION,
-        }
-      : envelope.payload
-  const read = readOptimistically(PlateEnvelopeSchema, rawPayload)
+  // Read upgrades through the schema, so fields they leave out are reported too.
+  const schema =
+    envelope.version < PLATE_ENVELOPE_VERSION
+      ? z.preprocess(
+          (value) =>
+            upgradePlateSources({
+              ...(value as Record<string, unknown>),
+              schemaVersion: PLATE_ENVELOPE_VERSION,
+            }),
+          PlateEnvelopeSchema
+        )
+      : PlateEnvelopeSchema
+  const read = readOptimistically(schema, envelope.payload)
   if (!read.success)
     return fail(`Its embedded setup is invalid: ${z.prettifyError(read.error)}`)
   const exported = read.data
-  const leftOut = read.leftOut.map((path) => describePath(rawPayload, path))
+  const leftOut = read.leftOut
+    .filter(
+      (path) =>
+        envelope.version === PLATE_ENVELOPE_VERSION ||
+        !retainedSourceField(exported.operations, path)
+    )
+    .map((path) => describePath(envelope.payload, path))
   const leftOutNotices = leftOut.length ? [notice(leftOutNotice(leftOut))] : []
   if (bodyChecksum(envelope.body) !== exported.bodyChecksum) {
     const plate = filePlate(

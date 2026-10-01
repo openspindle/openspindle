@@ -8,7 +8,7 @@ import {
   SaveFileResultSchema,
 } from "./files"
 import { diagnosticsEvents, diagnosticsMethods } from "./diagnostics"
-import { pluginEvents, pluginMethods } from "./plugin-rpc"
+import { pcbMethods } from "./pcb"
 import { machineEvents, machineMethods } from "./machine-rpc"
 import { MenuCommandSchema } from "./menu"
 import { modelMethods } from "./models"
@@ -29,7 +29,7 @@ export const hostContract = defineContract({
       result: SaveFileResultSchema,
       timeoutMs: 0,
     },
-    ...pluginMethods,
+    ...pcbMethods,
     ...machineMethods,
     ...storageMethods,
     ...modelMethods,
@@ -39,7 +39,6 @@ export const hostContract = defineContract({
   },
   events: {
     ...machineEvents,
-    ...pluginEvents,
     ...diagnosticsEvents,
     ...fusionEvents,
     "menu.command": { params: z.undefined(), data: MenuCommandSchema },

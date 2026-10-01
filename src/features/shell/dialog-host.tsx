@@ -6,8 +6,6 @@ import { useFusionSync } from "@/platform/fusion"
 import { HeightMapDialog } from "@/features/device/height-map-dialog"
 import { GCodeGlossaryDialog } from "@/features/glossary/gcode-glossary-dialog"
 import { ModelsDialog } from "@/features/models/models-dialog"
-import { PluginRequestHost } from "@/features/plugins/plugin-request-host"
-import { PluginsDialog } from "@/features/plugins/plugins-dialog"
 import { AddOperationDialog } from "@/features/prepare/add-operation/add-operation-dialog"
 import { ProgramSourceDialog } from "@/features/prepare/source/program-source-dialog"
 import {
@@ -47,8 +45,6 @@ function OpenDialog({ dialog }: { dialog: WorkspaceDialog }) {
           <DevicePicker close={closeDialog} />
         </AppDialog>
       )
-    case "plugins":
-      return <PluginsDialog onClose={closeDialog} />
     case "models":
       return <ModelsDialog onClose={closeDialog} />
     case "height-map":
@@ -92,18 +88,10 @@ function OpenDialog({ dialog }: { dialog: WorkspaceDialog }) {
   }
 }
 
-/**
- * Renders the open workspace dialog and, above it, what plugin views ask the user
- * (tools.choose, ui.confirm), so a view inside a dialog keeps running while it waits.
- */
+/** Renders the open workspace dialog. */
 export function DialogHost() {
   useFusionSync()
   useFusionPairing()
   const dialog = useOpenDialog()
-  return (
-    <>
-      {dialog && <OpenDialog dialog={dialog} />}
-      <PluginRequestHost />
-    </>
-  )
+  return dialog && <OpenDialog dialog={dialog} />
 }

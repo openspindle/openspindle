@@ -14,40 +14,6 @@ export default [
       "pnpm/json-enforce-catalog": "off",
     },
   },
-  // The plugin core serves Electron main, the renderer and the SDK CLI alike: hosts
-  // inject fetch, hashing and file access, and Node loads it with relative .ts imports.
-  {
-    files: ["packages/plugin-core/**/*.ts"],
-    rules: {
-      "no-restricted-imports": [
-        "error",
-        {
-          patterns: [
-            {
-              group: ["@/*"],
-              message: "plugin-core uses relative .ts imports only.",
-            },
-            {
-              group: ["react", "react-dom", "@tanstack/*"],
-              message: "plugin-core has no UI.",
-            },
-            {
-              group: ["electron", "node:*"],
-              message: "Inject host capabilities through ports.",
-            },
-          ],
-        },
-      ],
-      "no-restricted-globals": [
-        "error",
-        "window",
-        "document",
-        "localStorage",
-        "process",
-        "Buffer",
-      ],
-    },
-  },
   // Layer boundaries: the machine domain is host-agnostic and runs in Electron main
   // (and the dev simulator) with plain relative imports; the renderer only sees its contract.
   {
@@ -153,11 +119,6 @@ export default [
               message: "src/routes holds routed UI; the domain has no UI.",
             },
             {
-              group: ["@/plugin-runtime", "@/plugin-runtime/*"],
-              message:
-                "src/plugin-runtime is the sandboxed plugin frame; the domain does not run plugins.",
-            },
-            {
               group: ["@/lib", "@/lib/*"],
               message:
                 "src/lib holds generic helpers for formats, platform and UI code; the domain keeps its own.",
@@ -258,7 +219,6 @@ export default [
       "out/**",
       "release/**",
       "node_modules/**",
-      "packages/plugin-sdk/types/**",
       "src/routeTree.gen.ts",
     ],
   },

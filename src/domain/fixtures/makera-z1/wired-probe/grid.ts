@@ -18,7 +18,7 @@ import { CLEARANCE_Z } from "./travel"
 type GridWord = (field: AutoLevelGridField) => string
 
 /**
- * The grid bounds (those of the retired makera-wired-probe plugin). They are application
+ * The wired probe grid bounds. They are application
  * limits, not a clearance check; the included firmware configuration allows at most 15 × 15
  * points.
  */

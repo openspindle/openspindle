@@ -280,7 +280,7 @@ function lineRanges(lines: readonly number[]): ProgramLines[] {
 }
 
 /**
- * An operation's own NC: NC it keeps, from a file or a plugin, rather than NC generated for the
+ * An operation's own NC: NC it keeps, from a file or PCB conversion, rather than NC generated for the
  * machine, which its rules need not check and which sets no spindle speed. Null for generated NC
  * and for NC that does not resolve, which its own diagnostic reports.
  */

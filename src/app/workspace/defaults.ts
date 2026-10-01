@@ -100,7 +100,7 @@ export function newProject(library: WorkspaceLibrary): WorkspaceState {
     plates: [],
     selectedPlateId: null,
     ...library,
-    project: { ...DEFAULT_PROJECT, plugins: [] },
+    project: { ...DEFAULT_PROJECT },
     heightMaps: {},
     designRules: defaultDesignRules(),
   }

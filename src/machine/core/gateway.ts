@@ -1,7 +1,5 @@
-import { PLUGIN_ACCESSORY_KINDS } from "../contract/index.ts"
 import type {
   AnchorConfiguration,
-  CommandKind,
   ConsoleEntry,
   HeightMap,
   MachineSnapshot,
@@ -13,26 +11,11 @@ import type { CameraEvent } from "./camera.ts"
 import type { MachineController } from "./controller.ts"
 import { MachineError } from "./errors.ts"
 
-export type MachineGrant = "machine:read" | "machine:accessories"
-
-/** Who is asking. Plugins hold install-time grants; the app and the system menu hold all. */
-export type Principal =
-  | { readonly kind: "app" }
-  | { readonly kind: "system" }
-  | {
-      readonly kind: "plugin"
-      readonly pluginId: string
-      readonly grants: ReadonlySet<MachineGrant>
-    }
-
-/** Accessories a plugin may switch with machine:accessories; never motion or program control. */
-export const PLUGIN_ACCESSORIES: ReadonlySet<CommandKind> = new Set(
-  PLUGIN_ACCESSORY_KINDS
-)
+/** The app controls the machine; the system menu can read it and stop it. */
+export type Principal = { readonly kind: "app" } | { readonly kind: "system" }
 
 /**
- * Protection Proxy over the controller: each principal sees only what it was granted.
- * Main re-checks every plugin request here, whatever the renderer already enforced.
+ * Keeps machine control in the app while allowing the system menu to stop it directly.
  */
 export class MachineGateway {
   private readonly controller: MachineController
@@ -44,12 +27,10 @@ export class MachineGateway {
   }
 
   snapshot(): MachineSnapshot {
-    this.require("machine:read")
     return this.controller.snapshot()
   }
 
   subscribe(listener: (snapshot: MachineSnapshot) => void): () => void {
-    this.require("machine:read")
     return this.controller.subscribe(listener)
   }
 
@@ -84,28 +65,12 @@ export class MachineGateway {
   }
 
   execute(command: unknown): Promise<MachineSnapshot> {
-    if (this.principal.kind === "plugin") {
-      this.require("machine:accessories")
-      const type =
-        command && typeof command === "object" && "type" in command
-          ? command.type
-          : null
-      if (
-        typeof type !== "string" ||
-        !PLUGIN_ACCESSORIES.has(type as CommandKind)
-      )
-        throw new MachineError(
-          "permission",
-          "Plugins may only switch the light, beep and vacuum."
-        )
-    } else this.requireApp()
+    this.requireApp()
     return this.controller.execute(command)
   }
 
   /** The app and the system menu may always stop the machine. */
   stop(): Promise<MachineSnapshot> {
-    if (this.principal.kind === "plugin")
-      throw new MachineError("permission", "Plugins cannot stop the machine.")
     return this.controller.stop()
   }
 
@@ -125,7 +90,6 @@ export class MachineGateway {
   }
 
   readAnchors(signal?: AbortSignal): Promise<AnchorConfiguration> {
-    this.require("machine:read")
     return this.controller.readAnchors(signal)
   }
 
@@ -136,7 +100,6 @@ export class MachineGateway {
   }
 
   readHeightMap(signal?: AbortSignal): Promise<HeightMap> {
-    this.require("machine:read")
     return this.controller.readHeightMap(signal)
   }
 
@@ -145,14 +108,6 @@ export class MachineGateway {
       throw new MachineError(
         "permission",
         "Only the OpenSpindle app may do this."
-      )
-  }
-
-  private require(grant: MachineGrant) {
-    if (this.principal.kind === "plugin" && !this.principal.grants.has(grant))
-      throw new MachineError(
-        "permission",
-        `This plugin was not granted ${grant}.`
       )
   }
 }

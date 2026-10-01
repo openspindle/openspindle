@@ -15,7 +15,6 @@ import { LoadIssuesDialog } from "@/features/workspace-load/load-issues-dialog"
 import { useSaveErrors } from "@/features/workspace-load/use-save-errors"
 import type { Host } from "@/platform/host"
 import { useMachineSync } from "@/platform/machine"
-import { usePluginSync } from "@/platform/plugins"
 
 export type RouterContext = {
   readonly host: Host
@@ -29,7 +28,6 @@ export const Route = createRootRouteWithContext<RouterContext>()({
 
 function RootLayout() {
   useMachineSync()
-  usePluginSync()
   useUnsavedChanges()
   // Menu commands and their dialogs work on every page.
   useWorkspaceMenu()

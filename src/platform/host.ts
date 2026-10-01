@@ -12,14 +12,11 @@ import type {
   WriteAnchorsRequest,
   WriteAnchorsResult,
 } from "@/machine/contract"
-import type { ParamsOut } from "@openspindle/rpc"
 import type {
-  CompanionHealth,
-  CompanionStatus,
-  JsonValue,
-  PluginViewContract,
-  ProcessParameterValues,
-} from "@openspindle/plugin-core"
+  PcbGeneration,
+  PcbGenerationRequest,
+  PcbStatus,
+} from "./contract/pcb"
 import type { ModelStore } from "@/persistence/models/model-library"
 import type {
   FileKind,
@@ -29,15 +26,6 @@ import type {
   SaveFileResult,
 } from "./contract/files"
 import type { CameraEvent } from "./contract/machine-rpc"
-import type {
-  ChooseSettingResult,
-  CompanionEvent,
-  CompanionLogEntry,
-  InstallRequest,
-  PluginBundle,
-  PluginSummary,
-  PrepareInstallResult,
-} from "./contract/plugin-rpc"
 import type { BackupResult, StorageKey } from "./contract/storage"
 import type { MenuCommand } from "./contract/menu"
 import type {
@@ -147,87 +135,15 @@ export interface DiagnosticsHost {
   watchMainErrors: (listener: (error: MainError) => void) => () => void
 }
 
-type ViewParams<TMethod extends keyof PluginViewContract["methods"]> =
-  ParamsOut<PluginViewContract, TMethod>
-
-/** Plugin-scoped services of the main process, which applies the plugin's own grants. */
-export interface PluginServicesPort {
-  machineSnapshot: (pluginId: string) => Promise<MachineSnapshot>
-  readAnchors: (
-    pluginId: string,
-    signal: AbortSignal
-  ) => Promise<AnchorConfiguration>
-  readHeightMap: (pluginId: string, signal: AbortSignal) => Promise<HeightMap>
-  machineAccessory: (
-    pluginId: string,
-    request: ViewParams<"machine.accessory">
-  ) => Promise<MachineSnapshot>
-  subscribeMachine: (
-    pluginId: string,
-    listener: (snapshot: MachineSnapshot) => void
-  ) => () => void
-  companionCall: (
-    pluginId: string,
-    request: ViewParams<"companion.call">,
-    signal: AbortSignal
-  ) => Promise<JsonValue>
-  companionStatus: (pluginId: string) => Promise<CompanionStatus>
-  companionSetup: (
-    pluginId: string,
-    signal: AbortSignal
-  ) => Promise<CompanionHealth>
-  /** Holds the companion (on-view companions start) while subscribed. */
-  subscribeCompanion: (
-    pluginId: string,
-    listener: (event: CompanionEvent) => void
-  ) => () => void
-}
-
-/** What the plugin manager shows and does for companions; the status is in each summary. */
-export interface CompanionControl {
-  logs: (pluginId: string) => Promise<CompanionLogEntry[]>
-  restart: (pluginId: string) => Promise<CompanionStatus>
-  setup: (pluginId: string) => Promise<CompanionHealth>
-}
-
-export type RenderedProgram = { readonly name: string; readonly source: string }
-
-/**
- * Installed plugins: the registry of the main process. Installs go through the plugin-core
- * pipeline, with a review first.
- */
-export interface PluginHost {
-  list: () => Promise<PluginSummary[]>
-  /** Delivers the whole list once subscribed and again after every change. */
-  subscribe: (listener: (plugins: PluginSummary[]) => void) => () => void
-  prepareInstall: (request: InstallRequest) => Promise<PrepareInstallResult>
-  prepareUpdate: (pluginId: string) => Promise<PrepareInstallResult>
-  confirmInstall: (reviewId: string) => Promise<PluginSummary>
-  discardInstall: (reviewId: string) => Promise<void>
-  setEnabled: (pluginId: string, enabled: boolean) => Promise<PluginSummary>
-  remove: (pluginId: string) => Promise<void>
-  /** Checks and stores one of a plugin's settings (null clears it). */
-  setSetting: (
-    pluginId: string,
-    settingId: string,
-    value: string | null
-  ) => Promise<PluginSummary>
-  /** Asks for a setting's program with a native dialog, then stores it. */
-  chooseSetting: (
-    pluginId: string,
-    settingId: string
-  ) => Promise<ChooseSettingResult>
-  /** The verified view bundle a plugin frame starts with. */
-  readBundle: (pluginId: string) => Promise<PluginBundle>
-  /** Renders a template program from the installed, verified template. */
-  renderProgram: (
-    pluginId: string,
-    programId: string,
-    values: ProcessParameterValues
-  ) => Promise<RenderedProgram>
-  readonly companions: CompanionControl
-  /** Plugin-scoped machine and companion calls for views. */
-  readonly services: PluginServicesPort
+/** PCB conversion and the installed pcb2gcode program it uses. */
+export interface PcbHost {
+  status: () => Promise<PcbStatus>
+  chooseExecutable: () => Promise<PcbStatus>
+  setExecutable: (executable: string | null) => Promise<PcbStatus>
+  generate: (
+    request: PcbGenerationRequest,
+    signal?: AbortSignal
+  ) => Promise<PcbGeneration>
 }
 
 /** The main process, as the renderer reaches it: every service is a typed RPC call. */
@@ -239,6 +155,6 @@ export interface Host {
   readonly models: ModelStore
   readonly menu: MenuHost
   readonly window: WindowHost
-  readonly plugins: PluginHost
+  readonly pcb: PcbHost
   readonly diagnostics: DiagnosticsHost
 }

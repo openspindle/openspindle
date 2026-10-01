@@ -2,7 +2,7 @@ import { z } from "zod"
 import { COORDINATE_LIMIT } from "../primitives"
 import { ProbePlacementSchema } from "../probing/placement"
 
-/** The rectangular grid's parameters, in form and plugin-manifest order. */
+/** The rectangular grid's parameters, in form order. */
 export const AUTO_LEVEL_GRID_FIELDS = [
   "width",
   "depth",
@@ -12,7 +12,7 @@ export const AUTO_LEVEL_GRID_FIELDS = [
 ] as const
 export type AutoLevelGridField = (typeof AUTO_LEVEL_GRID_FIELDS)[number]
 
-/** One grid parameter. Its fields are those of a plugin manifest's numeric parameter. */
+/** One grid parameter. Its bounds and display metadata are shared by the form and validator. */
 export type AutoLevelGridParameter = {
   label: string
   default: number

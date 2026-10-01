@@ -1,6 +1,6 @@
 /*
  * The design tokens: the dark variant, theme variables and the light and dark palettes.
- * The app stylesheet and the plugin SDK's theme (for plugin stylesheets) both use them.
+ * The app stylesheet uses these across all features.
  */
 @custom-variant dark (&:is(.dark *));
 
@@ -55,8 +55,8 @@
 
 /*
  * The window is never narrower than 1000px (electron/main/window.ts), so the preset's
- * small-screen styles never apply in the app. From 0, the sm and md variants apply in plugin
- * frames too, which are narrower but part of the same window, so views match the app.
+ * small-screen styles never apply in the app. From 0, the sm and md variants also apply
+ * in narrow inspector panels so controls stay consistent across the window.
  */
 @theme {
   --breakpoint-sm: 0rem;

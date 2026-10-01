@@ -43,7 +43,7 @@ function roleOf(command: WorkspaceCommand): "edit" | "ambient" | "replace" {
 }
 
 /**
- * What an edit sets, so that quick edits of one value (typing a name, a plugin view saving as
+ * What an edit sets, so that quick edits of one value (typing a name, an operation editor saving as
  * it is edited) merge into one step; null for edits that are steps of their own.
  */
 function mergeKey(command: WorkspaceCommand): string | null {
@@ -123,6 +123,12 @@ export class WorkspaceStore {
   readonly store: Store<WorkspaceState>
   /** The user's edits, which Undo and Redo step through. */
   readonly history = new History<WorkspaceState>({ same: sameWork })
+  private projectSession = 0
+
+  /** Changes when a project is replaced, even if its saved operation revisions match. */
+  get session(): number {
+    return this.projectSession
+  }
 
   constructor(initial: WorkspaceState) {
     this.store = new Store(initial)
@@ -140,7 +146,10 @@ export class WorkspaceStore {
     const result = applyCommand(before, command)
     if (!result.ok || result.value === before) return result
     const next = this.kept(before, result.value, command, options)
-    if (next !== before) this.store.setState(() => next)
+    if (next !== before) {
+      if (roleOf(command) === "replace") this.projectSession += 1
+      this.store.setState(() => next)
+    }
     return ok(next)
   }
 

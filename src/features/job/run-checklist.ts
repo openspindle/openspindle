@@ -107,11 +107,8 @@ export function fixFor(diagnostic: Diagnostic): RunFix {
   switch (fix.kind) {
     case "assign-tool":
       return { kind: "prepare", label, search: { panel: "tools" } }
-    case "update-operation":
     case "edit-operation":
       return { kind: "prepare", label, search: { operation: fix.operationId } }
-    case "install-plugin":
-      return { kind: "prepare", label, search: operation ? { operation } : {} }
     case "read-anchors":
       return { kind: "read-anchors", label }
     case "resolve-rule":
@@ -124,8 +121,6 @@ export function fixFor(diagnostic: Diagnostic): RunFix {
 }
 
 const OPERATION_FIXES: ReadonlySet<QuickFix["kind"]> = new Set([
-  "update-operation",
-  "install-plugin",
   "edit-operation",
 ])
 

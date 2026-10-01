@@ -215,7 +215,7 @@ export function bindTools(
   operation: Operation,
   locals: readonly (number | null)[],
   options: {
-    /** Library tool intended for a local number (legacy assignments, plugin choices). */
+    /** Library tool intended for a local number (legacy assignments, PCB choices). */
     readonly preferred?: ReadonlyMap<number | null, string>
     readonly library?: readonly Tool[]
   } = {}

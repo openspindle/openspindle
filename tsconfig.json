@@ -4,21 +4,25 @@
     "src/**/*.ts",
     "src/**/*.tsx",
     "packages/*/src/**/*.ts",
-    "plugins/*/ui/**/*.ts",
-    "plugins/*/ui/**/*.tsx",
-    "plugins/*/src/**/*.d.mts",
     "tools/vite/**/*.ts",
-    "tools/plugin-sdk/**/*.ts",
     "tools/packaging/**/*.ts",
     "eslint.config.js",
     "vite.config.ts",
     "electron.vite.config.ts"
   ],
   "compilerOptions": {
-    "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "types": ["vite/client"],
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "types": [
+      "vite/client"
+    ],
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": [
+        "./src/*"
+      ]
     }
   }
 }

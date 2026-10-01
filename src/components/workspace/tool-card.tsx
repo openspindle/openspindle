@@ -18,7 +18,7 @@ import type { Tool } from "@/domain/tools/tool"
 import { ToolImage } from "./tool-image"
 import type { ToolImageSubject } from "./tool-image"
 
-/** A tool as its card shows it; a plugin's tool DTO brings the tool library's `picture`. */
+/** A tool as its card shows it, with an optional cached picture. */
 type CardTool = ToolImageSubject &
   ToolPictureSource &
   Pick<Tool, "id" | "kind" | "name" | "diameter" | "flutes"> & {
@@ -26,7 +26,7 @@ type CardTool = ToolImageSubject &
   }
 
 export type ToolCardProps = {
-  /** Any tool with an identity and a size, including plugin tool DTOs. */
+  /** Any tool with an identity and a size, including partial records. */
   tool?: CardTool | null
   id?: string
   onClick?: () => void
@@ -40,7 +40,7 @@ export type ToolCardProps = {
 
 /**
  * The tool's thumbnail as the tool library draws it (`useToolThumbnail`), else its photo, else
- * a placeholder. The card draws nothing itself, so it needs no renderer in a plugin's view.
+ * a placeholder. The card draws nothing itself, so cards share one cached drawing.
  */
 function CardPicture({ tool }: { tool: CardTool }) {
   const picture = useToolThumbnail(tool)

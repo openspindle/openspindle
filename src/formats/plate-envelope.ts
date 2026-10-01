@@ -21,13 +21,11 @@ export const carriesPlate = (source: string) =>
   source.startsWith(";@OPENSPINDLE|")
 
 /**
- * The envelope version exports write: version 3 fixtures name their model's source, since
- * version 4 the wasteboard is one of them, and since version 5 anchored probing travels at the
- * height the machine's probe travels at.
+ * The envelope version exports write. Version 6 keeps PCB as a built-in operation source.
  */
-export const PLATE_ENVELOPE_VERSION = 5
+export const PLATE_ENVELOPE_VERSION = 6
 
-/** The version read besides the current one, which it becomes on import. */
+/** The oldest envelope version that can be upgraded on import. */
 export const PREVIOUS_PLATE_ENVELOPE_VERSION = 4
 
 /** The exported plate: everything needed to restore editable operations exactly. */

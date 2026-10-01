@@ -104,9 +104,6 @@ export function useWorkspaceMenu() {
       case "settings.open":
         openDialog({ kind: "settings" })
         return
-      case "plugins.manage":
-        openDialog({ kind: "plugins" })
-        return
       case "models.manage":
         openDialog({ kind: "models" })
         return

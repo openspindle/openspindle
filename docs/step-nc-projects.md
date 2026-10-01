@@ -17,9 +17,9 @@ OpenSpindle starts with a new, empty project every time it opens; a project is k
 A project file has two layers, versioned independently:
 
 - The **container** is the ISO 10303-21 file described below: its header, the documentary AP238 graph with each operation's exact NC text, and the application payload stored inside it. Its profile, named in `FILE_DESCRIPTION`, is `OpenSpindle STEP-NC project archive v1`. The container does not interpret the payload. It is implemented in `src/formats/project/step-nc.ts`.
-- The **project document** is the application payload: JSON whose `schemaVersion` names the project format. The current format is **version 5** (`src/formats/project/document.ts`).
+- The **project document** is the application payload: JSON whose `schemaVersion` names the project format. The current format is **version 6** (`src/formats/project/document.ts`).
 
-`encodeProject` in `src/formats/project/project.ts` writes version 5 and `decodeProject` reads it, and reads version 4 as version 5. A payload of another `schemaVersion` is refused, naming its format number: "This project was saved by a newer version of OpenSpindle" or "…by an earlier version of OpenSpindle, which this version cannot open". The current workspace stays as it is.
+`encodeProject` in `src/formats/project/project.ts` writes version 6 and `decodeProject` reads versions 4 through 6, upgrading older operation sources as described below. A payload of another `schemaVersion` is refused, naming its format number: "This project was saved by a newer version of OpenSpindle" or "…by an earlier version of OpenSpindle, which this version cannot open". The current workspace stays as it is.
 
 ## Schema identity
 
@@ -38,7 +38,7 @@ The writer emits one `HEADER` section and one `DATA` section, with `FILE_DESCRIP
 
 The project root follows the `MACHINING_PROJECT` → formation → product definition → process association → main workplan structure illustrated in the AP238 annotated examples. Workplan order is expressed with `MACHINING_PROCESS_SEQUENCE_RELATIONSHIP.sequence_position`; entity numbers and physical line order are not ordering mechanisms. [AP238 annotated examples, Annex J](https://stepmfg.github.io/ap238/data/annexJ.htm)
 
-Each plate has a workplan, and each of its operations has a documentary setup-instructions entry in operation order. An operation with NC associates its exact NC text as a source document. A plugin operation that has not generated its NC yet is a pending entry: it associates a recipe document and carries an `openspindle:operation-state` property whose single item is `state` = `pending`; it has no NC source. These instructions represent reviewing the attached source, not a fabricated AP238 machining operation.
+Each plate has a workplan, and each of its operations has a documentary setup-instructions entry in operation order. An operation with NC associates its exact NC text as a source document. An operation that has not generated its NC yet is a pending entry: it associates a recipe document and carries an `openspindle:operation-state` property whose single item is `state` = `pending`; it has no NC source. These instructions represent reviewing the attached source, not a fabricated AP238 machining operation.
 
 Every `MACHINING_WORKPLAN` requires at least one sequence relationship to a `MACHINING_PROCESS_EXECUTABLE`, so an empty workplan is never written. A plate without operations gets one placeholder entry, `Empty plate`, whose operator instruction associates a `<plate ID>/archive` document of type `OpenSpindle project archive`. A project without plates uses a single root instruction, `Empty project`, associating the `openspindle-project/archive` document, with no synthetic plate or NC program: the inherited associated-document set cannot be empty. [Associated-document attribute](https://www.steptools.com/stds/stp_aim/html/t_action_method_with_associated_documents.html)
 
@@ -62,15 +62,15 @@ Each operation's setup-instructions leaf with NC also has an `openspindle:source
 
 Both project and source representations use the same name as their owning action property (`openspindle:project` or `openspindle:source`). The project product ID is `openspindle-project`, its formation ID is `1`, and its main workplan name is the saved project name. Each plate workplan is named `Plate N: <plate name>`, or `Plate N` for a plate without a name. These identifiers are part of the OpenSpindle profile, rather than additional AP238 requirements.
 
-Stock definitions, tool tables and library records, fixtures, work origins, anchors, operation sources and plugin data, and other saved application state remain application data in this profile. They are not advertised as reconstructed AP238 workpiece geometry or fully defined machining resources. Reconstructing these as interoperable semantic objects is a separate capability.
+Stock definitions, tool tables and library records, fixtures, work origins, anchors, operation sources and PCB recipes, and other saved application state remain application data in this profile. They are not advertised as reconstructed AP238 workpiece geometry or fully defined machining resources. Reconstructing these as interoperable semantic objects is a separate capability.
 
-## Project document, version 5
+## Project document, version 6
 
 The payload is a JSON object validated by `ProjectDocumentSchema`. Its workspace fields have exactly the types of the workspace state (`WorkspaceState`); the TypeScript type is derived from it, so the two cannot drift.
 
 | Field                             | Content                                                                                                                                                                                                                                                                                                                   |
 | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `schemaVersion`                   | `5`                                                                                                                                                                                                                                                                                                                       |
+| `schemaVersion`                   | `6`                                                                                                                                                                                                                                                                                                                       |
 | `name`                            | Project name: 1–200 characters without control characters                                                                                                                                                                                                                                                                 |
 | `plates`                          | The plates, in order. Each is the workspace plate aggregate itself (`PlateSchema`): its name, its setup (stock, stock anchor, the single work origin, assist policy, fixtures, device and its anchor snapshot), its tool table, its operations with their sources and NC, its groups of program sections, and its notices |
 | `selectedPlateId`                 | The selected plate, or `null`                                                                                                                                                                                                                                                                                             |
@@ -79,29 +79,21 @@ The payload is a JSON object validated by `ProjectDocumentSchema`. Its workspace
 | `defaultToolId`, `defaultStockId` | The library defaults, or `null`                                                                                                                                                                                                                                                                                           |
 | `heightMaps`                      | Stored height maps, keyed by the device that measured them                                                                                                                                                                                                                                                                |
 | `designRules`                     | The design rules the plates are checked against ([design-rules.md](design-rules.md)): each limit's value and severity, and the severities of the program rules set differently from their defaults (`programRules`, by rule id); a rule a project was saved without takes its default                                     |
-| `plugins`                         | References to the plugins the operations use (below)                                                                                                                                                                                                                                                                      |
 | `models`                          | The models the plates' fixtures use, with their meshes (below)                                                                                                                                                                                                                                                            |
 
-Plate IDs, tool IDs, stock IDs, plugin reference IDs and model IDs are unique; the selected plate and the library defaults must exist; each height map is filed under its own device. A plate tool-table entry may name a tool that is no longer in the library; as in the workspace, the entry is kept and blocks Run until a tool is assigned. A tool's 3D model, when it is a chosen GLB rather than a bundled path, is checked the same way importing a tool library checks one (`validateGlb`: one self-contained GLB).
+Plate IDs, tool IDs, stock IDs and model IDs are unique; the selected plate and the library defaults must exist; each height map is filed under its own device. A plate tool-table entry may name a tool that is no longer in the library; as in the workspace, the entry is kept and blocks Run until a tool is assigned. A tool's 3D model, when it is a chosen GLB rather than a bundled path, is checked the same way importing a tool library checks one (`validateGlb`: one self-contained GLB).
 
-An operation's source is a file, a plugin template, or plugin-owned data. Template and plugin sources keep the plugin ID and version they were generated with, and a file imported from Fusion 360 keeps where it came from (`origin`), to be updated from there; a plugin operation that has not generated its NC yet has `nc: null`, which is distinct from empty NC (`""`).
+An operation's source is an NC file, a PCB source and recipe, a built-in probing operation, or an unsupported older source without NC. A file imported from Fusion 360 keeps where it came from (`origin`), to be updated from there. A PCB source keeps its original file, role, settings, selected tool and preset, last generated settings and any generation error in `data`; `nc: null` means its toolpath still needs generating and is distinct from empty NC (`""`). Built-in probing sources keep their parameters and derive their NC from the plate when compiling.
 
 The writer validates the document before encoding it and stores exactly what the schema returns. The reader validates it again, optimistically, since another version may have written it: it takes the document as the schema returns it, including anything the schema brings up to date, and leaves out fields the schema does not recognize instead of refusing the file (`readOptimistically` in `src/formats/optimistic-read.ts`). Opening then lists every field of the file that the document does not keep, whether unrecognized or removed by an upgrade, since saving the project does not keep them either. Only a payload the schema cannot read without them is refused, with the schema's reasons. The STEP-NC graph must still document the document as read, so a project, plate or operation name the schema would rewrite, such as one with surrounding spaces, still fails the graph check.
 
-### Plugin references
+### Older operation sources
 
-A project never contains plugin code. `plugins` lists one reference per plugin that an operation uses, in first-use order:
+Project formats 4 and 5 are upgraded when opened. A PCB operation with a readable recipe becomes a `pcb` source and keeps its saved NC. Other plugin and template operations with generated NC become `file` sources, preserving that NC byte for byte and retaining their saved `phase` (`setup`, `machining` or `finish`). Their generator metadata is listed among the fields left out; they are ordinary NC operations after opening.
 
-| Field     | Content                                                 |
-| --------- | ------------------------------------------------------- |
-| `id`      | The plugin ID the operations name                       |
-| `name`    | The plugin name when the project was saved              |
-| `version` | The installed plugin version when the project was saved |
-| `source`  | Where the plugin comes from                             |
+An older source without generated NC becomes `unsupported`: its complete source data and phase remain in the project. It blocks Run and NC export until the user replaces or removes the operation. An unreadable PCB recipe follows these same rules, so its NC stays available when present and a pending recipe is kept intact.
 
-`source.kind` is `github` (with the canonical `repository` URL `https://github.com/<owner>/<repository>` and the full 40-character `commit` it was installed from) or `folder` (loaded from a local folder; it cannot be installed automatically). Every reference must be used by an operation.
-
-`referencedPlugins(plates, installed, retained)` builds the references: an installed plugin describes itself, and the references of the project last opened or saved (`retained`, kept in the workspace as `project.plugins`) keep describing plugins that are not installed, so saving never forgets where a missing plugin came from. `decodeProject` reports the references whose plugin is not installed as `missingPlugins`, so the workspace can offer to install them. Operations of a missing plugin keep their saved NC and settings.
+Version 6 has no plugin references. References and source fields an upgrade removes appear in the opening report. The same operation upgrades apply to a workspace kept across a renderer reload.
 
 ### Models
 
@@ -137,7 +129,6 @@ The limits are defined once, in `PROJECT_LIMITS` (`src/formats/project/step-nc.t
 | NC text of one operation             | 10 MiB (UTF-8)              |
 | Tool library entries                 | 10,000                      |
 | Stock library entries                | 1,000                       |
-| Plugin references                    | 32                          |
 | Fixture models, with their meshes    | 64                          |
 | Stored height maps                   | 100                         |
 | DATA entity records                  | 101,816                     |
@@ -146,7 +137,7 @@ The limits are defined once, in `PROJECT_LIMITS` (`src/formats/project/step-nc.t
 
 The entity record and aggregate limits follow from the others: they are the documentary graph and the payload item list of the largest project within them. Plates also bound their own tables: at most 100 tool-table entries, 500 groups, 100 notices, and 32 fixtures.
 
-The full-file limit applies after base64 expansion, Part 21 escaping, and the exact-source representations. Each operation's NC is stored twice (in the payload and as its source document), so a project below the decoded JSON limit may still be too large to save. Limits are checked before a project replaces the workspace. Library selections, plate references, plugin references, and historic device identities are validated rather than partially imported.
+The full-file limit applies after base64 expansion, Part 21 escaping, and the exact-source representations. Each operation's NC is stored twice (in the payload and as its source document), so a project below the decoded JSON limit may still be too large to save. Limits are checked before a project replaces the workspace. Library selections, plate references, and historic device identities are validated rather than partially imported.
 
 ## Validation scope and references
 

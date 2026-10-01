@@ -20,8 +20,7 @@ export type ToolPictureRequest = {
 
 /**
  * What a picture of a tool is drawn from: its 3D model, or else the shape its dimensions
- * describe. A plugin's tool has no model, and one from a plugin built against an earlier kit
- * may come without its dimensions.
+ * describe. Partial tool records may omit models or dimensions.
  */
 export type ToolPictureSource = Pick<Tool, "kind" | "diameter"> &
   Partial<Pick<Tool, "model" | "geometry" | "shaft">>
@@ -64,9 +63,9 @@ type Painter = (key: string, request: ToolPictureRequest) => void
 
 /**
  * Pictures of tools as the tool library draws them (`toolPictures`, with three.js), which
- * anything shows without drawing: tool cards, also in plugins' views. A picture is kept by what
+ * tool cards show without drawing. A picture is kept by what
  * it shows at its size in the theme, so equal shapes share one. What is asked for (`want`) is
- * drawn by whatever draws here (`serve`); a plugin's view has none.
+ * drawn by the registered painter (`serve`).
  */
 class ToolPictureCache {
   private readonly images = new Map<string, string>()
@@ -180,8 +179,8 @@ export function toolThumbnail(tool: ToolPictureSource): string | null {
 }
 
 /**
- * The tool's thumbnail: the one a plugin's view was given with the tool, else the tool
- * library's, asked for until it has drawn it; null until then, or without a picture.
+ * The tool's thumbnail: a supplied picture or the library's cached drawing; null until
+ * it is drawn, or without a picture.
  */
 export function useToolThumbnail(
   tool: ToolPictureSource & { readonly picture?: string | null }

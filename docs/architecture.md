@@ -2,47 +2,43 @@
 
 OpenSpindle is an Electron desktop app with a React renderer. This document covers the layers, what each one owns, and the patterns that tie them together. The workspace model has its own document: [workspace-model.md](workspace-model.md).
 
-The renderer is served from the privileged `app://openspindle` scheme with a strict content security policy. The sandboxed preload only hands the page a MessagePort; every file, menu, storage, plugin and machine request is a typed, validated RPC call to the main process (`src/platform/contract`). The renderer refuses to start outside the app.
+The renderer is served from the privileged `app://openspindle` scheme with a strict content security policy. The sandboxed preload only hands the page a MessagePort; every file, menu, storage, PCB and machine request is a typed, validated RPC call to the main process (`src/platform/contract`). The renderer refuses to start outside the app.
 
-An RPC endpoint (`packages/rpc`) serves at most 64 calls at once per budget, a method's `budget` in its contract; beyond that, and for a request whose ID is still in flight, it answers `BUSY`. The calls plugin views make in the main process count against a budget of their own, so plugins never hold up the app's calls, and Stop counts against none. The main process's host connection, the renderer's and each plugin frame's log what the peer is never told: the first of each run of events or results that fail the contract, which they drop or refuse, and every handler failure that is not an `RpcError`, with its stack.
+An RPC endpoint (`packages/rpc`) serves at most 64 calls at once per budget, a method's `budget` in its contract; beyond that, and for a request whose ID is still in flight, it answers `BUSY`. PCB conversion uses its own request budget; Stop counts against none. The main process's host connection and the renderer's log what the peer is never told: the first of each run of events or results that fail the contract, which they drop or refuse, and every handler failure that is not an `RpcError`, with its stack.
 
 ## Layers
 
 ```
-electron/main/        the main process: window, app:// protocol, menus, services, machine host, plugin host
+electron/main/        the main process: window, app:// protocol, menus, services, machine host, PCB conversion
 electron/preload/     a generic bridge that hands the renderer one RPC MessagePort
 packages/rpc          typed RPC: Zod contracts, endpoints, cancellation, subscriptions, transports
-packages/plugin-core  plugin manifest v2, capabilities, template engine, contracts, installer pipeline
-packages/plugin-sdk   the plugin author SDK: definePlugin, hooks, ui kit, companion server, CLI
 src/machine/          the machine domain (host-agnostic; runs in Electron main and the simulator)
 src/domain/           the workspace domain: plates, operations, tools, stock, fixtures and machine kits, stored anchors, NC reading, compile, auto-level, auto Z-height, auto-scan, 3D probing, design rules (pure)
 src/formats/          file formats: plate envelope, STEP-NC project, shared base64 JSON, GLB models, the tool library
 src/lib/              generic building blocks with no domain knowledge: zip reading, three.js helpers, appearance and fonts
 src/persistence/      versioned repositories: the tool and stock libraries, the fixture library; the Models library
 src/platform/         the Host (the main process over RPC), RPC clients, machine hooks
-src/app/              application state: TanStack stores, command dispatch, diagnostics, plugin broker
-src/features/         UI features: shell, prepare, job, device, tool library, models, project, plugins, design rules, settings, workspace settings
+src/app/              application state: TanStack stores, command dispatch, diagnostics
+src/features/         UI features: shell, prepare, job, device, tool library, models, project, PCB, design rules, settings, workspace settings
 src/routes/           thin TanStack Router file routes: /prepare, /job, /device
 src/components/       shadcn ui components and shared workspace components (bed viewer)
-src/plugin-runtime/   the sandboxed plugin frame (built separately into plugin-frame/)
-plugins/              plugins that come with the app (the PCB plugin), built into out/plugins/
 tools/z1-simulator/   a development-only Makera Z1 simulator
 ```
 
 Dependencies point downward: features use app and domain; app uses domain, formats, persistence and platform; the domain uses nothing above it. ESLint enforces the boundaries that matter most:
 
 - `src/machine` imports no React, TanStack, Electron or Node module; host capabilities are injected through `src/machine/core/ports.ts`.
-- `src/domain` imports nothing from `src/app`, `src/features`, `src/components`, `src/platform`, `src/persistence`, `src/formats`, `src/routes`, `src/plugin-runtime` or `src/lib`: it is the pure domain, and file formats such as the tool library import it, not the reverse. `src/lib` imports no other layer at all: it is generic building blocks.
+- `src/domain` imports nothing from `src/app`, `src/features`, `src/components`, `src/platform`, `src/persistence`, `src/formats`, `src/routes` or `src/lib`: it is the pure domain, and file formats such as the tool library import it, not the reverse. `src/lib` imports no other layer at all: it is generic building blocks.
 - `packages/*` stay host-agnostic (no DOM, no Node) unless a subpath says otherwise.
 - The renderer never imports Electron or the machine core, only the machine contract.
 
 ## The machine
 
-One `MachineController` (Facade) owns the only connection. Everything reaches it through a `MachineGateway`, a Protection Proxy per principal: the app, the system (menu Stop), or a plugin, whose grants allow reads and accessories only. The controller lives in Electron main; the renderer receives snapshots pushed into the TanStack Query cache and sends commands as mutations. Its status polling, its watchdog and Stop run on the main process's event loop, so the main process asks its questions and reports its errors in sheets on the window (`dialog.showMessageBox(window, …)`): synchronous dialogs, and on macOS any message box without a window, block that loop. Closing the window quits the app, and every quit closes it first, so the window asks before it closes: about unsaved changes, then about a running job, which quitting leaves running.
+One `MachineController` (Facade) owns the only connection. Everything reaches it through a `MachineGateway`, a Protection Proxy per principal: the app or the system (menu Stop). The controller lives in Electron main; the renderer receives snapshots pushed into the TanStack Query cache and sends commands as mutations. Its status polling, its watchdog and Stop run on the main process's event loop, so the main process asks its questions and reports its errors in sheets on the window (`dialog.showMessageBox(window, …)`): synchronous dialogs, and on macOS any message box without a window, block that loop. Closing the window quits the app, and every quit closes it first, so the window asks before it closes: about unsaved changes, then about a running job, which quitting leaves running.
 
 - **Firmware adapters** (Strategy): the codec, status parsing, the command catalog, the NC dialect, job protocol, completion rules, control limits, anchors (read, and optionally written) and height map of one firmware family. The Makera adapter is the only one; another firmware is another adapter. The machine contract holds no machine's numbers: a command is held to the connected machine's control limits when it is admitted, and the snapshot carries those limits (null without a machine) for the controls.
 - **Admission** (Chain of Responsibility): the same rules that admit a command produce `snapshot.availability`, the single source of every disabled reason in the UI.
-- **Operations** (Command pattern): commands are verified by acknowledgement and telemetry; while a program streams, only job-concurrent commands are admitted and verified by telemetry alone. Reads defer until the program ends, except a height-map read at a program pause. A read asked for while one of its kind is deferred or running joins it, so one read answers the app and plugins alike.
+- **Operations** (Command pattern): commands are verified by acknowledgement and telemetry; while a program streams, only job-concurrent commands are admitted and verified by telemetry alone. Reads defer until the program ends, except a height-map read at a program pause. A read asked for while one of its kind is deferred or running joins it, so one read answers concurrent requests.
 - **Completion**: a job is complete only when the player's progress disappears after the done snapshot with the machine idle and no abort; otherwise it is stopped, failed, unverified or lost.
 
 See [device-controls.md](device-controls.md), [device-jobs.md](device-jobs.md) and [device-height-map.md](device-height-map.md).
@@ -62,7 +58,7 @@ The compiled program is the NC as written, in work coordinates. How the machine'
 ## State and persistence
 
 - **Stores**: the workspace and the fixture library are TanStack stores created at startup and shared through `createStoreContext`. The workspace starts as a new project on every launch, on the stored libraries (`libraryTarget` binds only them); a project is kept only by saving it as a file, and the host asks before a window with unsaved changes closes. A reload of the page (⌘R, or the dev server's after a code change) keeps the workspace: as the page goes away it hands its project to the main process, which holds it in memory only (`KeptWorkspace`), and the next page restores it with its unsaved state (`keepWorkspaceAcrossReloads`). A crashed page kept nothing newer, so its reload starts a new project; a page whose crash repeats (three times within a minute) is not reloaded again, and shows an error instead. UI state that crosses components (the open dialog, the tree's section selection, the Job session) lives in small atoms or stores next to its feature.
-- **History**: the workspace and the fixture library each record the user's edits in a `History` (`src/app/workspace/history.ts`) as the states before and after each edit, which share what the edit left alone; changes that are not edits (the selection, what a device reports, saving) are noted and outlast undo and redo. **Edit › Undo** and **Redo** raise `edit.undo` and `edit.redo`: the renderer undoes the focused text field's typing, else the history of the section on show, and a plugin view or the developer tools undo their own typing in the main process ([workspace-model.md](workspace-model.md#undo-and-redo)). A reload keeps the workspace but starts a new history.
+- **History**: the workspace and the fixture library each record the user's edits in a `History` (`src/app/workspace/history.ts`) as the states before and after each edit, which share what the edit left alone; changes that are not edits (the selection, what a device reports, saving) are noted and outlast undo and redo. **Edit › Undo** and **Redo** raise `edit.undo` and `edit.redo`: the renderer undoes the focused text field's typing, else the history of the section on show, and the developer tools undo their own typing in the main process ([workspace-model.md](workspace-model.md#undo-and-redo)). A reload keeps the workspace but starts a new history.
 - **Persistence**: each stored document (the tool and stock libraries, the fixture library) is a `Repository` (a versioned `{version, data}` envelope that reads only its own version, per-item decoding, and a save checked item by item the same way before it is written) behind a `PersistedDocument` (load once, save debounced, never while load issues are unresolved). `bindDocument` hydrates a store from its document and saves every later change. The fixture library reads each device profile with its schema (`FixtureProfilesSchema`), optimistically: a profile it cannot read is dropped with the reason, and fields a profile has that the schema does not keep are left out, both named in the load issues. The main process writes JSON files atomically in the user data folder.
 - **Load issues**: anything that cannot be restored blocks saving and opens a dialog: save a copy, continue without it, or clear and start fresh (both back up first).
 - **Models library**: uploaded CAD models live beside the documents, behind `host.models` (`ModelLibrary` over a folder per model in the app's data folder). A model is identified by its mesh's SHA-256 and every entry is verified by the store itself, which never overwrites a record it cannot read; STEP files are tessellated in a worker, loaded only when needed. See [models.md](models.md).
@@ -71,7 +67,7 @@ The compiled program is the NC as written, in work coordinates. How the machine'
 
 - **Routes**: `/prepare`, `/job` and `/device` share the `_workspace` layout (tabs, the job indicator, the dialog host, window-wide drop import and files opened from Finder, menu commands). Search params hold UI selection (the selected operation, the inspector panel); the selected plate lives in the workspace.
 - **Dialogs**: one typed dialog atom and one host that renders it; features open dialogs by value. **Settings…** (⌘,) is one of them.
-- **Appearance**: the color mode and the display and mono fonts chosen in Settings › General are kept in `localStorage` and applied before the page paints (`appearance-init.js`, generated from `src/lib/appearance.ts` and `src/lib/fonts.ts`). A font sets the theme's `--app-font-*` variables; `src/styles.css` declares every face the settings offer. Plugin views receive both in their view context.
+- **Appearance**: the color mode and the display and mono fonts chosen in Settings › General are kept in `localStorage` and applied before the page paints (`appearance-init.js`, generated from `src/lib/appearance.ts` and `src/lib/fonts.ts`). A font sets the theme's `--app-font-*` variables; `src/styles.css` declares every face the settings offer.
 - **Async work**: TanStack Query mutations with a shared workspace scope serialize imports, project open and save; errors surface as sonner toasts or inline alerts.
 - **Components**: shadcn (Base UI) components with their variants; forms use TanStack Form with Zod schemas; long lists use TanStack Table and TanStack Virtual; layout uses Tailwind utilities only.
 
@@ -83,21 +79,22 @@ Problems the user can act on are `Diagnostic`s. An error in the app's own code i
 - **Error reports** go to Sentry when the build has a DSN (`SENTRY_DSN`, built into the main process; [releasing.md](releasing.md#error-reports)); without one, errors are logged with a local ID and the rest works alike. The renderer's SDK (`@sentry/electron/renderer` with `@sentry/react`, started first by `src/app/errors/instrument.ts`) hands its events to the main process's over the bridge the preload exposes, in IPC mode Classic: no privileged `sentry-ipc://` scheme, whose fetches would bypass the page's content security policy. The main process decides what leaves the Mac (`ErrorReports`, a gate on Sentry's transport). With Settings › Privacy › Send error reports automatically on, as it is until the user turns it off, everything goes. Otherwise an error is kept back, the last 20 of them, until the error dialog's **Send report** releases it by its event ID; feedback, which only the user sends, always goes, with its attachments (the log, the project); sessions are dropped. Sent reports wait in Sentry's queue while the Mac is offline. Reports carry no user, IP address or host name (`sendDefaultPii: false`).
 - **Where errors show**: a route that throws shows `ErrorFallback` in its place (TanStack Router's `defaultErrorComponent`, reported by `defaultOnCatch` with its component stack): in a workspace section the tabs stay, elsewhere it fills the window. `AppErrorBoundary`, around the router, catches the rest. Unhandled errors of the window (Sentry's global handlers and its wrappers of timers and event listeners) and of the main process (its `uncaughtException` and `unhandledRejection` handlers, sent as `diagnostics.mainError`) show in a toast. A failure before the window exists, during startup, has nowhere to show a toast: it is logged and shown in a dialog box, and the app quits. The fallback and the toast's **Report…** open the same dialog (`src/features/error-report`): the error and its event ID, which the log records beside the error, a description, the attachments, **Download log** and **Open GitHub issue**.
 
-## Plugins
+## PCB
 
-Plugins run in sandboxed frames (opaque origin, strict CSP) and reach the app only through a typed RPC API whose methods each require a capability granted at install. A broker (Mediator) maps plugin calls onto the same workspace commands and machine gateway the app uses. Companions are local helper programs that the app starts and stops for a plugin's views. The plugins that come with the app are built with it and installed from its own files at start, through the same pipeline. See [plugins.md](plugins.md).
+PCB is a built-in operation kind. Its importer and editor (`src/features/pcb`) dispatch the same workspace commands as other features. Source files, settings, tools and generated NC stay in the operation; updates check the operation revision before saving. `src/domain/pcb` validates the source data and generation parameters.
+
+The typed `host.pcb` service invokes the local conversion service in `electron/main/pcb`. It discovers or uses a user-selected pcb2gcode executable, serializes conversion requests, bounds inputs, outputs and execution time, and cancels the child process when the request is cancelled. It has no machine access. The converter builds with the app; pcb2gcode is installed separately. See [pcb.md](pcb.md).
 
 ## Patterns at a glance
 
 | Pattern                 | Where                                                                  |
 | ----------------------- | ---------------------------------------------------------------------- |
 | Facade                  | `MachineController`                                                    |
-| Protection Proxy        | `MachineGateway` principals; plugin capability guard                   |
+| Protection Proxy        | `MachineGateway` principals                   |
 | Strategy                | firmware adapters; operation kinds; machine probes and firmware models |
 | Chain of Responsibility | machine admission                                                      |
 | Command                 | machine operations; workspace commands (`applyCommand`)                |
 | Observer                | telemetry store; TanStack stores and atoms                             |
-| Mediator                | plugin broker                                                          |
 | Specification           | the Job tab's run checklist                                            |
 | State                   | the job view (`deriveJobView`)                                         |
 | Repository              | persisted documents                                                    |

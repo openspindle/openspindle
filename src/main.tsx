@@ -54,7 +54,7 @@ bindDocument(
 bindDocument(persistence.fixtures, fixtures, createFixtureLibrary)
 const stores = { workspace, fixtures }
 // The UI starts once every stored document is restored (or blocked on load issues, which
-// the app shows): a drop, an open or a plugin install made earlier would be replaced by it.
+// the app shows): a drop or an open made earlier would be replaced by it.
 await Promise.all(persistence.all.map((document) => document.load()))
 // The new project shows the bed as its plate 1, on the selected profile's fixtures.
 startNewProject(workspace, profilePlacement(fixtures.state))

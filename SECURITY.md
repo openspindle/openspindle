@@ -1,6 +1,6 @@
 # Security
 
-OpenSpindle drives a CNC machine, runs plugins and updates itself, so a vulnerability in it can do real harm. Report one privately, not in a public issue.
+OpenSpindle drives a CNC machine, runs local conversion tools and updates itself, so a vulnerability in it can do real harm. Report one privately, not in a public issue.
 
 ## Reporting a vulnerability
 
@@ -9,8 +9,7 @@ Use **Report a vulnerability** on this repository's [Security tab](https://githu
 Worth reporting, for example:
 
 - Anything that moves the machine, changes its settings or runs a program without the user's explicit action.
-- A plugin getting past its sandbox or the capabilities it was granted.
-- A project, NC, tool library or plugin file that runs code, or reads or writes files it should not.
+- A project, NC, tool library or PCB source file that runs code, or reads or writes files it should not.
 - An installed app accepting an update that is not an OpenSpindle release.
 - Error reports sending more than the app says they send.
 

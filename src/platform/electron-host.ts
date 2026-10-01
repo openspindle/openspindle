@@ -4,7 +4,6 @@ import { messagePortTransport } from "@openspindle/rpc/message-port"
 import { RPC_PORT_MESSAGE } from "./contract/channels"
 import { hostContract } from "./contract/host-contract"
 import type { HostContract } from "./contract/host-contract"
-import { electronPlugins } from "./electron-plugins"
 import type { Host } from "./host"
 
 /** Exposed by the preload script; it only asks the main process for an RPC port. */
@@ -123,7 +122,14 @@ export async function connectElectronHost(
       },
       keptWorkspace: () => peer.call("window.keptWorkspace", undefined),
     },
-    plugins: electronPlugins(peer),
+    pcb: {
+      status: () => peer.call("pcb.status", undefined),
+      chooseExecutable: () => peer.call("pcb.chooseExecutable", undefined),
+      setExecutable: (executable) =>
+        peer.call("pcb.setExecutable", { executable }),
+      generate: (request, signal) =>
+        peer.call("pcb.generate", request, signal ? { signal } : {}),
+    },
     diagnostics: {
       status: () => peer.call("diagnostics.status", undefined),
       updateSettings: (patch) => peer.call("diagnostics.updateSettings", patch),

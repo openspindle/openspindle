@@ -1,6 +1,6 @@
 # Device controls
 
-One module owns the machine: `MachineController` in `src/machine/core`, hosted in the Electron main process. The renderer, the native menu and plugins reach it only through a `MachineGateway` for their principal. There is no free-form command console: requests are the closed `MachineCommand` union (Zod-validated at the RPC boundary and again in the controller), plus Run, reads, writing the stored anchors and Stop.
+One module owns the machine: `MachineController` in `src/machine/core`, hosted in the Electron main process. The renderer and the native menu reach it only through a `MachineGateway` for their principal. There is no free-form command console: requests are the closed `MachineCommand` union (Zod-validated at the RPC boundary and again in the controller), plus Run, reads, writing the stored anchors and Stop.
 
 ## Admission and availability
 
@@ -53,7 +53,7 @@ Every snapshot the controller builds is checked against the machine contract (`M
 
 A device connected by address takes the name it announces: unless it was heard already, the controller listens up to three seconds for it before opening the connection, and **Disconnect** meanwhile cancels the connect. While connected, the app prevents system sleep. The last device the app connected to is recorded in its data folder (`last-device.json`), and each launch tries once to connect to it again; a device that is off or unreachable fails within the eight-second handshake.
 
-Disconnecting never stops a running program, and the app's Stop goes with the connection. So while a job is active (from Run until it ends), quitting asks first, and the controller refuses to disconnect, or to connect to another device, with `confirmation-required` unless the request says the user confirmed it (`confirmed: true`). The device picker then asks, in the controller's words, and **Disconnect** or **Connect** sends the request again, confirmed. Connecting to the device the job runs on changes nothing and asks nothing. Plugins can neither connect nor disconnect.
+Disconnecting never stops a running program, and the app's Stop goes with the connection. So while a job is active (from Run until it ends), quitting asks first, and the controller refuses to disconnect, or to connect to another device, with `confirmation-required` unless the request says the user confirmed it (`confirmed: true`). The device picker then asks, in the controller's words, and **Disconnect** or **Connect** sends the request again, confirmed. Connecting to the device the job runs on changes nothing and asks nothing.
 
 ## Camera
 
@@ -63,7 +63,7 @@ The main process opens `ws://<host>:82/ws_video`, sends `start_stream` and forwa
 
 The controller keeps the recent exchange with the device in a bounded ring (about 20,000 entries across connections): every frame sent, every status report and reply line with its classification, file transfer blocks summarised by size only, and notes for connecting, disconnecting, Stop and job phase changes. **Help › Export Protocol Trace…** saves it as text from the main process, so it works even when the window is unresponsive. It is the evidence to attach when a job's completion, a pause or a verification behaves differently on a real machine than described here.
 
-The part people read is the **console**, under the G-code on the Job tab: the commands the app sent (the halt byte reads `^X`), the machine's replies and the app's notes, without status polling, transfer blocks or the upload's checksum. The controller keeps its last 1,000 entries across connections and pushes new ones to the app renderer (`machine.console`: the backlog on subscribing, then batches); plugins cannot subscribe. Reported failures (errors, alarms, halts, refusals) show in red and acknowledgements muted. It is read-only, like everything else here: there is no command input.
+The part people read is the **console**, under the G-code on the Job tab: the commands the app sent (the halt byte reads `^X`), the machine's replies and the app's notes, without status polling, transfer blocks or the upload's checksum. The controller keeps its last 1,000 entries across connections and pushes new ones to the app renderer (`machine.console`: the backlog on subscribing, then batches). Reported failures (errors, alarms, halts, refusals) show in red and acknowledgements muted. It is read-only, like everything else here: there is no command input.
 
 ## Development simulator
 

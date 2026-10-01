@@ -1,4 +1,4 @@
-import { webCryptoSha256 } from "@openspindle/plugin-core"
+import { webCryptoSha256 } from "@/lib/sha256"
 import { MODEL_LIMITS, ModelRecordSchema } from "@/domain/models/model"
 import type { ModelRecord } from "@/domain/models/model"
 import { glbStats, validateGlb } from "@/formats/models/glb"

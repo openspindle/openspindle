@@ -43,13 +43,13 @@ The limits are checked on the plate's program as it runs: every operation combin
 - **Cutting moves** are feed moves (`G1`, `G2`, `G3`) that reach below the stock top. The probe's moves (T0) do not cut, and a move straight up (a retract) leaves through what the tool has cut, so none of these count.
 - **Rapid moves** count when they end below the stock top or travel sideways below it; a rapid straight up out of a cut does not.
 - **Lifts to the clearance.** A move in machine coordinates is not in the program's work coordinates. After one that moves Z alone (`G53 G0 Z…`, which the combined program makes between operations and before it ends), and at the start of the program, the tool is taken to be at the machine's clearance: moves that keep Z travel above the stock, and the first move that sets Z comes down from there.
-- **Operations that do not compile** (for example a plugin operation that has not generated its NC) are not in the program. The results say their moves are not checked; the program rules still read their NC.
+- **Operations that do not compile** (for example a PCB operation that has not generated its NC) are not in the program. The results say their moves are not checked; the program rules still read their NC.
 
 The check does not model material already removed: a move into a pocket that an earlier move cleared counts as a move into the stock.
 
 ## Results
 
-The results stay over the 3D view until closed. They name the plate and count the errors and warnings, then list each problem under its rule: **Problem:** what breaks it and where (the worst value against the limit and how many lines break it, or the lines a program rule found, numbered as in the operation's own NC), and **Suggested:** how to fix it. **Apply** makes a program rule's fix in an NC file's program, which can be undone; plugin operations show the suggestion only. **Show** selects the operation, highlights those lines in the 3D view and marks where the worst move ends (for a program rule, where the tool is at its first line), panning to it when it is out of view; selecting program sections in the plate list highlights them instead.
+The results stay over the 3D view until closed. They name the plate and count the errors and warnings, then list each problem under its rule: **Problem:** what breaks it and where (the worst value against the limit and how many lines break it, or the lines a program rule found, numbered as in the operation's own NC), and **Suggested:** how to fix it. **Apply** makes a program rule's fix in an NC file's program, which can be undone; PCB operations show the suggestion only. **Show** selects the operation, highlights those lines in the 3D view and marks where the worst move ends (for a program rule, where the tool is at its first line), panning to it when it is out of view; selecting program sections in the plate list highlights them instead.
 
 When the plate or the rules change after a check, the results are marked **Out of date** and Apply and Show are unavailable: **Check again** (the arrow) checks the plate again. Removing the plate closes its results.
 

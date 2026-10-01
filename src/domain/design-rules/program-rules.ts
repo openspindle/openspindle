@@ -136,7 +136,7 @@ export function resolveIssues(
 /**
  * An NC file operation's source with what one of its machine's rules finds in it resolved as
  * chosen, from what the operation starts with; null for an operation whose NC is not its own to
- * change (a plugin's, or generated), or with nothing left for the rule to find.
+ * change (PCB, or generated), or with nothing left for the rule to find.
  */
 export function resolvedFileSource(
   operation: Operation,
