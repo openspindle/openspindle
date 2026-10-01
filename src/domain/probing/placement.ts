@@ -166,25 +166,11 @@ export function placementAnchors(setup: {
     : []
 }
 
-function nearest(anchors: readonly BedAnchor[], [x, y]: XY<"bed">) {
-  let best: BedAnchor | null = null
-  let bestDistance = Infinity
-  for (const anchor of anchors) {
-    const distance =
-      (anchor.position[0] - x) ** 2 + (anchor.position[1] - y) ** 2
-    if (distance < bestDistance) {
-      best = anchor
-      bestDistance = distance
-    }
-  }
-  return best
-}
-
 /**
  * The anchored placement of a bed point: relative to the current (or last) anchor while the plate
- * has it, otherwise to the anchor nearest the point. The offset is the point's distance from the
- * anchor on the bed, which the G53 travel repeats in machine coordinates. Null when the plate has
- * no anchors.
+ * has it, otherwise to the first, the bed's origin (Anchor 1 on the Z1). The offset is the point's
+ * distance from the anchor on the bed, which the G53 travel repeats in machine coordinates. Null
+ * when the plate has no anchors.
  */
 export function anchorPlacementAt(
   point: XY<"bed">,
@@ -194,8 +180,7 @@ export function anchorPlacementAt(
 ): AnchorPlacement | null {
   const previous = current.kind === "anchor" ? current : last
   const anchor =
-    anchors.find((item) => item.id === previous?.anchorId) ??
-    nearest(anchors, point)
+    anchors.find((item) => item.id === previous?.anchorId) ?? anchors.at(0)
   if (!anchor) return null
   return {
     kind: "anchor",

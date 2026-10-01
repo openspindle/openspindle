@@ -13,7 +13,7 @@ import { OUTLINE_EDGE_LIMIT, outlineTarget } from "./tasks/outline/params"
  * a grid starts its grid there, and 3D probing starts where its routine is best started from
  * what it finds there (`originStartOffset`: half the distances in from an outside corner, beyond
  * both walls of an inside corner). The start is anchored, from the operation's anchor or else the
- * nearest, and has no height: the probe stays at the clearance it travels at, and the routine
+ * first (Anchor 1 on the Z1), and has no height: the probe stays at the clearance it travels at, and the routine
  * searches down for what is there, whatever work Z is. A pocket's centring, which touches no
  * top, keeps the height it has. Null for an outline, which starts nowhere, or a plate without
  * anchors.
