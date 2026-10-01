@@ -5,11 +5,11 @@ import type { Severity } from "@/domain/diagnostics"
 export type ViewerPalette = {
   primary: THREE.Color
   rapid: THREE.Color
-  /** Auto-level grids: yellow in any theme. */
+  /** Probe grids: yellow in any theme. */
   probe: THREE.Color
-  /** The probe's path over an auto-level grid: green in any theme, apart from cutting paths. */
+  /** The probe's path over a probe grid: green in any theme, apart from cutting paths. */
   probePath: THREE.Color
-  /** Where an auto Z-height touches: red in any theme. */
+  /** Where a touch-off touches: red in any theme. */
   touchOff: THREE.Color
   /** The outline of where a plate cuts. */
   workArea: THREE.Color

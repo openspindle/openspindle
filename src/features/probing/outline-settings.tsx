@@ -22,7 +22,7 @@ import {
 
 export type OutlineSettingsProps = {
   value: OutlineParams
-  /** The trace's parameters on the machine's probe: defaults, ranges and descriptions. */
+  /** The trace's parameters with its strategy on the plate's machine: defaults, ranges and descriptions. */
   parameters: OutlineSpecs
   /** What the scan traces: the plate's toolpath bounds, or why there are none. */
   outline: ToolpathBoundsResult
