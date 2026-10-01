@@ -1,5 +1,5 @@
 import { z } from "zod"
-import type { AnchorConfiguration } from "@/machine/contract"
+import type { AnchorConfiguration, AnchorPosition } from "@/machine/contract"
 import {
   COORDINATE_LIMIT,
   CoordinateSchema,
@@ -131,4 +131,28 @@ export function anchorDisplayName(
   factory: boolean
 ): string {
   return `${anchor.name}${factory ? " (default)" : ""}`
+}
+
+/**
+ * A device's anchors (machine X and Y) with one moved to `position`, as a probing found it. The
+ * others stay where they are, unless the first moves and they follow it (`follow`): the Z1 stores
+ * Anchor 2 as its offset from Anchor 1, so its own configuration has it move along.
+ */
+export function withMovedAnchor(
+  anchors: readonly AnchorPosition[],
+  anchorId: string,
+  position: readonly [number, number],
+  follow: boolean
+): AnchorPosition[] {
+  const moved = anchors.find((anchor) => anchor.id === anchorId)
+  if (!moved) return [...anchors]
+  const [dx, dy] = [position[0] - moved.x, position[1] - moved.y]
+  const first = anchors[0]?.id === anchorId
+  return anchors.map((anchor) => {
+    if (anchor.id === anchorId)
+      return { id: anchor.id, x: position[0], y: position[1] }
+    return first && follow
+      ? { id: anchor.id, x: anchor.x + dx, y: anchor.y + dy }
+      : { id: anchor.id, x: anchor.x, y: anchor.y }
+  })
 }

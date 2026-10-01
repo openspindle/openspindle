@@ -69,6 +69,8 @@ The routine forms one **3D probing** section in the Plates list, the G-code list
 
 The firmware's routines reply to every connection, even from a played file, so the machine reports each contact (`[PRB:x,y,z:1]`). The operation's card in the Job tab counts them as they come, then shows the machine X and Y where the routine set work X0 and Y0, the top it set Z0 on, and a pocket's or boss's size between the sides it touched, or that the machine stopped before the routine found it ([device-jobs.md](device-jobs.md#the-job-tab)).
 
+Once a routine that set both X0 and Y0 is done, **Save as anchor** keeps where it found its corner or centre as one of the connected device's anchors, such as Anchor 1 at the L-bracket's inner corner ([stored anchors](stored-anchors.md#changing-the-anchors)). Choose the anchor; for the first, **Move Anchor 2 with it** (on by default, as the Z1 stores Anchor 2 as its offset from Anchor 1) decides whether the others keep their offsets or stay where they are. The dialog lists what changes, and **Write anchors** writes them as the Device page's **Edit** does. Writing needs the device's anchors read since it connected, the machine idle and no program running; the machine places its tool setter and tool rack from Anchor 1 too, once it is reset.
+
 ## Checks
 
 Errors block Run; warnings inform. What stops the NC from being generated is the operation's error (`probing-invalid`, or `probing-probe` for the probe and its ball); the rest are rules in the [rule list](workspace-model.md#rules).

@@ -26,7 +26,10 @@ import {
   findsCorner,
 } from "@/domain/probing/tasks/origin/params"
 import type { OriginParams } from "@/domain/probing/tasks/origin/params"
-import { originResult } from "@/domain/probing/tasks/origin/result"
+import {
+  foundPosition,
+  originResult,
+} from "@/domain/probing/tasks/origin/result"
 import { placementHeight } from "@/domain/probing/placement"
 import { SURFACE_TOUCH } from "@/domain/probing/generic/surface-touch"
 import {
@@ -55,6 +58,7 @@ import { EndedStage, FinishingStage, TransferStage } from "./job-stages"
 import type { JobSubject, JobView } from "./job-view"
 import { PausePrompt } from "./pause-prompt"
 import { RunChecklistCard } from "./run-checklist-card"
+import { SaveAsAnchor } from "./save-as-anchor"
 import type { RunChecklist } from "./run-checklist"
 import { useReadAnchorsFix } from "@/features/prepare/quick-fix"
 import { runStages } from "./run-stages"
@@ -259,14 +263,22 @@ function Height({ z }: { z: number }) {
   )
 }
 
-/** Where a 3D probing routine set the work origin, from the contacts it reported. */
+/**
+ * Where a 3D probing routine set the work origin, from the contacts it reported, and once it is
+ * done the machine X and Y it found, to keep as an anchor.
+ */
 function probe3dFacts(
   params: OriginParams,
   ball: number,
   { contacts }: ContactsMeasurement,
   status: StageStatus
-): { description: ReactNode; facts: Fact[] } {
+): {
+  description: ReactNode
+  facts: Fact[]
+  found: readonly [number, number] | null
+} {
   const result = originResult(params, ball, contacts)
+  const found = status === "done" ? foundPosition(result) : null
   const set = (["X", "Y"] as const).flatMap((axis, index) => {
     const value = result.origin[index]
     return value === null ? [] : [{ axis, value }]
@@ -282,12 +294,13 @@ function probe3dFacts(
     })
   facts.push({ label: "Contacts", value: String(contacts.length) })
   if (!result.complete || !set.length)
-    return { description: probe3dUnfinished(params, status), facts }
-  const found = findsCorner(params.routine) ? "corner" : "center"
+    return { description: probe3dUnfinished(params, status), facts, found }
+  const feature = findsCorner(params.routine) ? "corner" : "center"
   return {
+    found,
     description: (
       <>
-        Found the {found} and set work{" "}
+        Found the {feature} and set work{" "}
         {set.map(({ axis }) => (
           <Fragment key={axis}>
             <AxisLabel axis={axis} />0{" "}
@@ -330,6 +343,7 @@ function operationResults(
   const { operation, surface, grid, contacts, status } = stage
   const facts: Fact[] = []
   let description: ReactNode = null
+  let found: readonly [number, number] | null = null
   const { source } = operation
   // The probe's ball, as the plate's table held it when the job ran.
   const probeId =
@@ -346,6 +360,7 @@ function operationResults(
     const probed = probe3dFacts(source.params, ball, contacts, status)
     description = probed.description
     facts.push(...probed.facts)
+    found = probed.found
   }
   if (surface) {
     const [x, y, z] = surface.machine
@@ -396,6 +411,7 @@ function operationResults(
       <>
         {facts.length > 0 && <HeightMapFacts facts={facts} />}
         {grid && <HeightMapGrid map={gridMap(grid)} compact />}
+        {found && <SaveAsAnchor position={found} />}
       </>
     ),
   }

@@ -67,3 +67,14 @@ export function originResult(
   }
   return { origin, top, size, complete: contacts.length >= next }
 }
+
+/**
+ * The machine X and Y a routine found, to keep as an anchor there: null unless it reported every
+ * contact and set both work X0 and Y0.
+ */
+export function foundPosition({
+  origin: [x, y],
+  complete,
+}: OriginResult): readonly [number, number] | null {
+  return complete && x !== null && y !== null ? [x, y] : null
+}
