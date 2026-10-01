@@ -153,10 +153,11 @@ export function DeviceCamera({
     : image
 
   if (variant === "overlay") {
-    // Over a live picture the buttons show only while it is pointed at or focused.
+    // Over a live picture the buttons fade in while it is pointed at, and out once it is not,
+    // also after a click on one; a keyboard's focus keeps them in.
     const reveal =
       showing &&
-      "opacity-0 transition-opacity group-hover/camera:opacity-100 group-focus-within/camera:opacity-100"
+      "opacity-0 transition-opacity duration-300 group-hover/camera:opacity-100 group-has-[:focus-visible]/camera:opacity-100"
     return (
       <div
         ref={panel}
