@@ -53,7 +53,7 @@ export const ProbePositionPlacementSchema = z.strictObject({
 
 /**
  * G53 travel to a stored anchor of the plate's device, plus an offset in X and Y, at the height
- * the machine's probe travels at.
+ * the probe travels at on the machine.
  */
 export const AnchorPlacementSchema = z.strictObject({
   kind: z.literal("anchor"),

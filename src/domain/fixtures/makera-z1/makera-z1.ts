@@ -48,10 +48,13 @@ export class MakeraZ1 extends FixtureKit {
   readonly bed = new Z1Bed()
   /**
    * The firmware selects a Z touch probe, such as Makera's wired Probe 2.0, as T0 and the 3D
-   * probe as T9999, its own number for it. Besides the generic strategies it offers its own
+   * probe as T9999, its own number for it. It finds origins with T9999 active (its 3D probing
+   * routines, M480) and probes everything else with T0 active, the probe's laser (M494) too, as
+   * its NC grammar reads them (`readZ1Block`). Besides the generic strategies it offers its own
    * auto-leveling (G32, M495), its Z probe (M495) and its 3D probing routines (M480).
    */
   readonly probing: MachineProbing = {
+    probes: (task, { touch }) => touch === (task === "origin" ? "xyz" : "z"),
     slot: ({ touch }) => (touch === "z" ? PROBE_TOOL : PROBE_3D_TOOL),
     nc: Z1_PROBING_NC,
     specs: Z1_GENERIC_SPECS,

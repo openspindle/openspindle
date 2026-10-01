@@ -1,3 +1,4 @@
+import { FIXTURE_KITS } from "../fixtures/catalog"
 import { createOperation } from "../operations/operation"
 import type {
   Operation,
@@ -17,25 +18,72 @@ import type {
   TaskStrategy,
 } from "./strategy"
 
-/** OpenSpindle's own strategies, which every machine with probing NC runs. */
+/**
+ * OpenSpindle's own strategies, which a machine runs where it gives what they are made of
+ * (`ProbingStrategy.runsOn`).
+ */
 export const GENERIC_STRATEGIES: readonly TaskStrategy[] = [
   SURFACE_TOUCH,
   OUTLINE_TRACE,
 ]
 
-/** The strategies a machine offers: the generic ones first, then its firmware's. */
+/** The strategies a machine offers: first the generic ones it runs, then its firmware's. */
 export const machineStrategies = (
   machine: MachineProbing
-): readonly TaskStrategy[] => [...GENERIC_STRATEGIES, ...machine.strategies]
+): readonly TaskStrategy[] => [
+  ...GENERIC_STRATEGIES.filter(
+    (strategy) => strategy.runsOn?.(machine) ?? true
+  ),
+  ...machine.strategies,
+]
 
-/** The strategies a probe with this profile can run on a machine, generic first. */
+/**
+ * Whether a strategy probes with a probe of this profile on a machine: the strategy can probe
+ * with it, and the machine's firmware lets that probe do the strategy's task.
+ */
+export const runsWith = (
+  strategy: TaskStrategy,
+  profile: ProbeProfile,
+  machine: MachineProbing
+): boolean =>
+  strategy.accepts(profile, machine) && machine.probes(strategy.task, profile)
+
+/** The strategies a probe with this profile can run on a machine (`runsWith`), generic first. */
 export const strategiesFor = (
   machine: MachineProbing,
   profile: ProbeProfile
 ): TaskStrategy[] =>
   machineStrategies(machine).filter((strategy) =>
-    strategy.accepts(profile, machine)
+    runsWith(strategy, profile, machine)
   )
+
+/**
+ * Why a strategy cannot run on a plate, as picking it shows (`ProbingStrategy.blocked`); null
+ * where it can.
+ */
+export const strategyBlocked = (
+  strategy: TaskStrategy,
+  plate: Plate,
+  machine: MachineProbing
+): string | null => strategy.blocked?.(plate, machine) ?? null
+
+/**
+ * A strategy's label by its id, among the generic strategies and those of every machine
+ * OpenSpindle knows, so that a strategy of another machine than a plate's is named too; the id
+ * itself for one it does not know.
+ */
+export function strategyLabel(id: string): string {
+  const known = [
+    ...GENERIC_STRATEGIES,
+    ...FIXTURE_KITS.flatMap((kit) => kit.probing?.strategies ?? []),
+  ]
+  return known.find((strategy) => strategy.id === id)?.label ?? id
+}
+
+/** What a probing operation is shown as: its strategy's label (`strategyLabel`). */
+export const probingLabel = (operation: {
+  readonly source: Pick<ProbingSource, "strategy">
+}): string => strategyLabel(operation.source.strategy)
 
 /** The strategy a probing operation names, among a machine's; null where it has none so named. */
 export const strategyOf = (
@@ -127,9 +175,9 @@ export function newProbingOperation(
 }
 
 /**
- * The library probe a new operation of a strategy would probe with: one whose profile it runs,
- * preferring the probe the plate's table already holds where the machine needs it; null when
- * the library has none.
+ * The library probe a new operation of a strategy would probe with: one it runs with on the
+ * machine (`runsWith`), preferring the probe the plate's table already holds where the machine
+ * needs it; null when the library has none.
  */
 export function preferredProbe(
   strategy: TaskStrategy,
@@ -139,7 +187,7 @@ export function preferredProbe(
 ): Tool | null {
   const runs = library.filter((tool) => {
     const profile = probeProfile(tool)
-    return profile !== null && strategy.accepts(profile, machine)
+    return profile !== null && runsWith(strategy, profile, machine)
   })
   const held = (tool: Tool) => {
     const profile = probeProfile(tool)

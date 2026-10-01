@@ -13,8 +13,8 @@ const storedLength = z.number().positive().max(COORDINATE_LIMIT)
 const storedCount = z.int().min(2).max(COORDINATE_LIMIT)
 
 /**
- * A built-in auto-level operation, as stored for any machine. Its NC is derived from these
- * parameters at compile time, within the ranges of the machine's probe
+ * A height grid's parameters, as stored for any machine. Its strategy writes the NC from them at
+ * compile time, within the ranges it gives them on the plate's machine
  * (`rangedSchema(GridParamsSchema, parameters)`).
  */
 export const GridParamsSchema = z.strictObject({

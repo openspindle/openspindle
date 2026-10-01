@@ -8,12 +8,12 @@ export type OutlineField = "travelZ" | "feed"
 /** A strategy's trace parameters on a machine (`ProbingStrategy.parameters`). */
 export type OutlineSpecs = SpecsOf<OutlineParams, OutlineField>
 
-/** A sanity bound for stored feeds, mm/min; the machine's probe sets the usable range. */
+/** A sanity bound for stored feeds, mm/min; the strategy sets the usable range. */
 const storedFeed = z.number().positive().max(100_000)
 
 /**
- * A built-in auto-scan operation, as stored for any machine. Its NC traces the plate's toolpath
- * bounds at compile time, within the ranges of the machine's probe (`rangedSchema`).
+ * An outline's parameters, as stored for any machine. Its strategy traces the plate's toolpath
+ * bounds at compile time, within the ranges it gives them on the plate's machine (`rangedSchema`).
  */
 export const OutlineParamsSchema = z.strictObject({
   /** Machine Z of the trace (G53), mm. */

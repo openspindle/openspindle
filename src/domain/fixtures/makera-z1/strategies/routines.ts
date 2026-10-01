@@ -27,6 +27,7 @@ import { placementContext } from "../../../probing/placement"
 import type { ProbingStrategy } from "../../../probing/strategy"
 import type { Tool } from "../../../tools/tool"
 import { ORIGIN_ROUTINE, routineSubcode } from "../3d-probe/blocks"
+import { firmwareMillimetres } from "../probing-nc"
 import { anchorTravel } from "../wired-probe/travel"
 
 /** How far in one axis the probe moves out; X's and Y's differ only in their axis. */
@@ -66,8 +67,8 @@ const ROUTINE_PARAMETERS: OriginSpecs = {
  */
 const BALL = { min: 0.5, max: 10 } as const
 
-/** Numbers as the firmware prints its own routines' values: three decimals at most. */
-const mm = (value: number) => String(Number(value.toFixed(3)) + 0)
+/** Lengths as the firmware prints its own routines' values. */
+const mm = firmwareMillimetres
 
 const ballError = issueOf<"ball-unknown" | "ball-out-of-range">("error")
 

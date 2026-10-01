@@ -1,8 +1,8 @@
 import { z } from "zod"
 
 /**
- * A numeric parameter of a probing operation as the machine's probe describes it: its label,
- * default and the range the probe accepts, with the fields of a plugin manifest's numeric
+ * A numeric parameter of a probing operation as its strategy describes it on a machine: its
+ * label, default and the range it takes, with the fields of a plugin manifest's numeric
  * parameter.
  */
 export type ParameterSpec = {
@@ -23,7 +23,7 @@ export type ParameterSpec = {
 /** A parameter per axis, such as a grid's size: X, then Y. */
 export type PairSpec = readonly [x: ParameterSpec, y: ParameterSpec]
 
-/** A machine's numeric parameters of one probing operation, by field, in form order. */
+/** A strategy's numeric parameters of a probing operation on a machine, by field, in form order. */
 export type ParameterSpecs<TField extends string = string> = Readonly<
   Record<TField, ParameterSpec | PairSpec>
 >
@@ -74,8 +74,8 @@ const fieldSchema = (spec: ParameterSpec | PairSpec) =>
 const schemas = new WeakMap<ParameterSpecs, WeakMap<z.ZodObject, z.ZodType>>()
 
 /**
- * An operation's stored parameters within the ranges of a machine's probe, as its form and its NC
- * take them: the stored schema with each of `specs`' fields held to its range.
+ * An operation's stored parameters within the ranges its strategy gives them on a machine, as its
+ * form and its NC take them: the stored schema with each of `specs`' fields held to its range.
  */
 export function rangedSchema<TParams, TField extends NumericField<TParams>>(
   stored: z.ZodObject & z.ZodType<TParams, TParams>,

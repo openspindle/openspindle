@@ -27,9 +27,9 @@ export function centerTouchOff(
 }
 
 /**
- * A new auto Z-height for a plate: the defaults of the machine's probe, touching the middle of
- * the area its job cuts (its stock when it machines nothing), relative to a stored anchor.
- * Without anchors or a work area it touches at the probe position.
+ * A new touch-off's parameters for a plate: the strategy's defaults, touching the middle of the
+ * area its job cuts (its stock when it machines nothing), relative to a stored anchor. Without
+ * anchors or a work area it touches at the probe position.
  */
 export function plateTouchOffParams(
   plate: Plate,

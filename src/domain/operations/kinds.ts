@@ -11,7 +11,11 @@ import { fail, ok } from "../primitives"
 import type { Result } from "../primitives"
 import { boundProbe } from "../probing/bound-probe"
 import { placementContext } from "../probing/placement"
-import { generateProbing, strategyFor } from "../probing/strategies"
+import {
+  generateProbing,
+  strategyFor,
+  strategyLabel,
+} from "../probing/strategies"
 import type { ProbingTask, TaskSpecs } from "../probing/strategy"
 import type { GridIssueCode } from "../probing/tasks/grid/issues"
 import { gridRunIssues, validateGrid } from "../probing/tasks/grid/rules"
@@ -172,8 +176,9 @@ const pluginKind: OperationKind<"plugin"> = {
 }
 
 /**
- * A probing operation whose strategy the plate's machine does not have, for its task. The
- * operation's inspector shows it; its editor has no settings to add.
+ * A probing operation on a machine that does not probe, or whose strategy the plate's machine
+ * does not offer for its task, named by its label (`strategyLabel`). The operation's inspector
+ * shows it; its editor has no settings to add.
  */
 const unsupported = (
   operation: ProbingOperation,
@@ -181,7 +186,9 @@ const unsupported = (
 ): Diagnostic =>
   error(
     "probing-unsupported",
-    `${operation.name}: the ${kit.name} has no probing strategy "${operation.source.strategy}" for this operation.`,
+    kit.probing
+      ? `${operation.name}: the ${kit.name} does not offer ${strategyLabel(operation.source.strategy)} for this operation.`
+      : `${operation.name}: the ${kit.name} does not probe.`,
     { subject: operationSubject(operation.id) }
   )
 

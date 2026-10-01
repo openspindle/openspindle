@@ -19,7 +19,10 @@ const PAUSE = [
   "M0",
 ]
 
-/** A probe's pointer the machine cannot switch on traces nothing. */
+/**
+ * A probe's pointer the machine cannot switch on traces nothing. Such a machine does not run the
+ * trace (`runsOn`), so this only guards its NC.
+ */
 const NO_POINTER = issueOf<"no-pointer">("error")(
   "no-pointer",
   "This machine cannot switch on a probe's pointer to trace with."
@@ -40,8 +43,9 @@ export const OUTLINE_TRACE: ProbingStrategy<
   task: "outline",
   label: "Outline trace",
   description: "Trace the edges of the plate's work area before cutting.",
-  accepts: (probe, machine) =>
-    probe.pointer && hasSpecs(machine, "outline-trace"),
+  runsOn: (machine) =>
+    machine.nc.pointer !== null && hasSpecs(machine, "outline-trace"),
+  accepts: (probe) => probe.pointer,
   parameters: (machine) => specsOf(machine, "outline-trace"),
   defaults: (_plate, parameters) => ({
     ...defaultsOf(parameters),

@@ -1,7 +1,8 @@
 import { issueOf } from "../../../diagnostics"
 import type { XY } from "../../../geometry/frame"
 import { formatMillimetres } from "../../../geometry/millimetres"
-import { placementContext } from "../../../probing/placement"
+import { workOriginOnMachine } from "../../../plate/work-origin"
+import { placementAnchors, placementContext } from "../../../probing/placement"
 import type { ProbingStrategy } from "../../../probing/strategy"
 import { plateTouchOffParams } from "../../../probing/tasks/touch-off/fit"
 import type {
@@ -9,8 +10,21 @@ import type {
   TouchOffSpecs,
 } from "../../../probing/tasks/touch-off/params"
 import { planTouchOff } from "../../../probing/tasks/touch-off/rules"
-import { TOUCH_PARAMETERS } from "../probing-nc"
+import { TOUCH_PARAMETERS, firmwareMillimetres } from "../probing-nc"
 import { anchorTravel } from "../wired-probe/travel"
+
+/**
+ * Surface touch's ranges on the Z1 (`TOUCH_PARAMETERS`), whose probe travel says that the
+ * firmware's Z probe searches down to its tool rack Z instead.
+ */
+const Z_PROBE_PARAMETERS: TouchOffSpecs = {
+  ...TOUCH_PARAMETERS,
+  probeTravel: {
+    ...TOUCH_PARAMETERS.probeTravel,
+    description:
+      "How far the probe searches down before the machine alarms. After a probe change it starts near the top of Z travel. The machine's own Z probe, run from a stored anchor with the work origin kept relative to one, searches to its tool rack Z instead.",
+  },
+}
 
 const INTRODUCTION = [
   "; Makera wired Probe 2.0 - auto Z-height",
@@ -36,7 +50,7 @@ const NOT_ANCHORED = issueOf<"work-origin-not-anchored">("error")(
  * every step.
  */
 function firmwareTouch([x, y]: XY<"work">) {
-  const mm = (value: number) => String(Number(value.toFixed(3)) + 0)
+  const mm = firmwareMillimetres
   return `M495 X${mm(x)} Y${mm(y)} O0 F0`
 }
 
@@ -61,10 +75,23 @@ export const Z_PROBE: ProbingStrategy<
   description:
     "Touch the stock top with the machine's own Z probe at a stored anchor and set work Z there; the machine reports the touch.",
   accepts: ({ touch }) => touch === "z",
-  parameters: () => TOUCH_PARAMETERS,
+  // Its settings choose the anchor later; the plate decides whether an anchored start can have
+  // work coordinates at all.
+  blocked: (plate) => {
+    if (!placementAnchors(plate.setup).length)
+      return "The firmware's Z probe touches only at a stored anchor: select an anchor snapshot for this plate's device."
+    if (!workOriginOnMachine(plate.setup))
+      return "The firmware's Z probe touches only on a plate whose work origin is kept relative to an anchor."
+    return null
+  },
+  parameters: () => Z_PROBE_PARAMETERS,
   defaults: plateTouchOffParams,
   generate: ({ params, plate, probe, machine }) => {
-    const plan = planTouchOff(params, placementContext(plate), TOUCH_PARAMETERS)
+    const plan = planTouchOff(
+      params,
+      placementContext(plate),
+      Z_PROBE_PARAMETERS
+    )
     if (!plan.ok) return plan
     const { start } = plan
     if (start.kind !== "anchor" || !start.work)
