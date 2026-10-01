@@ -12,6 +12,8 @@ const PROBE_3D = 9999
 
 /** One of the earlier formats' probing kinds as a probing operation. */
 type ProbingKind = {
+  /** What earlier formats named a new operation of it, and showed it as. */
+  readonly label: string
   readonly task: "grid" | "touch-off" | "outline" | "origin"
   /** The tool number its NC selected, which the operation's probe now is. */
   readonly probe: number
@@ -92,6 +94,7 @@ const KINDS = new Map<unknown, ProbingKind>([
   [
     "auto-level",
     {
+      label: "Auto-level",
       task: "grid",
       probe: PROBE,
       strategy: () => "makera-z1/height-map",
@@ -109,6 +112,7 @@ const KINDS = new Map<unknown, ProbingKind>([
   [
     "auto-z-height",
     {
+      label: "Auto Z-height",
       task: "touch-off",
       probe: PROBE,
       strategy: touchOffStrategy,
@@ -118,6 +122,7 @@ const KINDS = new Map<unknown, ProbingKind>([
   [
     "auto-scan",
     {
+      label: "Auto-scan",
       task: "outline",
       probe: PROBE,
       strategy: () => "outline-trace",
@@ -127,6 +132,7 @@ const KINDS = new Map<unknown, ProbingKind>([
   [
     "probe-3d",
     {
+      label: "3D probing",
       task: "origin",
       probe: PROBE_3D,
       strategy: () => "makera-z1/routines",
@@ -141,6 +147,10 @@ const KINDS = new Map<unknown, ProbingKind>([
 /** What upgrading a probing operation's source makes of it. */
 export type UpgradedSource = {
   readonly source: JsonObject
+  /** The earlier kind's label, which a new operation of it was named. */
+  readonly label: string
+  /** The strategy that writes its NC; null where the source holds no valid one. */
+  readonly strategy: string | null
   /** The tool number its NC selects; null where the source holds no valid one. */
   readonly probe: number | null
   /** The ball diameter 3D probing was set for, which the probe now gives; null for none. */
@@ -173,6 +183,8 @@ export function upgradeProbingSource(
   const probe = ToolNumberSchema.safeParse(upgraded.probe)
   return {
     source: upgraded,
+    label: kind.label,
+    strategy: typeof upgraded.strategy === "string" ? upgraded.strategy : null,
     probe: probe.success ? probe.data : null,
     ball:
       source.kind === "probe-3d" && typeof params.ballDiameter === "number"
