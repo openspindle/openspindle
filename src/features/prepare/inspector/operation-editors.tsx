@@ -10,19 +10,27 @@ import {
 } from "@/components/ui/field"
 import { Switch } from "@/components/ui/switch"
 import { templateProgram } from "@/app/workspace/templates"
-import { useWorkspaceStore } from "@/app/workspace/workspace-context"
+import {
+  useWorkspace,
+  useWorkspaceStore,
+} from "@/app/workspace/workspace-context"
 import { placementAnchors } from "@/domain/probing/placement"
-import { offering } from "@/domain/probing/probe"
+import { strategyFor } from "@/domain/probing/strategies"
+import type { MachineProbing } from "@/domain/probing/strategy"
 import { kitForPlate } from "@/domain/fixtures/catalog"
 import { closingParkCodes } from "@/domain/compile/nc-unit"
 import {
   plateToolpathBounds,
   plateWorkArea,
 } from "@/domain/compile/toolpath-bounds"
-import type { OperationOf } from "@/domain/operations/kinds"
-import type { NcOrigin, OperationSource } from "@/domain/operations/operation"
+import type { OperationOf, ProbingOperation } from "@/domain/operations/kinds"
+import type {
+  NcOrigin,
+  OperationSource,
+  ProbingSourceOf,
+} from "@/domain/operations/operation"
 import type { Plate } from "@/domain/plate/plate"
-import { localTools } from "@/domain/tools/tool-table"
+import { boundTools, localTools } from "@/domain/tools/tool-table"
 import { GridSettings } from "@/features/probing/grid-settings"
 import { OutlineSettings } from "@/features/probing/outline-settings"
 import { TouchOffSettings } from "@/features/probing/touch-off-settings"
@@ -275,74 +283,163 @@ function useWorkArea(plate: Plate): WorkAreaFit {
   )
 }
 
-function AutoLevelEditor({ plate, operation }: EditorProps<"auto-level">) {
+/** A probing task's settings editor: its operation, on a machine that has its strategy. */
+type TaskEditorProps<TSource> = {
+  plate: Plate
+  operation: ProbingOperation & { source: TSource }
+  machine: MachineProbing
+}
+
+function GridEditor({
+  plate,
+  operation,
+  machine,
+}: TaskEditorProps<ProbingSourceOf<"grid">>) {
   const update = useSourceUpdate(plate, operation.id, operation.revision)
   const workArea = useWorkArea(plate)
-  const grid = offering(kitForPlate(plate).probes, "grid")?.capability
-  // Without a probe the operation has no settings; its diagnostic above says why.
-  if (!grid) return null
+  const { source } = operation
+  const strategy = strategyFor(source, machine)
+  if (!strategy) return null
   return (
     <GridSettings
       key={operation.id}
-      value={operation.source.params}
-      parameters={grid.parameters}
+      value={source.params}
+      parameters={strategy.parameters(machine)}
       anchors={anchorOptions(plate)}
       workArea={workArea}
-      onChange={(params) => update({ kind: "auto-level", params })}
+      onChange={(params) => update({ ...source, params })}
     />
   )
 }
 
-function AutoZHeightEditor({ plate, operation }: EditorProps<"auto-z-height">) {
+function TouchOffEditor({
+  plate,
+  operation,
+  machine,
+}: TaskEditorProps<ProbingSourceOf<"touch-off">>) {
   const update = useSourceUpdate(plate, operation.id, operation.revision)
   const workArea = useWorkArea(plate)
-  const touchOff = offering(kitForPlate(plate).probes, "touch-off")?.capability
-  // Without a probe the operation has no settings; its diagnostic above says why.
-  if (!touchOff) return null
+  const { source } = operation
+  const strategy = strategyFor(source, machine)
+  if (!strategy) return null
   return (
     <TouchOffSettings
       key={operation.id}
-      value={operation.source.params}
-      parameters={touchOff.parameters}
+      value={source.params}
+      parameters={strategy.parameters(machine)}
       anchors={anchorOptions(plate)}
       workArea={workArea}
-      onChange={(params) => update({ kind: "auto-z-height", params })}
+      onChange={(params) => update({ ...source, params })}
     />
   )
 }
 
-function AutoScanEditor({ plate, operation }: EditorProps<"auto-scan">) {
+function OutlineEditor({
+  plate,
+  operation,
+  machine,
+}: TaskEditorProps<ProbingSourceOf<"outline">>) {
   const update = useSourceUpdate(plate, operation.id, operation.revision)
   const outline = useMemo(() => plateToolpathBounds(plate), [plate])
-  const trace = offering(kitForPlate(plate).probes, "outline")?.capability
-  // Without a pointer the operation has no settings; its diagnostic above says why.
-  if (!trace) return null
+  const { source } = operation
+  const strategy = strategyFor(source, machine)
+  if (!strategy) return null
   return (
     <OutlineSettings
       key={operation.id}
-      value={operation.source.params}
-      parameters={trace.parameters}
+      value={source.params}
+      parameters={strategy.parameters(machine)}
       outline={outline}
-      onChange={(params) => update({ kind: "auto-scan", params })}
+      onChange={(params) => update({ ...source, params })}
     />
   )
 }
 
 /** 3D probing's settings: the routine, and where it starts. */
-function Probe3dEditor({ plate, operation }: EditorProps<"probe-3d">) {
+function OriginEditor({
+  plate,
+  operation,
+  machine,
+}: TaskEditorProps<ProbingSourceOf<"origin">>) {
   const update = useSourceUpdate(plate, operation.id, operation.revision)
-  const probing = offering(kitForPlate(plate).probes, "origin")?.capability
-  // Without a 3D probe the operation has no settings; its diagnostic above says why.
-  if (!probing) return null
+  const { source } = operation
+  const strategy = strategyFor(source, machine)
+  if (!strategy) return null
   return (
     <OriginSettings
       key={operation.id}
-      value={operation.source.params}
-      parameters={probing.parameters}
+      value={source.params}
+      parameters={strategy.parameters(machine)}
       anchors={anchorOptions(plate)}
-      onChange={(params) => update({ kind: "probe-3d", params })}
+      onChange={(params) => update({ ...source, params })}
     />
   )
+}
+
+/**
+ * A probing operation's strategy and probe, then its task's settings. Without the strategy on the
+ * plate's machine it has no settings; its diagnostic above says why.
+ */
+function ProbingEditor({ plate, operation }: EditorProps<"probing">) {
+  const library = useWorkspace((state) => state.tools)
+  const machine = kitForPlate(plate).probing
+  const { source } = operation
+  const strategy = machine && strategyFor(source, machine)
+  if (!machine || !strategy) return null
+  const toolId = boundTools(plate, operation).get(source.probe)
+  const tool = library.find((item) => item.id === toolId)
+  const probe = tool ? `T${source.probe} · ${tool.name}` : `T${source.probe}`
+  return (
+    <>
+      <FieldDescription>
+        {strategy.label} · {probe}
+      </FieldDescription>
+      <TaskEditor plate={plate} operation={operation} machine={machine} />
+    </>
+  )
+}
+
+/** The settings of a probing operation's task. */
+function TaskEditor({
+  plate,
+  operation,
+  machine,
+}: TaskEditorProps<ProbingOperation["source"]>) {
+  const { source } = operation
+  switch (source.task) {
+    case "grid":
+      return (
+        <GridEditor
+          plate={plate}
+          operation={{ ...operation, source }}
+          machine={machine}
+        />
+      )
+    case "touch-off":
+      return (
+        <TouchOffEditor
+          plate={plate}
+          operation={{ ...operation, source }}
+          machine={machine}
+        />
+      )
+    case "outline":
+      return (
+        <OutlineEditor
+          plate={plate}
+          operation={{ ...operation, source }}
+          machine={machine}
+        />
+      )
+    case "origin":
+      return (
+        <OriginEditor
+          plate={plate}
+          operation={{ ...operation, source }}
+          machine={machine}
+        />
+      )
+  }
 }
 
 /** The editor for an operation's source, by kind. */
@@ -363,21 +460,9 @@ export function OperationEditor({
       )
     case "plugin":
       return <PluginEditor plate={plate} operation={{ ...operation, source }} />
-    case "auto-level":
+    case "probing":
       return (
-        <AutoLevelEditor plate={plate} operation={{ ...operation, source }} />
-      )
-    case "auto-z-height":
-      return (
-        <AutoZHeightEditor plate={plate} operation={{ ...operation, source }} />
-      )
-    case "auto-scan":
-      return (
-        <AutoScanEditor plate={plate} operation={{ ...operation, source }} />
-      )
-    case "probe-3d":
-      return (
-        <Probe3dEditor plate={plate} operation={{ ...operation, source }} />
+        <ProbingEditor plate={plate} operation={{ ...operation, source }} />
       )
   }
 }

@@ -50,7 +50,7 @@ export function HeightMapReviewStep({
 
   const source = view.operation?.source
   const expected =
-    source?.kind === "auto-level"
+    source?.kind === "probing" && source.task === "grid"
       ? { columns: source.params.points[0], rows: source.params.points[1] }
       : undefined
   return (

@@ -1,11 +1,13 @@
 import type { LucideIcon } from "lucide-react"
-import { OPERATION_KINDS, probingOf } from "@/domain/operations/kinds"
-import type { ProbingSourceKind } from "@/domain/operations/kinds"
-import { PROBING_ICONS } from "@/features/plugins/operation-icon"
+import { selectedPlate, useWorkspace } from "@/app/workspace/workspace-context"
+import { DEFAULT_KIT, kitForPlate } from "@/domain/fixtures/catalog"
 import {
-  useAddProbingOperation,
-  useProbesForAdding,
-} from "./use-add-probing-operation"
+  machineStrategies,
+  newProbingOperation,
+  preferredProbe,
+} from "@/domain/probing/strategies"
+import { PROBING_ICONS } from "@/features/plugins/operation-icon"
+import { useAddOperation } from "./use-add-operation"
 
 /** An operation OpenSpindle generates itself, as Add operation and the Prepare toolbar offer it. */
 export type BuiltInSource = {
@@ -17,45 +19,32 @@ export type BuiltInSource = {
   readonly add: () => boolean
 }
 
-const PROBING_KINDS: readonly ProbingSourceKind[] = [
-  "auto-level",
-  "auto-z-height",
-  "auto-scan",
-  "probe-3d",
-]
-
-const PROBING_DESCRIPTIONS: Record<ProbingSourceKind, string> = {
-  "auto-level":
-    "Probe the stock surface; the job pauses to review the height map.",
-  "auto-z-height": "Touch the stock top with the probe and set work Z there.",
-  "auto-scan": "Trace the edges of the plate's work area before cutting.",
-  "probe-3d":
-    "Find a corner or center with the 3D probe and set the work origin there.",
-}
-
 /**
- * The probing operations the machine's probes offer: none without a probe, auto-scan if one
- * traces, 3D probing if it has a 3D probe.
+ * The probing strategies of the machine an operation would be added to (the selected plate's,
+ * or the default kit's before any plate is selected, since a new plate starts from it too) that
+ * a probe of the tool library runs: each adds its operation with that probe, preferring the probe
+ * the plate's table already holds.
  */
 export function useBuiltInSources(): BuiltInSource[] {
-  const probes = useProbesForAdding()
-  const addAutoLevel = useAddProbingOperation("auto-level")
-  const addAutoZHeight = useAddProbingOperation("auto-z-height")
-  const addAutoScan = useAddProbingOperation("auto-scan")
-  const addProbe3d = useAddProbingOperation("probe-3d")
-  const add: Record<ProbingSourceKind, () => boolean> = {
-    "auto-level": addAutoLevel,
-    "auto-z-height": addAutoZHeight,
-    "auto-scan": addAutoScan,
-    "probe-3d": addProbe3d,
-  }
-  return PROBING_KINDS.filter(
-    (kind) => probingOf(kind).offer(probes) !== null
-  ).map((kind) => ({
-    id: kind,
-    icon: PROBING_ICONS[kind],
-    title: OPERATION_KINDS[kind].label,
-    description: PROBING_DESCRIPTIONS[kind],
-    add: add[kind],
-  }))
+  const library = useWorkspace((state) => state.tools)
+  const plate = useWorkspace(selectedPlate)
+  const add = useAddOperation({ stock: false })
+  const machine = (plate ? kitForPlate(plate) : DEFAULT_KIT).probing
+  if (!machine) return []
+  return machineStrategies(machine).flatMap((strategy) => {
+    const probe = preferredProbe(strategy, machine, library, plate)
+    if (!probe) return []
+    return [
+      {
+        id: strategy.id,
+        icon: PROBING_ICONS[strategy.task],
+        title: strategy.label,
+        description: strategy.description,
+        add: () =>
+          add((target) =>
+            newProbingOperation(target, probe, strategy, machine)
+          ),
+      },
+    ]
+  })
 }

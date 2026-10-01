@@ -127,38 +127,53 @@ export const PluginSourceSchema = z.object({
   nc: NcSchema.nullable(),
 })
 
-/** Built-in auto-level: the probing NC is derived from these parameters when compiling. */
-export const AutoLevelSourceSchema = z.object({
-  kind: z.literal("auto-level"),
-  params: GridParamsSchema,
-})
+/**
+ * A probing strategy's id: a generic strategy's is plain ("surface-touch"), a machine's is
+ * prefixed with the machine ("makera-z1/height-map").
+ */
+export const StrategyIdSchema = z
+  .string()
+  .max(200)
+  .regex(/^[a-z0-9-]+(?:\/[a-z0-9-]+)*$/, "Unsupported probing strategy.")
 
-/** Built-in auto Z-height: the touch-off NC is derived from these parameters when compiling. */
-export const AutoZHeightSourceSchema = z.object({
-  kind: z.literal("auto-z-height"),
-  params: TouchOffParamsSchema,
-})
+/** A probing operation doing `task` with its parameters, `params`. */
+const probingSource = <TTask extends string, TParams extends z.ZodType>(
+  task: TTask,
+  params: TParams
+) =>
+  z.object({
+    kind: z.literal("probing"),
+    task: z.literal(task),
+    /** The strategy that writes its NC, found among the plate's machine's when compiling. */
+    strategy: StrategyIdSchema,
+    /** The T number its NC selects the probe by, which its tool binding maps into the plate's table. */
+    probe: ToolNumberSchema,
+    params,
+  })
 
-/** Built-in auto-scan: traces the plate's toolpath bounds, derived when compiling. */
-export const AutoScanSourceSchema = z.object({
-  kind: z.literal("auto-scan"),
-  params: OutlineParamsSchema,
-})
-
-/** Built-in 3D probing: the routine's NC is derived from these parameters when compiling. */
-export const Probe3dSourceSchema = z.object({
-  kind: z.literal("probe-3d"),
-  params: OriginParamsSchema,
-})
+/**
+ * Built-in probing: a probe tool and a strategy that writes the NC from these parameters when
+ * compiling. What the operation does, its `task`, decides the parameters: a height grid, a
+ * touch-off that sets work Z, an outline traced with a pointer, or a work origin found with a 3D
+ * probe.
+ */
+export const ProbingSourceSchema = z.discriminatedUnion("task", [
+  probingSource("grid", GridParamsSchema),
+  probingSource("touch-off", TouchOffParamsSchema),
+  probingSource("outline", OutlineParamsSchema),
+  probingSource("origin", OriginParamsSchema),
+])
+export type ProbingSource = z.infer<typeof ProbingSourceSchema>
+export type ProbingSourceOf<TTask extends ProbingSource["task"]> = Extract<
+  ProbingSource,
+  { task: TTask }
+>
 
 export const OperationSourceSchema = z.discriminatedUnion("kind", [
   FileSourceSchema,
   TemplateSourceSchema,
   PluginSourceSchema,
-  AutoLevelSourceSchema,
-  AutoZHeightSourceSchema,
-  AutoScanSourceSchema,
-  Probe3dSourceSchema,
+  ProbingSourceSchema,
 ])
 export type OperationSource = z.infer<typeof OperationSourceSchema>
 export type SourceKind = OperationSource["kind"]

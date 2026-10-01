@@ -4,10 +4,10 @@ import type { StoredAnchorSetup } from "@/domain/anchors/stored-anchors"
 import { formatMillimetres } from "../../geometry/millimetres"
 import type { NcUnitState } from "../../compile/nc-unit"
 import type { MachineOrigin } from "../../plate/work-origin"
-import type { ProbeTool } from "../../probing/probe"
+import type { MachineProbing } from "../../probing/strategy"
+import { PROBE_3D_TOOL, PROBE_TOOL } from "../../tools/tool-table"
 import { FixtureKit } from "../fixture-kit"
 import type { KitFixture, KitRecolor } from "../fixture-kit"
-import { THREE_D_PROBE } from "./3d-probe"
 import { Z1DowelPin } from "./dowel-pin"
 import { Z1Firmware } from "./firmware"
 import { Z1FourthAxis } from "./fourth-axis"
@@ -18,9 +18,14 @@ import { Z1MdfWasteboard } from "./mdf-wasteboard"
 import { Z1_GLOSSARY } from "./nc-glossary"
 import { Z1_PROGRAM_RULES } from "./program-rules"
 import { isZ1Park, readZ1Block } from "./nc-grammar"
+import { Z1_GENERIC_SPECS, Z1_PROBING_NC } from "./probing-nc"
+import { HEIGHT_MAP } from "./strategies/height-map"
+import { ROUTINES } from "./strategies/routines"
+import { Z_PROBE } from "./strategies/z-probe"
 import { Z1TopClamp } from "./top-clamp"
-import { WIRED_PROBE } from "./wired-probe"
 import { Z1_PROBING_SECTIONS } from "./wired-probe/blocks"
+import { g32Grids } from "./wired-probe/grid"
+import { touchPoints } from "./wired-probe/touch-off"
 import { CLEARANCE_Z } from "./wired-probe/travel"
 import { Z1Bed } from "./z1-bed"
 
@@ -31,8 +36,8 @@ const ncNumber = (value: number) => String(Number(value.toFixed(4)) + 0)
 const LIGHTER_ALUMINIUM: KitRecolor = { in: 6, from: ["#a2aab3"] }
 
 /**
- * The Makera Z1 and Z1 Pro: the aluminium bed, the wired probe and the 3D probe, the fixtures
- * Makera makes for it and its anchors.
+ * The Makera Z1 and Z1 Pro: the aluminium bed, probing with the wired probe and the 3D probe,
+ * the fixtures Makera makes for it and its anchors.
  */
 export class MakeraZ1 extends FixtureKit {
   readonly name = "Makera Z1"
@@ -41,8 +46,19 @@ export class MakeraZ1 extends FixtureKit {
   /** The official three-axis work envelope, not the bed's size. */
   readonly workArea: Point3 = [200, 200, 100]
   readonly bed = new Z1Bed()
-  readonly probes: readonly ProbeTool[] = [WIRED_PROBE, THREE_D_PROBE]
-  readonly probingSections = Z1_PROBING_SECTIONS
+  /**
+   * The firmware selects a Z touch probe, such as Makera's wired Probe 2.0, as T0 and the 3D
+   * probe as T9999, its own number for it. Besides the generic strategies it offers its own
+   * auto-leveling (G32, M495), its Z probe (M495) and its 3D probing routines (M480).
+   */
+  readonly probing: MachineProbing = {
+    slot: ({ touch }) => (touch === "z" ? PROBE_TOOL : PROBE_3D_TOOL),
+    nc: Z1_PROBING_NC,
+    specs: Z1_GENERIC_SPECS,
+    strategies: [HEIGHT_MAP, Z_PROBE, ROUTINES],
+    sections: Z1_PROBING_SECTIONS,
+    readers: { grids: g32Grids, touches: touchPoints },
+  }
   readonly firmware = new Z1Firmware()
   readonly fixtures: readonly KitFixture[] = [
     { fixture: new Z1MdfBed(), addedIn: 1 },

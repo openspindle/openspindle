@@ -120,29 +120,30 @@ function operationSummary(
   plugins: readonly PluginSummary[] | undefined
 ): string {
   const { source } = operation
-  switch (source.kind) {
-    case "auto-z-height": {
-      const { placement } = source.params
+  const probing = source.kind === "probing" ? source : null
+  switch (probing?.task) {
+    case "touch-off": {
+      const { placement } = probing.params
       const where =
         placement.kind === "anchor"
           ? `at ${anchorName(subject, placement.anchorId)} + X${mm(placement.offset[0])} Y${mm(placement.offset[1])}`
           : "below the probe"
       return `Touches the stock top ${where} and sets work Z there.`
     }
-    case "auto-level": {
-      const [columns, rows] = source.params.points
-      const [width, depth] = source.params.size
+    case "grid": {
+      const [columns, rows] = probing.params.points
+      const [width, depth] = probing.params.size
       return `Probes ${columns} × ${rows} points over ${mm(width)} × ${mm(depth)} mm.`
     }
-    case "probe-3d": {
-      const { placement } = source.params
+    case "origin": {
+      const { placement } = probing.params
       const height = placementHeight(placement)
       const z = height === undefined ? "" : ` Z${mm(height)}`
       const where =
         placement.kind === "anchor"
           ? `from ${anchorName(subject, placement.anchorId)} + X${mm(placement.offset[0])} Y${mm(placement.offset[1])}${z}`
           : `from the probe position${z && ` at${z}`}`
-      return `Finds ${probe3dTarget(source.params)} ${where} and sets the work origin there.`
+      return `Finds ${probe3dTarget(probing.params)} ${where} and sets the work origin there.`
     }
     default: {
       const names = toolNames(operation, subject, tools)
@@ -292,8 +293,9 @@ function operationResults(
   const { operation, surface, grid, contacts, status } = stage
   const facts: { label: string; value: string }[] = []
   let description: string | null = null
-  if (contacts && operation.source.kind === "probe-3d") {
-    const probed = probe3dFacts(operation.source.params, contacts, status)
+  const { source } = operation
+  if (contacts && source.kind === "probing" && source.task === "origin") {
+    const probed = probe3dFacts(source.params, contacts, status)
     description = probed.description
     facts.push(...probed.facts)
   }
@@ -320,8 +322,8 @@ function operationResults(
       value: `Z ${mm(tool.machine[2])}`,
     })
   const probing =
-    operation.source.kind === "auto-z-height" ||
-    operation.source.kind === "auto-level"
+    source.kind === "probing" &&
+    (source.task === "touch-off" || source.task === "grid")
   if (!surface && !grid && status === "done" && probing)
     description =
       "The machine reports its measurements only when it probes from a stored anchor with the work origin kept relative to one."

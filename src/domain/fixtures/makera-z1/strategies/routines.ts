@@ -4,6 +4,7 @@ import {
   PROBE_3D_CORNER_LABELS,
   PROBE_3D_ROUTINE_LABELS,
   cornerInward,
+  defaultOriginParams,
   findsCorner,
   originFields,
   setsWorkXY,
@@ -13,12 +14,15 @@ import type {
   OriginSpecs,
   OriginParams,
 } from "../../../probing/tasks/origin/params"
-import { originStartOffset } from "../../../probing/tasks/origin/rules"
+import {
+  originStartOffset,
+  planOrigin,
+} from "../../../probing/tasks/origin/rules"
 import type { ParameterSpec } from "../../../probing/parameters"
-import type { OriginProbing } from "../../../probing/probe"
-import { PROBE_3D_TOOL } from "../../../tools/tool-table"
+import { placementContext } from "../../../probing/placement"
+import type { ProbingStrategy } from "../../../probing/strategy"
+import { ORIGIN_ROUTINE, routineSubcode } from "../3d-probe/blocks"
 import { anchorTravel } from "../wired-probe/travel"
-import { ORIGIN_ROUTINE, routineSubcode } from "./blocks"
 
 /** How far in one axis the probe moves out; X's and Y's differ only in their axis. */
 const distance = (axis: "X" | "Y"): ParameterSpec => ({
@@ -36,7 +40,7 @@ const distance = (axis: "X" | "Y"): ParameterSpec => ({
  * Application limits, not a clearance check. The ball's default is the Makera 3D Probe's; the
  * firmware's own defaults are 20 mm distances and a 2 mm depth.
  */
-const PROBE_3D_PARAMETERS: OriginSpecs = {
+const ROUTINE_PARAMETERS: OriginSpecs = {
   ballDiameter: {
     label: "Ball diameter",
     unit: "mm",
@@ -156,21 +160,29 @@ function routineBlock(params: OriginParams, subcode: number): string {
 }
 
 /**
- * The Makera 3D Probe's routines on the Z1 (ATCHandler's M480 with T9999, the firmware's tool
- * number for it): corners and centres found from where the probe starts, which set the work
- * origin there and report each contact.
+ * The Z1 firmware's 3D probing routines (ATCHandler's M480), with a 3D touch probe in T9999, the
+ * firmware's tool number for it: corners and centres found from where the probe starts, which
+ * set the work origin there and report each contact.
  */
-export const M480_ROUTINES: OriginProbing = {
-  parameters: PROBE_3D_PARAMETERS,
-  program({ params, start, height }) {
-    const subcode = routineSubcode(params.routine, params.corner)
+export const ROUTINES: ProbingStrategy<"origin", OriginParams, OriginSpecs> = {
+  id: "makera-z1/routines",
+  task: "origin",
+  label: "3D probing (Z1 routines)",
+  description:
+    "Find a corner or center with the 3D probe and set the work origin there.",
+  accepts: ({ touch }) => touch === "xyz",
+  parameters: () => ROUTINE_PARAMETERS,
+  defaults: (_plate, parameters) => defaultOriginParams(parameters),
+  generate: ({ params, plate, probe, machine }) => {
+    const plan = planOrigin(params, placementContext(plate), ROUTINE_PARAMETERS)
+    if (!plan.ok) return plan
+    const { start, height } = plan
+    const subcode = routineSubcode(plan.params.routine, plan.params.corner)
     const lines = [
-      ...introduction(params, subcode),
-      ...(start.kind === "probe-position" ? positioning(params) : []),
-      ...precautions(params),
-      "M5",
-      "G21 G90",
-      `M6 T${PROBE_3D_TOOL}`,
+      ...introduction(plan.params, subcode),
+      ...(start.kind === "probe-position" ? positioning(plan.params) : []),
+      ...precautions(plan.params),
+      ...machine.nc.select(probe),
       ...(start.kind === "anchor" ? anchorTravel(start) : []),
       ...(height === null
         ? []
@@ -178,9 +190,12 @@ export const M480_ROUTINES: OriginProbing = {
             "; Down to the start's height.",
             `G0 Z${formatMillimetres(height)}`,
           ]),
-      routineBlock(params, subcode),
+      routineBlock(plan.params, subcode),
+      "M2",
     ]
-    lines.push("M2")
-    return { nc: `${lines.join("\n")}\n`, reviewLine: null }
+    return {
+      ok: true,
+      program: { nc: `${lines.join("\n")}\n`, reviewLine: null },
+    }
   },
 }

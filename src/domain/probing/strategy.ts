@@ -9,18 +9,35 @@
 import type { Issue } from "../diagnostics"
 import type { GCodeProgram } from "../nc/gcode"
 import type { ResolveContext } from "../operations/kinds"
+import type { ProbingSource, ProbingSourceOf } from "../operations/operation"
 import type { Plate } from "../plate/plate"
 import type { ProbeProfile, Tool } from "../tools/tool"
 import type { ParameterSpecs } from "./parameters"
 import type { AnchorStart } from "./placement"
 import type { ProbeGrid, ProbeTouch } from "./preview"
-import type { CapabilityKind, ProbeProgram, ProbingSections } from "./probe"
+import type { ProbeProgram, ProbingSections } from "./probe"
+import type { GridSpecs } from "./tasks/grid/params"
+import type { OriginSpecs } from "./tasks/origin/params"
+import type { OutlineSpecs } from "./tasks/outline/params"
+import type { TouchOffSpecs } from "./tasks/touch-off/params"
 
 /**
  * What a probing operation does, which decides its parameters: probe a height grid, touch off a
  * surface and set work Z there, trace an outline, or find a work origin.
  */
-export type ProbingTask = CapabilityKind
+export type ProbingTask = ProbingSource["task"]
+
+/** A task's parameters, as its operations store them. */
+export type TaskParams<TTask extends ProbingTask> =
+  ProbingSourceOf<TTask>["params"]
+
+/** The ranges and defaults a strategy gives a task's numeric parameters. */
+export type TaskSpecs = {
+  readonly grid: GridSpecs
+  readonly "touch-off": TouchOffSpecs
+  readonly outline: OutlineSpecs
+  readonly origin: OriginSpecs
+}
 
 /** The probe an operation selects: the T number its NC selects and the library probe bound there. */
 export type BoundProbe = {
@@ -67,6 +84,14 @@ export interface ProbingStrategy<
 }
 
 /**
+ * A strategy of one of `TTask`, with that task's parameters and specs: what registries hold, as
+ * a strategy of one task's parameters is no strategy of any parameters. Its `task` tells which.
+ */
+export type TaskStrategy<TTask extends ProbingTask = ProbingTask> = {
+  [TKey in TTask]: ProbingStrategy<TKey, TaskParams<TKey>, TaskSpecs[TKey]>
+}[TTask]
+
+/**
  * The machine's NC that generic strategies are made of: readying a probe, its pointer and
  * indicator, travel to an anchored start, and the touch motion its firmware configures.
  */
@@ -102,7 +127,7 @@ export interface MachineProbing {
   /** The machine's ranges and defaults for the generic strategies, by strategy id. */
   readonly specs: Readonly<Record<string, ParameterSpecs>>
   /** Strategies of the machine's firmware, offered besides the generic ones. */
-  readonly strategies: readonly ProbingStrategy[]
+  readonly strategies: readonly TaskStrategy[]
   /** How its NC reads as probing in a program's sections. */
   readonly sections: ProbingSections
   /** Where any NC file probes, as the machine's firmware reads it: previews. */

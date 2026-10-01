@@ -15,10 +15,10 @@ import type { Plate, PlateSetup } from "./plate"
 /** Bed coordinates are kept to the nanometre, without float noise or −0. */
 const toNanometre = (value: number) => Number(value.toFixed(6)) + 0
 
-/** Whether a plate sets its work Z by touching off the stock top (auto Z-height). */
+/** Whether a plate sets its work Z by touching off the stock top (a touch-off). */
 export const touchesOffWorkZ = (plate: Pick<Plate, "operations">) =>
   plate.operations.some(
-    (operation) => operation.source.kind === "auto-z-height"
+    ({ source }) => source.kind === "probing" && source.task === "touch-off"
   )
 
 /**

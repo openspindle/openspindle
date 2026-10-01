@@ -19,6 +19,8 @@ import { plus } from "../geometry/frame"
 import type { XY } from "../geometry/frame"
 import { roundMillimetres } from "../geometry/millimetres"
 import type { Rect } from "../geometry/rect"
+import type { Plate } from "../plate/plate"
+import { workOriginOnMachine } from "../plate/work-origin"
 import { COORDINATE_LIMIT, fail, ok } from "../primitives"
 import type { Result } from "../primitives"
 
@@ -84,6 +86,14 @@ export type PlacementContext = {
   /** The plate's work origin's height on the bed, which work Z0 is on. */
   workOriginZ: number
 }
+
+/** Where a plate's probing operations start: its device, anchor snapshot and work origin. */
+export const placementContext = ({ setup }: Pick<Plate, "setup">) => ({
+  deviceId: setup.deviceId,
+  anchorSetup: setup.anchors ?? undefined,
+  machineWorkOrigin: workOriginOnMachine(setup)?.position ?? null,
+  workOriginZ: setup.workOrigin[2],
+})
 
 /**
  * Where an operation starts on the machine: where the operator put the probe, or over a stored

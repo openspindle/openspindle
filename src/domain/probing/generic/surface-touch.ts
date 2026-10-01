@@ -6,7 +6,7 @@ import type {
 } from "../tasks/touch-off/params"
 import { planTouchOff } from "../tasks/touch-off/rules"
 import { formatMillimetres } from "../../geometry/millimetres"
-import { placementContext } from "../../operations/kinds"
+import { placementContext } from "../placement"
 import type { ProbingNc, ProbingStrategy } from "../strategy"
 import { hasSpecs, specsOf } from "./specs"
 
