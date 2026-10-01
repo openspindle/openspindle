@@ -94,7 +94,7 @@ What a failure becomes is each view's own:
 - **Diagnostics** are the tool, operation and run rules' failures ([above](#diagnostics)).
 - **Design rule results** are the move and program rules' failures (below).
 - **Importing** asks about the program rules' failures that offer a fix and makes the chosen ones (`resolveProgram`, `src/domain/design-rules/program-rules.ts`), as a program rule's quick fix does.
-- **The height-map review** lists the height-map rules' failures in list order, and `height-map/flat` for a surface within the tolerance ([height-map.md](height-map.md)).
+- **The height-map review** lists the height-map rules' failures in list order, and `height-map/flat` for a surface within the tolerance ([height-map.md](height-map.md#reviewing-the-height-map)).
 - **The console's command line** holds a typed line to the connected machine's program rules the project reports as errors.
 
 A project sets how its configurable rules are reported, and their limits (`ruleSettings`, `RuleSettings`): a map by rule id of `{ severity, limit }` that holds only what differs from each rule's default (`savedRuleSettings`), so a rule it does not set follows its default. `RuleSettingsSchema` (`src/domain/rules/settings.ts`) refuses a setting for a rule that is not configurable and a limit outside its rule's range; a setting for an id this version does not know is kept as it is, and neither tested nor shown. `ruleSettings.set` changes them; they are saved with the project, kept across reloads and count as unsaved changes.

@@ -28,6 +28,7 @@ import {
 import type { OriginParams } from "@/domain/probing/tasks/origin/params"
 import { originResult } from "@/domain/probing/tasks/origin/result"
 import { placementHeight } from "@/domain/probing/placement"
+import { SURFACE_TOUCH } from "@/domain/probing/generic/surface-touch"
 import {
   PROBE_3D_TOOL,
   PROBE_TOOL,
@@ -386,7 +387,9 @@ function operationResults(
     (source.task === "touch-off" || source.task === "grid")
   if (!surface && !grid && status === "done" && probing)
     description =
-      "The machine reports its measurements only when it probes from a stored anchor with the work origin kept relative to one."
+      source.strategy === SURFACE_TOUCH.id
+        ? "The machine does not report a surface touch's measurement: it touches with G38.2."
+        : "The machine reports its measurements only when it probes from a stored anchor with the work origin kept relative to one."
   return {
     description: description ?? operationSummary(operation, subject, tools),
     details: (
