@@ -1,5 +1,6 @@
 import { toast } from "sonner"
 import { useFixtureLibraryStore } from "@/app/fixtures/fixture-context"
+import { profileAnchors } from "@/app/fixtures/fixture-library-store"
 import { useWorkspaceStore } from "@/app/workspace/workspace-context"
 import { operationStart } from "@/domain/design-rules/check"
 import { resolvedFileSource } from "@/domain/design-rules/program-rules"
@@ -41,18 +42,19 @@ export function useReadAnchorsFix(plateId: string | null) {
             fixtures.recordDeviceAnchors(device, configuration)
             const deviceId = machineId(device)
             const { profiles } = fixtures.state
-            const anchors = Object.hasOwn(profiles, deviceId)
-              ? profiles[deviceId].anchors
-              : undefined
+            const profile = Object.hasOwn(profiles, deviceId)
+              ? profileAnchors(deviceId, profiles[deviceId])
+              : null
             if (
-              anchors?.source === "firmware-config" &&
-              anchors.fetchedAt === configuration.fetchedAt
+              profile?.anchors.source === "firmware-config" &&
+              profile.anchors.fetchedAt === configuration.fetchedAt
             )
               workspace.dispatch({
                 type: "plate.useDevice",
                 plateId,
                 deviceId,
-                anchors,
+                anchors: profile.anchors,
+                bedSetups: profile.bedSetups,
               })
           }
           toast.success("Stored anchors updated.")

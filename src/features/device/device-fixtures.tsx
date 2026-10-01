@@ -40,7 +40,6 @@ import { openDialog } from "@/features/shell/dialogs"
 import { FixtureOrientationField } from "./fixture-orientation-field"
 import { MountPointsField } from "./mount-points-field"
 import { profileDeviceId } from "@/domain/fixtures/profiles"
-import type { FixtureProfiles } from "@/domain/fixtures/profiles"
 import {
   FIXTURE_LIMIT,
   FIXTURE_NAME_LIMIT,
@@ -245,15 +244,12 @@ function DefaultPositionFields({
 export function DeviceFixtures({
   definitions,
   onChange,
-  profiles,
   selectedId,
-  onProfileChange,
 }: {
   definitions: FixtureDefinition[]
   onChange: (definitions: FixtureDefinition[]) => void
-  profiles: FixtureProfiles
+  /** The profile they belong to. */
   selectedId: string
-  onProfileChange: (id: string) => void
 }) {
   const [expanded, setExpanded] = useState(new Set<string>())
   const library = useModelLibrary().data
@@ -321,20 +317,6 @@ export function DeviceFixtures({
       </CardHeader>
       <CardContent>
         <FieldGroup>
-          <Field>
-            <FieldLabel htmlFor="fixture-library-device">Device</FieldLabel>
-            <OptionSelect
-              options={Object.entries(profiles).map(([id, profile]) => ({
-                value: id,
-                label: profile.name,
-              }))}
-              value={selectedId}
-              onValueChange={onProfileChange}
-              id="fixture-library-device"
-              aria-label="Fixture library device"
-              className="w-full"
-            />
-          </Field>
           {definitions.map((definition) => {
             const key = `${selectedId}:${definition.id}`
             // Previews are drawn while open: each holds a WebGL context.

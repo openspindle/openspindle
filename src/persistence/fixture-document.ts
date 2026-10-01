@@ -1,5 +1,6 @@
 import { z } from "zod"
 import {
+  DEFAULT_BED_SETUP,
   FIXTURE_PROFILE_LIMIT,
   FixtureProfilesSchema,
   WORKSPACE_PROFILE,
@@ -88,9 +89,23 @@ function decodeFixtures(data: unknown): Decoded<FixtureLibrary> {
   return { value: { selectedId, profiles }, dropped }
 }
 
+/** A profile of version 2, whose fixture definitions become its first bed setup's. */
+function withBedSetups(profile: unknown): unknown {
+  if (!record(profile) || !Object.hasOwn(profile, "definitions")) return profile
+  const { definitions, ...rest } = profile
+  return {
+    ...rest,
+    bedSetups: [
+      { id: DEFAULT_BED_SETUP, name: "Default", definitions, anchors: [] },
+    ],
+    defaultBedSetupId: DEFAULT_BED_SETUP,
+  }
+}
+
 /**
  * A fixture library of version 2, whose positions had the work area's front-left corner at the
- * origin, with each profile in bed coordinates from Anchor 1 (`upgradeProfileBedFrame`).
+ * origin: each profile in bed coordinates from Anchor 1 (`upgradeProfileBedFrame`), its fixture
+ * definitions its first bed setup's.
  */
 function upgradeFixtures(data: unknown): unknown {
   if (!record(data) || !record(data.profiles)) return data
@@ -99,13 +114,16 @@ function upgradeFixtures(data: unknown): unknown {
     profiles: Object.fromEntries(
       Object.entries(data.profiles).map(([id, profile]) => [
         id,
-        upgradeProfileBedFrame(profile),
+        withBedSetups(upgradeProfileBedFrame(profile)),
       ])
     ),
   }
 }
 
-/** Version 3: bed coordinates are from Anchor 1, with Z 0 on the MDF bed's top. */
+/**
+ * Version 3: bed coordinates are from Anchor 1, with Z 0 on the MDF bed's top, and a profile's
+ * fixtures are in bed setups.
+ */
 export function fixtureRepository(storage: StoragePort) {
   return new Repository<FixtureLibrary>(storage, {
     key: "fixtures",

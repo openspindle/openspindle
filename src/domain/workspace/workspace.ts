@@ -24,6 +24,8 @@ import {
 import type { FixturePatch } from "../plate/plate-fixtures"
 import { moveSetupItem } from "../plate/setup-items"
 import type { SetupItemRef } from "../plate/setup-items"
+import { plateAnchors } from "../plate/bed-setup"
+import type { BedSetupAnchors } from "../plate/bed-setup"
 import { withAnchors, withTouchedWorkOrigin } from "../plate/work-origin"
 import { fail, normalizeText, ok, schemaIssue } from "../primitives"
 import {
@@ -115,13 +117,15 @@ export type WorkspaceCommand =
       readonly bed: FixtureInstance | null
     } & PlateTarget)
   /**
-   * The fixtures and anchors of the plate's device profile: `fixtures` are its fixtures for new
-   * plates. The plate's locked fixtures stay, and its bed is the profile's.
+   * The fixtures and anchors of one of the plate's device's bed setups (`bedSetupId`), which the
+   * plate is then set up on: `fixtures` are its fixtures for new plates. The plate's locked
+   * fixtures stay, and its bed is the bed setup's.
    */
   | ({
       readonly type: "fixtures.useDefaults"
       readonly fixtures: readonly FixtureInstance[]
       readonly anchors: StoredAnchorSetup | null
+      readonly bedSetupId: string | null
     } & PlateTarget)
   /**
    * Moves a setup item by `delta` millimetres: a fixture, the stock with the design on it, or
@@ -145,6 +149,8 @@ export type WorkspaceCommand =
       readonly type: "anchors.sync"
       readonly deviceId: string | null
       readonly anchors: StoredAnchorSetup
+      /** The device's bed setups' anchors, which plates on them keep after the device's. */
+      readonly bedSetups: BedSetupAnchors
       readonly connected?: boolean
     }
   /** The plate moves to a device, whichever it was set up for, and takes its anchors. */
@@ -152,6 +158,7 @@ export type WorkspaceCommand =
       readonly type: "plate.useDevice"
       readonly deviceId: string
       readonly anchors: StoredAnchorSetup
+      readonly bedSetups: BedSetupAnchors
     } & PlateTarget)
   | ({
       readonly type: "operation.add"
@@ -300,15 +307,16 @@ const sameGroups = (left: readonly Group[], right: readonly Group[]) =>
 type DeviceAnchors = {
   readonly deviceId: string | null
   readonly anchors: StoredAnchorSetup
+  readonly bedSetups: BedSetupAnchors
 }
 
-/** The plate set up for the device, with its anchors. */
+/** The plate set up for the device, with its anchors and those of its bed setup. */
 function withDeviceAnchors(plate: Plate, device: DeviceAnchors): Plate {
   const { deviceId, anchors } = plate.setup
-  if (deviceId === device.deviceId && sameAnchors(anchors, device.anchors))
-    return plate
+  const next = plateAnchors(plate.setup, device.anchors, device.bedSetups)
+  if (deviceId === device.deviceId && sameAnchors(anchors, next)) return plate
   // What is kept relative to an anchor follows it; nothing else moves.
-  const setup = withAnchors(plate.setup, structuredClone(device.anchors))
+  const setup = withAnchors(plate.setup, next)
   return { ...plate, setup: { ...setup, deviceId: device.deviceId } }
 }
 
@@ -490,8 +498,10 @@ function commandResult(
       return updateSetup(state, command.plateId, (setup) => {
         const fixtures = defaultFixtures(setup, command.fixtures)
         if (!fixtures.ok) return fixtures
-        const { anchors } = command
-        return ok(patchedSetup(setup, { anchors, fixtures: fixtures.value }))
+        const { anchors, bedSetupId } = command
+        return ok(
+          patchedSetup(setup, { anchors, bedSetupId, fixtures: fixtures.value })
+        )
       })
     case "anchors.sync": {
       const plates = state.plates.map((plate) =>

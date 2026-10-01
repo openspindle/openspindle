@@ -106,7 +106,7 @@ const probingAnchorsChanged: StageRule<"run"> = {
   stage: "run",
   label: "Probing anchors unchanged",
   description:
-    "The connected device must still store the anchors of the plate's snapshot, the probing operation's among them.",
+    "The connected device must still store the anchors of the plate's snapshot, the probing operation's among them, or for an anchor of the plate's bed setup, the first it is kept from.",
   severity: "error",
   configurable: false,
   chain: PROBING_CHAIN,
@@ -129,10 +129,14 @@ const probingAnchorsChanged: StageRule<"run"> = {
           Math.abs(anchor.machinePosition[0] - x) <= EPSILON &&
           Math.abs(anchor.machinePosition[1] - y) <= EPSILON
       )
-    return (
-      live.some((anchor) => anchor.id === anchored.placement.anchorId) &&
-      live.every(saved)
+    // An anchor the plate's bed setup keeps is the first device anchor plus its offset.
+    const placed = setup.anchors.find(
+      (anchor) => anchor.id === anchored.placement.anchorId
     )
+    const stored = placed?.bedSetup
+      ? setup.anchors[0].id
+      : anchored.placement.anchorId
+    return live.some((anchor) => anchor.id === stored) && live.every(saved)
   },
   explain: ({ first }) => ({
     problem: "Stored anchors changed. Use Read anchors before Run.",

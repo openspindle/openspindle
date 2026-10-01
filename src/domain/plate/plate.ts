@@ -78,6 +78,11 @@ export const PlateSetupSchema = z
     /** The machine profile this plate is set up for (fixtures and anchors). */
     deviceId: EntityIdSchema.nullable(),
     anchors: StoredAnchorSetupSchema.nullable(),
+    /**
+     * The bed setup of its device's profile it is set up on (`BedSetup`), whose anchors its
+     * snapshot holds after the device's; null or absent for none.
+     */
+    bedSetupId: EntityIdSchema.nullable().optional(),
   })
   .refine(
     (setup) => !setup.anchors || setup.anchors.deviceId === setup.deviceId,
@@ -208,6 +213,7 @@ export function createPlateSetup(options: {
   fixtures?: FixtureInstance[]
   deviceId?: string | null
   anchors?: StoredAnchorSetup | null
+  bedSetupId?: string | null
 }): PlateSetup {
   const kit = kitForSetup({
     deviceId: options.deviceId ?? null,
@@ -231,6 +237,7 @@ export function createPlateSetup(options: {
     fixtures,
     deviceId: options.deviceId ?? null,
     anchors: options.anchors ?? null,
+    ...(options.bedSetupId && { bedSetupId: options.bedSetupId }),
   }
 }
 

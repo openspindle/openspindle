@@ -54,8 +54,7 @@ function useSectionHistory() {
         const before = fixtures.state
         if (!fixtures[step]()) return
         const restored = changedAnchors(before, fixtures.state)
-        for (const { deviceId, anchors } of restored)
-          followDeviceAnchors(workspace, deviceId, anchors)
+        for (const anchors of restored) followDeviceAnchors(workspace, anchors)
         return
       }
     }

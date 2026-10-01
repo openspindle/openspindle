@@ -1,5 +1,12 @@
 import { z } from "zod"
-import { StoredAnchorSetupSchema } from "../anchors/stored-anchors"
+import {
+  BED_SETUP_ANCHOR_LIMIT,
+  BedSetupAnchorSchema,
+  StoredAnchorSetupSchema,
+  withBedSetupAnchors,
+} from "../anchors/stored-anchors"
+import type { StoredAnchorSetup } from "../anchors/stored-anchors"
+import type { BedSetupAnchors } from "../plate/bed-setup"
 import { machineId } from "@/machine/contract"
 import type { ConnectedDevice } from "@/machine/contract"
 import { DEFAULT_KIT, kitForDevice, kitOf } from "@/domain/fixtures/catalog"
@@ -18,23 +25,108 @@ export const profileDeviceId = (id: string) =>
 /** The most profiles the fixture library holds. */
 export const FIXTURE_PROFILE_LIMIT = 100
 
-/** A device's fixture definitions and anchors, which new plates for it start from. */
-export const FixtureProfileSchema = z.object({
+/** The most bed setups a device's profile holds. */
+export const BED_SETUP_LIMIT = 20
+
+/** The bed setup a profile starts with. */
+export const DEFAULT_BED_SETUP = "default"
+
+const uniqueIds = (items: readonly { readonly id: string }[]) =>
+  new Set(items.map((item) => item.id)).size === items.length
+
+/**
+ * One way a device's bed is set up: the fixtures new plates on it start from (each definition
+ * with whether it is on them and where), and anchors of its own, kept as X and Y from the
+ * device's first anchor, such as a jig's corner.
+ */
+export const BedSetupSchema = z.object({
+  id: EntityIdSchema,
   name: TextSchema,
-  anchors: StoredAnchorSetupSchema.optional(),
   definitions: z
     .array(FixtureDefinitionSchema)
     .max(FIXTURE_LIMIT)
-    .refine(
-      (definitions) =>
-        new Set(definitions.map((definition) => definition.id)).size ===
-        definitions.length,
-      "Fixture definition ids repeat."
-    ),
-  /** The version of the kit its fixtures come from (`FixtureKit`); absent before version 2. */
-  bundle: z.int().min(1).optional(),
+    .refine(uniqueIds, "Fixture definition ids repeat."),
+  anchors: z
+    .array(BedSetupAnchorSchema)
+    .max(BED_SETUP_ANCHOR_LIMIT)
+    .refine(uniqueIds, "Anchor ids repeat."),
 })
+export type BedSetup = z.infer<typeof BedSetupSchema>
+
+/**
+ * A device's anchors and the ways its bed is set up (`BedSetup`), which new plates for it start
+ * from: its default one unless another is chosen.
+ */
+export const FixtureProfileSchema = z
+  .object({
+    name: TextSchema,
+    anchors: StoredAnchorSetupSchema.optional(),
+    bedSetups: z
+      .array(BedSetupSchema)
+      .min(1)
+      .max(BED_SETUP_LIMIT)
+      .refine(uniqueIds, "Bed setup ids repeat."),
+    defaultBedSetupId: EntityIdSchema,
+    /** The version of the kit its fixtures come from (`FixtureKit`); absent before version 2. */
+    bundle: z.int().min(1).optional(),
+  })
+  .superRefine((profile, context) => {
+    if (
+      !profile.bedSetups.some((setup) => setup.id === profile.defaultBedSetupId)
+    )
+      context.addIssue({
+        code: "custom",
+        message: "Its default bed setup is not one of its bed setups.",
+        path: ["defaultBedSetupId"],
+      })
+    if (profile.anchors?.anchors.some((anchor) => anchor.bedSetup))
+      context.addIssue({
+        code: "custom",
+        message: "Its device's anchors hold a bed setup's.",
+        path: ["anchors"],
+      })
+  })
 export type FixtureProfile = z.infer<typeof FixtureProfileSchema>
+
+/** A profile's bed setup with an id, else its default one. */
+export function bedSetupOf(
+  profile: FixtureProfile,
+  id?: string | null
+): BedSetup {
+  return (
+    profile.bedSetups.find((setup) => setup.id === id) ??
+    profile.bedSetups.find((setup) => setup.id === profile.defaultBedSetupId) ??
+    profile.bedSetups[0]
+  )
+}
+
+/**
+ * The anchors a plate on one of a profile's bed setups keeps: the device's, then the bed setup's
+ * at the first plus their offsets; null without the device's.
+ */
+export const bedSetupAnchors = (
+  profile: FixtureProfile,
+  setup: BedSetup
+): StoredAnchorSetup | null =>
+  profile.anchors
+    ? withBedSetupAnchors(structuredClone(profile.anchors), setup.anchors)
+    : null
+
+/** A profile's bed setups' anchors by bed setup id, which plates on them follow. */
+export const profileBedSetupAnchors = (
+  profile: FixtureProfile
+): BedSetupAnchors =>
+  Object.fromEntries(
+    profile.bedSetups.map((setup) => [setup.id, setup.anchors])
+  )
+
+/** A bed setup holding the given fixture definitions and no anchors of its own. */
+const firstBedSetup = (definitions: BedSetup["definitions"]): BedSetup => ({
+  id: DEFAULT_BED_SETUP,
+  name: "Default",
+  definitions,
+  anchors: [],
+})
 
 /** Profiles by id, a device's (`machineId`) or the workspace's, each with its device's anchors. */
 export const FixtureProfilesSchema = z
@@ -107,7 +199,8 @@ const kitProfile = (
 ): FixtureProfile => ({
   name,
   anchors: kit.factoryAnchors(deviceId),
-  definitions: kit.definitions(),
+  bedSetups: [firstBedSetup(kit.definitions())],
+  defaultBedSetupId: DEFAULT_BED_SETUP,
   bundle: kit.version,
 })
 
@@ -117,36 +210,54 @@ export function defaultFixtureProfile(
 ): FixtureProfile {
   if (!device) return kitProfile(DEFAULT_KIT, "Workspace defaults", null)
   const kit = kitForDevice(device.model)
-  if (!kit) return { name: device.name, definitions: [] }
+  if (!kit)
+    return {
+      name: device.name,
+      bedSetups: [firstBedSetup([])],
+      defaultBedSetupId: DEFAULT_BED_SETUP,
+    }
   return kitProfile(kit, device.name, machineId(device))
 }
 
 /**
  * A profile made from an earlier version of its kit gains the fixtures added since and the
- * corrections made since, once: a fixture deleted afterwards stays deleted. It catches up as far
- * as it has room for the fixtures added: the versions whose fixtures would take it past
- * `FIXTURE_LIMIT` wait, with their corrections, until it has room for them.
+ * corrections made since in each of its bed setups, once: a fixture deleted afterwards stays
+ * deleted. It catches up as far as every bed setup has room for the fixtures added: the versions
+ * whose fixtures would take one past `FIXTURE_LIMIT` wait, with their corrections, until it has
+ * room for them.
  */
 export function withCurrentBundle(profile: FixtureProfile): FixtureProfile {
-  const kit = kitOf(profile.definitions)
+  const kit = kitOf(profile.bedSetups.flatMap((setup) => setup.definitions))
   const from = profile.bundle ?? 1
   if (!kit || from >= kit.version) return profile
-  const held = new Set(profile.definitions.map((definition) => definition.id))
-  const addedUpTo = (to: number) =>
+  const addedUpTo = (setup: BedSetup, to: number) =>
     kit.fixtures.filter(
       ({ fixture, addedIn }) =>
-        addedIn > from && addedIn <= to && !held.has(fixture.id)
+        addedIn > from &&
+        addedIn <= to &&
+        !setup.definitions.some((definition) => definition.id === fixture.id)
     )
   let to = kit.version
   while (
     to > from &&
-    profile.definitions.length + addedUpTo(to).length > FIXTURE_LIMIT
+    profile.bedSetups.some(
+      (setup) =>
+        setup.definitions.length + addedUpTo(setup, to).length > FIXTURE_LIMIT
+    )
   )
     to -= 1
   if (to === from) return profile
-  const definitions = profile.definitions.map((definition) =>
-    refreshed(kit, definition, from, to)
-  )
-  const added = addedUpTo(to).map(({ fixture }) => fixture.definition())
-  return { ...profile, definitions: [...definitions, ...added], bundle: to }
+  return {
+    ...profile,
+    bundle: to,
+    bedSetups: profile.bedSetups.map((setup) => ({
+      ...setup,
+      definitions: [
+        ...setup.definitions.map((definition) =>
+          refreshed(kit, definition, from, to)
+        ),
+        ...addedUpTo(setup, to).map(({ fixture }) => fixture.definition()),
+      ],
+    })),
+  }
 }

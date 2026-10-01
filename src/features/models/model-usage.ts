@@ -24,7 +24,9 @@ export function modelUsage(
     return found
   }
   for (const profile of Object.values(profiles))
-    for (const definition of profile.definitions) {
+    for (const definition of profile.bedSetups.flatMap(
+      (setup) => setup.definitions
+    )) {
       const id = libraryModelId(definition)
       if (id) entry(id).definitions++
     }

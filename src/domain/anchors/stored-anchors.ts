@@ -12,16 +12,32 @@ import type { Transform } from "@/domain/geometry/frame"
 export const AnchorXYSchema = z.tuple([CoordinateSchema, CoordinateSchema])
 export type AnchorXY = z.infer<typeof AnchorXYSchema>
 
-/** A position the machine stores: its id, which never changes, its name and machine XY. */
+/**
+ * A position the machine stores: its id, which never changes, its name and machine XY. One a
+ * bed setup keeps instead (`bedSetup`) is at the first anchor plus its offset.
+ */
 export const StoredAnchorSchema = z.object({
   id: EntityIdSchema,
   name: TextSchema,
   machinePosition: AnchorXYSchema,
+  /** Kept by the plate's bed setup, from the first anchor, rather than stored by the device. */
+  bedSetup: z.literal(true).optional(),
 })
 export type StoredAnchor = z.infer<typeof StoredAnchorSchema>
 
-/** The most anchors a setup keeps, as many as a machine reports. */
+/** The most anchors a device's snapshot keeps, as many as a machine reports. */
 export const ANCHOR_LIMIT = 32
+
+/** The most anchors a bed setup keeps of its own. */
+export const BED_SETUP_ANCHOR_LIMIT = 16
+
+/** An anchor a bed setup keeps: its X and Y from the device's first anchor, Anchor 1 on the Z1. */
+export const BedSetupAnchorSchema = z.object({
+  id: EntityIdSchema,
+  name: TextSchema,
+  offset: AnchorXYSchema,
+})
+export type BedSetupAnchor = z.infer<typeof BedSetupAnchorSchema>
 
 /**
  * A snapshot of a machine's anchors, as plates and device profiles keep it: the kit's factory
@@ -39,9 +55,26 @@ export const StoredAnchorSetupSchema = z
      * first anchor, in X and Y; [0, 0] where the kit has it.
      */
     bedOffset: AnchorXYSchema,
-    anchors: z.array(StoredAnchorSchema).min(1).max(ANCHOR_LIMIT),
+    /** The device's anchors, then those of the plate's bed setup (`withBedSetupAnchors`). */
+    anchors: z
+      .array(StoredAnchorSchema)
+      .min(1)
+      .max(ANCHOR_LIMIT + BED_SETUP_ANCHOR_LIMIT),
   })
   .superRefine((setup, context) => {
+    const kept = setup.anchors.filter((anchor) => anchor.bedSetup)
+    const device = setup.anchors.length - kept.length
+    if (
+      setup.anchors[0].bedSetup ||
+      setup.anchors.slice(device).some((anchor) => !anchor.bedSetup) ||
+      device > ANCHOR_LIMIT ||
+      kept.length > BED_SETUP_ANCHOR_LIMIT
+    )
+      context.addIssue({
+        code: "custom",
+        message: `The device's anchors come first, at most ${ANCHOR_LIMIT}, then at most ${BED_SETUP_ANCHOR_LIMIT} of its bed setup.`,
+        path: ["anchors"],
+      })
     if (
       setup.source === "firmware-config" &&
       (setup.deviceId === null || setup.fetchedAt === undefined)
@@ -67,7 +100,13 @@ export const StoredAnchorSetupSchema = z
       })
   })
 export type StoredAnchorSetup = z.infer<typeof StoredAnchorSetupSchema>
-export type BedAnchor = { id: string; name: string; position: AnchorXY }
+export type BedAnchor = {
+  id: string
+  name: string
+  position: AnchorXY
+  /** Kept by the plate's bed setup rather than stored by the device. */
+  bedSetup?: true
+}
 
 export const isAnchorXY = (value: unknown): value is AnchorXY =>
   AnchorXYSchema.safeParse(value).success
@@ -122,15 +161,19 @@ export function bedAnchors(setup?: StoredAnchorSetup): BedAnchor[] {
     id: anchor.id,
     name: anchor.name,
     position: [...toBed(anchor.machinePosition)] as AnchorXY,
+    ...(anchor.bedSetup && { bedSetup: true }),
   }))
 }
 
-/** A bed anchor's name, marked the same way wherever the factory defaults gave it. */
+/**
+ * A bed anchor's name, marked the same way wherever the factory defaults gave it: a device's
+ * anchor in a factory snapshot, never one its bed setup keeps.
+ */
 export function anchorDisplayName(
-  anchor: Pick<BedAnchor, "name">,
+  anchor: Pick<BedAnchor, "name" | "bedSetup">,
   factory: boolean
 ): string {
-  return `${anchor.name}${factory ? " (default)" : ""}`
+  return `${anchor.name}${factory && !anchor.bedSetup ? " (default)" : ""}`
 }
 
 /**
@@ -155,4 +198,50 @@ export function withMovedAnchor(
       ? { id: anchor.id, x: anchor.x + dx, y: anchor.y + dy }
       : { id: anchor.id, x: anchor.x, y: anchor.y }
   })
+}
+
+/** The anchors a snapshot has from its device, without those of a bed setup. */
+export const deviceAnchorsOf = (setup: Pick<StoredAnchorSetup, "anchors">) =>
+  setup.anchors.filter((anchor) => !anchor.bedSetup)
+
+/**
+ * A snapshot with a bed setup's anchors after the device's, each at the first anchor plus its
+ * offset; any it had of another bed setup go.
+ */
+export function withBedSetupAnchors(
+  setup: StoredAnchorSetup,
+  anchors: readonly BedSetupAnchor[]
+): StoredAnchorSetup {
+  const device = deviceAnchorsOf(setup)
+  const [x, y] = device[0].machinePosition
+  return {
+    ...setup,
+    anchors: [
+      ...device,
+      ...anchors.map((anchor): StoredAnchor => ({
+        id: anchor.id,
+        name: anchor.name,
+        machinePosition: [
+          Number((x + anchor.offset[0]).toFixed(6)) + 0,
+          Number((y + anchor.offset[1]).toFixed(6)) + 0,
+        ],
+        bedSetup: true,
+      })),
+    ],
+  }
+}
+
+/** The bed setup's anchors a snapshot holds, as offsets from its first anchor. */
+export function bedSetupAnchorsOf(setup: StoredAnchorSetup): BedSetupAnchor[] {
+  const [x, y] = setup.anchors[0].machinePosition
+  return setup.anchors
+    .filter((anchor) => anchor.bedSetup)
+    .map((anchor) => ({
+      id: anchor.id,
+      name: anchor.name,
+      offset: [
+        Number((anchor.machinePosition[0] - x).toFixed(6)) + 0,
+        Number((anchor.machinePosition[1] - y).toFixed(6)) + 0,
+      ],
+    }))
 }

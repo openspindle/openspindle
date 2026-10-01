@@ -2,7 +2,7 @@ import { createAtom } from "@tanstack/react-store"
 import { libraryOf } from "@/domain/workspace/library"
 import type { WorkspaceState } from "@/domain/workspace/workspace"
 import type { Result } from "@/domain/primitives"
-import type { StoredAnchorSetup } from "@/domain/anchors/stored-anchors"
+import type { ProfileAnchors } from "@/app/fixtures/fixture-library-store"
 import { emptyPlate, newProject } from "./defaults"
 import type { PlatePlacement } from "./import-program"
 import type { WorkspaceStore } from "./store"
@@ -85,18 +85,23 @@ export function markProjectEdited() {
 }
 
 /**
- * Plates set up for a device (or for none yet) follow its anchors; the connected device's,
- * every plate moves to it. That is not an edit of the project: a project without unsaved
- * changes keeps none, since following them again is the same.
+ * Plates set up for a device (or for none yet) follow its anchors and those of their bed setups;
+ * the connected device's, every plate moves to it. That is not an edit of the project: a
+ * project without unsaved changes keeps none, since following them again is the same.
  */
 export function followDeviceAnchors(
   workspace: WorkspaceStore,
-  deviceId: string | null,
-  anchors: StoredAnchorSetup,
+  { deviceId, anchors, bedSetups }: ProfileAnchors,
   connected = false
 ) {
   const unchanged = !hasUnsavedChanges(workspace.state)
-  workspace.dispatch({ type: "anchors.sync", deviceId, anchors, connected })
+  workspace.dispatch({
+    type: "anchors.sync",
+    deviceId,
+    anchors,
+    bedSetups,
+    connected,
+  })
   if (unchanged) markProjectSaved(workspace.state)
 }
 

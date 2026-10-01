@@ -4,7 +4,9 @@ import { useDocumentState, usePersistence } from "@/persistence/persistence"
 import { useMachineSnapshot } from "@/platform/machine"
 import { followDeviceAnchors } from "../workspace/project-session"
 import { useWorkspace, useWorkspaceStore } from "../workspace/workspace-context"
+import { plateAnchors } from "@/domain/plate/bed-setup"
 import { useFixtureLibraryStore } from "./fixture-context"
+import { profileAnchors } from "./fixture-library-store"
 
 /**
  * Follows the connected device: its fixture profile is created and selected, anchors read
@@ -23,15 +25,19 @@ export function useDeviceProfileSync() {
   const ready = fixturesState.phase !== "loading"
   const deviceKey = device ? machineId(device) : null
   // A plate set up for another device, or with other anchors, is one to move.
-  const anchorsKey =
+  const profile =
     deviceKey && Object.hasOwn(fixtures.state.profiles, deviceKey)
-      ? JSON.stringify(fixtures.state.profiles[deviceKey].anchors)
+      ? profileAnchors(deviceKey, fixtures.state.profiles[deviceKey])
       : null
   const behind = useWorkspace((state) =>
     state.plates.some(
       (plate) =>
         plate.setup.deviceId !== deviceKey ||
-        JSON.stringify(plate.setup.anchors) !== anchorsKey
+        !profile ||
+        JSON.stringify(plate.setup.anchors) !==
+          JSON.stringify(
+            plateAnchors(plate.setup, profile.anchors, profile.bedSetups)
+          )
     )
   )
 
@@ -41,14 +47,14 @@ export function useDeviceProfileSync() {
     if (!configuration) return
     fixtures.recordDeviceAnchors(device, configuration)
     const id = machineId(device)
-    const anchors = Object.hasOwn(fixtures.state.profiles, id)
-      ? fixtures.state.profiles[id].anchors
-      : undefined
+    const recorded = Object.hasOwn(fixtures.state.profiles, id)
+      ? profileAnchors(id, fixtures.state.profiles[id])
+      : null
     if (
-      anchors?.source === "firmware-config" &&
-      anchors.fetchedAt === configuration.fetchedAt
+      recorded?.anchors.source === "firmware-config" &&
+      recorded.anchors.fetchedAt === configuration.fetchedAt
     )
-      followDeviceAnchors(workspace, id, anchors, true)
+      followDeviceAnchors(workspace, recorded, true)
   })
 
   useEffect(() => {

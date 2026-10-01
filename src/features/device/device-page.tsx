@@ -1,10 +1,17 @@
+import { useState } from "react"
 import { toast } from "sonner"
 import {
   useFixtureLibrary,
   useFixtureLibraryStore,
   useSelectedFixtureProfile,
 } from "@/app/fixtures/fixture-context"
+import {
+  profileAnchors,
+  selectedProfile,
+} from "@/app/fixtures/fixture-library-store"
 import { followDeviceAnchors } from "@/app/workspace/project-session"
+import { deviceAnchorsOf } from "@/domain/anchors/stored-anchors"
+import { bedSetupOf } from "@/domain/fixtures/profiles"
 import { useWorkspaceStore } from "@/app/workspace/workspace-context"
 import type { AnchorXY } from "@/domain/anchors/stored-anchors"
 import { openDialog } from "@/features/shell/dialogs"
@@ -16,6 +23,7 @@ import {
 } from "@/platform/machine"
 import type { AnchorWriting } from "./anchor-positions-form"
 import { DeviceAnchors } from "./device-anchors"
+import { DeviceBedSetup } from "./device-bed-setup"
 import { DeviceFixtures } from "./device-fixtures"
 import { DeviceConfigurationCard } from "./device-configuration"
 import { DevicePanel } from "./device-panel"
@@ -37,6 +45,15 @@ export function DevicePage() {
   const { profile, deviceId } = useSelectedFixtureProfile()
   const workspace = useWorkspaceStore()
   const { map } = useDeviceHeightMap()
+  // The bed setup shown, the profile's default one until another is chosen.
+  const [shownBedSetup, setShownBedSetup] = useState<string | null>(null)
+  const bedSetup = bedSetupOf(profile, shownBedSetup)
+  /** Plates set up for the shown profile's device follow its anchors and its bed setups'. */
+  const follow = () => {
+    const { selectedId: id } = fixtures.state
+    const anchors = profileAnchors(id, selectedProfile(fixtures.state))
+    if (anchors) followDeviceAnchors(workspace, anchors)
+  }
   // A connected machine that stores no anchors has none to read; its kit may still place some.
   const storesAnchors = machine.features?.anchors !== false
   const telemetry = isFresh(machine.telemetry, Date.now())
@@ -45,6 +62,24 @@ export function DevicePage() {
   const current: AnchorXY | null = telemetry?.machine
     ? [telemetry.machine.x, telemetry.machine.y]
     : null
+  // Where the machine is from the shown device's first anchor, to keep as a bed setup's anchor.
+  const first = profile.anchors ? deviceAnchorsOf(profile.anchors)[0] : null
+  const shownConnected =
+    !!machine.connection.device &&
+    deviceId === machineId(machine.connection.device)
+  const currentFromAnchor =
+    first && current && shownConnected
+      ? {
+          position: [
+            current[0] - first.machinePosition[0],
+            current[1] - first.machinePosition[1],
+          ] as AnchorXY,
+        }
+      : {
+          reason: shownConnected
+            ? "The machine's position is not known."
+            : "Connect this device to take where it is.",
+        }
   const entry = machine.availability.writeAnchors
   const device = machine.connection.device
   const read = machine.anchors.value
@@ -107,17 +142,47 @@ export function DevicePage() {
               writing={storesAnchors ? writing : undefined}
               onAlign={(bedOffset) => {
                 if (!profile.anchors) return
-                const anchors = { ...profile.anchors, bedOffset }
-                fixtures.setAnchors(anchors)
-                followDeviceAnchors(workspace, deviceId, anchors)
+                fixtures.setAnchors({ ...profile.anchors, bedOffset })
+                follow()
+              }}
+            />
+            <DeviceBedSetup
+              profiles={profiles}
+              selectedId={selectedId}
+              onProfileChange={(id) => {
+                fixtures.select(id)
+                setShownBedSetup(null)
+              }}
+              bedSetups={profile.bedSetups}
+              bedSetup={bedSetup}
+              defaultBedSetupId={profile.defaultBedSetupId}
+              onBedSetupChange={setShownBedSetup}
+              deviceAnchors={profile.anchors}
+              current={currentFromAnchor}
+              onAdd={() => {
+                const id = fixtures.addBedSetup(
+                  `${bedSetup.name} copy`,
+                  bedSetup.id
+                )
+                if (id) setShownBedSetup(id)
+              }}
+              onRename={(name) => fixtures.renameBedSetup(bedSetup.id, name)}
+              onRemove={() => {
+                fixtures.removeBedSetup(bedSetup.id)
+                setShownBedSetup(null)
+              }}
+              onMakeDefault={() => fixtures.setDefaultBedSetup(bedSetup.id)}
+              onAnchorsChange={(anchors) => {
+                fixtures.setBedSetupAnchors(bedSetup.id, anchors)
+                follow()
               }}
             />
             <DeviceFixtures
-              definitions={profile.definitions}
-              onChange={(definitions) => fixtures.setDefinitions(definitions)}
-              profiles={profiles}
+              definitions={bedSetup.definitions}
+              onChange={(definitions) =>
+                fixtures.setDefinitions(bedSetup.id, definitions)
+              }
               selectedId={selectedId}
-              onProfileChange={(id) => fixtures.select(id)}
             />
           </>
         }

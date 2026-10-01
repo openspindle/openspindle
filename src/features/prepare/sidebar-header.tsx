@@ -16,6 +16,7 @@ import {
   useWorkspaceStore,
 } from "@/app/workspace/workspace-context"
 import { kitForDevice } from "@/domain/fixtures/catalog"
+import { bedSetupOf } from "@/domain/fixtures/profiles"
 import { openDialog } from "@/features/shell/dialogs"
 import { fixtureInstance, isBedKind } from "@/domain/fixtures/definitions"
 import type { FixtureDefinition } from "@/domain/fixtures/definitions"
@@ -53,7 +54,7 @@ export function DeviceCard() {
   )
 }
 
-/** The selected plate's bed: one of the profile's beds, or none. */
+/** The selected plate's bed: one of its bed setup's beds, or none. */
 export function BedTypeField() {
   const workspace = useWorkspaceStore()
   const plate = useSelectedPlate()
@@ -62,7 +63,9 @@ export function BedTypeField() {
   const definitions = [
     ...new Map(
       [
-        ...profile.definitions.filter((item) => isBedKind(item.kind)),
+        ...bedSetupOf(profile, plate?.setup.bedSetupId).definitions.filter(
+          (item) => isBedKind(item.kind)
+        ),
         ...fixtures
           .filter((item) => isBedKind(item.definition.kind))
           .map((item) => item.definition),

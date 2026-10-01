@@ -2,22 +2,31 @@ import { Store } from "@tanstack/react-store"
 import { History, sameData } from "@/app/workspace/history"
 import type { PlatePlacement } from "@/app/workspace/import-program"
 import {
+  BED_SETUP_LIMIT,
   WORKSPACE_PROFILE,
+  bedSetupAnchors,
+  bedSetupOf,
   defaultFixtureProfile,
+  profileBedSetupAnchors,
   profileDeviceId,
   withCurrentBundle,
 } from "@/domain/fixtures/profiles"
 import type {
+  BedSetup,
   FixtureProfile,
   FixtureProfiles,
 } from "@/domain/fixtures/profiles"
+import type { BedSetupAnchors } from "@/domain/plate/bed-setup"
 import { defaultFixtureInstances } from "@/domain/fixtures/definitions"
 import type { FixtureDefinition } from "@/domain/fixtures/definitions"
 import {
   anchorsFromDevice,
   isStoredAnchorSetup,
 } from "@/domain/anchors/stored-anchors"
-import type { StoredAnchorSetup } from "@/domain/anchors/stored-anchors"
+import type {
+  BedSetupAnchor,
+  StoredAnchorSetup,
+} from "@/domain/anchors/stored-anchors"
 import { machineId } from "@/machine/contract"
 import type { AnchorConfiguration, ConnectedDevice } from "@/machine/contract"
 import type { FixtureLibrary } from "@/persistence/fixture-document"
@@ -34,31 +43,70 @@ export function selectedProfile(library: FixtureLibrary): FixtureProfile {
     : defaultFixtureProfile()
 }
 
-/** Where new plates are set up: the selected profile's fixtures, its device and anchors. */
-export function profilePlacement(library: FixtureLibrary): PlatePlacement {
-  const profile = selectedProfile(library)
+/**
+ * Where plates are set up on a profile's bed setup (its default one unless `bedSetupId` names
+ * another): its fixtures, the profile's device, and the device's anchors with the bed setup's.
+ */
+export function bedSetupPlacement(
+  profileId: string,
+  profile: FixtureProfile,
+  bedSetupId?: string | null
+): PlatePlacement {
+  const setup = bedSetupOf(profile, bedSetupId)
   return {
-    fixtures: defaultFixtureInstances(profile.definitions),
-    deviceId: profileDeviceId(library.selectedId),
-    anchors: profile.anchors ? structuredClone(profile.anchors) : null,
+    fixtures: defaultFixtureInstances(setup.definitions),
+    deviceId: profileDeviceId(profileId),
+    anchors: bedSetupAnchors(profile, setup),
+    bedSetupId: setup.id,
   }
 }
 
+/** Where new plates are set up: the selected profile's default bed setup. */
+export const profilePlacement = (library: FixtureLibrary): PlatePlacement =>
+  bedSetupPlacement(library.selectedId, selectedProfile(library))
+
+/** A device's anchors and its bed setups' anchors, which plates set up for it follow. */
+export type ProfileAnchors = {
+  readonly deviceId: string | null
+  readonly anchors: StoredAnchorSetup
+  readonly bedSetups: BedSetupAnchors
+}
+
+/** A profile's anchors as plates follow them; null without the device's. */
+export function profileAnchors(
+  profileId: string,
+  profile: FixtureProfile
+): ProfileAnchors | null {
+  return profile.anchors
+    ? {
+        deviceId: profileDeviceId(profileId),
+        anchors: profile.anchors,
+        bedSetups: profileBedSetupAnchors(profile),
+      }
+    : null
+}
+
 /**
- * The anchors that one state of the library has and the other had not, with the device they
- * belong to: plates set up for that device follow them when an undo or a redo restores them.
+ * The anchors that one state of the library has and the other had not, a device's or its bed
+ * setups', with the device they belong to: plates set up for that device follow them when an
+ * undo or a redo restores them.
  */
 export function changedAnchors(
   before: FixtureLibrary,
   after: FixtureLibrary
-): { deviceId: string | null; anchors: StoredAnchorSetup }[] {
-  return Object.entries(after.profiles).flatMap(([id, { anchors }]) => {
+): ProfileAnchors[] {
+  return Object.entries(after.profiles).flatMap(([id, profile]) => {
     const previous = Object.hasOwn(before.profiles, id)
-      ? before.profiles[id].anchors
+      ? before.profiles[id]
       : undefined
-    return anchors && anchors !== previous
-      ? [{ deviceId: profileDeviceId(id), anchors }]
-      : []
+    const changed =
+      profile.anchors !== previous?.anchors ||
+      !sameData(
+        profileBedSetupAnchors(profile),
+        previous && profileBedSetupAnchors(previous)
+      )
+    const anchors = profileAnchors(id, profile)
+    return changed && anchors ? [anchors] : []
   })
 }
 
@@ -213,19 +261,135 @@ export class FixtureLibraryStore implements DocumentTarget<FixtureLibrary> {
     }, `anchors:${this.state.selectedId}`)
   }
 
-  setDefinitions(definitions: FixtureDefinition[]) {
+  /** Replaces the fixture definitions of one of the selected profile's bed setups. */
+  setDefinitions(bedSetupId: string, definitions: FixtureDefinition[]) {
     const { selectedId } = this.state
-    const key = definitionsKey(
-      selectedProfile(this.state).definitions,
-      definitions
+    const setup = selectedProfile(this.state).bedSetups.find(
+      (item) => item.id === bedSetupId
     )
+    if (!setup) return
+    const key = definitionsKey(setup.definitions, definitions)
+    this.edit(
+      (library) => this.withBedSetup(library, bedSetupId, { definitions }),
+      key === null ? null : `definitions:${selectedId}:${bedSetupId}:${key}`
+    )
+  }
+
+  /** Replaces the anchors one of the selected profile's bed setups keeps. */
+  setBedSetupAnchors(bedSetupId: string, anchors: BedSetupAnchor[]) {
+    this.edit(
+      (library) => this.withBedSetup(library, bedSetupId, { anchors }),
+      `bed-setup-anchors:${this.state.selectedId}:${bedSetupId}`
+    )
+  }
+
+  /**
+   * Adds a bed setup to the selected profile, a copy of `from` (its fixtures and anchors, with
+   * anchor ids of its own) or with its default bed setup's fixtures; returns its id, or null when
+   * the profile holds as many as it can.
+   */
+  addBedSetup(name: string, from?: string): string | null {
+    const profile = selectedProfile(this.state)
+    if (profile.bedSetups.length >= BED_SETUP_LIMIT) return null
+    const source = bedSetupOf(profile, from)
+    const setup: BedSetup = {
+      id: crypto.randomUUID(),
+      name,
+      definitions: structuredClone(source.definitions),
+      anchors: from
+        ? source.anchors.map((anchor) => ({
+            ...anchor,
+            id: crypto.randomUUID(),
+          }))
+        : [],
+    }
     this.edit(
       (library) =>
         Object.hasOwn(library.profiles, library.selectedId)
-          ? this.withSelected(library, { definitions })
+          ? this.withSelected(library, {
+              bedSetups: [...selectedProfile(library).bedSetups, setup],
+            })
           : library,
-      key === null ? null : `definitions:${selectedId}:${key}`
+      null
     )
+    return setup.id
+  }
+
+  renameBedSetup(bedSetupId: string, name: string) {
+    this.edit(
+      (library) => this.withBedSetup(library, bedSetupId, { name }),
+      `bed-setup-name:${this.state.selectedId}:${bedSetupId}`
+    )
+  }
+
+  /** Removes one of the selected profile's bed setups; its last one stays. */
+  removeBedSetup(bedSetupId: string) {
+    this.edit((library) => {
+      if (!Object.hasOwn(library.profiles, library.selectedId)) return library
+      const profile = selectedProfile(library)
+      const bedSetups = profile.bedSetups.filter(
+        (setup) => setup.id !== bedSetupId
+      )
+      if (!bedSetups.length || bedSetups.length === profile.bedSetups.length)
+        return library
+      const defaultBedSetupId =
+        profile.defaultBedSetupId === bedSetupId
+          ? bedSetups[0].id
+          : profile.defaultBedSetupId
+      return this.withSelected(library, { bedSetups, defaultBedSetupId })
+    }, null)
+  }
+
+  /**
+   * Keeps a bed setup in a device's profile, such as one a plate set up on another computer
+   * names, unless the profile has one of its id or holds as many as it can.
+   */
+  keepBedSetup(profileId: string, setup: BedSetup) {
+    this.edit((library) => {
+      if (!Object.hasOwn(library.profiles, profileId)) return library
+      const profile = library.profiles[profileId]
+      if (
+        profile.bedSetups.length >= BED_SETUP_LIMIT ||
+        profile.bedSetups.some((item) => item.id === setup.id)
+      )
+        return library
+      return {
+        ...library,
+        profiles: {
+          ...library.profiles,
+          [profileId]: { ...profile, bedSetups: [...profile.bedSetups, setup] },
+        },
+      }
+    }, null)
+  }
+
+  /** Makes one of the selected profile's bed setups the one new plates start on. */
+  setDefaultBedSetup(bedSetupId: string) {
+    this.edit((library) => {
+      if (!Object.hasOwn(library.profiles, library.selectedId)) return library
+      const profile = selectedProfile(library)
+      if (
+        profile.defaultBedSetupId === bedSetupId ||
+        !profile.bedSetups.some((setup) => setup.id === bedSetupId)
+      )
+        return library
+      return this.withSelected(library, { defaultBedSetupId: bedSetupId })
+    }, null)
+  }
+
+  private withBedSetup(
+    library: FixtureLibrary,
+    bedSetupId: string,
+    patch: Partial<BedSetup>
+  ): FixtureLibrary {
+    if (!Object.hasOwn(library.profiles, library.selectedId)) return library
+    const { bedSetups } = library.profiles[library.selectedId]
+    if (!bedSetups.some((setup) => setup.id === bedSetupId)) return library
+    return this.withSelected(library, {
+      bedSetups: bedSetups.map((setup) =>
+        setup.id === bedSetupId ? { ...setup, ...patch } : setup
+      ),
+    })
   }
 
   private withSelected(

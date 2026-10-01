@@ -23,7 +23,7 @@ The store verifies every entry it adds, whoever prepared it: the id is the diges
 
 ## Fixtures
 
-A fixture definition (**Device → Fixtures**) draws a model bundled with OpenSpindle, a box, a library model, or nothing. A new one starts in the middle of the machine's bed, on the top of the bed fixture new plates have (on the Z1, the MDF bed's top at Z 0), or on the machine's bed without one. Choosing a library model puts the fixture's origin at the centre of the model's footprint, on its underside; a box is framed the same way, and its **Size** (width, depth and height) is set there too. The Z1's MDF wasteboard is a box. Plates keep a snapshot of the definitions they were set up with. A fixture whose library model is missing shows a translucent box of the model's size, and its definition says so.
+A fixture definition (**Device → Fixtures**, of the bed setup shown) draws a model bundled with OpenSpindle, a box, a library model, or nothing. A new one starts in the middle of the machine's bed, on the top of the bed fixture new plates have (on the Z1, the MDF bed's top at Z 0), or on the machine's bed without one. Choosing a library model puts the fixture's origin at the centre of the model's footprint, on its underside; a box is framed the same way, and its **Size** (width, depth and height) is set there too. The Z1's MDF wasteboard is a box. Plates keep a snapshot of the definitions they were set up with. A fixture whose library model is missing shows a translucent box of the model's size, and its definition says so.
 
 ### Origin
 

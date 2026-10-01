@@ -45,7 +45,7 @@ import { withNotices } from "@/formats/upgrade/plate"
  */
 export type PlatePlacement = Pick<
   PlateSetup,
-  "fixtures" | "deviceId" | "anchors"
+  "fixtures" | "deviceId" | "anchors" | "bedSetupId"
 >
 
 export type ImportContext = {

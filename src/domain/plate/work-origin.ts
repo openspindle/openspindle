@@ -1,6 +1,10 @@
 import { isAnchorConfiguration } from "@/machine/contract"
 import type { RuleFixes } from "@/machine/contract"
-import { anchorsFromDevice, bedAnchors } from "@/domain/anchors/stored-anchors"
+import {
+  anchorsFromDevice,
+  bedAnchors,
+  deviceAnchorsOf,
+} from "@/domain/anchors/stored-anchors"
 import type {
   AnchorXY,
   StoredAnchor,
@@ -279,7 +283,7 @@ const anchorsChanged: StageRule<"run"> = {
   stage: "run",
   label: "Work origin anchor unchanged",
   description:
-    "The anchor a work origin is set from must still be where the connected device stores it; otherwise the work offset lands where the machine's anchor is not.",
+    "The anchor a work origin is set from (for an anchor of the plate's bed setup, the first it is kept from) must still be where the connected device stores it; otherwise the work offset lands where the machine's anchor is not.",
   severity: "error",
   configurable: false,
   chain: WORK_ORIGIN_CHAIN,
@@ -288,7 +292,12 @@ const anchorsChanged: StageRule<"run"> = {
     const { connectedDeviceId, anchors } = subject.machine
     if (!anchored || !connectedDeviceId || !isAnchorConfiguration(anchors))
       return true
-    const { anchor } = anchored.origin
+    // An anchor the plate's bed setup keeps is the first device anchor plus its offset.
+    const { setup, origin } = anchored
+    const anchor =
+      origin.anchor.bedSetup && setup.anchors
+        ? deviceAnchorsOf(setup.anchors)[0]
+        : origin.anchor
     const live = anchorsFromDevice(anchors, connectedDeviceId).anchors.find(
       (item) => item.id === anchor.id
     )
