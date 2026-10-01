@@ -1,0 +1,86 @@
+import { issueOf } from "../../../diagnostics"
+import type { XY } from "../../../geometry/frame"
+import { formatMillimetres } from "../../../geometry/millimetres"
+import { placementContext } from "../../../probing/placement"
+import type { ProbingStrategy } from "../../../probing/strategy"
+import { plateTouchOffParams } from "../../../probing/tasks/touch-off/fit"
+import type {
+  TouchOffParams,
+  TouchOffSpecs,
+} from "../../../probing/tasks/touch-off/params"
+import { planTouchOff } from "../../../probing/tasks/touch-off/rules"
+import { TOUCH_PARAMETERS } from "../probing-nc"
+import { anchorTravel } from "../wired-probe/travel"
+
+const INTRODUCTION = [
+  "; Makera wired Probe 2.0 - auto Z-height",
+  "; The firmware's own Z probe (M495, as Makera Studio runs it) touches the stock top,",
+  "; reports the touch and sets work Z0 there.",
+  "; REQUIRE: homed machine, installed/calibrated probe, tested probe signal.",
+]
+const PRECAUTIONS = [
+  "; The probe searches down as far as the firmware's tool rack Z; no contact alarms the machine.",
+  "; Replaces work Z of the active coordinate system; the firmware saves G54.",
+]
+
+/** The firmware's Z probe goes to its X Y in work coordinates, which only an anchored start has. */
+const NOT_ANCHORED = issueOf<"work-origin-not-anchored">("error")(
+  "work-origin-not-anchored",
+  "The firmware's Z probe touches only at a stored anchor, on a plate whose work origin is kept relative to an anchor. Touch at an anchor and keep the work origin on one, or use Surface touch."
+)
+
+/**
+ * The firmware's own Z probe (ATCHandler::fill_zprobe_scripts), run by M495 with a zero O/F
+ * offset from X Y: over X Y in work coordinates, where the G53 travel already is, the same fast
+ * and slow touches, then work Z0 at the contact and 1 mm up, left in G91. The machine reports
+ * every step.
+ */
+function firmwareTouch([x, y]: XY<"work">) {
+  const mm = (value: number) => String(Number(value.toFixed(3)) + 0)
+  return `M495 X${mm(x)} Y${mm(y)} O0 F0`
+}
+
+/** Back to absolute distances after the firmware's Z probe, and up to the clearance. */
+function firmwareLift({ clearance }: Pick<TouchOffParams, "clearance">) {
+  return ["G90", `G0 Z${formatMillimetres(clearance)}`]
+}
+
+/**
+ * The Z1 firmware's own Z probe with a Z touch probe in T0, which reports the touch as it goes:
+ * from a stored anchor on a plate that keeps its work origin relative to an anchor, where the
+ * touch point has work coordinates. M495 switches the probe's laser itself.
+ */
+export const Z_PROBE: ProbingStrategy<
+  "touch-off",
+  TouchOffParams,
+  TouchOffSpecs
+> = {
+  id: "makera-z1/z-probe",
+  task: "touch-off",
+  label: "Z probe (Z1 firmware)",
+  description:
+    "Touch the stock top with the machine's own Z probe at a stored anchor and set work Z there; the machine reports the touch.",
+  accepts: ({ touch }) => touch === "z",
+  parameters: () => TOUCH_PARAMETERS,
+  defaults: plateTouchOffParams,
+  generate: ({ params, plate, probe, machine }) => {
+    const plan = planTouchOff(params, placementContext(plate), TOUCH_PARAMETERS)
+    if (!plan.ok) return plan
+    const { start } = plan
+    if (start.kind !== "anchor" || !start.work)
+      return { ok: false, issues: [NOT_ANCHORED] }
+    const lines = [
+      ...INTRODUCTION,
+      ...PRECAUTIONS,
+      ...machine.nc.select(probe),
+      ...anchorTravel(start),
+      firmwareTouch(start.work),
+      ...firmwareLift(plan.params),
+      "M2",
+    ]
+    return {
+      ok: true,
+      program: { nc: `${lines.join("\n")}\n`, reviewLine: null },
+    }
+  },
+}

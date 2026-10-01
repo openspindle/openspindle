@@ -9,7 +9,7 @@ import type { NcBlockEffect, NcUnitState } from "../compile/nc-unit"
 import type { FirmwareModel } from "../firmware/firmware-model"
 import type { MachineOrigin } from "../plate/work-origin"
 import type { Result } from "../primitives"
-import type { ProbeTool, ProbingSections } from "../probing/probe"
+import type { MachineProbing } from "../probing/strategy"
 import type { Fixture } from "./fixture"
 import type { MachineBed } from "./machine-bed"
 
@@ -35,7 +35,7 @@ export type KitRecolor = {
 }
 
 /**
- * What a kind of machine is and comes with: its work area, bed and probes, the fixtures made for
+ * What a kind of machine is and comes with: its work area, bed and probing, the fixtures made for
  * it and its factory anchors. A device's fixture profile starts from its machine's kit and keeps
  * up with the kit's versions: each version adds fixtures or corrects them.
  */
@@ -52,15 +52,11 @@ export abstract class FixtureKit {
   abstract readonly workArea: Point3
   abstract readonly bed: MachineBed
   /**
-   * The probes the probing operations measure with, in the order they are preferred; empty for
-   * none.
+   * How it probes with the probes of the tool library: the tool numbers its firmware needs them
+   * in, the NC generic strategies are made of, its firmware's own strategies and how its NC reads
+   * as probing; null for a machine that does not probe.
    */
-  abstract readonly probes: readonly ProbeTool[]
-  /**
-   * How its NC reads as probing in a program's sections, whichever probe runs it; null without
-   * probes.
-   */
-  abstract readonly probingSections: ProbingSections | null
+  abstract readonly probing: MachineProbing | null
   /**
    * How its firmware moves for what the preview leaves to it (machine coordinates, probing,
    * tool changes); null when the preview does not follow it.

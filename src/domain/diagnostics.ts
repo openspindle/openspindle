@@ -175,7 +175,7 @@ export type Issue<TCode extends string = string> = {
   readonly places?: readonly Place[]
 }
 
-/** The issues of one family of codes: `const probeError = issueOf<Probe3dIssueCode>("error")`. */
+/** The issues of one family of codes: `const probeError = issueOf<OriginIssueCode>("error")`. */
 export const issueOf =
   <TCode extends string>(severity: Severity) =>
   (

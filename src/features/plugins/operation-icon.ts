@@ -8,18 +8,18 @@ import {
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 import type { ToolbarItem } from "@openspindle/plugin-core"
-import type { ProbingSourceKind } from "@/domain/operations/kinds"
 import type { Operation } from "@/domain/operations/operation"
+import type { ProbingTask } from "@/domain/probing/strategy"
 import type { PluginSummary } from "@/platform/contract/plugin-rpc"
 import { useInstalledPlugins } from "@/platform/plugins"
 import { TOOLBAR_ICONS } from "./plugin-sources"
 
-/** The probing operations' icons, wherever they are offered or listed. */
-export const PROBING_ICONS: Record<ProbingSourceKind, LucideIcon> = {
-  "auto-level": LandPlot,
-  "auto-z-height": ArrowDownToLine,
-  "auto-scan": SquareDashed,
-  "probe-3d": Axis3d,
+/** The probing operations' icons by task, wherever they are offered or listed. */
+export const PROBING_ICONS: Record<ProbingTask, LucideIcon> = {
+  grid: LandPlot,
+  "touch-off": ArrowDownToLine,
+  outline: SquareDashed,
+  origin: Axis3d,
 }
 
 /** The icon of the plugin's toolbar item for what made an operation; the plugin icon without one. */
@@ -35,7 +35,7 @@ function pluginIcon(
 }
 
 /**
- * An operation's icon: a program file's, its probing kind's, or the one its plugin's toolbar
+ * An operation's icon: a program file's, its probing task's, or the one its plugin's toolbar
  * gives the template program or importer that made it.
  */
 export function operationIcon(
@@ -58,8 +58,8 @@ export function operationIcon(
         source.pluginId,
         (item) => item.viewId !== undefined
       )
-    default:
-      return PROBING_ICONS[source.kind]
+    case "probing":
+      return PROBING_ICONS[source.task]
   }
 }
 

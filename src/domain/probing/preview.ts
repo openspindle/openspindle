@@ -2,8 +2,7 @@ import type { GCodeProgram } from "../nc/gcode"
 import { isStoredAnchorSetup, machineToBed } from "../anchors/stored-anchors"
 import type { StoredAnchorSetup } from "../anchors/stored-anchors"
 import type { Frame, Vec2, XY } from "../geometry/frame"
-import { offering } from "./probe"
-import type { GridProbing, ProbeTool } from "./probe"
+import type { MachineProbing } from "./strategy"
 
 /**
  * The frames previews place probing in: relative to where the probe starts, as NC places it
@@ -61,23 +60,28 @@ export type ProbingPreview = {
   readonly pointCount: number
 }
 const NO_PROBING: ProbingPreview = { grids: [], pointCount: 0 }
-const caches = new WeakMap<GridProbing, WeakMap<GCodeProgram, ProbingPreview>>()
+
+/** What a machine's readers read of each program, by the machine's readers. */
+const caches = new WeakMap<
+  MachineProbing["readers"],
+  WeakMap<GCodeProgram, ProbingPreview>
+>()
 
 /**
- * The grids a program probes, as the machine's probe that probes grids reads its NC
- * (`GridProbing.grids`): planned XY samples only, never measured heights. Nothing without one.
+ * The grids a program probes, as the machine's firmware reads its NC (`readers.grids`): planned
+ * XY samples only, never measured heights. Nothing for a machine that does not probe.
  */
 export function getProbingPreview(
   program: GCodeProgram,
-  probes: readonly ProbeTool[]
+  probing: MachineProbing | null
 ): ProbingPreview {
-  const probing = offering(probes, "grid")?.capability
   if (!probing) return NO_PROBING
-  let cache = caches.get(probing)
-  if (!cache) caches.set(probing, (cache = new WeakMap()))
+  const { readers } = probing
+  let cache = caches.get(readers)
+  if (!cache) caches.set(readers, (cache = new WeakMap()))
   const saved = cache.get(program)
   if (saved) return saved
-  const grids = probing.grids(program)
+  const grids = readers.grids(program)
   const result: ProbingPreview = {
     grids,
     pointCount: grids.reduce((count, grid) => count + grid.samples.length, 0),
@@ -86,29 +90,30 @@ export function getProbingPreview(
   return result
 }
 
-/** Per machine's probes, which say both the touch-off and the grids it reads touches after. */
+/** Per machine's readers, which read both the touch-offs and the grids they follow. */
 const touchCaches = new WeakMap<
-  readonly ProbeTool[],
+  MachineProbing["readers"],
   WeakMap<GCodeProgram, ProbeTouch<"probe" | "machine">[]>
 >()
 
 /**
- * Where a program's touch-offs touch, as the machine's probe that touches off reads its NC
- * (`TouchOff.touches`): planned XY only, never measured heights. Nothing without one.
+ * Where a program's touch-offs touch, as the machine's firmware reads its NC
+ * (`readers.touches`): planned XY only, never measured heights. Nothing for a machine that does
+ * not probe.
  */
 export function getProbeTouches(
   program: GCodeProgram,
-  probes: readonly ProbeTool[]
+  probing: MachineProbing | null
 ): ProbeTouch<"probe" | "machine">[] {
-  const touchOff = offering(probes, "touch-off")?.capability
-  if (!touchOff) return []
-  let cache = touchCaches.get(probes)
-  if (!cache) touchCaches.set(probes, (cache = new WeakMap()))
+  if (!probing) return []
+  const { readers } = probing
+  let cache = touchCaches.get(readers)
+  if (!cache) touchCaches.set(readers, (cache = new WeakMap()))
   const saved = cache.get(program)
   if (saved) return saved
-  const touches = touchOff.touches(
+  const touches = readers.touches(
     program,
-    getProbingPreview(program, probes).grids
+    getProbingPreview(program, probing).grids
   )
   cache.set(program, touches)
   return touches

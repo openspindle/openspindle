@@ -104,16 +104,19 @@ function reachedOperations(view: Exclude<JobView, { kind: "idle" }>) {
       }
     return -1
   }
-  const kindAt = (index: number) => stages[index].operation.source.kind
+  const taskAt = (index: number) => {
+    const { source } = stages[index].operation
+    return source.kind === "probing" ? source.task : null
+  }
   const measured: Map<number, JobMeasurement[]> = new Map()
   for (const measurement of view.job.measurements) {
     let index = -1
     if (measurement.kind === "grid")
-      index = place("grid", (at) => kindAt(at) === "auto-level")
+      index = place("grid", (at) => taskAt(at) === "grid")
     else if (measurement.kind === "contacts")
-      index = place("contacts", (at) => kindAt(at) === "probe-3d")
+      index = place("contacts", (at) => taskAt(at) === "origin")
     else if (measurement.target === "surface")
-      index = place("surface", (at) => kindAt(at) === "auto-z-height")
+      index = place("surface", (at) => taskAt(at) === "touch-off")
     else if (measurement.tool !== null) {
       const tool = measurement.tool
       index = place(`tool-${tool}`, (at) =>

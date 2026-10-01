@@ -5,7 +5,7 @@ import {
 } from "@/app/workspace/workspace-context"
 import { machineId } from "@/machine/contract"
 import { useMachineSnapshot, useReadHeightMap } from "@/platform/machine"
-import { HeightMapReview } from "@/features/auto-level/height-map-review"
+import { HeightMapReview } from "@/features/probing/height-map-review"
 import { availabilityReason } from "./job-hooks"
 import { jobSessionStore } from "./job-session"
 import type { JobViewOf } from "./job-view"
@@ -50,7 +50,7 @@ export function HeightMapReviewStep({
 
   const source = view.operation?.source
   const expected =
-    source?.kind === "auto-level"
+    source?.kind === "probing" && source.task === "grid"
       ? { columns: source.params.points[0], rows: source.params.points[1] }
       : undefined
   return (

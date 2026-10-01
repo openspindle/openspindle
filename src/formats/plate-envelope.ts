@@ -9,7 +9,7 @@ import {
 import { OperationSchema } from "@/domain/operations/operation"
 import { adler32, decodeBase64Json, encodeBase64Json } from "./base64-json"
 import { isJsonObject } from "./upgrade/json"
-import { upgradeOperations } from "./upgrade/operations"
+import { upgradePlate } from "./upgrade/plate"
 
 /** Setup and editable operations embedded as leading comments of an exported NC file. */
 const MAX_ENVELOPE_BYTES = 32 * 1024 * 1024
@@ -25,8 +25,10 @@ export const carriesPlate = (source: string) =>
 /**
  * The envelope version exports write: version 3 fixtures name their model's source, since
  * version 4 the wasteboard is one of them, since version 5 anchored probing travels at the
- * height the machine's probe travels at, and since version 6 probing parameters hold a value per
- * axis together, and placements their height apart from their offset.
+ * height the machine's probe travels at, and since version 6 probing operations are one kind, a
+ * task done by a strategy with a probe tool of the plate's table, 3D probing takes its ball from
+ * that probe, probing parameters hold a value per axis together, and placements their height
+ * apart from their offset.
  */
 export const PLATE_ENVELOPE_VERSION = 6
 
@@ -34,17 +36,20 @@ export const PLATE_ENVELOPE_VERSION = 6
 export const OLDEST_PLATE_ENVELOPE_VERSION = 4
 
 /**
- * An export's payload of an earlier version, in the current one: its probing operations
- * upgraded (`upgradeOperations`). What it still does not recognize (such as format 4's travel Z)
- * is left for reading to leave out and report, rather than rewritten field by field.
+ * An export's payload of an earlier version, in the current one: its plate upgraded
+ * (`upgradePlate`, with the importing app's tool `library`), and the notices that brings, for
+ * the plate it imports as. What it still does not recognize (such as format 4's travel Z) is
+ * left for reading to leave out and report, rather than rewritten field by field.
  */
-export function upgradeEnvelopePayload(payload: unknown): unknown {
-  if (!isJsonObject(payload)) return payload
-  const exported = payload
+export function upgradeEnvelopePayload(
+  payload: unknown,
+  library: readonly unknown[]
+): { readonly payload: unknown; readonly notices: readonly string[] } {
+  if (!isJsonObject(payload)) return { payload, notices: [] }
+  const { plate, notices } = upgradePlate(payload, library)
   return {
-    ...exported,
-    schemaVersion: PLATE_ENVELOPE_VERSION,
-    operations: upgradeOperations(exported.operations),
+    payload: { ...plate, schemaVersion: PLATE_ENVELOPE_VERSION },
+    notices,
   }
 }
 

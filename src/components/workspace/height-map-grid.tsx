@@ -9,8 +9,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { formatHeight, heightStatistics } from "@/domain/auto-level/analysis"
-import type { GridPosition } from "@/domain/auto-level/analysis"
+import {
+  formatHeight,
+  heightStatistics,
+} from "@/domain/probing/tasks/grid/analysis"
+import type { GridPosition } from "@/domain/probing/tasks/grid/analysis"
 import type { HeightMap } from "@/machine/contract"
 import { cn } from "@/lib/utils"
 

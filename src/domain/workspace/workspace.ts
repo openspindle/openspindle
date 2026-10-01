@@ -6,7 +6,7 @@ import type { Stock } from "@/domain/stock/stock"
 import { DesignRulesSchema, sameDesignRules } from "../design-rules/rules"
 import type { DesignRules } from "../design-rules/rules"
 import { kitForPlate } from "../fixtures/catalog"
-import { resolveOperation } from "../operations/kinds"
+import { kindOf, resolveOperation } from "../operations/kinds"
 import {
   OperationSchema,
   OperationSourceSchema,
@@ -223,13 +223,20 @@ function replacePlate(state: WorkspaceState, next: Plate): WorkspaceState {
   }
 }
 
-/** Re-binds an operation's tools to what its NC currently selects. */
+/**
+ * Re-binds an operation's tools to what its NC currently selects: the numbers its kind knows it
+ * selects, such as a probing operation's probe, whether or not its NC resolves, or else those of
+ * its NC.
+ */
 function rebind(
   plate: Plate,
   operation: Operation,
   library: readonly Tool[],
   preferred?: ReadonlyMap<number | null, string>
 ): Plate {
+  const known = kindOf(operation).tools?.(operation)
+  if (known)
+    return bindTools(plate, operation, known, { preferred, library }).plate
   const resolved = resolveOperation(operation, plate, {
     kit: kitForPlate(plate),
     tools: library,

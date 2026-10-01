@@ -6,8 +6,11 @@
 import { readNcBlock } from "@/machine/contract"
 import type { NcWord } from "@/machine/contract"
 import type { Vec2 } from "../../../geometry/frame"
-import { cornerInward } from "../../../probe-3d/params"
-import type { Probe3dCorner, Probe3dRoutine } from "../../../probe-3d/params"
+import { cornerInward } from "../../../probing/tasks/origin/params"
+import type {
+  Probe3dCorner,
+  Probe3dRoutine,
+} from "../../../probing/tasks/origin/params"
 
 /** The firmware's 3D probing routines (ATCHandler's M480). */
 export const ORIGIN_ROUTINE = 480

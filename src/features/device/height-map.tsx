@@ -16,7 +16,7 @@ import {
   formatHeight,
   formatSpan,
   heightStatistics,
-} from "@/domain/auto-level/analysis"
+} from "@/domain/probing/tasks/grid/analysis"
 import {
   HeightMapFacts,
   HeightMapGrid,

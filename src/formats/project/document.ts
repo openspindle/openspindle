@@ -23,8 +23,9 @@ import { PROJECT_LIMITS } from "./step-nc"
 
 /**
  * Version 5: anchored probing travels at the height the machine's probe travels at. Version 6:
- * probing parameters hold a value per axis together, and placements their height apart from
- * their offset.
+ * probing operations are one kind, a task done by a strategy with a probe tool of the plate's
+ * table, and 3D probing takes its ball from that probe; probing parameters hold a value per axis
+ * together, and placements their height apart from their offset.
  */
 export const PROJECT_SCHEMA_VERSION = 6
 

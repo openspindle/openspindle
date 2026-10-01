@@ -24,6 +24,7 @@ import {
   upgradeEnvelopePayload,
 } from "@/formats/plate-envelope"
 import { describePath, readOptimistically } from "@/formats/optimistic-read"
+import { withNotices } from "@/formats/upgrade/plate"
 
 /**
  * Where plates created from plain programs are set up: the selected fixture profile, or the
@@ -173,10 +174,11 @@ export function importProgram(
       "It was exported by an earlier version of OpenSpindle, which this version cannot read."
     )
   // An earlier version's payload becomes the current version before reading it optimistically.
-  const rawPayload =
+  const upgraded =
     envelope.version < PLATE_ENVELOPE_VERSION
-      ? upgradeEnvelopePayload(envelope.payload)
-      : envelope.payload
+      ? upgradeEnvelopePayload(envelope.payload, context.tools)
+      : { payload: envelope.payload, notices: [] }
+  const rawPayload = upgraded.payload
   const read = readOptimistically(PlateEnvelopeSchema, rawPayload)
   if (!read.success)
     return fail(`Its embedded setup is invalid: ${z.prettifyError(read.error)}`)
@@ -203,7 +205,7 @@ export function importProgram(
     tools: exported.tools,
     operations: exported.operations,
     groups: exported.groups,
-    notices: leftOutNotices,
+    notices: withNotices(leftOutNotices, upgraded.notices),
     example: false,
   })
 }

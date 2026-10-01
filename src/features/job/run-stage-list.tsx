@@ -19,11 +19,18 @@ import {
 import { Spinner } from "@/components/ui/spinner"
 import { formatMillimetres } from "@/domain/geometry/millimetres"
 import type { Operation } from "@/domain/operations/operation"
-import { PROBE_3D_CORNER_LABELS, findsCorner } from "@/domain/probe-3d/params"
-import type { Probe3dParams } from "@/domain/probe-3d/params"
-import { probe3dResult } from "@/domain/probe-3d/result"
+import {
+  PROBE_3D_CORNER_LABELS,
+  findsCorner,
+} from "@/domain/probing/tasks/origin/params"
+import type { OriginParams } from "@/domain/probing/tasks/origin/params"
+import { originResult } from "@/domain/probing/tasks/origin/result"
 import { placementHeight } from "@/domain/probing/placement"
-import { PROBE_3D_TOOL, PROBE_TOOL } from "@/domain/tools/tool-table"
+import {
+  PROBE_3D_TOOL,
+  PROBE_TOOL,
+  boundTools,
+} from "@/domain/tools/tool-table"
 import { programParts } from "@/machine/contract"
 import type {
   ContactsMeasurement,
@@ -117,29 +124,30 @@ function operationSummary(
   plugins: readonly PluginSummary[] | undefined
 ): string {
   const { source } = operation
-  switch (source.kind) {
-    case "auto-z-height": {
-      const { placement } = source.params
+  const probing = source.kind === "probing" ? source : null
+  switch (probing?.task) {
+    case "touch-off": {
+      const { placement } = probing.params
       const where =
         placement.kind === "anchor"
           ? `at ${anchorName(subject, placement.anchorId)} + X${mm(placement.offset[0])} Y${mm(placement.offset[1])}`
           : "below the probe"
       return `Touches the stock top ${where} and sets work Z there.`
     }
-    case "auto-level": {
-      const [columns, rows] = source.params.points
-      const [width, depth] = source.params.size
+    case "grid": {
+      const [columns, rows] = probing.params.points
+      const [width, depth] = probing.params.size
       return `Probes ${columns} × ${rows} points over ${mm(width)} × ${mm(depth)} mm.`
     }
-    case "probe-3d": {
-      const { placement } = source.params
+    case "origin": {
+      const { placement } = probing.params
       const height = placementHeight(placement)
       const z = height === undefined ? "" : ` Z${mm(height)}`
       const where =
         placement.kind === "anchor"
           ? `from ${anchorName(subject, placement.anchorId)} + X${mm(placement.offset[0])} Y${mm(placement.offset[1])}${z}`
           : `from the probe position${z && ` at${z}`}`
-      return `Finds ${probe3dTarget(source.params)} ${where} and sets the work origin there.`
+      return `Finds ${probe3dTarget(probing.params)} ${where} and sets the work origin there.`
     }
     default: {
       const names = toolNames(operation, subject, tools)
@@ -209,7 +217,7 @@ function gridText(grid: GridMeasurement): string {
 }
 
 /** What a 3D probing operation finds, in words. */
-function probe3dTarget({ routine, corner, axes }: Probe3dParams): string {
+function probe3dTarget({ routine, corner, axes }: OriginParams): string {
   const at = PROBE_3D_CORNER_LABELS[corner].toLowerCase()
   const across = axes === "xy" ? "X and Y" : axes.toUpperCase()
   switch (routine) {
@@ -225,7 +233,7 @@ function probe3dTarget({ routine, corner, axes }: Probe3dParams): string {
 }
 
 /** What a 3D probing routine that has not found what it probes did, by its stage's status. */
-function probe3dUnfinished(params: Probe3dParams, status: StageStatus) {
+function probe3dUnfinished(params: OriginParams, status: StageStatus) {
   const target = probe3dTarget(params)
   switch (status) {
     case "failed":
@@ -240,11 +248,12 @@ function probe3dUnfinished(params: Probe3dParams, status: StageStatus) {
 
 /** Where a 3D probing routine set the work origin, from the contacts it reported. */
 function probe3dFacts(
-  params: Probe3dParams,
+  params: OriginParams,
+  ball: number,
   { contacts }: ContactsMeasurement,
   status: StageStatus
 ): { description: string; facts: { label: string; value: string }[] } {
-  const result = probe3dResult(params, contacts)
+  const result = originResult(params, ball, contacts)
   const set = (["X", "Y"] as const).flatMap((axis, index) => {
     const value = result.origin[index]
     return value === null ? [] : [{ axis, value }]
@@ -289,8 +298,20 @@ function operationResults(
   const { operation, surface, grid, contacts, status } = stage
   const facts: { label: string; value: string }[] = []
   let description: string | null = null
-  if (contacts && operation.source.kind === "probe-3d") {
-    const probed = probe3dFacts(operation.source.params, contacts, status)
+  const { source } = operation
+  // The probe's ball, as the plate's table held it when the job ran.
+  const probeId =
+    source.kind === "probing"
+      ? boundTools(subject.plate, operation).get(source.probe)
+      : undefined
+  const ball = tools.find((tool) => tool.id === probeId)?.diameter ?? null
+  if (
+    contacts &&
+    source.kind === "probing" &&
+    source.task === "origin" &&
+    ball !== null
+  ) {
+    const probed = probe3dFacts(source.params, ball, contacts, status)
     description = probed.description
     facts.push(...probed.facts)
   }
@@ -317,8 +338,8 @@ function operationResults(
       value: `Z ${mm(tool.machine[2])}`,
     })
   const probing =
-    operation.source.kind === "auto-z-height" ||
-    operation.source.kind === "auto-level"
+    source.kind === "probing" &&
+    (source.task === "touch-off" || source.task === "grid")
   if (!surface && !grid && status === "done" && probing)
     description =
       "The machine reports its measurements only when it probes from a stored anchor with the work origin kept relative to one."
