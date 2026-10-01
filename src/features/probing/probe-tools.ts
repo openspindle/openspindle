@@ -1,7 +1,9 @@
+import type { ProbingOperation } from "@/domain/operations/kinds"
 import type { Plate, PlateTool } from "@/domain/plate/plate"
 import type { MachineProbing } from "@/domain/probing/strategy"
 import { probeProfile } from "@/domain/tools/tool"
 import type { ProbeProfile, Tool } from "@/domain/tools/tool"
+import { isProbeSlot } from "@/domain/tools/tool-table"
 
 /** What a probe senses and carries, in a few words: "Touches Z · laser pointer". */
 export function profileText({ touch, pointer }: ProbeProfile): string {
@@ -39,13 +41,78 @@ export function replacedEntry(
   )
 }
 
-/** "Replaces Makera Wired Probe 2.0 in T0.": what choosing a probe does to the plate's table. */
-export function replacesText(
+/** "Makera Wired Probe 2.0 in T0": a table entry as choosing a probe that replaces it names it. */
+export function entryText(
   entry: PlateTool & { readonly number: number },
   library: readonly Tool[]
 ): string {
   const name =
     library.find((tool) => tool.id === entry.toolId)?.name ??
     "a tool missing from the library"
-  return `Replaces ${name} in T${entry.number}.`
+  return `${name} in T${entry.number}`
+}
+
+/** "Replaces Makera Wired Probe 2.0 in T0.": what choosing a probe does to the plate's table. */
+export function replacesText(
+  entry: PlateTool & { readonly number: number },
+  library: readonly Tool[]
+): string {
+  return `Replaces ${entryText(entry, library)}.`
+}
+
+/** The number a probing operation selects a probe by: where the machine needs it, else its own. */
+export const probeNumber = (
+  operation: Pick<ProbingOperation, "source">,
+  profile: ProbeProfile,
+  machine: MachineProbing
+): number => machine.slot(profile) ?? operation.source.probe
+
+/**
+ * The table entry that choosing a probe for a probing operation replaces for other operations
+ * too, and how many of them use it: the entry of the number the operation selects the probe by
+ * (`probeNumber`), while it holds another tool. Assigning puts the probe there for everyone, as
+ * a probe slot is one entry per plate (`assignOperationTools`). Undefined where no other
+ * operation's tool changes.
+ */
+export function sharedReplacement(
+  plate: Plate,
+  operation: Pick<ProbingOperation, "id" | "source" | "tools">,
+  tool: Tool,
+  machine: MachineProbing
+):
+  | { entry: PlateTool & { readonly number: number }; others: number }
+  | undefined {
+  const profile = probeProfile(tool)
+  if (!profile) return undefined
+  const local = probeNumber(operation, profile, machine)
+  const number =
+    operation.tools.find((binding) => binding.local === local)?.plate ?? local
+  // Outside the probe slots, a shared entry keeps its tool and the operation moves instead.
+  if (!isProbeSlot(number)) return undefined
+  const entry = plate.tools.find(
+    (item): item is PlateTool & { number: number } =>
+      item.number === number && item.toolId !== null && item.toolId !== tool.id
+  )
+  const others = plate.operations.filter(
+    (item) =>
+      item.id !== operation.id &&
+      item.tools.some((binding) => binding.plate === number)
+  ).length
+  return entry && others ? { entry, others } : undefined
+}
+
+/**
+ * "Replaces Ruby 3D probe in T9999, which 1 other operation uses.": what choosing a probe
+ * changes for the plate's other operations (`sharedReplacement`).
+ */
+export function sharedReplacementText(
+  {
+    entry,
+    others,
+  }: { entry: PlateTool & { readonly number: number }; others: number },
+  library: readonly Tool[]
+): string {
+  const users =
+    others === 1 ? "1 other operation uses" : `${others} other operations use`
+  return `Replaces ${entryText(entry, library)}, which ${users}.`
 }
