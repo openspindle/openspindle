@@ -1,34 +1,6 @@
 import { formatMillimetres } from "../../../geometry/millimetres"
-import type { AutoScanSpecs } from "../../../auto-scan/params"
 import type { OutlineTrace } from "../../../probing/probe"
-import { CLEARANCE_Z, MACHINE_Z } from "./travel"
-
-/**
- * The defaults are those of the firmware's own margin scan on the Z1: its configured clearance Z
- * (`coordinate.clearance_z`) and trace speed (`atc.margin_rate_mm_m`). The trace stays within
- * the Z the machine moves in; the feeds are application limits. Neither is a clearance check.
- */
-const TRACE_PARAMETERS: AutoScanSpecs = {
-  travelZ: {
-    label: "Machine Z",
-    axis: "Z",
-    unit: "mm",
-    default: CLEARANCE_Z,
-    min: MACHINE_Z.min,
-    max: MACHINE_Z.max,
-    step: 1,
-    description: `Absolute machine Z the probe traces at, clear of the stock and fixtures. Makera configures the Z1's clearance at ${CLEARANCE_Z}.`,
-  },
-  feed: {
-    label: "Trace feed",
-    unit: "mm/min",
-    default: 1000,
-    min: 100,
-    max: 3000,
-    step: 100,
-    description: "How fast the probe's laser follows the outline.",
-  },
-}
+import { TRACE_PARAMETERS } from "../probing-nc"
 
 const INTRODUCTION = [
   "; Makera wired Probe 2.0 - auto-scan",

@@ -1,7 +1,6 @@
 import { formatMillimetres } from "../../../geometry/millimetres"
 import type {
   AutoZHeightField,
-  AutoZHeightSpecs,
   AutoZHeightParams,
 } from "../../../auto-z-height/params"
 import type { XY } from "../../../geometry/frame"
@@ -14,49 +13,10 @@ import type {
   ProbeTouch,
 } from "../../../probing/preview"
 import type { GCodeProgram } from "@/domain/nc/gcode"
+import { TOUCH_OFF_MOTION, TOUCH_PARAMETERS } from "../probing-nc"
 import { FIRMWARE_ROUTINE, GRID, TOUCH_CODES } from "./blocks"
 import { scanBlocks, travelTarget } from "./scan"
 import { anchorTravel } from "./travel"
-
-/**
- * Application limits, not a clearance check. The default travel is the one the firmware's own
- * Z probe uses on the Z1 (`coordinate.toolrack_z`): a probe change ends at the firmware's
- * clearance Z near the top of travel, and the search has to reach the stock from there.
- */
-const TOUCH_PARAMETERS: AutoZHeightSpecs = {
-  probeTravel: {
-    label: "Probe travel",
-    axis: "Z",
-    unit: "mm",
-    default: 108,
-    min: 1,
-    max: 150,
-    step: 1,
-    description:
-      "How far the probe searches down before the machine alarms. After a probe change it starts near the top of Z travel. The machine's own Z probe, run from a stored anchor with the work origin kept relative to one, searches to its tool rack Z instead.",
-  },
-  clearance: {
-    label: "Clearance height",
-    axis: "Z",
-    unit: "mm",
-    default: 5,
-    min: 0.5,
-    max: 50,
-    step: 0.5,
-    description: "Lift above the probed surface once work Z is set.",
-  },
-}
-
-/**
- * The supplied Z1 configuration's probe speeds (mm/min) and back-off (mm) between the fast and
- * the slow touch: `atc.probe.fast_rate_mm_m`, `slow_rate_mm_m` and `retract_mm`, as the
- * firmware's own Z probe uses them.
- */
-const TOUCH_OFF_MOTION = {
-  fastFeed: 500,
-  slowFeed: 100,
-  backOff: 1,
-} as const
 
 type Touch = Pick<AutoZHeightParams, AutoZHeightField>
 
