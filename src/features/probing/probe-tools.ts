@@ -41,7 +41,7 @@ export function replacedEntry(
   )
 }
 
-/** "Makera Wired Probe 2.0 in T0": a table entry as choosing a probe that replaces it names it. */
+/** "Makera Wired Probe 2.0 in T0": the tool a table entry holds, and its number. */
 export function entryText(
   entry: PlateTool & { readonly number: number },
   library: readonly Tool[]
@@ -50,14 +50,6 @@ export function entryText(
     library.find((tool) => tool.id === entry.toolId)?.name ??
     "a tool missing from the library"
   return `${name} in T${entry.number}`
-}
-
-/** "Replaces Makera Wired Probe 2.0 in T0.": what choosing a probe does to the plate's table. */
-export function replacesText(
-  entry: PlateTool & { readonly number: number },
-  library: readonly Tool[]
-): string {
-  return `Replaces ${entryText(entry, library)}.`
 }
 
 /** The number a probing operation selects a probe by: where the machine needs it, else its own. */

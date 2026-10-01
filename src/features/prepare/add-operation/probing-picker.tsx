@@ -19,10 +19,10 @@ import type { ProbeProfile, Tool } from "@/domain/tools/tool"
 import { isProbe } from "@/domain/tools/tool-table"
 import { probingIcon } from "@/features/plugins/operation-icon"
 import {
+  entryText,
   heldEntry,
   profileText,
   replacedEntry,
-  replacesText,
 } from "@/features/probing/probe-tools"
 import { AppDialog } from "@/features/shell/app-dialog"
 import { openDialog } from "@/features/shell/dialogs"
@@ -79,8 +79,9 @@ function probeReason(
 }
 
 /**
- * A library probe as the picker shows it: what it senses and carries, the number the plate's
- * table holds it in, and the probe it would replace there. Without `onSelect`, it only shows.
+ * A library probe as the picker shows it: what it senses and carries and the tool it would
+ * replace in the plate's table, and the number the table holds it in. Without `onSelect`, it only
+ * shows.
  */
 function ProbeChoice({
   tool,
@@ -100,22 +101,22 @@ function ProbeChoice({
   const profile = probeProfile(tool)
   const reason = probeReason(profile, kit, machine)
   const held = heldEntry(plate, tool)
-  const replaced = replacedEntry(plate, tool, machine)
+  const replaced = reason === null && replacedEntry(plate, tool, machine)
+  const senses = profile ? profileText(profile) : "Profile unknown"
   return (
-    <div className="flex flex-col gap-1">
-      <Unavailable label={tool.name} reason={reason}>
-        <ToolCard
-          tool={tool}
-          details={profile ? profileText(profile) : "Profile unknown"}
-          slotLabel={held && `In T${held.number}`}
-          disabled={reason !== null}
-          onClick={onSelect}
-        />
-      </Unavailable>
-      {replaced && reason === null && (
-        <FieldDescription>{replacesText(replaced, library)}</FieldDescription>
-      )}
-    </div>
+    <Unavailable label={tool.name} reason={reason}>
+      <ToolCard
+        tool={tool}
+        details={
+          replaced
+            ? `${senses} · replaces ${entryText(replaced, library)}`
+            : senses
+        }
+        slotLabel={held && `In T${held.number}`}
+        disabled={reason !== null}
+        onClick={onSelect}
+      />
+    </Unavailable>
   )
 }
 
