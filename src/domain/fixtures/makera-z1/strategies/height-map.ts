@@ -150,7 +150,7 @@ export const HEIGHT_MAP: ProbingStrategy<"grid", GridParams, GridSpecs> = {
   task: "grid",
   label: "Height map (Z1 firmware)",
   description:
-    "Probe the stock surface; the job pauses to review the height map.",
+    "Probe a height grid on the stock surface; the machine compensates later cuts for it.",
   accepts: ({ touch }) => touch === "z",
   parameters: () => GRID_PARAMETERS,
   defaults: plateGridParams,
