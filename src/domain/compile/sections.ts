@@ -355,7 +355,7 @@ export function buildProgramSections(
       const segmentStart = lowerSegment(line)
       push(
         "probe",
-        "Auto-level probing",
+        "Height map probing",
         line,
         line,
         activeTool,
