@@ -7,7 +7,7 @@ import type {
   DatagramListener,
   MachinePorts,
   TcpConnector,
-} from "../../../src/machine/core/ports.ts"
+} from "../../src/machine/core/ports.ts"
 
 const clock: Clock = {
   now: () => Date.now(),

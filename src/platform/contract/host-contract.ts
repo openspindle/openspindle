@@ -9,7 +9,6 @@ import {
 } from "./files"
 import { diagnosticsEvents, diagnosticsMethods } from "./diagnostics"
 import { pcbMethods } from "./pcb"
-import { machineEvents, machineMethods } from "./machine-rpc"
 import { MenuCommandSchema } from "./menu"
 import { modelMethods } from "./models"
 import { simulatorMethods } from "./simulator"
@@ -17,7 +16,7 @@ import { storageMethods } from "./storage"
 import { windowMethods } from "./window"
 import { fusionEvents, fusionMethods } from "./fusion"
 
-/** Everything the Electron main process serves to the renderer. */
+/** Everything the Electron main process serves to the renderer; the machine has its own process. */
 export const hostContract = defineContract({
   methods: {
     "files.open": {
@@ -31,7 +30,6 @@ export const hostContract = defineContract({
       timeoutMs: 0,
     },
     ...pcbMethods,
-    ...machineMethods,
     ...storageMethods,
     ...modelMethods,
     ...windowMethods,
@@ -40,7 +38,6 @@ export const hostContract = defineContract({
     ...simulatorMethods,
   },
   events: {
-    ...machineEvents,
     ...diagnosticsEvents,
     ...fusionEvents,
     "menu.command": { params: z.undefined(), data: MenuCommandSchema },

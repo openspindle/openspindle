@@ -1,6 +1,6 @@
 # Device controls
 
-One module owns the machine: `MachineController` in `src/machine/core`, hosted in the Electron main process. The renderer and the native menu reach it only through a `MachineGateway` for their principal. Requests are the closed `MachineCommand` union (Zod-validated at the RPC boundary and again in the controller), plus Run, reads, writing the stored anchors or firmware configuration, a line typed in the [console](#protocol-trace-and-console) and Stop.
+One module owns the machine: `MachineController` in `src/machine/core`, hosted in the machine process, an Electron utility process of its own ([architecture.md](architecture.md#the-machine)). The renderer and the native menu reach it only through a `MachineGateway` for their principal, each over its own port. Requests are the closed `MachineCommand` union (Zod-validated at the RPC boundary and again in the controller), plus Run, reads, writing the stored anchors or firmware configuration, a line typed in the [console](#protocol-trace-and-console) and Stop.
 
 ## Admission and availability
 
@@ -50,7 +50,7 @@ The **Accessories** card starts with **Beep** and **Follow spindle**, followed b
 
 **Reset** (Device, after a confirmation) sends the console command `reset`, which reboots the controller three seconds later ("Rebooting machine in 3 seconds..."). The connection does not outlive a reboot, so the session ends right away and the controller connects to the same device again: first after five seconds, then every three, for up to 90 seconds. Meanwhile `snapshot.connection.restarting` is set and failed attempts are not reported as errors; connecting or disconnecting by hand ends the wait.
 
-Stop preempts everything: it cancels an in-flight transfer (the B5 frame, see [Transaction](device-jobs.md#transaction)), aborts the current operation and every deferred read, then sends the halt and waits for Alarm. Machine › Stop (⌘.) goes straight to the controller in the main process, so it works even if the renderer is unresponsive. An unconfirmed Stop sets a lockout; only Stop is admitted until the machine is reconnected or confirms a Stop. That holds for Reset too, whose reconnection would otherwise clear the lockout before anyone checked the machine. Stop does not replace the physical emergency stop.
+Stop preempts everything: it cancels an in-flight transfer (the B5 frame, see [Transaction](device-jobs.md#transaction)), aborts the current operation and every deferred read, then sends the halt and waits for Alarm. Machine › Stop (⌘.) goes from the main process straight to the controller in the machine process, over the main process's own port, so it works even if the renderer is unresponsive; and the controller's loop does nothing but the machine's work, so nothing else delays it. An unconfirmed Stop sets a lockout; only Stop is admitted until the machine is reconnected or confirms a Stop. That holds for Reset too, whose reconnection would otherwise clear the lockout before anyone checked the machine. Stop does not replace the physical emergency stop.
 
 ## Status
 
@@ -60,13 +60,13 @@ The firmware reports the work position as the machine position less the work off
 
 Every snapshot the controller builds is checked against the machine contract (`MachineSnapshotSchema`). The renderer drops a snapshot the contract refuses, and so every later one while the value stays, which would freeze the UI. So a refused value is left out instead, by the nearest part of it the contract lets go: a nullable value becomes null, a list entry is dropped. The app's log gets the contract's issues once for each run of such snapshots.
 
-A device connected by address takes the name announced at that address and port, so two simulators on this computer keep their own names: unless it was heard already, the controller listens up to three seconds for it before opening the connection, and **Disconnect** meanwhile cancels the connect. While connected, the app prevents system sleep. The last device the app connected to is recorded in its data folder (`last-device.json`), and each launch tries once to connect to it again; a device that is off or unreachable fails within the eight-second handshake.
+A device connected by address takes the name announced at that address and port, so two simulators on this computer keep their own names: unless it was heard already, the controller listens up to three seconds for it before opening the connection, and **Disconnect** meanwhile cancels the connect. While connected, the app prevents system sleep. The last device the app connected to is recorded in its data folder (`last-device.json`), and each launch tries once to connect to it again; a device that is off or unreachable fails within the eight-second handshake. A machine process started again after it stopped does not: its snapshots say why the connection ended, and the user connects again.
 
 Disconnecting never stops a running program, and the app's Stop goes with the connection. So while a job is active (from Run until it ends), quitting asks first, and the controller refuses to disconnect, or to connect to another device, with `confirmation-required` unless the request says the user confirmed it (`confirmed: true`). The device picker then asks, in the controller's words, and **Disconnect** or **Connect** sends the request again, confirmed. Connecting to the device the job runs on changes nothing and asks nothing.
 
 ## Camera
 
-The main process opens `ws://<host>:82/ws_video`, sends `start_stream` and forwards binary JPEG frames (at most 4 MiB, SOI/EOI checked, 8 s connect and 15 s frame timeouts) to subscribers. The renderer opens no sockets of its own.
+The machine process opens `ws://<host>:82/ws_video`, sends `start_stream` and forwards binary JPEG frames (at most 4 MiB, SOI/EOI checked, 8 s connect and 15 s frame timeouts) to subscribers, over the page's own port to it. The renderer opens no sockets of its own.
 
 ## Firmware configuration
 
@@ -80,7 +80,7 @@ The Z1 simulator provides a representative configuration file independent of rea
 
 ## Protocol trace and console
 
-The controller keeps the recent exchange with the device in a bounded ring (about 20,000 entries across connections): every frame sent, every status report and reply line with its classification, file transfer blocks summarised by size only, and notes for connecting, disconnecting, Stop and job phase changes. **Help › Export Protocol Trace…** saves it as text from the main process, so it works even when the window is unresponsive. It is the evidence to attach when a job's completion, a pause or a verification behaves differently on a real machine than described here.
+The controller keeps the recent exchange with the device in a bounded ring (about 20,000 entries across connections): every frame sent, every status report and reply line with its classification, file transfer blocks summarised by size only, and notes for connecting, disconnecting, Stop and job phase changes. **Help › Export Protocol Trace…** has the main process ask the machine process for it and save it as text, so it works even when the window is unresponsive. It is the evidence to attach when a job's completion, a pause or a verification behaves differently on a real machine than described here.
 
 The part people read is the **console**, under the G-code on the Job tab: the commands the app sent (the halt byte reads `^X`), the machine's replies and the app's notes, without status polling, transfer blocks or the upload's checksum. The controller keeps its last 1,000 entries across connections and pushes new ones to the app renderer (`machine.console`: the backlog on subscribing, then batches). Reported failures (errors, alarms, halts, refusals) show in red and acknowledgements muted. **Clear** empties the view of what it shows so far; the controller keeps the entries, and the protocol trace has them.
 

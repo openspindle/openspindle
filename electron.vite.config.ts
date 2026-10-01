@@ -62,7 +62,15 @@ export default defineConfig(({ command }) => {
         // Bundle everything so the packaged app ships only out/**.
         externalizeDeps: false,
         sourcemap,
-        rollupOptions: { input: { index: path("./electron/main/index.ts") } },
+        // The machine process and its program thread start from their own files beside the
+        // main process's (electron/main/machine, electron/machine/program-worker.ts).
+        rollupOptions: {
+          input: {
+            index: path("./electron/main/index.ts"),
+            machine: path("./electron/machine/index.ts"),
+            "program-thread": path("./electron/machine/program-thread.ts"),
+          },
+        },
       },
     },
     preload: {

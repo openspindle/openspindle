@@ -1,13 +1,13 @@
 import { readFile } from "node:fs/promises"
 import path from "node:path"
 import { z } from "zod"
-import { ConnectTargetSchema } from "../../../src/machine/contract/index.ts"
+import { ConnectTargetSchema } from "../../src/machine/contract/index.ts"
 import type {
   ConnectTarget,
   ConnectedDevice,
-} from "../../../src/machine/contract/index.ts"
-import { log } from "../diagnostics/log.ts"
-import { writeFileAtomic } from "../services/atomic-write.ts"
+} from "../../src/machine/contract/index.ts"
+import { log } from "./log.ts"
+import { writeFileAtomic } from "../main/services/atomic-write.ts"
 
 /** Read whatever version wrote the file; only whether `device` itself still parses matters. */
 const StoredSchema = z.object({

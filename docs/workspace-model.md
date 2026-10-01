@@ -89,7 +89,7 @@ One runner, `runRules(rules, subjects, { settings, level, machine, group })`, te
 
 What a failure becomes is each view's own:
 
-- **Admission** runs the command rules on every request to the machine, in the main process: none failing allows it, an error refuses it and a warning defers it, with the rule's problem as the reason ([device-controls.md](device-controls.md)). They give `snapshot.availability` too; the renderer never runs them.
+- **Admission** runs the command rules on every request to the machine, in the machine process: none failing allows it, an error refuses it and a warning defers it, with the rule's problem as the reason ([device-controls.md](device-controls.md)). They give `snapshot.availability` too; the renderer never runs them.
 - **The run checklist** (`RUN_CHECKLIST`, `src/features/job/run-checklist.ts`) is rows over the run rules' failures, the plate's diagnostics, the design rule check, the dialect's check and `availability.run`.
 - **Diagnostics** are the tool, operation and run rules' failures ([above](#diagnostics)).
 - **Design rule results** are the move and program rules' failures (below).

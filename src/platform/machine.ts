@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react"
 import {
   skipToken,
   useMutation,
@@ -64,18 +64,25 @@ const isSnapshot = (value: unknown): value is MachineSnapshot =>
   "revision" in value &&
   "availability" in value
 
-/** Mounted once: mirrors the main process's pushed machine snapshots into the query cache. */
+/** The machine process's host: another one once the process restarted. */
+export function useMachineHost(): MachineHost {
+  const link = useHost().machine
+  return useSyncExternalStore(link.subscribe, link.current)
+}
+
+/** Mounted once: mirrors the machine process's pushed snapshots into the query cache. */
 export function useMachineSync() {
-  const machine = useHost().machine
+  const machine = useMachineHost()
   const client = useQueryClient()
-  useEffect(
-    () => machine.subscribe((snapshot) => storeSnapshot(client, snapshot)),
-    [machine, client]
-  )
+  useEffect(() => {
+    // Another machine process counts its snapshots' revisions from the beginning.
+    client.setQueryData(machineKeys.snapshot, INITIAL_SNAPSHOT)
+    return machine.subscribe((snapshot) => storeSnapshot(client, snapshot))
+  }, [machine, client])
 }
 
 export function useMachineSnapshot(): MachineSnapshot {
-  const machine = useHost().machine
+  const machine = useMachineHost()
   const { data } = useQuery({
     queryKey: machineKeys.snapshot,
     queryFn: () => machine.snapshot(),
@@ -105,7 +112,7 @@ export function useMachineConsole(): {
   readonly entries: ConsoleEntry[]
   readonly clear: () => void
 } {
-  const machine = useHost().machine
+  const machine = useMachineHost()
   const cleared = useSelector(consoleCleared)
   const [entries, setEntries] = useState<ConsoleEntry[]>([])
   useEffect(() => {
@@ -138,7 +145,7 @@ function useMachineMutation<TVariables, TResult>(
   name: string,
   run: (machine: MachineHost, variables: TVariables) => Promise<TResult>
 ) {
-  const machine = useHost().machine
+  const machine = useMachineHost()
   const client = useQueryClient()
   return useMutation({
     mutationKey: ["machine", name],
@@ -262,7 +269,7 @@ function fingerprint(text: string): string {
  * never prepares that program again; a new check drops the checks no view shows.
  */
 export function useProgramCheck(source: string | null) {
-  const machine = useHost().machine
+  const machine = useMachineHost()
   const client = useQueryClient()
   const key = useMemo(
     () => (source === null ? null : fingerprint(source)),

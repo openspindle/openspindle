@@ -1,67 +1,102 @@
-import { dialog, powerSaveBlocker } from "electron"
-import type { BrowserWindow } from "electron"
-import { isJobActive } from "../../../src/machine/contract/index.ts"
+import {
+  MessageChannelMain,
+  dialog,
+  powerSaveBlocker,
+  utilityProcess,
+} from "electron"
+import type { BrowserWindow, MessagePortMain, UtilityProcess } from "electron"
+import { fileURLToPath } from "node:url"
+import { createEndpoint } from "@openspindle/rpc"
+import type { EmptyContract, Peer } from "@openspindle/rpc"
+import {
+  disconnectedSnapshot,
+  isJobActive,
+} from "../../../src/machine/contract/index.ts"
 import type { MachineSnapshot } from "../../../src/machine/contract/index.ts"
-import { MachineController } from "../../../src/machine/core/controller.ts"
-import { MachineGateway } from "../../../src/machine/core/gateway.ts"
-import { formatTrace } from "../../../src/machine/core/protocol-trace.ts"
+import type { Principal } from "../../../src/machine/core/gateway.ts"
+import { machineContract } from "../../../src/platform/contract/machine-rpc"
+import type { MachineContract } from "../../../src/platform/contract/machine-rpc"
+import type {
+  ErrorRecord,
+  FromMachine,
+  ToMachine,
+} from "../../machine/protocol.ts"
 import { showErrorMessage } from "../diagnostics/diagnostics.ts"
+import type { ErrorReports } from "../diagnostics/error-reports.ts"
 import { log } from "../diagnostics/log.ts"
+import { portMainTransport } from "../rpc/port-main-transport.ts"
 import type { FileService } from "../services/file-service.ts"
-import type { LastDevice } from "./last-device.ts"
-import { nodeMachinePorts } from "./node-ports.ts"
+
+/** The machine process's entry, built beside the main process's (electron.vite.config.ts). */
+const MACHINE_PROCESS = fileURLToPath(new URL("./machine.js", import.meta.url))
+
+/** A machine process that stops this often within the window is not started again. */
+const RESTARTS = 3
+const RESTART_WINDOW_MS = 60_000
+/** How long quitting waits for the machine process to close the connection and end. */
+const QUIT_MS = 1000
+
+export type MachineHostOptions = {
+  readonly userData: string
+  readonly reports: ErrorReports
+  /** Each snapshot; a disconnected one when the machine process stopped. */
+  readonly onChange: (snapshot: MachineSnapshot) => void
+  /** The machine process started again: the window needs a port to the new one. */
+  readonly onRestart: () => void
+}
+
+const rebuilt = ({ name, message, stack }: ErrorRecord): Error => {
+  const error = new Error(message)
+  error.name = name
+  if (stack) error.stack = stack
+  return error
+}
 
 /**
- * The machine domain hosted in the main process: one controller, a gateway per
- * principal, and the desktop duties around it (no app suspension while connected, and the
- * last used device remembered for the next launch).
+ * The machine as the main process hosts it: a utility process of its own (electron/machine) owns
+ * the connection, so its polling, watchdog and Stop never wait for the main process. It starts
+ * with the app, and again when it stops unexpectedly. The main process keeps the desktop duties
+ * around it: no app suspension while connected, the menu's Stop, which it sends over its own
+ * port as the system principal, the quit prompt and the protocol trace's export.
  */
 export class MachineHost {
-  /** What the core cannot tell the user, such as a snapshot it had to repair, goes to the log. */
-  readonly controller = new MachineController({ ...nodeMachinePorts, log })
-  /** The app renderer. */
-  readonly app = new MachineGateway(this.controller, { kind: "app" })
-  /** Native menus: Stop works even when the renderer is unresponsive. */
-  readonly system = new MachineGateway(this.controller, { kind: "system" })
+  private child: UtilityProcess | null = null
+  /** The main process's own port to the machine process: the system principal. */
+  private system: Peer<MachineContract> | null = null
+  private latest: MachineSnapshot = disconnectedSnapshot()
   private blocker: number | null = null
-  private readonly lastDevice: LastDevice
-  private readonly unsubscribe: () => void
-  /** What the log last recorded of the connection and the job; a launch starts disconnected. */
-  private logged = { connection: "Machine disconnected", job: "" }
+  private exits: number[] = []
+  private quitting = false
+  private readonly options: MachineHostOptions
 
-  constructor(
-    onChange: (snapshot: MachineSnapshot) => void,
-    lastDevice: LastDevice
-  ) {
-    this.lastDevice = lastDevice
-    this.unsubscribe = this.controller.subscribe((snapshot) => {
-      this.logChanges(snapshot)
-      const { status, device } = snapshot.connection
-      this.keepAwake(status === "connected")
-      if (status === "connected" && device) lastDevice.remember(device)
-      onChange(snapshot)
-    })
+  constructor(options: MachineHostOptions) {
+    this.options = options
   }
 
-  /**
-   * At launch: one attempt to connect to the device the app last connected to. A device that
-   * is off or unreachable fails within the handshake timeout, and the snapshot says why.
-   */
-  async reconnect() {
-    const target = await this.lastDevice.read()
-    if (!target) return
-    // The app's own connection, restored for it: the app principal connects.
-    await this.app.connect(target).catch(() => undefined)
+  /** Starts the machine process, which connects to the last used device. */
+  start() {
+    this.fork({ reconnect: true, error: null })
+  }
+
+  /** A port for the app renderer to the machine process; null when it does not run. */
+  connectApp(): MessagePortMain | null {
+    return this.child ? this.connect(this.child, "app") : null
   }
 
   /** Quitting disconnects but never stops the machine, so a running job needs consent. */
   get jobRunning(): boolean {
-    return isJobActive(this.controller.snapshot().job)
+    return isJobActive(this.latest.job)
+  }
+
+  /** Machine › Stop in the menu: works however busy or unresponsive the window is. */
+  async stop(): Promise<void> {
+    if (!this.system) throw new Error("The machine process is not running.")
+    await this.system.call("machine.stop", undefined)
   }
 
   /**
    * Whether to quit with a job running. It asks in a sheet on the window, which leaves the
-   * main process, and the connection's polling and Stop on it, running.
+   * main process running, as other questions do; the machine process runs on regardless.
    */
   async confirmQuit(window: BrowserWindow): Promise<boolean> {
     if (!this.jobRunning) return true
@@ -81,10 +116,11 @@ export class MachineHost {
   async exportTrace(files: FileService) {
     const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-")
     try {
+      if (!this.system) throw new Error("The machine process is not running.")
       await files.save({
         kind: "trace",
         suggestedName: `openspindle-protocol-${stamp}.txt`,
-        contents: formatTrace(this.controller.protocolTrace()),
+        contents: await this.system.call("machine.protocolTrace", undefined),
       })
     } catch (error) {
       showErrorMessage(
@@ -94,32 +130,111 @@ export class MachineHost {
     }
   }
 
+  /** As the app quits: the machine process closes the connection and ends, or is ended. */
+  async close(): Promise<void> {
+    this.quitting = true
+    const child = this.child
+    if (!child) return
+    await new Promise<void>((resolve) => {
+      const timer = setTimeout(resolve, QUIT_MS)
+      child.once("exit", () => {
+        clearTimeout(timer)
+        resolve()
+      })
+      this.send(child, { kind: "quit" })
+    })
+  }
+
   dispose() {
-    this.unsubscribe()
-    this.controller.dispose()
+    this.quitting = true
+    this.system?.close()
+    this.system = null
+    this.child?.kill()
+    this.child = null
     this.keepAwake(false)
   }
 
-  /** Records the connection's and the job's changes in the app's log. */
-  private logChanges({ connection, job }: MachineSnapshot) {
-    const { status, device, error } = connection
-    const place = device
-      ? ` ${device.name} (${device.model}) at ${device.host}:${device.port}`
-      : ""
-    const connectionLine = `Machine ${status}${place}${error ? `: ${error}` : ""}`
-    if (connectionLine !== this.logged.connection) {
-      if (error) log.warn(connectionLine)
-      else log.info(connectionLine)
-      this.logged.connection = connectionLine
-    }
-    const jobLine = job
-      ? `Job ${job.id} "${job.name}" ${job.phase}${job.error ? `: ${job.error}` : ""}`
-      : ""
-    if (jobLine && jobLine !== this.logged.job) {
-      if (job?.error) log.warn(jobLine)
-      else log.info(jobLine)
-    }
-    this.logged.job = jobLine
+  private fork(start: { reconnect: boolean; error: string | null }) {
+    const child = utilityProcess.fork(MACHINE_PROCESS, [], {
+      serviceName: "OpenSpindle Machine",
+    })
+    this.child = child
+    child.on("message", (message: FromMachine) => this.receive(message))
+    child.on("exit", (code) => this.exited(child, code))
+    this.send(child, {
+      kind: "start",
+      userData: this.options.userData,
+      ...start,
+    })
+    const system = createEndpoint<EmptyContract, MachineContract>({
+      transport: portMainTransport(this.connect(child, "system")),
+      remote: machineContract,
+      log,
+    })
+    this.system = system
+    system.subscribe("machine.changed", undefined, (snapshot) =>
+      this.changed(snapshot)
+    )
+  }
+
+  private connect(
+    child: UtilityProcess,
+    principal: Principal["kind"]
+  ): MessagePortMain {
+    const { port1, port2 } = new MessageChannelMain()
+    this.send(child, { kind: "connect", principal }, [port1])
+    return port2
+  }
+
+  private send(
+    child: UtilityProcess,
+    message: ToMachine,
+    ports: MessagePortMain[] = []
+  ) {
+    child.postMessage(message, ports)
+  }
+
+  private receive(message: FromMachine) {
+    if (message.kind === "log")
+      log.write(message.level, "machine", message.message, message.detail)
+    else
+      this.options.reports.processError(
+        "machine",
+        rebuilt(message.error),
+        message.mechanism
+      )
+  }
+
+  private changed(snapshot: MachineSnapshot) {
+    this.latest = snapshot
+    this.keepAwake(snapshot.connection.status === "connected")
+    this.options.onChange(snapshot)
+  }
+
+  /**
+   * The machine process ended. Unless the app quits, that is unexpected: the connection ended
+   * with it, so a new process starts and its snapshots say why, unless it keeps stopping.
+   */
+  private exited(child: UtilityProcess, code: number) {
+    if (this.child !== child) return
+    this.child = null
+    this.system?.close()
+    this.system = null
+    if (this.quitting) return
+    const now = Date.now()
+    this.exits = [
+      ...this.exits.filter((time) => now - time < RESTART_WINDOW_MS),
+      now,
+    ]
+    const again = this.exits.length <= RESTARTS
+    const error = again
+      ? `OpenSpindle's machine process stopped (exit code ${code}), which ended the connection. A running program keeps running on the machine: connect again to follow or stop it.`
+      : `OpenSpindle's machine process stopped ${this.exits.length} times within a minute (exit code ${code}) and was not started again. A running program keeps running on the machine: restart OpenSpindle to connect again.`
+    this.options.reports.processError("machine", new Error(error), "onexit")
+    this.changed(disconnectedSnapshot(0, "Connect a device first.", error))
+    if (!again) return
+    this.fork({ reconnect: false, error })
+    this.options.onRestart()
   }
 
   private keepAwake(connected: boolean) {

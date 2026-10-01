@@ -1,7 +1,7 @@
 import { RpcError } from "@openspindle/rpc"
 import type { RpcErrorCode } from "@openspindle/rpc"
-import { MachineError } from "../../../src/machine/core/errors.ts"
-import type { MachineErrorCode } from "../../../src/machine/core/errors.ts"
+import { MachineError } from "../../src/machine/core/errors.ts"
+import type { MachineErrorCode } from "../../src/machine/core/errors.ts"
 
 const MACHINE_ERROR_CODES: Record<MachineErrorCode, RpcErrorCode> = {
   "not-connected": "UNAVAILABLE",

@@ -1,5 +1,4 @@
 import type { Handlers } from "@openspindle/rpc"
-import type { MachineGateway } from "../../../src/machine/core/gateway.ts"
 import type { HostContract } from "../../../src/platform/contract/host-contract"
 import type { FileService } from "../services/file-service"
 import type { FusionService } from "../services/fusion-service"
@@ -12,14 +11,12 @@ import type { UnsavedChanges } from "../services/unsaved-changes"
 import type { PcbService } from "../pcb/service"
 import type { Diagnostics } from "../diagnostics/diagnostics"
 import type { SimulatorService } from "../simulator/simulator-service"
-import { machine } from "./machine-errors"
 
 export type HostServices = {
   readonly files: FileService
   readonly fusion: FusionService
   readonly menu: MenuBus
   readonly openedFiles: OpenedFileBus
-  readonly machine: MachineGateway
   readonly storage: StorageService
   readonly models: ModelStore
   readonly pcb: PcbService
@@ -43,7 +40,6 @@ export function createHostHandlers(
     unsaved,
     diagnostics,
   } = services
-  const gateway = services.machine
   return {
     methods: {
       "files.open": ({ kind }) => files.open(kind),
@@ -56,31 +52,6 @@ export function createHostHandlers(
       "fusion.list": (_params, { signal }) => fusion.list(signal),
       "fusion.read": ({ id }, { signal }) => fusion.read(id, signal),
       "fusion.disconnect": () => fusion.disconnect(),
-      "machine.snapshot": () => machine(() => gateway.snapshot()),
-      "machine.discover": () => machine(() => gateway.discover()),
-      "machine.connect": (request) => machine(() => gateway.connect(request)),
-      "machine.disconnect": (request) =>
-        machine(() => gateway.disconnect(request)),
-      "machine.execute": (command, { signal }) =>
-        machine(() => gateway.execute(command, signal)),
-      "machine.simulateBed": (bed) => machine(() => gateway.simulateBed(bed)),
-      "machine.sendConsoleLine": ({ line }) =>
-        machine(() => gateway.sendConsoleLine(line)),
-      "machine.stop": () => machine(() => gateway.stop()),
-      "machine.reset": () => machine(() => gateway.reset()),
-      "machine.prepare": (input) => machine(() => gateway.prepare(input)),
-      "machine.run": (request) => machine(() => gateway.run(request)),
-      "machine.dismissJob": () => machine(() => gateway.dismissJob()),
-      "machine.readAnchors": (_params, { signal }) =>
-        machine(() => gateway.readAnchors(signal)),
-      "machine.writeAnchors": (request) =>
-        machine(() => gateway.writeAnchors(request)),
-      "machine.readConfiguration": (_params, { signal }) =>
-        machine(() => gateway.readConfiguration(signal)),
-      "machine.writeConfiguration": (request) =>
-        machine(() => gateway.writeConfiguration(request)),
-      "machine.readHeightMap": (_params, { signal }) =>
-        machine(() => gateway.readHeightMap(signal)),
       "storage.read": ({ key }) => storage.read(key),
       "storage.write": ({ key, value }) => storage.write(key, value),
       "storage.backup": ({ key }) => storage.backup(key),
@@ -115,9 +86,6 @@ export function createHostHandlers(
     },
     events: {
       "fusion.changed": (_params, emit) => fusion.subscribe(emit),
-      "machine.changed": (_params, emit) => gateway.subscribe(emit),
-      "machine.camera": (_params, emit) => gateway.watchCamera(emit),
-      "machine.console": (_params, emit) => gateway.watchConsole(emit),
       "menu.command": (_params, emit) => menu.subscribe(emit),
       "files.opened": (_params, emit) => openedFiles.subscribe(emit),
       "diagnostics.mainError": (_params, emit) =>

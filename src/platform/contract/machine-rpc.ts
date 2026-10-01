@@ -1,3 +1,4 @@
+import { defineContract } from "@openspindle/rpc"
 import { z } from "zod"
 import {
   AnchorConfigurationSchema,
@@ -34,7 +35,7 @@ export type CameraEvent = z.infer<typeof CameraEventSchema>
 
 const none = z.undefined()
 
-/** The machine surface the main process serves to the app renderer. */
+/** The machine surface the machine process serves to the app renderer and the main process. */
 export const machineMethods = {
   "machine.snapshot": {
     params: none,
@@ -128,6 +129,12 @@ export const machineMethods = {
     result: WriteAnchorsResultSchema,
     timeoutMs: 120_000,
   },
+  /** The recent exchange with the machine as text, for Help › Export Protocol Trace. */
+  "machine.protocolTrace": {
+    params: none,
+    result: z.string(),
+    timeoutMs: 15_000,
+  },
 } as const
 
 export const machineEvents = {
@@ -136,3 +143,13 @@ export const machineEvents = {
   /** The console's backlog first, then new entries in batches. */
   "machine.console": { params: none, data: z.array(ConsoleEntrySchema) },
 } as const
+
+/**
+ * Everything the machine process serves, on a port of its own per principal: the app renderer
+ * and the main process (the system menu) each reach it directly.
+ */
+export const machineContract = defineContract({
+  methods: machineMethods,
+  events: machineEvents,
+})
+export type MachineContract = typeof machineContract

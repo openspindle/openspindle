@@ -1,12 +1,14 @@
 import { createEndpoint } from "@openspindle/rpc"
 import type { EmptyContract, EndpointLog } from "@openspindle/rpc"
 import { messagePortTransport } from "@openspindle/rpc/message-port"
-import { RPC_PORT_MESSAGE } from "./contract/channels"
+import { RPC_PORT_MESSAGE, RPC_SERVICES } from "./contract/channels"
+import type { RpcService } from "./contract/channels"
 import { hostContract } from "./contract/host-contract"
 import type { HostContract } from "./contract/host-contract"
 import type { Host } from "./host"
+import { createMachineLink } from "./machine-link"
 
-/** Exposed by the preload script; it only asks the main process for an RPC port. */
+/** Exposed by the preload script; it only asks the main process for the page's RPC ports. */
 export type OpenSpindleBridge = { readonly connect: () => void }
 
 declare global {
@@ -15,24 +17,26 @@ declare global {
   }
 }
 
-/** The preload forwards the main-process port to this window; ignore frames and other senders. */
-function requestPort(bridge: OpenSpindleBridge): Promise<MessagePort> {
-  return new Promise((resolve) => {
-    const receive = (event: MessageEvent) => {
-      const data: unknown = event.data
-      if (
-        event.source !== window ||
-        !data ||
-        typeof data !== "object" ||
-        (data as { type?: unknown }).type !== RPC_PORT_MESSAGE ||
-        !event.ports[0]
-      )
-        return
-      window.removeEventListener("message", receive)
-      resolve(event.ports[0])
-    }
-    window.addEventListener("message", receive)
-    bridge.connect()
+/**
+ * The preload forwards each port it is given to this window, with the service at its other end;
+ * ignore frames and other senders. The machine process's ports come again after it restarted.
+ */
+function receivePorts(
+  onPort: (service: RpcService, port: MessagePort) => void
+) {
+  window.addEventListener("message", (event: MessageEvent) => {
+    const data: unknown = event.data
+    if (
+      event.source !== window ||
+      !data ||
+      typeof data !== "object" ||
+      (data as { type?: unknown }).type !== RPC_PORT_MESSAGE ||
+      !event.ports[0]
+    )
+      return
+    const service = (data as { service?: unknown }).service
+    const known = RPC_SERVICES.find((candidate) => candidate === service)
+    if (known) onPort(known, event.ports[0])
   })
 }
 
@@ -41,47 +45,21 @@ export async function connectElectronHost(
   bridge: OpenSpindleBridge,
   log: EndpointLog
 ): Promise<Host> {
-  const port = await requestPort(bridge)
+  const machine = createMachineLink(log)
+  const port = await new Promise<MessagePort>((resolve) => {
+    receivePorts((service, received) => {
+      if (service === "machine") machine.attach(received)
+      else resolve(received)
+    })
+    bridge.connect()
+  })
   const peer = createEndpoint<EmptyContract, HostContract>({
     transport: messagePortTransport(port),
     remote: hostContract,
     log,
   })
   return {
-    machine: {
-      snapshot: () => peer.call("machine.snapshot", undefined),
-      subscribe: (listener) =>
-        peer.subscribe("machine.changed", undefined, listener),
-      discover: () => peer.call("machine.discover", undefined),
-      connect: (request) => peer.call("machine.connect", request),
-      disconnect: (request) => peer.call("machine.disconnect", request),
-      execute: (command, signal) =>
-        peer.call("machine.execute", command, signal ? { signal } : {}),
-      simulateBed: (bed) => peer.call("machine.simulateBed", bed),
-      sendConsoleLine: (line) => peer.call("machine.sendConsoleLine", { line }),
-      stop: () => peer.call("machine.stop", undefined),
-      reset: () => peer.call("machine.reset", undefined),
-      prepare: (source) => peer.call("machine.prepare", { source }),
-      run: (request) => peer.call("machine.run", request),
-      dismissJob: () => peer.call("machine.dismissJob", undefined),
-      readAnchors: (signal) =>
-        peer.call("machine.readAnchors", undefined, signal ? { signal } : {}),
-      writeAnchors: (request) => peer.call("machine.writeAnchors", request),
-      readConfiguration: (signal) =>
-        peer.call(
-          "machine.readConfiguration",
-          undefined,
-          signal ? { signal } : {}
-        ),
-      writeConfiguration: (request) =>
-        peer.call("machine.writeConfiguration", request),
-      readHeightMap: (signal) =>
-        peer.call("machine.readHeightMap", undefined, signal ? { signal } : {}),
-      watchCamera: (listener) =>
-        peer.subscribe("machine.camera", undefined, listener),
-      watchConsole: (listener) =>
-        peer.subscribe("machine.console", undefined, listener),
-    },
+    machine,
     files: {
       open: (kind) => peer.call("files.open", { kind }),
       save: (request) => peer.call("files.save", request),

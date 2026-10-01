@@ -83,7 +83,7 @@ npm run dev      # the app, with the renderer's dev server
 npm run sim:z1   # another simulated Z1, with fault injection, on 127.0.0.1:2222
 ```
 
-The renderer updates while developing. Changes to Electron main, preload or the host RPC contract require a full app restart: save your project, quit normally, and run `npm run dev` again. Reloading the window alone keeps the old host and can cause an `Unknown method` error when the renderer calls a newly added method.
+The renderer updates while developing. Changes to Electron main, the machine process, preload or the host or machine RPC contracts require a full app restart: save your project, quit normally, and run `npm run dev` again. Reloading the window alone keeps the old host and can cause an `Unknown method` error when the renderer calls a newly added method.
 
 Before you open a pull request, `npm run typecheck`, `npm run lint`, `npm run check` (`npm run format` fixes it) and `npm run build` must pass. Say in the pull request how you checked your change, and for anything sent to the machine whether that was against the simulator, with a protocol trace or on a real machine.
 

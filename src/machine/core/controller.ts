@@ -36,7 +36,7 @@ import type {
   FirmwareConfiguration,
   WriteConfigurationResult,
 } from "../contract/index.ts"
-import { ProgramError } from "../firmware/adapter.ts"
+import { prepareResult } from "../firmware/adapter.ts"
 import type {
   CompletionUpdate,
   FirmwareAdapter,
@@ -137,6 +137,15 @@ function parse<TSchema extends z.ZodType>(
 const message = (error: unknown, fallback: string) =>
   error instanceof Error ? error.message : fallback
 
+export type ControllerOptions = {
+  readonly adapter?: FirmwareAdapter
+  /**
+   * Why there is no connection as this controller starts, which its snapshots report until the
+   * next connect: the machine process it replaces stopped.
+   */
+  readonly error?: string | null
+}
+
 const FAST_PHASES: ReadonlySet<JobState["phase"]> = new Set([
   "starting",
   "finishing",
@@ -173,10 +182,10 @@ export class MachineController {
     readonly program: PreparedProgram
     bedCleanBefore: boolean | null
   } | null = null
-  /** The programs prepared last, newest first, found by their source. */
+  /** The programs prepared last or being prepared, newest first, found by their source. */
   private preparedPrograms: {
     readonly source: string
-    readonly result: PrepareResult
+    readonly result: Promise<PrepareResult>
   }[] = []
   /** Disconnect counts up: a connect still looking up the device's name then gives up. */
   private disconnects = 0
@@ -199,12 +208,11 @@ export class MachineController {
   /** The latest snapshot left out values the contract refused; the log has the run's first. */
   private refusing = false
 
-  constructor(
-    ports: MachinePorts,
-    adapter: FirmwareAdapter = DEFAULT_FIRMWARE
-  ) {
+  constructor(ports: MachinePorts, options: ControllerOptions = {}) {
+    const adapter = options.adapter ?? DEFAULT_FIRMWARE
     this.ports = ports
     this.adapter = adapter
+    this.lastError = options.error ?? null
     this.discovery = new DiscoveryService(ports.udp, adapter, ports.clock)
     this.camera = new CameraFeed(ports.camera, ports.clock)
     this.trace = new ProtocolTrace(ports.clock)
@@ -519,51 +527,57 @@ export class MachineController {
   // ── Jobs ───────────────────────────────────────────────────────────────
 
   /** The normalized program this firmware would execute, or why it cannot. */
-  prepare(input: unknown): PrepareResult {
+  prepare(input: unknown): Promise<PrepareResult> {
     const { source } = parse(PrepareInputSchema, input)
     return this.preparedFor(source)
   }
 
   /**
-   * Prepares a source once. A long program takes the main process most of a second, which holds
-   * up status polling and Stop, so the last few results are kept by their source, and the
-   * running job's program is never prepared again while the job lasts.
+   * Prepares a source once, on the host's program preparer: a long program takes most of a
+   * second, which on this loop would hold up status polling and Stop. Callers asking while it
+   * prepares share it, the last few results are kept by their source, and the running job's
+   * program is never prepared again while the job lasts.
    */
-  private preparedFor(source: string): PrepareResult {
+  private preparedFor(source: string): Promise<PrepareResult> {
     if (this.running?.request.source === source)
-      return { ok: true, program: this.running.program }
+      return Promise.resolve({ ok: true, program: this.running.program })
     const kept = this.preparedPrograms.find((entry) => entry.source === source)
-    let result = kept?.result
-    if (!result) {
-      try {
-        result = { ok: true, program: this.adapter.prepareProgram(source) }
-      } catch (error) {
-        if (!(error instanceof ProgramError)) throw error
-        result = { ok: false, error: error.message, line: error.line }
-      }
-    }
+    const result = kept?.result ?? this.prepareProgram(source)
     this.preparedPrograms = [
       { source, result },
       ...this.preparedPrograms.filter((entry) => entry !== kept),
     ].slice(0, PREPARED_KEPT)
+    // Preparing that failed is not the program's answer: the next request tries again.
+    if (!kept)
+      result.catch(() => {
+        this.preparedPrograms = this.preparedPrograms.filter(
+          (entry) => entry.result !== result
+        )
+      })
     return result
+  }
+
+  private async prepareProgram(source: string): Promise<PrepareResult> {
+    const { programs } = this.ports
+    if (programs) return programs.prepare(this.adapter.id, source)
+    return prepareResult(this.adapter, source)
   }
 
   async run(input: unknown): Promise<MachineSnapshot> {
     const request = parse(RunRequestSchema, input)
-    if (this.usedRunIds.has(request.id))
-      throw new MachineError(
-        "invalid",
-        "This Run request was already used. Review the machine and start a new Run; it is never replayed."
-      )
+    this.refuseUsedRun(request.id)
+    // Refused at once when the machine would not take it, before the program is prepared.
     this.admitNow({ key: "run" })
     let prepared: PrepareResult
     try {
-      prepared = this.preparedFor(request.source)
+      prepared = await this.preparedFor(request.source)
     } catch (error) {
       throw new MachineError("invalid", message(error, "Invalid NC program."))
     }
     if (!prepared.ok) throw new MachineError("invalid", prepared.error)
+    // Asked again: other requests, and the machine, went on while the program was prepared.
+    this.refuseUsedRun(request.id)
+    this.admitNow({ key: "run" })
     const program = prepared.program
     this.rememberRun(request.id)
     const now = this.ports.clock.now()
@@ -961,6 +975,14 @@ export class MachineController {
     // An unconfirmed Stop sets the lockout, which the snapshot shows.
     this.stop().catch(() => {})
     return true
+  }
+
+  private refuseUsedRun(id: string) {
+    if (this.usedRunIds.has(id))
+      throw new MachineError(
+        "invalid",
+        "This Run request was already used. Review the machine and start a new Run; it is never replayed."
+      )
   }
 
   private rememberRun(id: string) {

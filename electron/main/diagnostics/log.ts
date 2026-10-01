@@ -15,7 +15,7 @@ const EARLIER = "openspindle.1.log"
 /** Records wait this long to be written together, errors not at all. */
 const WRITE_DELAY_MS = 200
 
-export type LogSource = "main" | "renderer"
+export type LogSource = "main" | "renderer" | "machine"
 
 /** A record as the log writes it. */
 export type WrittenRecord = {
@@ -31,7 +31,7 @@ const missing = (error: unknown) =>
 
 /**
  * The app's log: one text file in the system's log folder, written by the main process for
- * itself and for the renderer, one record per line (continuation lines indented). Records
+ * itself, the renderer and the machine process, one record per line (continuation lines indented). Records
  * below the chosen level are left out. Until the log is opened, records wait in memory.
  */
 export class AppLog {

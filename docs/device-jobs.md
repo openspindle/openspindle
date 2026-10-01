@@ -17,7 +17,7 @@ Run is explicit and lives only on the Job tab. Preparing, previewing, importing 
 
 Every rewrite is listed (`changes`) and the pause lines are reported, so the Job view can show them.
 
-Preparing a long program takes the main process most of a second (about 0.7 s for 10 MiB), which holds up status polling and Stop. So the controller keeps the last four prepared programs by their source text, which Run uses too, and never prepares the running job's program again while the job lasts. The Job tab keeps its check while the program is unchanged, however long the tab stays closed.
+Preparing a long program takes most of a second (about 0.7 s for 10 MiB), so the machine process prepares programs on a worker thread, where it holds up neither status polling nor Stop. The controller keeps the last four prepared programs by their source text, which Run uses too, a check asked for while the same program is being prepared waits for that one, and it never prepares the running job's program again while the job lasts. Run checks again, once its program is prepared, that the machine still takes it. The Job tab keeps its check while the program is unchanged, however long the tab stays closed.
 
 ## The Job tab
 
