@@ -4,7 +4,7 @@ import type { XY } from "../../../geometry/frame"
 import { formatMillimetres } from "../../../geometry/millimetres"
 import { workOriginOnMachine } from "../../../plate/work-origin"
 import { placementAnchors, placementContext } from "../../../probing/placement"
-import type { ProbingStrategy } from "../../../probing/strategy"
+import type { BoundProbe, ProbingStrategy } from "../../../probing/strategy"
 import { plateTouchOffParams } from "../../../probing/tasks/touch-off/fit"
 import type {
   TouchOffParams,
@@ -40,8 +40,10 @@ const READ_PARAMETERS: TouchOffSpecs = {
   },
 }
 
+/** What the program is, by the probe it touches with. */
+const title = ({ tool }: BoundProbe) => `; ${tool.name} - auto Z-height`
+
 const INTRODUCTION = [
-  "; Makera wired Probe 2.0 - auto Z-height",
   "; The firmware's own Z probe (M495, as Makera Studio runs it) touches the stock top,",
   "; reports the touch and sets work Z0 there.",
   "; REQUIRE: homed machine, installed/calibrated probe, tested probe signal.",
@@ -109,6 +111,7 @@ export const Z_PROBE: ProbingStrategy<
     if (start.kind !== "anchor" || !start.work)
       return { ok: false, issues: [NOT_ANCHORED] }
     const lines = [
+      title(probe),
       ...INTRODUCTION,
       ...PRECAUTIONS,
       ...machine.nc.select(probe),

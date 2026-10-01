@@ -3,7 +3,7 @@ import type { XY } from "../../../geometry/frame"
 import type { AnchorStart } from "../../../probing/placement"
 import { placementContext } from "../../../probing/placement"
 import type { GridPlan } from "../../../probing/probe"
-import type { ProbingStrategy } from "../../../probing/strategy"
+import type { BoundProbe, ProbingStrategy } from "../../../probing/strategy"
 import { plateGridParams } from "../../../probing/tasks/grid/fit"
 import type { GridParams, GridSpecs } from "../../../probing/tasks/grid/params"
 import { planGrid } from "../../../probing/tasks/grid/plan"
@@ -67,13 +67,15 @@ const GRID_PARAMETERS: GridSpecs = {
   },
 }
 
+/** What the program is, by the probe it probes with. */
+const title = ({ tool }: BoundProbe) =>
+  `; ${tool.name} - rectangular auto-leveling`
+
 const INTRODUCTION = [
-  "; Makera wired Probe 2.0 - rectangular auto-leveling",
   "; The firmware measures the grid and applies Z compensation.",
   "; REQUIRE: homed machine, installed/calibrated probe, tested probe signal.",
 ]
 const FIRMWARE_INTRODUCTION = [
-  "; Makera wired Probe 2.0 - rectangular auto-leveling",
   "; The firmware's own auto-leveling (M495, as Makera Studio runs it) measures the grid,",
   "; reports every point and the height map, and applies Z compensation.",
   "; REQUIRE: homed machine, installed/calibrated probe, tested probe signal.",
@@ -163,6 +165,7 @@ export const HEIGHT_MAP: ProbingStrategy<"grid", GridParams, GridSpecs> = {
     let lines: string[]
     if (start.kind === "probe-position")
       lines = [
+        title(probe),
         ...INTRODUCTION,
         POSITION_PROBE,
         ...PRECAUTIONS,
@@ -173,6 +176,7 @@ export const HEIGHT_MAP: ProbingStrategy<"grid", GridParams, GridSpecs> = {
       ]
     else if (work)
       lines = [
+        title(probe),
         ...FIRMWARE_INTRODUCTION,
         ...PRECAUTIONS,
         ...select,
@@ -181,6 +185,7 @@ export const HEIGHT_MAP: ProbingStrategy<"grid", GridParams, GridSpecs> = {
       ]
     else
       lines = [
+        title(probe),
         ...INTRODUCTION,
         ...PRECAUTIONS,
         ...select,

@@ -23,7 +23,7 @@ import { fail, ok, toolNumberText } from "../../../primitives"
 import type { Result } from "../../../primitives"
 import type { ParameterSpec } from "../../../probing/parameters"
 import { placementContext } from "../../../probing/placement"
-import type { ProbingStrategy } from "../../../probing/strategy"
+import type { BoundProbe, ProbingStrategy } from "../../../probing/strategy"
 import type { Tool } from "../../../tools/tool"
 import { ORIGIN_ROUTINE, routineSubcode } from "../3d-probe/blocks"
 import { firmwareMillimetres } from "../probing-nc"
@@ -88,8 +88,12 @@ function ballOf({ diameter }: Tool, held: string): Result<number, string> {
 /** A probe whose ball the routines do not take, which resolving refuses first (`refuses`). */
 const ballRefused = issueOf<"ball-refused">("error")
 
-/** What the routine touches, and what it sets. */
-function introduction(params: OriginParams, subcode: number): string[] {
+/** What the routine touches with which probe, and what it sets. */
+function introduction(
+  params: OriginParams,
+  subcode: number,
+  { tool }: BoundProbe
+): string[] {
   const { routine, corner, axes } = params
   const [inX, inY] = cornerInward(corner)
   const sideX = inX > 0 ? "left" : "right"
@@ -99,7 +103,7 @@ function introduction(params: OriginParams, subcode: number): string[] {
   const title = findsCorner(routine)
     ? `${what}, ${PROBE_3D_CORNER_LABELS[corner].toLowerCase()}`
     : `${what}, ${PROBE_3D_AXES_LABELS[axes].replace(" only", "")}`
-  const lines = [`; Makera 3D Probe - 3D probing: ${title}`]
+  const lines = [`; ${tool.name} - 3D probing: ${title}`]
   switch (routine) {
     case "outside-corner":
       lines.push(
@@ -211,7 +215,7 @@ export const ROUTINES: ProbingStrategy<"origin", OriginParams, OriginSpecs> = {
     const { start, height } = plan
     const subcode = routineSubcode(plan.params.routine, plan.params.corner)
     const lines = [
-      ...introduction(plan.params, subcode),
+      ...introduction(plan.params, subcode, probe),
       ...(start.kind === "probe-position" ? positioning(plan.params) : []),
       ...precautions(plan.params),
       ...machine.nc.select(probe),
