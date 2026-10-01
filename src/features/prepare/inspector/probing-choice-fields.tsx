@@ -3,6 +3,14 @@ import { toast } from "sonner"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { OptionSelect } from "@/components/option-select"
 import type { Option } from "@/components/option-select"
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Hint } from "@/components/workspace/hint"
 import {
   useWorkspace,
@@ -10,21 +18,42 @@ import {
 } from "@/app/workspace/workspace-context"
 import type { ProbingOperation } from "@/domain/operations/kinds"
 import type { Plate } from "@/domain/plate/plate"
-import { strategiesFor, strategyBlocked } from "@/domain/probing/strategies"
+import {
+  runsWith,
+  strategiesFor,
+  strategyBlocked,
+} from "@/domain/probing/strategies"
 import type { MachineProbing, TaskStrategy } from "@/domain/probing/strategy"
+import { formatToolNumber } from "@/domain/tools/format"
 import { probeProfile } from "@/domain/tools/tool"
+import type { Tool } from "@/domain/tools/tool"
 import { boundTools } from "@/domain/tools/tool-table"
 import type { WorkspaceCommand } from "@/domain/workspace/workspace"
-import { profileText } from "@/features/probing/probe-tools"
+import {
+  probeNumber,
+  profileText,
+  sharedReplacement,
+  sharedReplacementText,
+} from "@/features/probing/probe-tools"
 
 const ROW = "grid grid-cols-2 items-center gap-3"
 
+/** A probe the Probe select lists, with what choosing it replaces for other operations. */
+type ProbeOption = Option<string> & { replaces?: string }
+
+/** A probe's ball, its diameter, as 3D probing takes it: "Ø 3 mm ball". */
+const ballText = ({ diameter }: Tool) =>
+  diameter === null
+    ? "No ball diameter"
+    : `Ø ${formatToolNumber(diameter, "millimeters")} mm ball`
+
 /**
  * A probing operation's probe and strategy, each changeable among those that go with the other:
- * the library probes its strategy runs with, and the strategies of its task that run with its
- * probe. A strategy keeps the operation's parameters, which its own ranges then check. A probe
- * goes in the number the machine's firmware needs it in, replacing what the plate's table holds
- * there, as assigning a tool does.
+ * the library probes its strategy runs with on the machine (`runsWith`), and the strategies of
+ * its task that run with its probe. A strategy keeps the operation's parameters, which its own
+ * ranges then check. A probe goes in the number the machine's firmware needs it in, replacing
+ * what the plate's table holds there for every operation that uses it, as assigning a tool does;
+ * a probe that would replace another operation's says so while the pointer rests on it.
  */
 export function ProbingChoiceFields({
   plate,
@@ -48,20 +77,28 @@ export function ProbingChoiceFields({
 
   const probes = library.filter((item) => {
     const itemProfile = probeProfile(item)
-    return itemProfile !== null && strategy.accepts(itemProfile, machine)
+    return itemProfile !== null && runsWith(strategy, itemProfile, machine)
   })
   // The bound tool stays listed when the strategy cannot run with it, so the select names it.
-  const probeOptions: Option<string>[] = [
+  const probeOptions: ProbeOption[] = [
     ...(tool && probes.includes(tool)
       ? []
       : [
           {
             value: toolId ?? "",
-            label: tool?.name ?? "No probe",
+            label:
+              tool?.name ?? (toolId ? "Missing from the library" : "No probe"),
             disabled: true,
           },
         ]),
-    ...probes.map((item) => ({ value: item.id, label: item.name })),
+    ...probes.map((item) => {
+      const replaced = sharedReplacement(plate, operation, item, machine)
+      return {
+        value: item.id,
+        label: item.name,
+        replaces: replaced && sharedReplacementText(replaced, library),
+      }
+    }),
   ]
   const runs = profile
     ? strategiesFor(machine, profile).filter(
@@ -76,19 +113,21 @@ export function ProbingChoiceFields({
       ? { value: item.id, label: item.label }
       : { value: item.id, label: item.label, disabled: true, reason }
   })
-  const probeHint = profile
-    ? `T${source.probe} · ${profileText(profile)}`
-    : `T${source.probe}`
+  const probeHint = [
+    `T${source.probe}`,
+    ...(profile ? [profileText(profile)] : []),
+    ...(tool && source.task === "origin" ? [ballText(tool)] : []),
+  ].join(" · ")
 
   const dispatch = (commands: WorkspaceCommand[]) => {
     const result = workspace.dispatch({ type: "batch", commands })
     if (!result.ok) toast.error(result.error)
   }
   const changeProbe = (nextId: string) => {
-    const next = library.find((item) => item.id === nextId)
+    const next = probes.find((item) => item.id === nextId)
     const nextProfile = next && probeProfile(next)
     if (!next || !nextProfile || next === tool) return
-    const number = machine.slot(nextProfile) ?? source.probe
+    const number = probeNumber(operation, nextProfile, machine)
     dispatch([
       ...(number === source.probe
         ? []
@@ -130,14 +169,36 @@ export function ProbingChoiceFields({
         <FieldLabel htmlFor={`${id}-probe`}>
           <Hint text={probeHint}>Probe</Hint>
         </FieldLabel>
-        <OptionSelect
-          id={`${id}-probe`}
-          className="w-full min-w-0"
-          aria-description={probeHint}
-          options={probeOptions}
+        {/* OptionSelect's options carry no note of what choosing them changes. */}
+        <Select
+          items={probeOptions}
           value={toolId ?? ""}
-          onValueChange={changeProbe}
-        />
+          onValueChange={(next) => {
+            if (next !== null) changeProbe(next)
+          }}
+        >
+          <SelectTrigger
+            id={`${id}-probe`}
+            className="w-full min-w-0"
+            aria-description={probeHint}
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              {probeOptions.map((option) => (
+                <SelectItem
+                  key={option.value}
+                  value={option.value}
+                  disabled={option.disabled}
+                  title={option.replaces}
+                >
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectGroup>
+          </SelectContent>
+        </Select>
       </Field>
       <Field orientation="horizontal" className={ROW}>
         <FieldLabel htmlFor={`${id}-strategy`}>

@@ -1,4 +1,4 @@
-import { useId, useState } from "react"
+import { useEffect, useId, useMemo, useState } from "react"
 import { LocateFixed } from "lucide-react"
 import { FieldGroup, FieldLegend, FieldSet } from "@/components/ui/field"
 import { Hint } from "@/components/workspace/hint"
@@ -104,10 +104,31 @@ function TouchOffForm({
   disabled,
 }: Required<TouchOffSettingsProps>) {
   const id = useId()
-  const schema = rangedSchema(TouchOffParamsSchema, parameters)
+  // Only what the strategy reads is held to its range: a probe travel it does not read stays as
+  // stored, whatever it is.
+  const schema = useMemo(
+    () =>
+      reads.probeTravel
+        ? rangedSchema(TouchOffParamsSchema, parameters)
+        : rangedSchema(TouchOffParamsSchema, {
+            clearance: parameters.clearance,
+          }),
+    [parameters, reads.probeTravel]
+  )
   // Switching back from the probe position restores the anchor settings.
   const [lastAnchor, setLastAnchor] = useState<AnchorPlacement | null>(null)
   const form = useProbingForm(value, schema, onChange)
+  // A probe travel the strategy stops reading takes back its last valid value, as the form passes
+  // on only valid parameters: a hidden error would hold back every later edit.
+  useEffect(() => {
+    if (
+      !reads.probeTravel &&
+      form.getFieldValue("probeTravel") !== value.probeTravel
+    )
+      form.setFieldValue("probeTravel", value.probeTravel, {
+        dontRunListeners: true,
+      })
+  }, [reads.probeTravel])
 
   return (
     <FieldGroup>

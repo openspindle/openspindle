@@ -4,6 +4,7 @@ import { capitalize, fail, ok, toolNumberText } from "../primitives"
 import type { Result } from "../primitives"
 import { probeProfile } from "../tools/tool"
 import type { Tool } from "../tools/tool"
+import { isProbe } from "../tools/tool-table"
 import type {
   BoundProbe,
   MachineProbing,
@@ -33,8 +34,10 @@ const ACTIONS: { readonly [TTask in ProbingTask]: string } = {
  * of its probe number, the table entry that binding maps it to, and the library tool the entry
  * holds, among `tools`. The tool must be a probe of known profile that the strategy runs with
  * on the machine (`runsWith`), in the number the machine's firmware needs a probe of that profile
- * in; failing, it says whether the strategy cannot probe with it or the machine does not let it
- * do the task. The library is read only through the table, as compiling's cache expects.
+ * in; failing, it says whether the tool is no probe, a probe of unknown profile, one the
+ * strategy cannot probe with or one the machine does not let do the task, and where a profile is
+ * at fault, that the tool library corrects it. The library is read only through the table, as
+ * compiling's cache expects.
  */
 export function boundProbe(
   operation: Operation & { readonly source: ProbingSource },
@@ -63,20 +66,25 @@ export function boundProbe(
       message: `${named} uses a tool that is no longer in the library.`,
       toolNumber,
     })
+  if (!isProbe(tool))
+    return fail({
+      message: `${named} holds ${tool.name}, which is not a probe: assign a probe.`,
+      toolNumber,
+    })
   const profile = probeProfile(tool)
   if (!profile)
     return fail({
-      message: `${named} holds ${tool.name}, which is not a probe of known profile: assign a probe, or say what it touches in the tool library.`,
+      message: `${named} holds ${tool.name}, a probe of unknown profile: say what it touches in the tool library, or assign another probe.`,
       toolNumber,
     })
   if (!strategy.accepts(profile, machine))
     return fail({
-      message: `${named} holds ${tool.name}, which this strategy cannot probe with: assign a probe it runs with.`,
+      message: `${named} holds ${tool.name}, which this strategy cannot probe with: assign a probe it runs with, or correct the probe's profile in the tool library.`,
       toolNumber,
     })
   if (!machine.probes(strategy.task, profile))
     return fail({
-      message: `${named} holds ${tool.name}, but the ${machineName} does not ${ACTIONS[strategy.task]} with a probe like it: assign another probe.`,
+      message: `${named} holds ${tool.name}, but the ${machineName} does not ${ACTIONS[strategy.task]} with a probe like it: assign another probe, or correct the probe's profile in the tool library.`,
       toolNumber,
     })
   const slot = machine.slot(profile)

@@ -1,4 +1,5 @@
 import { issueOf } from "../../../diagnostics"
+import { COORDINATE_LIMIT } from "../../../primitives"
 import type { XY } from "../../../geometry/frame"
 import { formatMillimetres } from "../../../geometry/millimetres"
 import { workOriginOnMachine } from "../../../plate/work-origin"
@@ -23,6 +24,19 @@ const Z_PROBE_PARAMETERS: TouchOffSpecs = {
     ...TOUCH_PARAMETERS.probeTravel,
     description:
       "How far the probe searches down before the machine alarms. After a probe change it starts near the top of Z travel. The machine's own Z probe, run from a stored anchor with the work origin kept relative to one, searches to its tool rack Z instead.",
+  },
+}
+
+/**
+ * The Z probe's ranges as generating holds the parameters to them: only what M495 reads. The
+ * probe travel, which it does not read, passes as stored.
+ */
+const READ_PARAMETERS: TouchOffSpecs = {
+  ...Z_PROBE_PARAMETERS,
+  probeTravel: {
+    ...Z_PROBE_PARAMETERS.probeTravel,
+    min: 0,
+    max: COORDINATE_LIMIT,
   },
 }
 
@@ -89,11 +103,7 @@ export const Z_PROBE: ProbingStrategy<
   reads: () => ({ probeTravel: false, clearance: true }),
   defaults: plateTouchOffParams,
   generate: ({ params, plate, probe, machine }) => {
-    const plan = planTouchOff(
-      params,
-      placementContext(plate),
-      Z_PROBE_PARAMETERS
-    )
+    const plan = planTouchOff(params, placementContext(plate), READ_PARAMETERS)
     if (!plan.ok) return plan
     const { start } = plan
     if (start.kind !== "anchor" || !start.work)
