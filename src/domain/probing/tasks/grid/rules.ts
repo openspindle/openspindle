@@ -103,7 +103,7 @@ const AUTO_LEVEL_STOCK_CHAIN = "grid/stock"
 const autoLevelFactoryAnchors: StageRule<"operation"> = {
   id: "grid/factory-anchors",
   stage: "operation",
-  label: "Auto-level anchors read",
+  label: "Probe grid anchors read",
   description:
     "A grid placed from the machine's factory default anchor positions lands wherever the device's own anchors differ from them.",
   severity: "warning",
@@ -123,7 +123,7 @@ const autoLevelFactoryAnchors: StageRule<"operation"> = {
 const autoLevelStockUnspecified: StageRule<"operation"> = {
   id: "grid/stock-unspecified",
   stage: "operation",
-  label: "Auto-level stock size",
+  label: "Probe grid stock size",
   description: "A grid is checked against the stock, which needs its size.",
   severity: "warning",
   configurable: false,
@@ -143,7 +143,7 @@ const autoLevelStockUnspecified: StageRule<"operation"> = {
 const gridExceedsStock: StageRule<"operation"> = {
   id: "grid/exceeds-stock",
   stage: "operation",
-  label: "Auto-level grid within the stock size",
+  label: "Probe grid within the stock size",
   description:
     "A grid larger than the stock probes beside it, where there is nothing to measure.",
   severity: "error",
@@ -169,7 +169,7 @@ const gridExceedsStock: StageRule<"operation"> = {
 const gridOutsideStock: StageRule<"operation"> = {
   id: "grid/outside-stock",
   stage: "operation",
-  label: "Auto-level grid on the stock",
+  label: "Probe grid on the stock",
   description:
     "An anchored grid that extends beyond the stock as placed on the bed probes beside it.",
   severity: "warning",

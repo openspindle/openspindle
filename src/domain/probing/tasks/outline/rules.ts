@@ -43,7 +43,7 @@ function outlineBeyondStock({
 const outlineOffStock: StageRule<"operation"> = {
   id: "outline/outside-stock",
   stage: "operation",
-  label: "Auto-scan outline on the stock",
+  label: "Outline on the stock",
   description:
     "Cuts that reach beyond the stock as placed are worth checking, which is what the scan is for.",
   severity: "warning",
@@ -64,7 +64,7 @@ const outlineOffStock: StageRule<"operation"> = {
 const afterMachining: StageRule<"operation"> = {
   id: "outline/after-machining",
   stage: "operation",
-  label: "Auto-scan before machining",
+  label: "Outline before machining",
   description:
     "A scan after machining has started checks the outline too late.",
   severity: "warning",
@@ -79,7 +79,7 @@ const afterMachining: StageRule<"operation"> = {
   },
   explain: ({ first }) => ({
     problem:
-      "Auto-scan runs after machining operations. Move it before them to check the outline first.",
+      "The scan runs after machining operations. Move it before them to check the outline first.",
     about: operationSubject(first.operation.id),
   }),
   fixes: editOperation,
