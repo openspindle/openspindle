@@ -142,7 +142,7 @@ const zHeightBeforeAutoLevel: StageRule<"operation"> = {
   },
   explain: ({ first }) => ({
     problem:
-      "A later probe grid measures heights from its first point, so work Z is off by any height difference between that point and this one. Move the touch-off after the probe grid, or probe where the grid starts.",
+      "A later probe grid measures heights from its first point, so work Z is off by any height difference between that point and this one. Move it after the probe grid, or probe where the grid starts.",
     about: operationSubject(first.operation.id),
   }),
   fixes: editOperation,
