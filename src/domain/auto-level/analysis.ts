@@ -1,5 +1,7 @@
+import { runRules } from "@/machine/contract"
 import type { HeightMap } from "@/machine/contract"
 import { plural } from "../primitives"
+import type { StageRule } from "../rules/stages"
 
 export type GridSize = { columns: number; rows: number }
 
@@ -36,16 +38,8 @@ export type SurfaceFit = {
 
 export type FlatnessVerdict = "flat" | "uneven" | "unreliable"
 
-export type FlatnessReasonCode =
-  | "no-samples"
-  | "size-mismatch"
-  | "missing-samples"
-  | "outliers"
-  | "tilted"
-  | "uneven"
-  | "flat"
-
-export type FlatnessReason = { code: FlatnessReasonCode; message: string }
+/** A finding of the review: a height-map rule's failure, coded by its id, or `height-map/flat`. */
+export type FlatnessReason = { code: string; message: string }
 
 export type HeightMapAnalysis = {
   /** Grid size reported by the device. */
@@ -243,7 +237,7 @@ function surfaceFit(samples: readonly HeightSample[]): SurfaceFit | null {
 const positionText = ({ row, column }: GridPosition) =>
   `row ${row + 1}, column ${column + 1}`
 
-function outlierReason(outliers: readonly HeightOutlier[]): FlatnessReason {
+function outlierMessage(outliers: readonly HeightOutlier[]): string {
   const listed = outliers
     .slice(0, LISTED_OUTLIERS)
     .map(
@@ -251,22 +245,101 @@ function outlierReason(outliers: readonly HeightOutlier[]): FlatnessReason {
         `${positionText(outlier)} (${formatHeight(outlier.deviation)} mm)`
     )
   const more = outliers.length - listed.length
-  return {
-    code: "outliers",
-    message: `${plural(outliers.length, "point")} ${outliers.length === 1 ? "stands" : "stand"} out from the surface: ${listed.join("; ")}${more ? `; and ${more} more` : ""}.`,
-  }
+  return `${plural(outliers.length, "point")} ${outliers.length === 1 ? "stands" : "stand"} out from the surface: ${listed.join("; ")}${more ? `; and ${more} more` : ""}.`
 }
 
-function verdictOf(
-  unreliable: boolean,
-  surface: SurfaceFit | null,
-  tolerance: number
-): FlatnessVerdict {
-  if (unreliable || !surface) return "unreliable"
-  return surface.flatness > tolerance ? "uneven" : "flat"
-}
+const UNEVEN = "height-map/uneven"
 
-/** Review of a height map read after probing (M375.1). Heights are relative, never machine Z. */
+/**
+ * What a height map needs to be relied on, and to be called flat: an error makes the map
+ * unreliable, a warning qualifies it.
+ */
+export const HEIGHT_MAP_RULES: readonly StageRule<"height-map">[] = [
+  {
+    id: "height-map/no-samples",
+    stage: "height-map",
+    label: "Heights measured",
+    description:
+      "The device reports measured heights; without any, there is no surface to follow.",
+    severity: "error",
+    configurable: false,
+    test: ({ measured }) => measured > 0,
+    explain: () => ({ problem: "The device reported no measured heights." }),
+  },
+  {
+    id: "height-map/size-mismatch",
+    stage: "height-map",
+    label: "Grid size",
+    description:
+      "The device's grid is the one the operation probes; another may be from another probe.",
+    severity: "error",
+    configurable: false,
+    test: ({ size, expected }) =>
+      !expected ||
+      (expected.columns === size.columns && expected.rows === size.rows),
+    explain: ({ first: { size, expected } }) => {
+      const probed = expected ?? size
+      return {
+        problem: `The device reports a ${size.columns} × ${size.rows} grid, but this operation probes ${probed.columns} × ${probed.rows}. The map may be from another probe.`,
+      }
+    },
+  },
+  {
+    id: "height-map/missing-samples",
+    stage: "height-map",
+    label: "Every point measured",
+    description: "Every point of the grid has a measured height.",
+    severity: "error",
+    configurable: false,
+    test: ({ measured, missing }) => !measured || !missing,
+    explain: ({ first: { missing, total } }) => ({
+      problem: `${missing} of ${plural(total, "point")} ${missing === 1 ? "has" : "have"} no measured height.`,
+    }),
+  },
+  {
+    id: "height-map/outliers",
+    stage: "height-map",
+    label: "No outliers",
+    description:
+      "No height stands out from the fitted surface by more than probe noise.",
+    severity: "error",
+    configurable: false,
+    test: ({ outliers }) => !outliers.length,
+    explain: ({ first }) => ({ problem: outlierMessage(first.outliers) }),
+  },
+  {
+    id: "height-map/tilted",
+    stage: "height-map",
+    label: "Level surface",
+    description:
+      "The surface tilts across the grid by no more than the flatness tolerance; compensation follows a larger tilt.",
+    severity: "warning",
+    configurable: false,
+    test: ({ surface, tolerance }) => !surface || surface.tilt <= tolerance,
+    explain: ({ first }) => ({
+      problem: `The surface is tilted by ${formatSpan(first.surface?.tilt ?? 0)} mm across the grid; compensation follows it.`,
+    }),
+  },
+  {
+    id: UNEVEN,
+    stage: "height-map",
+    label: "Flat surface",
+    description:
+      "The heights deviate from a plane by no more than the flatness tolerance.",
+    severity: "warning",
+    configurable: false,
+    test: ({ surface, tolerance }) => !surface || surface.flatness <= tolerance,
+    explain: ({ first }) => ({
+      problem: `Peak-to-valley deviation from a plane is ${formatSpan(first.surface?.flatness ?? 0)} mm, more than ${formatSpan(first.tolerance)} mm. Check that the stock lies flat.`,
+    }),
+  },
+]
+
+/**
+ * Review of a height map read after probing (M375.1), as a view of its rules: their failures in
+ * list order, then that the surface is flat where it has one and it is not uneven. Heights are
+ * relative, never machine Z.
+ */
 export function analyzeHeightMap(
   map: HeightMap,
   options: HeightMapAnalysisOptions = {}
@@ -295,43 +368,36 @@ export function analyzeHeightMap(
   const surface = surfaceFit(
     measured.filter((sample) => !outlying.has(index(sample)))
   )
-  const findings: FlatnessReason[] = []
-  if (!measured.length)
-    findings.push({
-      code: "no-samples",
-      message: "The device reported no measured heights.",
-    })
-  if (expected && sizeMatches === false)
-    findings.push({
-      code: "size-mismatch",
-      message: `The device reports a ${size.columns} × ${size.rows} grid, but this operation probes ${expected.columns} × ${expected.rows}. The map may be from another probe.`,
-    })
-  if (measured.length && missingPositions.length)
-    findings.push({
-      code: "missing-samples",
-      message: `${missingPositions.length} of ${plural(total, "point")} ${missingPositions.length === 1 ? "has" : "have"} no measured height.`,
-    })
-  if (outliers.length) findings.push(outlierReason(outliers))
   const tolerance = thresholds.flatnessTolerance
-  const verdict = verdictOf(findings.length > 0, surface, tolerance)
-  const reasons = [...findings]
-  if (surface && surface.tilt > tolerance)
+  const failures = runRules(HEIGHT_MAP_RULES, [
+    {
+      size,
+      expected,
+      total,
+      measured: measured.length,
+      missing: missingPositions.length,
+      outliers,
+      surface,
+      tolerance,
+    },
+  ])
+  const reasons: FlatnessReason[] = failures.map((failure) => ({
+    code: failure.rule.id,
+    message: failure.rule.explain(failure).problem,
+  }))
+  const uneven = failures.some((failure) => failure.rule.id === UNEVEN)
+  if (surface && !uneven)
     reasons.push({
-      code: "tilted",
-      message: `The surface is tilted by ${formatSpan(surface.tilt)} mm across the grid; compensation follows it.`,
+      code: "height-map/flat",
+      message: `Peak-to-valley deviation from a plane is ${formatSpan(surface.flatness)} mm, within ${formatSpan(tolerance)} mm.`,
     })
-  if (surface)
-    reasons.push(
-      surface.flatness > tolerance
-        ? {
-            code: "uneven",
-            message: `Peak-to-valley deviation from a plane is ${formatSpan(surface.flatness)} mm, more than ${formatSpan(tolerance)} mm. Check that the stock lies flat.`,
-          }
-        : {
-            code: "flat",
-            message: `Peak-to-valley deviation from a plane is ${formatSpan(surface.flatness)} mm, within ${formatSpan(tolerance)} mm.`,
-          }
-    )
+  const unreliable =
+    !surface || failures.some((failure) => failure.severity === "error")
+  const verdict: FlatnessVerdict = unreliable
+    ? "unreliable"
+    : uneven
+      ? "uneven"
+      : "flat"
   return {
     size,
     expected,

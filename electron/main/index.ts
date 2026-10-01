@@ -1,4 +1,4 @@
-import { Menu, app, dialog, net } from "electron"
+import { Menu, app, dialog } from "electron"
 import type { BrowserWindow } from "electron"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
@@ -10,8 +10,7 @@ import { DiagnosticsSettingsStore } from "./diagnostics/settings"
 import { LastDevice } from "./machine/last-device"
 import { MachineHost } from "./machine/machine-host"
 import { MACHINE_STOP_ITEM, buildApplicationMenu } from "./menu"
-import { lockPluginFrames } from "./plugins/frame-security"
-import { PluginPlatform } from "./plugins/platform"
+import { PcbService } from "./pcb/service"
 import { handleAppProtocol, registerAppScheme } from "./protocol"
 import { createHostHandlers } from "./rpc/host-handlers"
 import { serveHostConnections } from "./rpc/host-server"
@@ -33,10 +32,6 @@ import {
 
 const RENDERER_ROOT = fileURLToPath(new URL("../renderer", import.meta.url))
 const PRELOAD = fileURLToPath(new URL("../preload/index.cjs", import.meta.url))
-/** The plugins that come with the app: packaged apps carry them among their resources. */
-const BUNDLED_PLUGINS = app.isPackaged
-  ? path.join(process.resourcesPath, "plugins")
-  : fileURLToPath(new URL("../plugins", import.meta.url))
 /** Packaged apps carry their icon; dev and preview runs start Electron's own bundle. */
 const DEV_ICON = app.isPackaged
   ? undefined
@@ -130,14 +125,7 @@ function start(diagnostics: Diagnostics, openedFiles: OpenedFileBus) {
     new LastDevice(app.getPath("userData"))
   )
   const entry = rendererEntry()
-  const pluginPlatform = new PluginPlatform({
-    userData: app.getPath("userData"),
-    temp: app.getPath("temp"),
-    bundled: BUNDLED_PLUGINS,
-    machine: machine.controller,
-    window: currentWindow,
-    fetch: (input, init) => net.fetch(input, init),
-  })
+  const pcb = new PcbService(app.getPath("userData"), currentWindow)
   serveHostConnections({
     handlers: createHostHandlers({
       files,
@@ -147,7 +135,7 @@ function start(diagnostics: Diagnostics, openedFiles: OpenedFileBus) {
       machine: machine.app,
       storage,
       models,
-      pluginPlatform,
+      pcb,
       unsaved,
       keptWorkspace,
       diagnostics,
@@ -182,13 +170,13 @@ function start(diagnostics: Diagnostics, openedFiles: OpenedFileBus) {
     if (storageSettled) {
       fusion.dispose()
       machine.dispose()
-      pluginPlatform.dispose()
+      pcb.dispose()
       log.info("OpenSpindle quit")
       log.flushSync()
       return
     }
     event.preventDefault()
-    void storage.idle().finally(() => {
+    void Promise.all([storage.idle(), pcb.idle()]).finally(() => {
       storageSettled = true
       // From a later task: with nothing left to write, idle() settles while this event is still
       // being emitted, and until it returns Electron ignores app.quit() as already quitting.
@@ -197,7 +185,6 @@ function start(diagnostics: Diagnostics, openedFiles: OpenedFileBus) {
   })
 
   mainWindow = createMainWindow({ preload: PRELOAD, entry, icon: DEV_ICON })
-  lockPluginFrames(mainWindow, entry.origin)
   const window = mainWindow
   // Closing the window quits the app, and every quit closes the window first, so the window
   // asks before it closes: about unsaved changes, then about a running job, which quitting

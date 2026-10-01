@@ -9,10 +9,9 @@ import type { ModelStore } from "../../../src/persistence/models/model-library"
 import type { KeptWorkspace } from "../services/kept-workspace"
 import type { StorageService } from "../services/storage-service"
 import type { UnsavedChanges } from "../services/unsaved-changes"
-import type { PluginPlatform } from "../plugins/platform"
+import type { PcbService } from "../pcb/service"
 import type { Diagnostics } from "../diagnostics/diagnostics"
 import { machine } from "./machine-errors"
-import { createPluginHandlers } from "./plugin-handlers"
 
 export type HostServices = {
   readonly files: FileService
@@ -22,7 +21,7 @@ export type HostServices = {
   readonly machine: MachineGateway
   readonly storage: StorageService
   readonly models: ModelStore
-  readonly pluginPlatform: PluginPlatform
+  readonly pcb: PcbService
   readonly unsaved: UnsavedChanges
   readonly keptWorkspace: KeptWorkspace
   readonly diagnostics: Diagnostics
@@ -43,7 +42,6 @@ export function createHostHandlers(
     diagnostics,
   } = services
   const gateway = services.machine
-  const platform = createPluginHandlers(services.pluginPlatform)
   return {
     methods: {
       "files.open": ({ kind }) => files.open(kind),
@@ -62,6 +60,9 @@ export function createHostHandlers(
       "machine.disconnect": (request) =>
         machine(() => gateway.disconnect(request)),
       "machine.execute": (command) => machine(() => gateway.execute(command)),
+      "machine.simulateBed": (bed) => machine(() => gateway.simulateBed(bed)),
+      "machine.sendConsoleLine": ({ line }) =>
+        machine(() => gateway.sendConsoleLine(line)),
       "machine.stop": () => machine(() => gateway.stop()),
       "machine.reset": () => machine(() => gateway.reset()),
       "machine.prepare": (input) => machine(() => gateway.prepare(input)),
@@ -96,7 +97,12 @@ export function createHostHandlers(
       "diagnostics.exportLog": () => diagnostics.exportLog(files),
       "diagnostics.sendError": ({ eventId }) =>
         diagnostics.reports.send(eventId),
-      ...platform.methods,
+      "pcb.status": () => services.pcb.status(),
+      "pcb.chooseExecutable": () => services.pcb.chooseExecutable(),
+      "pcb.setExecutable": ({ executable }) =>
+        services.pcb.setExecutable(executable),
+      "pcb.generate": (request, { signal }) =>
+        services.pcb.generate(request, signal),
     },
     events: {
       "fusion.changed": (_params, emit) => fusion.subscribe(emit),
@@ -107,7 +113,6 @@ export function createHostHandlers(
       "files.opened": (_params, emit) => openedFiles.subscribe(emit),
       "diagnostics.mainError": (_params, emit) =>
         diagnostics.reports.subscribe(emit),
-      ...platform.events,
     },
   }
 }

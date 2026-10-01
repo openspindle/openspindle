@@ -10,7 +10,7 @@ import type { Operation } from "@/domain/operations/operation"
 import type { Plate } from "@/domain/plate/plate"
 import type { PrepareSearch } from "@/routes/_workspace/prepare"
 import { useKeyedDiagnostics } from "@/app/workspace/use-plate-diagnostics"
-import { useOperationKindLabel } from "@/features/plugins/use-operation-kind-label"
+import { useOperationKindLabel } from "@/features/prepare/use-operation-kind-label"
 import { DiagnosticsList } from "./diagnostics-list"
 import { NameField } from "@/components/name-field"
 import { OperationEditor } from "./operation-editors"
@@ -56,8 +56,8 @@ function OperationBasics({
 }
 
 /**
- * An operation's diagnostics as its inspector shows them. A pending plugin operation is its
- * plugin editor's to explain, and Edit would only open the operation already open.
+ * An operation's diagnostics as its inspector shows them. A pending PCB operation is its
+ * editor's to explain, and Edit would only open the operation already open.
  */
 function inspectorDiagnostics(
   diagnostics: readonly KeyedDiagnostic[],

@@ -18,22 +18,57 @@ export type Step = {
   readonly waitsForTool?: number
 }
 
+/**
+ * ATCHandler's tool lengths: where the last tool measured at the sensor met it, where the
+ * reference tool did (the one work Z was last set with), and the offset between them.
+ */
+export type ToolLengths = {
+  measured: number | null
+  reference: number | null
+  offset: number
+}
+
 /** What the scripts read and change on the simulated machine. */
 export type AutomationMachine = {
   mpos: Xyz
   offset: Xyz
   tool: number
+  readonly lengths: ToolLengths
+  /** What the probe meets going down at machine X Y. */
+  readonly surfaceAt: (x: number, y: number) => number
 }
 
-const CLEARANCE_Z = -3
+/** set_ref_tool_mz: setting work Z makes the measured tool the reference, with no offset. */
+export function setReference(lengths: ToolLengths) {
+  lengths.reference = lengths.measured
+  lengths.offset = 0
+}
+
+/** A work position on an axis in machine coordinates (wcs2mcs): with the tool offset in Z. */
+export const machineOf = (
+  machine: Pick<AutomationMachine, "offset" | "lengths">,
+  axis: number,
+  value: number
+) => value + machine.offset[axis] + (axis === 2 ? machine.lengths.offset : 0)
+
+export const CLEARANCE_Z = -3
 const SAFE_Z = -20
 const TOOLRACK_Z = -108
 const FAST = 500
 const SLOW = 100
 const RETRACT = 1
-/** The stock top on the bed, and the tool sensor's contact for a tool of that number. */
-const SURFACE_Z = -82.35
-function sensorZ(tool: number) {
+/**
+ * The machine Z at which the probe meets stock until the app sends its plate's bed: a 1 mm PCB
+ * on the MDF bed (bed Z 7.02).
+ */
+export const DEFAULT_SURFACE_Z = -82.35
+
+/** What the probe meets going down where it is. */
+const surfaceUnder = (machine: AutomationMachine) =>
+  machine.surfaceAt(machine.mpos[0], machine.mpos[1])
+
+/** The tool sensor's contact for a tool of that number. */
+export function sensorZ(tool: number) {
   if (tool === 0) return -76.5
   // A Z1 Pro measured its 3D probe (T9999) at -67.174 (2026-09-28): 9.4 mm longer, as fitted,
   // than the wired probe.
@@ -55,12 +90,16 @@ const say = (echo: string, ms: number, then: string[] = []): Step => ({
 })
 
 /** A straight probe move down to a contact at `z`, reported as the firmware's [PRB] line. */
-function touch(echo: string, ms: number, z: () => number): Step {
+function touch(
+  echo: string,
+  ms: number,
+  z: (machine: AutomationMachine) => number
+): Step {
   return {
     echo,
     ms,
     output: (machine) => {
-      machine.mpos[2] = z()
+      machine.mpos[2] = z(machine)
       const [x, y] = machine.mpos
       return [`[PRB:${f3(x)},${f3(y)},${f3(machine.mpos[2])}:1]`, "ok"]
     },
@@ -76,7 +115,7 @@ function move(echo: string, ms: number, target: Target, work: boolean): Step {
     output: (machine: AutomationMachine) => {
       for (const [index, value] of [target.x, target.y, target.z].entries())
         if (value !== undefined)
-          machine.mpos[index] = value + (work ? machine.offset[index] : 0)
+          machine.mpos[index] = work ? machineOf(machine, index, value) : value
       return ["ok"]
     },
   }
@@ -118,22 +157,36 @@ function calibrate(tool: number, sensor: [number, number], ms: number): Step[] {
     touch(`G38.6 Z${f3(-1 - RETRACT)} F${f3(SLOW)}`, ms * 3, () =>
       sensorZ(tool)
     ),
-    say("M493.1", ms),
+    {
+      // set_tool_offset: the contact just made, from the reference once there is one.
+      echo: "M493.1",
+      ms,
+      output: (machine) => {
+        const { lengths } = machine
+        lengths.measured = machine.mpos[2]
+        if (lengths.reference !== null)
+          lengths.offset = lengths.measured - lengths.reference
+        return ["ok"]
+      },
+    },
     move(`G53 G0 Z${f3(SAFE_Z)}`, ms, { z: SAFE_Z }, false),
     ...(probe ? [say("M492.3", ms * 4), say("M494.2", ms)] : []),
   ]
 }
 
 /**
- * A tool change by hand (fill_change_scripts, fill_cali_scripts): to the change position,
- * wait for the confirmation, no tool, measure the new one, then set it.
+ * A tool change by hand (fill_change_scripts, fill_cali_scripts): to the change `position`,
+ * wait for the confirmation, no tool, measure the new one at the sensor, then set it. A
+ * program's M6 then rises to the clearance and goes back over `returnTo`, where it began
+ * (ATCHandler, unechoed).
  */
 export function changeTool(
   tool: number,
+  position: [number, number],
   sensor: [number, number],
-  ms: number
+  ms: number,
+  returnTo?: [number, number]
 ): Step[] {
-  const position: [number, number] = [sensor[0] - 0.2, sensor[1]]
   return [
     move(`G53 G0 Z${f3(CLEARANCE_Z)}`, ms, { z: CLEARANCE_Z }, false),
     move(
@@ -148,6 +201,27 @@ export function changeTool(
     ...calibrate(tool, sensor, ms),
     setTool(tool, ms),
     say(tool === 9999 ? "M494.1" : "M494.2", ms),
+    ...(returnTo
+      ? [
+          {
+            echo: null,
+            ms,
+            output: (machine: AutomationMachine) => {
+              machine.mpos[2] = CLEARANCE_Z
+              return []
+            },
+          },
+          {
+            echo: null,
+            ms,
+            output: (machine: AutomationMachine) => {
+              machine.mpos[0] = returnTo[0]
+              machine.mpos[1] = returnTo[1]
+              return []
+            },
+          },
+        ]
+      : []),
   ]
 }
 
@@ -158,13 +232,14 @@ export function probeZ(x: number, y: number, ms: number): Step[] {
     say("M494.1", ms),
     move(`G53 G0 Z${f3(CLEARANCE_Z)}`, ms, { z: CLEARANCE_Z }, false),
     move(`G90 G0 X${f3(x)} Y${f3(y)}`, ms * 3, { x, y }, true),
-    touch(`G38.2 Z${f3(TOOLRACK_Z)} F${f3(FAST)}`, ms * 8, () => SURFACE_Z),
+    touch(`G38.2 Z${f3(TOOLRACK_Z)} F${f3(FAST)}`, ms * 8, surfaceUnder),
     rise(RETRACT, ms),
-    touch(`G38.2 Z${f3(-1 - RETRACT)} F${f3(SLOW)}`, ms * 3, () => SURFACE_Z),
+    touch(`G38.2 Z${f3(-1 - RETRACT)} F${f3(SLOW)}`, ms * 3, surfaceUnder),
     {
       echo: "G10 L20 P0 Z0.000",
       ms,
       output: (machine) => {
+        setReference(machine.lengths)
         machine.offset[2] = machine.mpos[2]
         return ["ok"]
       },
@@ -214,6 +289,8 @@ export function levelGrid(
 ): Step[] {
   const { width, depth, columns, rows, height } = grid
   const first = surfaceHeight(0, 0)
+  /** Where G32 starts, in machine X and Y, which the samples are from. */
+  const start: [number, number] = [0, 0]
   const points: Step[] = []
   let maxDeviation = 0
   let lowest = Infinity
@@ -230,9 +307,13 @@ export function levelGrid(
       points.push({
         echo: null,
         ms: ms * 4,
-        output: (machine) => [
-          `DEBUG: X${f3(machine.mpos[0] + dx)}, Y${f3(machine.mpos[1] + dy)}, Z${f3(z)}`,
-        ],
+        output: (machine) => {
+          machine.mpos[0] = start[0] + dx
+          machine.mpos[1] = start[1] + dy
+          return [
+            `DEBUG: X${f3(machine.mpos[0])}, Y${f3(machine.mpos[1])}, Z${f3(z)}`,
+          ]
+        },
       })
     }
   return [
@@ -242,12 +323,16 @@ export function levelGrid(
     {
       echo: `G32R1X0Y0A${f3(width)}B${f3(depth)}I${columns}J${rows}H${f3(height)}`,
       ms: ms * 4,
-      output: (machine) => [
-        "Rectangular Grid Probe...",
-        "Leveling start, offset by XY",
-        `Probe start ht: ${f3(height)} mm, start MCS x,y: ${f3(machine.mpos[0])},${f3(machine.mpos[1])}, rectangular bed width,height in mm: ${f3(width)},${f3(depth)}, grid size: ${columns}x${rows}`,
-        `probe at 0,0 is ${f3(0.01)} mm`,
-      ],
+      output: (machine) => {
+        start[0] = machine.mpos[0]
+        start[1] = machine.mpos[1]
+        return [
+          "Rectangular Grid Probe...",
+          "Leveling start, offset by XY",
+          `Probe start ht: ${f3(height)} mm, start MCS x,y: ${f3(machine.mpos[0])},${f3(machine.mpos[1])}, rectangular bed width,height in mm: ${f3(width)},${f3(depth)}, grid size: ${columns}x${rows}`,
+          `probe at 0,0 is ${f3(0.01)} mm`,
+        ]
+      },
     },
     ...points,
     {
@@ -336,7 +421,7 @@ export function originRoutine(code: string, start: Xyz, ms: number): Step[] {
     const [x, y, z] = machine.mpos
     return [`[PRB:${f3(x)},${f3(y)},${f3(z)}:1]`]
   }
-  const workZ = (machine: AutomationMachine) => machine.offset[2] - dz
+  const workZ = (machine: AutomationMachine) => machineOf(machine, 2, -dz)
   /** Down beside a side at a tenth of the speed, as the firmware comes down (M220 S10). */
   const descend = (over?: (machine: AutomationMachine) => void) => {
     line("M220S10", () => [])
@@ -358,18 +443,19 @@ export function originRoutine(code: string, start: Xyz, ms: number): Step[] {
       line(
         `G38.2 Z${f3(TOOLRACK_Z)} F${f3(SLOW)}`,
         (machine) => {
-          at(machine, undefined, undefined, SURFACE_Z)
+          at(machine, undefined, undefined, surfaceUnder(machine))
           return report(machine)
         },
         ms * (pass ? 3 : 8)
       )
       line("G10 L20 P0 Z0", (machine) => {
+        setReference(machine.lengths)
         machine.offset[2] = machine.mpos[2]
         return []
       })
       if (!pass)
         line(`G91 G0 Z${f3(RETRACT)}`, (machine) =>
-          at(machine, undefined, undefined, SURFACE_Z + RETRACT)
+          at(machine, undefined, undefined, surfaceUnder(machine) + RETRACT)
         )
     }
     line(`G53 G0 Z${f3(sz)}`, (machine) =>

@@ -1,7 +1,7 @@
 import type { LucideIcon } from "lucide-react"
 import { OPERATION_KINDS, probingOf } from "@/domain/operations/kinds"
 import type { ProbingSourceKind } from "@/domain/operations/kinds"
-import { PROBING_ICONS } from "@/features/plugins/operation-icon"
+import { PROBING_ICONS } from "@/features/prepare/operation-icon"
 import {
   useAddProbingOperation,
   useProbeForAdding,

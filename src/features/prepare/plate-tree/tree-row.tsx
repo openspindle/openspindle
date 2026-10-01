@@ -54,11 +54,8 @@ import { TEXT_LIMIT } from "@/domain/primitives"
 import { boundTools } from "@/domain/tools/tool-table"
 import type { WorkspaceCommand } from "@/domain/workspace/workspace"
 import { useFusionUpdate } from "@/features/fusion360/use-fusion-update"
-import { useOperationIcon } from "@/features/plugins/operation-icon"
+import { useOperationIcon } from "@/features/prepare/operation-icon"
 import { openDialog } from "@/features/shell/dialogs"
-import { isPluginUsable } from "@/platform/contract/plugin-rpc"
-import { useInstalledPlugins } from "@/platform/plugins"
-import { useQuickFix } from "../quick-fix"
 import { selectSections } from "../selection"
 import { toggleOperationHidden, useHiddenOperations } from "../visibility"
 import type { TreeRow } from "./tree-rows"
@@ -322,7 +319,7 @@ function transferCommand(
 
 /**
  * Brings an operation up to date from where it came from: a Fusion 360 NC program posted
- * again, or a plugin program generated again by the newer version of its plugin installed.
+ * again.
  * Nothing for an operation with nowhere to update from.
  */
 function UpdateItems({
@@ -333,49 +330,22 @@ function UpdateItems({
   operation: Operation
 }) {
   const fusionUpdate = useFusionUpdate()
-  const quickFix = useQuickFix()
-  const plugins = useInstalledPlugins().data ?? []
   const { source } = operation
   const fromFusion = source.kind === "file" && source.origin !== undefined
-  const plugin =
-    source.kind === "template"
-      ? plugins.find((item) => item.id === source.pluginId)
-      : undefined
-  const newer =
-    source.kind === "template" &&
-    plugin &&
-    isPluginUsable(plugin) &&
-    plugin.version !== source.version
-      ? plugin
-      : null
-  if (!fromFusion && !newer) return null
+  if (!fromFusion) return null
   return (
     <>
-      {fromFusion && (
-        <ContextMenuItem
-          disabled={fusionUpdate.isPending}
-          onClick={() =>
-            fusionUpdate.mutate({
-              plateId: plate.id,
-              operationId: operation.id,
-            })
-          }
-        >
-          Update from Fusion 360
-        </ContextMenuItem>
-      )}
-      {newer && (
-        <ContextMenuItem
-          onClick={() =>
-            quickFix(plate, {
-              kind: "update-operation",
-              operationId: operation.id,
-            })
-          }
-        >
-          Update to {newer.manifest.name} {newer.version}
-        </ContextMenuItem>
-      )}
+      <ContextMenuItem
+        disabled={fusionUpdate.isPending}
+        onClick={() =>
+          fusionUpdate.mutate({
+            plateId: plate.id,
+            operationId: operation.id,
+          })
+        }
+      >
+        Update from Fusion 360
+      </ContextMenuItem>
       <ContextMenuSeparator />
     </>
   )

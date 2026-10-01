@@ -7,21 +7,9 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty"
 import { useSelectedPlate } from "@/app/workspace/workspace-context"
-import type { Operation } from "@/domain/operations/operation"
-import { MissingPluginsBanner } from "@/features/plugins/missing-plugins-banner"
 import { usePrepareSelection } from "../plate-tree/use-prepare-selection"
 import { OperationInspector } from "./operation-inspector"
 import { PlateInspector } from "./plate-inspector"
-
-/**
- * Operations of one plugin share an inspector, so its editor frame stays mounted and follows
- * the selection (the view gets the new operation in its context): work in progress, such as
- * a generation started just before switching, is finished instead of discarded.
- */
-const inspectorKey = (operation: Operation) =>
-  operation.source.kind === "plugin"
-    ? `plugin:${operation.source.pluginId}`
-    : operation.id
 
 /** Settings of what is selected in the tree: an operation, or else its plate. */
 export function PrepareInspector() {
@@ -46,10 +34,9 @@ export function PrepareInspector() {
   )
   return (
     <>
-      <MissingPluginsBanner plate={plate} />
       {operation ? (
         <OperationInspector
-          key={inspectorKey(operation)}
+          key={operation.id}
           plate={plate}
           operation={operation}
           panel={selection.panel}

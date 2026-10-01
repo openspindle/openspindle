@@ -2,23 +2,24 @@ import type {
   AnchorConfiguration,
   AnchorPosition,
   AssistKey,
-  CommandKind,
   ConnectedDevice,
   ControlLimits,
+  FirmwareRules,
   HeightMap,
+  Identity,
   JobFault,
   JobMeasurement,
   JobPhase,
-  JobState,
   JobWait,
   MachineCommand,
   MachineFeatures,
-  MachineModel,
   NetworkDevice,
   PlateAssists,
   PreparedProgram,
   Telemetry,
 } from "../contract/index.ts"
+
+export type { FirmwareRules, Identity } from "../contract/index.ts"
 
 export type InboundFrame = {
   readonly type: number
@@ -63,11 +64,6 @@ export const FAILURE_LINES: ReadonlySet<LineKind> = new Set([
 /** Device text quoted in a user-facing message. */
 export const excerpt = (text: string) =>
   text.length > 240 ? `${text.slice(0, 239)}…` : text
-
-export type Identity = {
-  readonly model: MachineModel
-  readonly atc: boolean
-}
 
 export type FirmwareEvent =
   | {
@@ -168,20 +164,6 @@ export interface CompletionTracker {
   readonly streaming: boolean
 }
 
-export interface FirmwareRules {
-  /** Whether the machine reports the state this command needs. */
-  supports: (
-    kind: CommandKind,
-    telemetry: Telemetry,
-    identity: Identity
-  ) => boolean
-  /** Machine-state preconditions for a command, or null. */
-  command: (command: MachineCommand, telemetry: Telemetry) => string | null
-  run: (telemetry: Telemetry) => string | null
-  /** Height maps may also be read while a job waits at a program pause. */
-  readHeightMap: (telemetry: Telemetry, job: JobState | null) => string | null
-}
-
 export interface JobProtocol {
   path: (id: string) => string
   homedQuery: OutboundFrame
@@ -238,6 +220,8 @@ export interface FirmwareAdapter {
   readonly halt: OutboundFrame
   /** Reboots the controller; the connection does not outlive it. */
   readonly restart: OutboundFrame
+  /** A line typed in the console, as the machine takes a command line. */
+  consoleLine: (line: string) => OutboundFrame
   /** What the machine has; whether it stores anchors follows from `anchors`. */
   features: (
     identity: Identity,

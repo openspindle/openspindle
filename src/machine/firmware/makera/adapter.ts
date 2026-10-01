@@ -185,6 +185,7 @@ export const makeraAdapter: FirmwareAdapter = {
   halt: { type: FRAME_TYPES.control, payload: "\x18" },
   // SimpleShell's reset: "Rebooting machine in 3 seconds...".
   restart: command("reset"),
+  consoleLine: command,
   features: (identity, telemetry) => ({
     atc: identity.atc,
     camera: true,

@@ -1,11 +1,10 @@
-import { programRulesFor } from "@/domain/design-rules/common-rules"
+import { runRules } from "@/machine/contract"
+import type { RuleSettings } from "@/machine/contract"
 import {
   FRESH_START,
-  findIssues,
   programEnd,
-  programRuleSeverity,
-  reportedProgramRules,
-  resolveIssues,
+  programIssue,
+  resolveProgram,
   suggestedChoice,
 } from "@/domain/design-rules/program-rules"
 import type {
@@ -13,7 +12,6 @@ import type {
   ProgramStart,
   Resolution,
 } from "@/domain/design-rules/program-rules"
-import type { DesignRules } from "@/domain/design-rules/rules"
 import type { Severity } from "@/domain/diagnostics"
 import type { FixtureKit } from "@/domain/fixtures/fixture-kit"
 import { programLines } from "@/domain/nc/program-lines"
@@ -22,6 +20,8 @@ import type { NcOrigin } from "@/domain/operations/operation"
 import type { Plate } from "@/domain/plate/plate"
 import { fail, ok } from "@/domain/primitives"
 import type { Result } from "@/domain/primitives"
+import { rulesOf } from "@/domain/rules/rules"
+import { programSubject } from "@/domain/rules/stages"
 import {
   splitParts,
   splitPlan,
@@ -141,22 +141,23 @@ export const asksAbout = (program: PlannedProgram, target: ImportTarget) =>
 function plannedIssues(
   text: string,
   kit: FixtureKit,
-  rules: DesignRules,
+  settings: RuleSettings,
   start: ProgramStart
 ): PlannedIssue[] {
-  const reported = reportedProgramRules(rules, programRulesFor(kit))
-  return findIssues(text, reported, start).flatMap((issue) => {
-    const rule = reported.find((item) => item.id === issue.rule)
-    const severity = rule ? programRuleSeverity(rules, rule) : "ignore"
-    return rule && severity !== "ignore" && suggestedChoice(issue)
-      ? [{ ...issue, label: rule.label, severity }]
+  return runRules(rulesOf("program"), [programSubject(text, start)], {
+    settings,
+    machine: kit.id,
+  }).flatMap((failure) => {
+    const issue = programIssue(failure)
+    return suggestedChoice(issue)
+      ? [{ ...issue, label: failure.rule.label, severity: failure.severity }]
       : []
   })
 }
 
 /**
  * Plans importing programs into a plate of `kit`'s machine, whose program rules the project's
- * design rules report (`rules`), as `target` says: into the plate the user chooses, or as the
+ * settings report (`settings`), as `target` says: into the plate the user chooses, or as the
  * update of an operation. Each program starts with what the ones before it leave set, in their order. An
  * update resolves what was resolved before alike, so it asks only about issues that are new.
  */
@@ -164,7 +165,7 @@ export function planPrograms(
   texts: readonly ProgramText[],
   context: ImportContext,
   kit: FixtureKit,
-  rules: DesignRules,
+  settings: RuleSettings,
   target: ImportTarget = CHOSEN_PLATE
 ): ImportPlan {
   const programs: PlannedProgram[] = []
@@ -188,7 +189,7 @@ export function planPrograms(
       text,
       origin,
       start,
-      issues: plannedIssues(text, kit, rules, start).filter(
+      issues: plannedIssues(text, kit, settings, start).filter(
         (issue) => !Object.hasOwn(resolved, issue.rule)
       ),
       split: splitPlan(text, kit),
@@ -203,7 +204,7 @@ export async function planImport(
   files: readonly File[],
   context: ImportContext,
   kit: FixtureKit,
-  rules: DesignRules
+  settings: RuleSettings
 ): Promise<ImportPlan> {
   const texts: ProgramText[] = []
   const unread: FileProblem[] = []
@@ -212,7 +213,7 @@ export async function planImport(
     if (text.ok) texts.push({ fileName: file.name, text: text.value })
     else unread.push({ fileName: file.name, message: text.error })
   }
-  const plan = planPrograms(texts, context, kit, rules)
+  const plan = planPrograms(texts, context, kit, settings)
   return { ...plan, problems: [...unread, ...plan.problems] }
 }
 
@@ -259,9 +260,9 @@ export function plannedOperations(
   context: ImportContext,
   kit: FixtureKit
 ): Result<TransferableOperation[]> {
-  const text = resolveIssues(
+  const text = resolveProgram(
     program.text,
-    programRulesFor(kit),
+    kit,
     answer.resolutions,
     program.start
   )
@@ -302,12 +303,7 @@ export function updatedNc(
   part: NcOrigin["part"],
   kit: FixtureKit
 ): Result<string> {
-  const text = resolveIssues(
-    program.text,
-    programRulesFor(kit),
-    resolutions,
-    program.start
-  )
+  const text = resolveProgram(program.text, kit, resolutions, program.start)
   if (!part) return ok(text)
   const parts = splitParts(text, kit)[part.mode]
   const index = parts.findIndex((item) => item.name === part.name)

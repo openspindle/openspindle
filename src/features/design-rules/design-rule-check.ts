@@ -1,5 +1,6 @@
 import { useMemo } from "react"
 import { createAtom, useSelector } from "@tanstack/react-store"
+import type { RuleSettings } from "@/machine/contract"
 import { selectedPlate, useWorkspace } from "@/app/workspace/workspace-context"
 import { compilePlate } from "@/domain/compile/compile"
 import { keyDiagnostics } from "@/domain/diagnostics"
@@ -9,45 +10,44 @@ import type {
   DesignRuleCheck,
   DesignRuleViolation,
 } from "@/domain/design-rules/check"
-import type { DesignRules } from "@/domain/design-rules/rules"
 import type { Plate } from "@/domain/plate/plate"
 import type { Tool } from "@/domain/tools/tool"
 import type { WorkspaceState } from "@/domain/workspace/workspace"
 import { unfocusProblem } from "@/features/viewer/problem-focus"
 import type { ProblemFocus } from "@/features/viewer/problem-focus"
 
-/** A plate's last check: the plate and rules as checked, and what it found. */
+/** A plate's last check: the plate and settings as checked, and what it found. */
 export type DesignRuleResult = {
   readonly plate: Plate
-  readonly rules: DesignRules
+  readonly settings: RuleSettings
   readonly check: DesignRuleCheck
   /** The check's violations with the keys the 3D view shows them by (`keyDiagnostics`). */
   readonly violations: readonly KeyedDiagnostic<DesignRuleViolation>[]
 }
 
-/** Each plate's latest check, with the rules and tools it was checked with. */
+/** Each plate's latest check, with the settings and tools it was checked with. */
 const checked = new WeakMap<
   Plate,
   {
-    readonly rules: DesignRules
+    readonly settings: RuleSettings
     readonly tools: readonly Tool[]
     readonly check: DesignRuleCheck
   }
 >()
 
 /**
- * A plate's check against the project's design rules (`checkDesignRules`), with the library's
- * tools; kept per plate object while the rules and the tools stay the same.
+ * A plate's check against the design rules as the project sets them (`checkDesignRules`), with
+ * the library's tools; kept per plate object while the settings and the tools stay the same.
  */
 export function plateDesignRuleCheck(
   plate: Plate,
-  rules: DesignRules,
+  settings: RuleSettings,
   tools: readonly Tool[]
 ): DesignRuleCheck {
   const saved = checked.get(plate)
-  if (saved?.rules === rules && saved.tools === tools) return saved.check
-  const check = checkDesignRules(plate, compilePlate(plate), rules, tools)
-  checked.set(plate, { rules, tools, check })
+  if (saved?.settings === settings && saved.tools === tools) return saved.check
+  const check = checkDesignRules(plate, compilePlate(plate), settings, tools)
+  checked.set(plate, { settings, tools, check })
   return check
 }
 
@@ -55,11 +55,11 @@ export function plateDesignRuleCheck(
 export function usePlateDesignRuleCheck(
   plate: Plate | null
 ): DesignRuleCheck | null {
-  const rules = useWorkspace((state) => state.designRules)
+  const settings = useWorkspace((state) => state.ruleSettings)
   const tools = useWorkspace((state) => state.tools)
   return useMemo(
-    () => (plate ? plateDesignRuleCheck(plate, rules, tools) : null),
-    [plate, rules, tools]
+    () => (plate ? plateDesignRuleCheck(plate, settings, tools) : null),
+    [plate, settings, tools]
   )
 }
 
@@ -87,13 +87,13 @@ export function checkPlateDesignRules(state: WorkspaceState, plateId?: string) {
     ? state.plates.find((item) => item.id === plateId)
     : selectedPlate(state)
   if (!plate) return
-  const rules = state.designRules
-  const check = plateDesignRuleCheck(plate, rules, state.tools)
+  const settings = state.ruleSettings
+  const check = plateDesignRuleCheck(plate, settings, state.tools)
   unfocusResults(resultsAtom.get())
   resultsAtom.set(() => ({
     result: {
       plate,
-      rules,
+      settings,
       check,
       violations: keyDiagnostics(check.violations),
     },
@@ -106,9 +106,9 @@ export function closeDesignRuleResults() {
   resultsAtom.set(() => ({ result: null }))
 }
 
-/** A result no longer matches the workspace once its plate or the rules change. */
+/** A result no longer matches the workspace once its plate or the settings change. */
 export const isOutOfDate = (result: DesignRuleResult, state: WorkspaceState) =>
-  state.designRules !== result.rules || !state.plates.includes(result.plate)
+  state.ruleSettings !== result.settings || !state.plates.includes(result.plate)
 
 /** The violation the 3D view shows, while the check is of this plate as it is. */
 export function shownViolation(

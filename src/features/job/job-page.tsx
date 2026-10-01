@@ -20,6 +20,7 @@ import {
   ResizablePanelGroup,
 } from "@/components/ui/resizable"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { DeviceCard } from "@/features/prepare/sidebar-header"
 import { MachineConsole } from "./machine-console"
 import { useMachineSnapshot } from "@/platform/machine"
 import { CutFacts } from "./cut-facts"
@@ -41,7 +42,10 @@ import { useJobTimeline } from "./use-job-timeline"
 import type { JobTimeline } from "./use-job-timeline"
 import { useJobView } from "./use-job-view"
 
-/** The job panel: the job's controls on top, then its stages from the checks to its end. */
+/**
+ * The job panel: the connected device and the job's controls on top, then its stages from the
+ * checks to its end.
+ */
 function JobPanel({
   view,
   subject,
@@ -73,6 +77,9 @@ function JobPanel({
       className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden"
       aria-label="Job"
     >
+      <div className="shrink-0 p-3 pb-0">
+        <DeviceCard />
+      </div>
       <JobToolbar view={view} actions={actions} run={run} />
       <ScrollArea className="min-h-0 flex-1">
         <div className="flex flex-col gap-3 p-3">
@@ -230,7 +237,10 @@ export function JobPage({
               />
             }
           />
-          <JobCamera />
+          <JobCamera
+            shown={subject}
+            playhead={timeline.live ? timeline.playhead : undefined}
+          />
         </main>
       </ResizablePanel>
       <ResizableHandle withHandle aria-label="Resize G-code panel" />

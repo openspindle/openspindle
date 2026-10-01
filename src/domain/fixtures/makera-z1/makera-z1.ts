@@ -14,7 +14,6 @@ import { MAKERA_CAM } from "./makera-cam"
 import { Z1MdfBed } from "./mdf-bed"
 import { Z1MdfWasteboard } from "./mdf-wasteboard"
 import { Z1_GLOSSARY } from "./nc-glossary"
-import { Z1_PROGRAM_RULES } from "./program-rules"
 import { isZ1Park, readZ1Block } from "./nc-grammar"
 import { Z1TopClamp } from "./top-clamp"
 import { MakeraWiredProbe } from "./wired-probe"
@@ -27,11 +26,15 @@ const ncNumber = (value: number) => String(Number(value.toFixed(4)) + 0)
 /** Version 6 drew the aluminium parts lighter than the steel pins, in machined aluminium. */
 const LIGHTER_ALUMINIUM: KitRecolor = { in: 6, from: ["#a2aab3"] }
 
+/** The Makera Z1's kit id (`FixtureKit.id`), as its rules name the machine they hold for. */
+export const MAKERA_Z1_ID = "makera-z1"
+
 /**
  * The Makera Z1 and Z1 Pro: the aluminium bed, the wired probe, the fixtures Makera makes for it
  * and its anchors.
  */
 export class MakeraZ1 extends FixtureKit {
+  readonly id = MAKERA_Z1_ID
   readonly name = "Makera Z1"
   readonly deviceModels = ["Z1", "Z1 Pro"]
   readonly imageUrl = "/images/makera_z1.png"
@@ -40,6 +43,8 @@ export class MakeraZ1 extends FixtureKit {
   readonly bed = new Z1Bed()
   readonly probe = new MakeraWiredProbe()
   readonly firmware = new Z1Firmware()
+  /** Nominal: from above the front of the enclosure, looking down across the bed. */
+  readonly cameraView: Point3 = [0, -320, 540]
   readonly fixtures: readonly KitFixture[] = [
     { fixture: new Z1MdfBed(), addedIn: 1 },
     { fixture: new Z1FourthAxis(), addedIn: 1 },
@@ -66,7 +71,6 @@ export class MakeraZ1 extends FixtureKit {
   /** Makera CAM's toolpath and stock markers (`;@MKR|…`). */
   readonly camMarkers = MAKERA_CAM
   readonly glossary = Z1_GLOSSARY
-  readonly programRules = Z1_PROGRAM_RULES
 
   /**
    * The firmware reads `G10 L2`'s X and Y in the current units, and its `P0` is the current work

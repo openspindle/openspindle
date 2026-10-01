@@ -24,7 +24,7 @@ export function DiagnosticsList({
   diagnostics: readonly KeyedDiagnostic[]
 }) {
   const quickFix = useQuickFix()
-  const readAnchors = useReadAnchorsFix()
+  const readAnchors = useReadAnchorsFix(plate.id)
   const focus = useProblemFocus()
   if (!diagnostics.length) return null
   return (

@@ -5,8 +5,6 @@ directories:
   output: release
 files:
   - out/**
-  # Shipped among the resources instead (below).
-  - "!out/plugins/**"
 # The About panel's credits, which production builds keep in build/third-party-notices.json, and the
 # licenses of Electron and of the Chromium, Node.js and other software it includes, which they refer to.
 extraResources:
@@ -14,10 +12,6 @@ extraResources:
     to: third-party-notices.json
   - from: node_modules/electron/dist/LICENSE
     to: LICENSE.electron.txt
-  # The plugins that come with the app, which it installs from here at start: one package
-  # folder each, as tools/vite/bundled-plugins.ts builds them.
-  - from: out/plugins
-    to: plugins
   # Fusion loads the Python add-in from a folder outside app.asar.
   - from: integrations/fusion360/OpenSpindleBridge
     to: fusion360/OpenSpindleBridge
@@ -34,8 +28,7 @@ afterPack: ./tools/packaging/chromium-licenses.ts
 forceCodeSigning: true
 # Electron's fuses, flipped before signing so that the signature covers them. The app loads only
 # its own app.asar, checked against the hash in Info.plist, and runs no code handed to it through
-# ELECTRON_RUN_AS_NODE, NODE_OPTIONS, --inspect or SIGUSR1 (plugin companions are utility
-# processes, which need none of them). The renderer comes from app://, so file:// pages get no
+# ELECTRON_RUN_AS_NODE, NODE_OPTIONS, --inspect or SIGUSR1. The renderer comes from app://, so file:// pages get no
 # extra privileges. Cookies stay unencrypted: the app keeps none worth protecting, and on macOS
 # their key would live in the keychain, which asks for access again after every ad-hoc build.
 electronFuses:

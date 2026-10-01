@@ -1,4 +1,4 @@
-import { CircleAlert, Puzzle } from "lucide-react"
+import { CircleAlert } from "lucide-react"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import {
   AlertDialog,
@@ -11,16 +11,9 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
-import {
-  Item,
-  ItemContent,
-  ItemDescription,
-  ItemMedia,
-  ItemTitle,
-} from "@/components/ui/item"
 import { plural } from "@/domain/primitives"
 import { AppDialog } from "@/features/shell/app-dialog"
-import { closeDialog, openDialog } from "@/features/shell/dialogs"
+import { closeDialog } from "@/features/shell/dialogs"
 import {
   useApplyProject,
   useSaveProject,
@@ -152,7 +145,7 @@ function LeftOutFields({ leftOut }: { leftOut: readonly string[] }) {
   )
 }
 
-/** What opening a project changed or left out, and the plugins it refers to that are not installed. */
+/** What opening a project changed or left out. */
 export function ProjectReportDialog({ report }: { report: ProjectCandidate }) {
   return (
     <AppDialog
@@ -170,28 +163,6 @@ export function ProjectReportDialog({ report }: { report: ProjectCandidate }) {
             <CircleAlert />
             <AlertDescription>{notice}</AlertDescription>
           </Alert>
-        ))}
-        {report.missingPlugins.map((reference) => (
-          <Item key={reference.id} variant="outline">
-            <ItemMedia variant="icon">
-              <Puzzle />
-            </ItemMedia>
-            <ItemContent>
-              <ItemTitle>
-                {reference.name} {reference.version} is not installed
-              </ItemTitle>
-              <ItemDescription>
-                Its operations keep their NC; install the plugin to edit them.
-              </ItemDescription>
-            </ItemContent>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => openDialog({ kind: "plugins" })}
-            >
-              Manage plugins
-            </Button>
-          </Item>
         ))}
       </div>
     </AppDialog>

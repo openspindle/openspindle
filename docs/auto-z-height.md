@@ -72,7 +72,7 @@ G90
 G0 Z5
 ```
 
-The firmware's routine replies to every connection, even from a played file, so the machine reports the touch (`[PRB:x,y,z:1]`) and the Job tab's Auto Z-height card shows where it touched the stock top ([device-jobs.md](device-jobs.md#the-job-tab)); the explicit touches report nothing, as lines a file plays reply to a null stream.
+The firmware's routine replies to every connection, even from a played file, so the machine reports the touch (`[PRB:x,y,z:1]`) and the Job tab's Auto Z-height card shows where it touched the stock top, at machine X and Y and at work X and Y, and the top's machine Z ([device-jobs.md](device-jobs.md#the-job-tab)); the explicit touches report nothing, as lines a file plays reply to a null stream.
 
 - `M6 T0` selects and calibrates the probe; Run sets no tool first, so the change and the measurement run even when the machine believes the probe is loaded ([Tool reset](device-jobs.md#transaction)). After a probe change the firmware returns to its configured clearance Z (`coordinate.clearance_z`) above the previous XY, which is why the default search covers the whole stroke, like the firmware's own.
 - The firmware reads `G38.2` distances as relative in any distance mode; `G91` says so for every reader. No contact within the travel is `ALARM: Probe fail`, and a probe that is already triggered halts before moving.

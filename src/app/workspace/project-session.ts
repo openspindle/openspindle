@@ -13,7 +13,7 @@ import type { WorkspaceStore } from "./store"
  */
 type Baseline = Pick<
   WorkspaceState,
-  "plates" | "heightMaps" | "designRules"
+  "plates" | "heightMaps" | "ruleSettings"
 > & {
   readonly name: string
 }
@@ -27,7 +27,7 @@ const baselineAtom = createAtom<Baseline | "edited" | null>(null)
 const baselineOf = (state: WorkspaceState): Baseline => ({
   plates: state.plates,
   heightMaps: state.heightMaps,
-  designRules: state.designRules,
+  ruleSettings: state.ruleSettings,
   name: state.project.name,
 })
 
@@ -71,7 +71,7 @@ export function hasUnsavedChanges(state: WorkspaceState): boolean {
   return (
     current.plates !== baseline.plates ||
     current.heightMaps !== baseline.heightMaps ||
-    current.designRules !== baseline.designRules ||
+    current.ruleSettings !== baseline.ruleSettings ||
     current.name !== baseline.name
   )
 }
@@ -85,16 +85,18 @@ export function markProjectEdited() {
 }
 
 /**
- * Plates set up for a device (or for none yet) follow its anchors. That is not an edit of the
- * project: a project without unsaved changes keeps none, since following them again is the same.
+ * Plates set up for a device (or for none yet) follow its anchors; the connected device's,
+ * every plate moves to it. That is not an edit of the project: a project without unsaved
+ * changes keeps none, since following them again is the same.
  */
 export function followDeviceAnchors(
   workspace: WorkspaceStore,
   deviceId: string | null,
-  anchors: StoredAnchorSetup
+  anchors: StoredAnchorSetup,
+  connected = false
 ) {
   const unchanged = !hasUnsavedChanges(workspace.state)
-  workspace.dispatch({ type: "anchors.sync", deviceId, anchors })
+  workspace.dispatch({ type: "anchors.sync", deviceId, anchors, connected })
   if (unchanged) markProjectSaved(workspace.state)
 }
 

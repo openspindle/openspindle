@@ -62,7 +62,7 @@ const dismissedAtom = createAtom<string | null>(null)
 
 /**
  * Asks to confirm a manual tool change once the machine waits for it: the tool to install and
- * the operation the job goes on with. Dismiss leaves the job waiting for Tool installed.
+ * the operation the job goes on with. Dismiss leaves the job waiting for Confirm installed.
  */
 function ToolChangeDialog({
   view,
@@ -143,7 +143,7 @@ export function ToolChangePrompt({
         description={
           atc
             ? "The machine waits for its tool changer."
-            : "The machine waits with the spindle stopped. Install the tool, then choose Tool installed."
+            : "The machine waits with the spindle stopped. Install the tool, then choose Confirm installed."
         }
       >
         {request.tool && (

@@ -32,8 +32,6 @@ const DATA_LIMITS = {
   operationsPerPlate: OPERATION_LIMITS.operationsPerPlate,
   tools: TOOL_COUNT_LIMIT,
   stocks: 1000,
-  /** Plugins a project refers to. */
-  plugins: 32,
   /** Models its fixtures use, each with its display mesh. */
   models: 64,
   heightMaps: 100,

@@ -4,20 +4,18 @@ import { useWorkspace } from "@/app/workspace/workspace-context"
 import { keyDiagnostics } from "@/domain/diagnostics"
 import type { Diagnostic, KeyedDiagnostic } from "@/domain/diagnostics"
 import type { Plate } from "@/domain/plate/plate"
-import { useInstalledPlugins } from "@/platform/plugins"
 
 const NONE: readonly Diagnostic[] = []
 
 /**
- * Gathers any workspace plate's diagnostics (`plateDiagnostics`) with the library's tools and the
- * installed plugins; a new function once those change.
+ * Gathers any workspace plate's diagnostics (`plateDiagnostics`) with the library's tools;
+ * a new function once those change.
  */
 export function useDiagnosticsOf(): (plate: Plate) => readonly Diagnostic[] {
   const tools = useWorkspace((state) => state.tools)
-  const plugins = useInstalledPlugins().data ?? null
   return useCallback(
-    (plate: Plate) => plateDiagnostics(plate, { tools, plugins }),
-    [tools, plugins]
+    (plate: Plate) => plateDiagnostics(plate, { tools }),
+    [tools]
   )
 }
 

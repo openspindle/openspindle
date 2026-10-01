@@ -1,4 +1,4 @@
-import { Settings2, ShieldCheck } from "lucide-react"
+import { CircuitBoard, Settings2, ShieldCheck } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import { TooltipProvider } from "@/components/ui/tooltip"
@@ -9,25 +9,15 @@ import {
   useWorkspaceStore,
 } from "@/app/workspace/workspace-context"
 import { checkPlateDesignRules } from "@/features/design-rules/design-rule-check"
-import {
-  TOOLBAR_ICONS,
-  sourceDescription,
-  sourceKey,
-  sourceRefOf,
-  toolbarItems,
-} from "@/features/plugins/plugin-sources"
 import { openDialog } from "@/features/shell/dialogs"
-import { useInstalledPlugins } from "@/platform/plugins"
 import { useBuiltInSources } from "./add-operation/built-in-sources"
 import { ArrangeTools } from "./arrange/arrange-tools"
 
 /**
  * Tools over the viewer, as icons that say what they do on hover: moving and locking what is
- * selected in it, quick actions (built-in auto-level, auto Z-height and auto-scan, and plugin
- * sources), then checking the selected plate's design rules and the workspace settings.
+ * selected in it, PCB and probing actions, then checking the selected plate's design rules and the workspace settings.
  */
 export function PrepareToolbar() {
-  const plugins = useInstalledPlugins().data ?? []
   const builtIns = useBuiltInSources()
   const workspace = useWorkspaceStore()
   const hasPlate = useWorkspace((state) => selectedPlate(state) !== null)
@@ -54,24 +44,13 @@ export function PrepareToolbar() {
               <Icon />
             </ToolbarButton>
           ))}
-          {toolbarItems(plugins).map(({ item, source }) => {
-            const Icon = TOOLBAR_ICONS[item.icon]
-            return (
-              <ToolbarButton
-                key={`${sourceKey(source)}/${item.id}`}
-                label={item.label}
-                description={sourceDescription(source)}
-                onClick={() =>
-                  openDialog({
-                    kind: "add-operation",
-                    preset: sourceRefOf(source),
-                  })
-                }
-              >
-                <Icon />
-              </ToolbarButton>
-            )
-          })}
+          <ToolbarButton
+            label="PCB"
+            description="Create operations from KiCad Gerber and Excellon files."
+            onClick={() => openDialog({ kind: "add-operation", preset: "pcb" })}
+          >
+            <CircuitBoard />
+          </ToolbarButton>
           <Separator orientation="vertical" />
           <ToolbarButton
             label="Check design rules"

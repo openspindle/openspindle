@@ -1,5 +1,5 @@
 # Dependencies
-node_modules/
+node_modules
 
 # Build output
 dist/
@@ -36,6 +36,4 @@ __pycache__/
 __unconfig*
 todos.json
 
-# Plugin SDK declarations (npm run sdk:types, also on install)
-packages/plugin-sdk/types/
 .gitnexus

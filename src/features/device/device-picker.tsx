@@ -254,8 +254,9 @@ export function DevicePicker({ close }: { close: () => void }) {
             {scanning ? "Searching…" : "Search again"}
           </Button>
         </FieldLegend>
+        {/* Room for the cards' rings, which the scrolling would clip, keeping the cards in line. */}
         <div
-          className="flex max-h-64 flex-col gap-2 overflow-auto"
+          className="-m-px flex max-h-64 flex-col gap-2 overflow-auto p-px"
           aria-live="polite"
         >
           {!devices.length && (

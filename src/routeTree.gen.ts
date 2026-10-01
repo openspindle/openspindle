@@ -11,7 +11,6 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as WorkspaceRouteImport } from './routes/_workspace'
-import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as WorkspaceDeviceRouteImport } from './routes/_workspace/device'
 import { Route as WorkspaceJobRouteImport } from './routes/_workspace/job'
 import { Route as WorkspacePrepareRouteImport } from './routes/_workspace/prepare'
@@ -23,11 +22,6 @@ const IndexRoute = IndexRouteImport.update({
 } as any)
 const WorkspaceRoute = WorkspaceRouteImport.update({
   id: '/_workspace',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SettingsRoute = SettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
 const WorkspaceDeviceRoute = WorkspaceDeviceRouteImport.update({
@@ -48,14 +42,12 @@ const WorkspacePrepareRoute = WorkspacePrepareRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/settings': typeof SettingsRoute
   '/device': typeof WorkspaceDeviceRoute
   '/job': typeof WorkspaceJobRoute
   '/prepare': typeof WorkspacePrepareRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/settings': typeof SettingsRoute
   '/device': typeof WorkspaceDeviceRoute
   '/job': typeof WorkspaceJobRoute
   '/prepare': typeof WorkspacePrepareRoute
@@ -64,21 +56,19 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_workspace': typeof WorkspaceRouteWithChildren
-  '/settings': typeof SettingsRoute
   '/_workspace/device': typeof WorkspaceDeviceRoute
   '/_workspace/job': typeof WorkspaceJobRoute
   '/_workspace/prepare': typeof WorkspacePrepareRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/settings' | '/device' | '/job' | '/prepare'
+  fullPaths: '/' | '/device' | '/job' | '/prepare'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/settings' | '/device' | '/job' | '/prepare'
+  to: '/' | '/device' | '/job' | '/prepare'
   id:
     | '__root__'
     | '/'
     | '/_workspace'
-    | '/settings'
     | '/_workspace/device'
     | '/_workspace/job'
     | '/_workspace/prepare'
@@ -87,7 +77,6 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   WorkspaceRoute: typeof WorkspaceRouteWithChildren
-  SettingsRoute: typeof SettingsRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -104,13 +93,6 @@ declare module '@tanstack/react-router' {
       path: ''
       fullPath: '/'
       preLoaderRoute: typeof WorkspaceRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/settings': {
-      id: '/settings'
-      path: '/settings'
-      fullPath: '/settings'
-      preLoaderRoute: typeof SettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_workspace/device': {
@@ -156,7 +138,6 @@ const WorkspaceRouteWithChildren = WorkspaceRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   WorkspaceRoute: WorkspaceRouteWithChildren,
-  SettingsRoute: SettingsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

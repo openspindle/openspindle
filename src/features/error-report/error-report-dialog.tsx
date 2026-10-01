@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from "react"
 import { useForm } from "@tanstack/react-form"
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { useMutation, useQuery } from "@tanstack/react-query"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
@@ -95,7 +95,6 @@ export function ErrorReportDialog({
 }) {
   const id = useId()
   const host = useHost()
-  const queryClient = useQueryClient()
   const workspace = useWorkspaceStore()
   const projectName = useWorkspace((state) =>
     suggestedProjectName(state.project.fileName)
@@ -113,11 +112,7 @@ export function ErrorReportDialog({
           contentType: "text/plain",
         })
       if (fields.attachProject) {
-        const { contents } = await encodeWorkspace(
-          workspace.state,
-          host,
-          queryClient
-        )
+        const { contents } = await encodeWorkspace(workspace.state, host)
         attachments.push({
           filename: projectName,
           data: contents,
