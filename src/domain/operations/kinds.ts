@@ -152,7 +152,6 @@ const probingKind: OperationKind<"probing"> = {
       plate,
       probe: probe.value,
       machine,
-      context,
       machining: plateMachining(plate, kit),
     })
     if (!generated?.ok)

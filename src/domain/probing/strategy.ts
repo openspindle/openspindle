@@ -9,7 +9,6 @@
 import type { PlateMachining } from "../compile/toolpath-bounds"
 import type { Issue } from "../diagnostics"
 import type { GCodeProgram } from "../nc/gcode"
-import type { ResolveContext } from "../operations/kinds"
 import type { ProbingSource, ProbingSourceOf } from "../operations/operation"
 import type { Plate } from "../plate/plate"
 import type { ProbeProfile, Tool } from "../tools/tool"
@@ -58,7 +57,6 @@ export type StrategyInput<TParams> = {
   readonly plate: Plate
   readonly probe: BoundProbe
   readonly machine: MachineProbing
-  readonly context: ResolveContext
   /** Where the plate's other operations cut, measured only if the strategy reads it. */
   readonly machining: PlateMachining
 }
