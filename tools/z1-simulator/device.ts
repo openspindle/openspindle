@@ -36,7 +36,7 @@ export type SimulatorOptions = {
   readonly anchors: readonly [number, number, number, number]
   /** Milliseconds per played program line, moves taking their own time on top. */
   readonly lineMs: number
-  /** How many times faster than the machine it moves. */
+  /** How many times faster than the machine it moves at start. */
   readonly speed: number
   /** Skip the one-second done snapshot: P vanishes without a completion report. */
   readonly noDoneSnapshot: boolean
@@ -174,6 +174,8 @@ export class SimulatedZ1 {
   halted = false
   haltReason = 0
   answeringStatus = true
+  /** How many times faster than the machine it moves; a change applies from the next move. */
+  speed: number
   /** Called when a reset reboots the controller; the connection drops with it. */
   onReboot: () => void = () => {}
   private readonly options: SimulatorOptions
@@ -242,6 +244,7 @@ export class SimulatedZ1 {
     this.send = send
     this.log = log
     this.homed = options.homed
+    this.speed = options.speed
     this.tool = options.tool
     this.bedClean = options.bedClean
     this.anchor1 = [options.anchors[0], options.anchors[1]]
@@ -642,6 +645,7 @@ export class SimulatedZ1 {
       this.ok(text)
       return
     }
+    if (!this.motion(code, (line) => this.lines(line))) return
     if (this.machineCode(code)) this.ok(text)
     else this.lines("error:Unsupported command")
   }
@@ -757,7 +761,7 @@ export class SimulatedZ1 {
     const delta: Xyz = arc
       ? [xy, 0, dz]
       : [to[0] - from[0], to[1] - from[1], dz]
-    const ms = moveMs(delta, Math.hypot(xy, dz), rate) / this.options.speed
+    const ms = moveMs(delta, Math.hypot(xy, dz), rate) / this.speed
     const now = Date.now()
     if (ms <= 0) return Math.max(0, this.motionUntil - now)
     const startedAt = Math.max(now, this.motionUntil)
@@ -927,6 +931,20 @@ export class SimulatedZ1 {
       this.reply("ok")
       return
     }
+    if (!this.motion(code, (text) => this.reply(text))) return
+    if (/^M0*5\b/.test(code)) player.dwellUntil = Date.now() + 1500
+    if (/^G0*4\b/.test(code))
+      player.dwellUntil = Date.now() + (word(code, "P") ?? 0) * 1000
+    this.reply(this.machineCode(code) ? "ok" : "error:Unsupported command")
+  }
+
+  /**
+   * What a line does to the modes and where the machine goes (Robot, ZProbe), whether it is
+   * played or typed in the console: G90 and G91, F, G0 to G3, G53, G28, G10, G32 and the
+   * probe's G38.2 to G38.5. `say` writes to the line's stream. Whether the line goes on to its
+   * acknowledgement: a probe search that alarms does not.
+   */
+  private motion(code: string, say: (text: string) => void): boolean {
     const mode = /\bG0*9([01])(?![\d.])/.exec(code)?.[1]
     if (mode !== undefined) this.absolute = mode === "0"
     const feed = word(code, "F")
@@ -934,10 +952,7 @@ export class SimulatedZ1 {
     const motion = /\bG0*([0-3])(?![\d.])/.exec(code)?.[1]
     if (motion !== undefined) this.motionMode = Number(motion)
     const probe = /^G0*38\.([2-5])(?!\d)/.exec(code)?.[1]
-    if (probe !== undefined) {
-      if (this.probe(code, Number(probe))) this.reply("ok")
-      return
-    }
+    if (probe !== undefined) return this.probe(code, Number(probe), say)
     const from: Xyz = [...this.mpos]
     const machineMove = /^G0*53\b/.test(code)
     if (machineMove) {
@@ -958,9 +973,6 @@ export class SimulatedZ1 {
         if (word(code, "L") === 20)
           this.offset[index] = this.mpos[index] - value
       }
-    if (/^M0*5\b/.test(code)) player.dwellUntil = Date.now() + 1500
-    if (/^G0*4\b/.test(code))
-      player.dwellUntil = Date.now() + (word(code, "P") ?? 0) * 1000
     if (/^G0*32\b/.test(code)) this.recordProbe(code)
     // Axis words move in the modal motion, but not a code's own (G4, G10, G28, G32, G92).
     const moves =
@@ -982,7 +994,7 @@ export class SimulatedZ1 {
       }
       this.travel(from, this.rate, this.arc(code, from))
     }
-    this.reply(this.machineCode(code) ? "ok" : "error:Unsupported command")
+    return true
   }
 
   /** A G2 or G3 move's arc from `from` to `mpos`, about I and J from its start (G17); else null. */
@@ -996,12 +1008,16 @@ export class SimulatedZ1 {
   }
 
   /**
-   * G38.2 to G38.5 in a played line (ZProbe probe_XYZ): X Y Z are distances in either distance
-   * mode. Going down, the probe meets the tool sensor under it, else the stock top; G38.2 and
-   * G38.4 halt with a probe failure when it meets nothing. The contact goes to the line's
-   * stream. Whether the line goes on to its acknowledgement.
+   * G38.2 to G38.5 (ZProbe probe_XYZ): X Y Z are distances in either distance mode. Going down,
+   * the probe meets the tool sensor under it, else the stock top; G38.2 and G38.4 halt with a
+   * probe failure when it meets nothing. The contact goes to the line's stream (`say`). Whether
+   * the line goes on to its acknowledgement.
    */
-  private probe(code: string, subcode: number): boolean {
+  private probe(
+    code: string,
+    subcode: number,
+    say: (text: string) => void
+  ): boolean {
     const target = this.mpos.map(
       (value, index) => value + (word(code, "XYZ"[index]) ?? 0)
     ) as Xyz
@@ -1016,9 +1032,7 @@ export class SimulatedZ1 {
     const from: Xyz = [...this.mpos]
     for (const index of [0, 1, 2]) this.mpos[index] = target[index]
     const ms = this.travel(from, this.feed ?? FEED_RATE)
-    this.reply(
-      `[PRB:${f3(target[0])},${f3(target[1])},${f3(target[2])}:${flag(met)}]`
-    )
+    say(`[PRB:${f3(target[0])},${f3(target[1])},${f3(target[2])}:${flag(met)}]`)
     if (met) {
       this.log(`probe contact at machine Z ${f3(surface)}`)
       return true

@@ -9,6 +9,7 @@ import { log } from "./diagnostics/log"
 import { DiagnosticsSettingsStore } from "./diagnostics/settings"
 import { LastDevice } from "./machine/last-device"
 import { MachineHost } from "./machine/machine-host"
+import { SimulatorService } from "./simulator/simulator-service"
 import { MACHINE_STOP_ITEM, buildApplicationMenu } from "./menu"
 import { PcbService } from "./pcb/service"
 import { handleAppProtocol, registerAppScheme } from "./protocol"
@@ -124,6 +125,7 @@ function start(diagnostics: Diagnostics, openedFiles: OpenedFileBus) {
     },
     new LastDevice(app.getPath("userData"))
   )
+  const simulator = new SimulatorService(app.getPath("userData"))
   const entry = rendererEntry()
   const pcb = new PcbService(app.getPath("userData"), currentWindow)
   serveHostConnections({
@@ -139,6 +141,7 @@ function start(diagnostics: Diagnostics, openedFiles: OpenedFileBus) {
       unsaved,
       keptWorkspace,
       diagnostics,
+      simulator,
     }),
     isTrusted: trustedSender(currentWindow, entry.origin),
   })
@@ -170,6 +173,7 @@ function start(diagnostics: Diagnostics, openedFiles: OpenedFileBus) {
     if (storageSettled) {
       fusion.dispose()
       machine.dispose()
+      simulator.dispose()
       pcb.dispose()
       log.info("OpenSpindle quit")
       log.flushSync()
@@ -218,6 +222,7 @@ function start(diagnostics: Diagnostics, openedFiles: OpenedFileBus) {
   })
   // A crashed page kept nothing newer: the reload that follows starts a new project.
   window.webContents.on("render-process-gone", () => keptWorkspace.forget())
-  // The only thing a launch restores: the connection to the last used device.
-  void machine.reconnect()
+  // The only thing a launch restores: the connection to the last used device, once the app's
+  // simulator, which it may be, is listening.
+  void simulator.start().finally(() => machine.reconnect())
 }

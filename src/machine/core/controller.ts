@@ -266,7 +266,7 @@ export class MachineController {
     this.endRestart()
     if (target.name !== undefined) return this.open(target, confirmed)
     const disconnects = this.disconnects
-    const name = await this.discovery.nameOf(target.host)
+    const name = await this.discovery.nameOf(target)
     if (disconnects !== this.disconnects)
       throw new MachineError(
         "cancelled",

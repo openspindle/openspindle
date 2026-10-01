@@ -6,10 +6,16 @@ import type { Clock, DatagramListener } from "./ports.ts"
 const LISTEN_MS = 3000
 const MAX_DEVICES = 128
 
+type DeviceAddress = Pick<NetworkDevice, "host" | "port">
+const address = ({ host, port }: DeviceAddress) => `${host}:${port}`
+
 /** Passive announcements only: no broadcast probe and no automatic connection. */
 export class DiscoveryService {
   private current: Promise<NetworkDevice[]> | null = null
-  /** The latest announcement per host, from every listening window so far. */
+  /**
+   * The latest announcement per host and port, from every listening window so far: devices on
+   * one host, such as two simulators, keep their own names.
+   */
   private readonly heard = new Map<string, NetworkDevice>()
   private stop: (() => void) | null = null
   private readonly udp: DatagramListener
@@ -48,10 +54,10 @@ export class DiscoveryService {
         message: (data, sender) => {
           const device = this.adapter.discovery.parse(data, sender)
           if (!device) return
-          if (found.size < MAX_DEVICES)
-            found.set(`${device.host}:${device.port}`, device)
-          if (this.heard.size < MAX_DEVICES || this.heard.has(device.host))
-            this.heard.set(device.host, device)
+          const key = address(device)
+          if (found.size < MAX_DEVICES) found.set(key, device)
+          if (this.heard.size < MAX_DEVICES || this.heard.has(key))
+            this.heard.set(key, device)
         },
         error: (message) =>
           finish(
@@ -65,24 +71,24 @@ export class DiscoveryService {
     return this.current
   }
 
-  /** The device that announced itself from a host, if one was heard. */
-  announced(host: string): NetworkDevice | undefined {
-    return this.heard.get(host)
+  /** The device that announced itself at a host and port, if one was heard. */
+  announced(target: DeviceAddress): NetworkDevice | undefined {
+    return this.heard.get(address(target))
   }
 
   /**
-   * The name a device at a host announces, listening once if it has not been heard yet.
-   * Null when nothing announces there (or listening fails): the caller names it by host.
+   * The name a device at a host and port announces, listening once if it has not been heard
+   * yet. Null when nothing announces there (or listening fails): the caller names it by host.
    */
-  async nameOf(host: string): Promise<string | null> {
-    const known = this.announced(host)
+  async nameOf(target: DeviceAddress): Promise<string | null> {
+    const known = this.announced(target)
     if (known) return known.name
     try {
       await this.discover()
     } catch {
       return null
     }
-    return this.announced(host)?.name ?? null
+    return this.announced(target)?.name ?? null
   }
 
   dispose() {

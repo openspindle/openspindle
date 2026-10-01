@@ -153,5 +153,9 @@ export async function connectElectronHost(
       watchMainErrors: (listener) =>
         peer.subscribe("diagnostics.mainError", undefined, listener),
     },
+    simulator: {
+      status: () => peer.call("simulator.status", undefined),
+      update: (patch) => peer.call("simulator.update", patch),
+    },
   }
 }

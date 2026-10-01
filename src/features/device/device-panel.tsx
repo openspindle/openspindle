@@ -41,6 +41,7 @@ import { DeviceAccessoriesCard } from "./device-accessories-card"
 import { DeviceCoordinatesCard } from "./device-coordinates-card"
 import { DeviceJogCard } from "./device-jog-card"
 import { DeviceOverridesCard } from "./device-overrides-card"
+import { DeviceSimulatorCard } from "./device-simulator-card"
 import { DeviceSpindleCard } from "./device-spindle-card"
 import { DeviceStatusCard } from "./device-status-card"
 
@@ -275,6 +276,7 @@ export function DevicePanel({
             reason={reason}
             execute={execute}
           />
+          <DeviceSimulatorCard device={device} />
         </div>
       </div>
       <FieldDescription

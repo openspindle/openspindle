@@ -12,6 +12,7 @@ import { pcbMethods } from "./pcb"
 import { machineEvents, machineMethods } from "./machine-rpc"
 import { MenuCommandSchema } from "./menu"
 import { modelMethods } from "./models"
+import { simulatorMethods } from "./simulator"
 import { storageMethods } from "./storage"
 import { windowMethods } from "./window"
 import { fusionEvents, fusionMethods } from "./fusion"
@@ -36,6 +37,7 @@ export const hostContract = defineContract({
     ...windowMethods,
     ...diagnosticsMethods,
     ...fusionMethods,
+    ...simulatorMethods,
   },
   events: {
     ...machineEvents,

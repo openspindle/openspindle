@@ -11,6 +11,7 @@ import type { StorageService } from "../services/storage-service"
 import type { UnsavedChanges } from "../services/unsaved-changes"
 import type { PcbService } from "../pcb/service"
 import type { Diagnostics } from "../diagnostics/diagnostics"
+import type { SimulatorService } from "../simulator/simulator-service"
 import { machine } from "./machine-errors"
 
 export type HostServices = {
@@ -25,6 +26,7 @@ export type HostServices = {
   readonly unsaved: UnsavedChanges
   readonly keptWorkspace: KeptWorkspace
   readonly diagnostics: Diagnostics
+  readonly simulator: SimulatorService
 }
 
 /** Maps every host-contract method and event onto a main-process service. */
@@ -108,6 +110,8 @@ export function createHostHandlers(
         services.pcb.setExecutable(executable),
       "pcb.generate": (request, { signal }) =>
         services.pcb.generate(request, signal),
+      "simulator.status": () => services.simulator.status(),
+      "simulator.update": (patch) => services.simulator.update(patch),
     },
     events: {
       "fusion.changed": (_params, emit) => fusion.subscribe(emit),

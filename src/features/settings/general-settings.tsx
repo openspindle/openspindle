@@ -5,11 +5,13 @@ import {
   FieldGroup,
   FieldLabel,
 } from "@/components/ui/field"
+import { Switch } from "@/components/ui/switch"
 import { OptionSelect } from "@/components/option-select"
 import { Hint } from "@/components/workspace/hint"
 import { isAppearance } from "@/lib/appearance"
 import { FONTS, FONT_CHOICES, isFontFor } from "@/lib/fonts"
 import type { FontRole } from "@/lib/fonts"
+import { useSimulatorStatus, useUpdateSimulator } from "@/platform/simulator"
 
 const APPEARANCE_OPTIONS = [
   { value: "system", label: "System" },
@@ -42,10 +44,18 @@ const FONT_FIELDS: ReadonlyArray<{
 const fontOptions = (role: FontRole) =>
   FONT_CHOICES[role].map((id) => ({ value: id, label: FONTS[id].label }))
 
-/** Settings › General: how the app looks. Changes apply at once. */
+const simulatorHint = (host: string, port: number) =>
+  `A simulated Makera Z1 that OpenSpindle runs at ${host}:${port}, to try jobs without a machine. Connect to it as to a machine.`
+
+/** Settings › General: how the app looks, and its simulated Z1. Changes apply at once. */
 export function GeneralSettings() {
   const { appearance, setAppearance, fonts, setFont, saveError } =
     useAppearance()
+  const simulator = useSimulatorStatus().data
+  const updateSimulator = useUpdateSimulator()
+  const simulatorError = updateSimulator.error
+    ? `This setting could not be saved: ${updateSimulator.error.message}`
+    : simulator?.error && `The simulator is not running. ${simulator.error}`
   return (
     <FieldGroup>
       <Field orientation="horizontal">
@@ -81,6 +91,22 @@ export function GeneralSettings() {
         </Field>
       ))}
       {saveError && <FieldError>{saveError}</FieldError>}
+      {simulator && (
+        <Field orientation="horizontal">
+          <FieldLabel htmlFor="z1-simulator">
+            <Hint text={simulatorHint(simulator.host, simulator.port)}>
+              Z1 Simulator device
+            </Hint>
+          </FieldLabel>
+          <Switch
+            id="z1-simulator"
+            aria-description={simulatorHint(simulator.host, simulator.port)}
+            checked={simulator.settings.enabled}
+            onCheckedChange={(enabled) => updateSimulator.mutate({ enabled })}
+          />
+        </Field>
+      )}
+      {simulatorError && <FieldError>{simulatorError}</FieldError>}
     </FieldGroup>
   )
 }

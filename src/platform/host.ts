@@ -30,6 +30,7 @@ import type {
   SaveFileResult,
 } from "./contract/files"
 import type { CameraEvent } from "./contract/machine-rpc"
+import type { SimulatorSettings, SimulatorStatus } from "./contract/simulator"
 import type { BackupResult, StorageKey } from "./contract/storage"
 import type { MenuCommand } from "./contract/menu"
 import type {
@@ -162,6 +163,13 @@ export interface PcbHost {
   ) => Promise<PcbGeneration>
 }
 
+/** The simulated Z1 the app runs: whether it does, and how fast it moves. */
+export interface SimulatorHost {
+  status: () => Promise<SimulatorStatus>
+  /** Starts or stops it, or changes its speed at once; the change is kept. */
+  update: (patch: Partial<SimulatorSettings>) => Promise<SimulatorStatus>
+}
+
 /** The main process, as the renderer reaches it: every service is a typed RPC call. */
 export interface Host {
   readonly machine: MachineHost
@@ -173,4 +181,5 @@ export interface Host {
   readonly window: WindowHost
   readonly pcb: PcbHost
   readonly diagnostics: DiagnosticsHost
+  readonly simulator: SimulatorHost
 }

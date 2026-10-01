@@ -2,17 +2,11 @@
  * Development-only Makera Z1 simulator: `npm run sim:z1 -- [options]`.
  * It listens where the app connects (TCP 2222), announces itself for discovery
  * (UDP 3333) and serves the camera WebSocket. Never point it at real hardware.
+ * The app runs one of its own as well (Settings › General › Z1 Simulator device).
  */
-import { createSocket } from "node:dgram"
-import { createServer } from "node:net"
-import type { Socket } from "node:net"
 import { parseArgs } from "node:util"
-import {
-  FrameDecoder,
-  encodeFrame,
-} from "../../src/machine/firmware/makera/codec.ts"
 import { startCamera } from "./camera.ts"
-import { SimulatedZ1 } from "./device.ts"
+import { DEFAULT_SIMULATOR_OPTIONS, serveSimulator } from "./server.ts"
 
 const { values } = parseArgs({
   options: {
@@ -75,10 +69,13 @@ if (anchors.length !== 4 || anchors.some((value) => !Number.isFinite(value))) {
 const log = (message: string) =>
   console.log(`${new Date().toISOString().slice(11, 23)}  ${message}`)
 const port = Number(values.port)
-let client: Socket | null = null
+const stallAfter = values["stall-after"]
 
-const device = new SimulatedZ1(
-  {
+const simulator = await serveSimulator({
+  name: values.name,
+  port,
+  options: {
+    ...DEFAULT_SIMULATOR_OPTIONS,
     model: values.pro ? 4 : 3,
     atc: values.atc,
     bedClean: values["bed-clean"],
@@ -97,60 +94,28 @@ const device = new SimulatedZ1(
       corrupt: values["corrupt-upload"],
     },
   },
-  (type, payload) => client?.write(encodeFrame(type, payload)),
-  log
-)
-
-device.onReboot = () => client?.destroy()
-
-const server = createServer((socket) => {
-  if (client) {
-    socket.destroy()
-    return
-  }
-  client = socket
-  log(`app connected from ${socket.remoteAddress ?? "?"}`)
-  if (values["stall-after"])
-    setTimeout(() => {
-      device.answeringStatus = false
-      log("status stalled")
-    }, Number(values["stall-after"]))
-  const decoder = new FrameDecoder()
-  socket.on("data", (chunk: Buffer) => {
-    try {
-      for (const frame of decoder.push(new Uint8Array(chunk)))
-        device.receive(frame)
-    } catch (error) {
-      log(
-        `protocol error: ${error instanceof Error ? error.message : String(error)}`
-      )
-      socket.destroy()
-    }
-  })
-  socket.on("close", () => {
-    if (client === socket) client = null
-    log("app disconnected")
-  })
-  socket.on("error", () => socket.destroy())
+  log,
+  onConnect: (device) => {
+    if (stallAfter)
+      setTimeout(() => {
+        device.answeringStatus = false
+        log("status stalled")
+      }, Number(stallAfter))
+  },
+}).catch((error: unknown) => {
+  const message = error instanceof Error ? error.message : String(error)
+  console.error(
+    `The simulator could not listen on 127.0.0.1:${port} (${message}). Choose another --port; the app's own simulator takes 2223.`
+  )
+  process.exit(1)
 })
-server.listen(port, "127.0.0.1", () => log(`Z1 simulator on 127.0.0.1:${port}`))
-
-// Passive discovery: name,ip,port,busy,version to the app's listener.
-const announcer = createSocket("udp4")
-const announce = setInterval(() => {
-  const message = `${values.name},127.0.0.1,${port},${client ? 1 : 0},sim`
-  announcer.send(message, 3333, "127.0.0.1")
-}, 1000)
+const device = simulator.device
 
 const camera = startCamera(Number(values["camera-port"]), log)
 
 const shutdown = () => {
-  clearInterval(announce)
-  device.dispose()
-  announcer.close()
+  simulator.close()
   camera.close()
-  server.close()
-  client?.destroy()
   process.exit(0)
 }
 process.on("SIGINT", shutdown)
