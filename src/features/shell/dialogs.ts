@@ -34,6 +34,8 @@ export type WorkspaceDialog =
       /** Opens a plugin's template form or importer view directly. */
       readonly preset?: PluginSourceRef
     }
+  /** A probing operation from a probe of the tool library and a strategy it runs. */
+  | { readonly kind: "probing" }
   /** Starting a new project over unsaved changes: save them, discard them, or cancel. */
   | { readonly kind: "new-project" }
   /** Opening a project over unsaved changes: save them, discard them, or cancel. */

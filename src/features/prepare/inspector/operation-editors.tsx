@@ -10,10 +10,7 @@ import {
 } from "@/components/ui/field"
 import { Switch } from "@/components/ui/switch"
 import { templateProgram } from "@/app/workspace/templates"
-import {
-  useWorkspace,
-  useWorkspaceStore,
-} from "@/app/workspace/workspace-context"
+import { useWorkspaceStore } from "@/app/workspace/workspace-context"
 import { placementAnchors } from "@/domain/probing/placement"
 import { strategyFor } from "@/domain/probing/strategies"
 import type { MachineProbing } from "@/domain/probing/strategy"
@@ -30,7 +27,7 @@ import type {
   ProbingSourceOf,
 } from "@/domain/operations/operation"
 import type { Plate } from "@/domain/plate/plate"
-import { boundTools, localTools } from "@/domain/tools/tool-table"
+import { localTools } from "@/domain/tools/tool-table"
 import { GridSettings } from "@/features/probing/grid-settings"
 import { OutlineSettings } from "@/features/probing/outline-settings"
 import { TouchOffSettings } from "@/features/probing/touch-off-settings"
@@ -46,6 +43,7 @@ import { isPluginUsable } from "@/platform/contract/plugin-rpc"
 import type { PluginSummary } from "@/platform/contract/plugin-rpc"
 import { useInstalledPlugins } from "@/platform/plugins"
 import { usePrepareSelection } from "../plate-tree/use-prepare-selection"
+import { ProbingChoiceFields } from "./probing-choice-fields"
 
 type EditorProps<TKind extends OperationSource["kind"]> = {
   plate: Plate
@@ -355,7 +353,7 @@ function OutlineEditor({
   )
 }
 
-/** 3D probing's settings: the routine, and where it starts. */
+/** An origin task's settings: the routine, and where it starts. */
 function OriginEditor({
   plate,
   operation,
@@ -377,23 +375,21 @@ function OriginEditor({
 }
 
 /**
- * A probing operation's strategy and probe, then its task's settings. Without the strategy on the
+ * A probing operation's probe and strategy, then its task's settings. Without the strategy on the
  * plate's machine it has no settings; its diagnostic above says why.
  */
 function ProbingEditor({ plate, operation }: EditorProps<"probing">) {
-  const library = useWorkspace((state) => state.tools)
   const machine = kitForPlate(plate).probing
-  const { source } = operation
-  const strategy = machine && strategyFor(source, machine)
+  const strategy = machine && strategyFor(operation.source, machine)
   if (!machine || !strategy) return null
-  const toolId = boundTools(plate, operation).get(source.probe)
-  const tool = library.find((item) => item.id === toolId)
-  const probe = tool ? `T${source.probe} · ${tool.name}` : `T${source.probe}`
   return (
     <>
-      <FieldDescription>
-        {strategy.label} · {probe}
-      </FieldDescription>
+      <ProbingChoiceFields
+        plate={plate}
+        operation={operation}
+        machine={machine}
+        strategy={strategy}
+      />
       <TaskEditor plate={plate} operation={operation} machine={machine} />
     </>
   )

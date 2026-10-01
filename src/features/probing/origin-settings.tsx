@@ -81,7 +81,7 @@ function routineDescription({ routine }: OriginParams) {
 }
 
 /**
- * Parameters of a built-in 3D probing operation. Edits apply as soon as the parameters are
+ * Parameters of an origin probing operation. Edits apply as soon as the parameters are
  * valid; invalid input stays in the form with its errors and is never passed on.
  */
 export function OriginSettings({

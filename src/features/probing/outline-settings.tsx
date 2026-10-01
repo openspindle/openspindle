@@ -42,7 +42,7 @@ function outlineDescription(outline: ToolpathBoundsResult) {
 }
 
 /**
- * Parameters of a built-in auto-scan operation. Edits apply as soon as the parameters are valid;
+ * Parameters of an outline probing operation. Edits apply as soon as the parameters are valid;
  * invalid input stays in the form with its errors and is never passed on.
  */
 export function OutlineSettings({
@@ -101,7 +101,7 @@ function OutlineForm({
         {(field) => (
           <SwitchField
             id={`${id}-pause`}
-            label="Pause after scanning"
+            label="Pause after tracing"
             description="Pause after the trace to check the outline against the stock and fixtures, then Resume or Stop."
             checked={field.state.value}
             disabled={disabled}

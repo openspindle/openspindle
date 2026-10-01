@@ -9,6 +9,7 @@ import { ModelsDialog } from "@/features/models/models-dialog"
 import { PluginRequestHost } from "@/features/plugins/plugin-request-host"
 import { PluginsDialog } from "@/features/plugins/plugins-dialog"
 import { AddOperationDialog } from "@/features/prepare/add-operation/add-operation-dialog"
+import { ProbingPicker } from "@/features/prepare/add-operation/probing-picker"
 import { ProgramSourceDialog } from "@/features/prepare/source/program-source-dialog"
 import {
   NewProjectDialog,
@@ -68,6 +69,8 @@ function OpenDialog({ dialog }: { dialog: WorkspaceDialog }) {
       )
     case "add-operation":
       return <AddOperationDialog preset={dialog.preset} onClose={closeDialog} />
+    case "probing":
+      return <ProbingPicker onClose={closeDialog} />
     case "new-project":
       return <NewProjectDialog />
     case "open-project":

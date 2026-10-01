@@ -157,7 +157,7 @@ function Verdict({ analysis }: { analysis: HeightMapAnalysis }) {
 }
 
 /**
- * Review of the measured height map while a job waits at its auto-level review pause; Resume
+ * Review of the measured height map while a job waits at its height map review pause; Resume
  * and Stop are the job's own controls.
  */
 export function HeightMapReview({

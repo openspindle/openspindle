@@ -266,7 +266,7 @@ export function PlacementFields({
   lastAnchor: AnchorPlacement | null
   setLastAnchor: (anchor: AnchorPlacement | null) => void
   disabled: boolean
-  /** The operation starts at a height on the bed, such as 3D probing. */
+  /** The operation starts at a height on the bed, such as finding an origin. */
   height?: boolean
   /** Fit grid or Center, above the start; left out where it sits beside other fields instead. */
   action?: (

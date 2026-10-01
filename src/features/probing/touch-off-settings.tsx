@@ -64,7 +64,7 @@ function centerReason({ result, anchors }: WorkAreaFit) {
 }
 
 /**
- * Parameters of a built-in auto Z-height operation. Edits apply as soon as the parameters are
+ * Parameters of a touch-off probing operation. Edits apply as soon as the parameters are
  * valid; invalid input stays in the form with its errors and is never passed on.
  */
 export function TouchOffSettings({

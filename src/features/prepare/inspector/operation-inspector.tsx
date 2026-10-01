@@ -92,7 +92,7 @@ export function OperationInspector({
     useKeyedDiagnostics(plate),
     operation.id
   )
-  const kindLabel = useOperationKindLabel(operation)
+  const kindLabel = useOperationKindLabel(operation, plate)
   return (
     <Tabs
       value={panel === "tools" ? "tools" : "operation"}
