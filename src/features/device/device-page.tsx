@@ -1,5 +1,7 @@
 import { useState } from "react"
+import { Crosshair } from "lucide-react"
 import { toast } from "sonner"
+import { ReasonButton } from "@/components/workspace/reason-button"
 import {
   useFixtureLibrary,
   useFixtureLibraryStore,
@@ -24,6 +26,7 @@ import {
 import type { AnchorWriting } from "./anchor-positions-form"
 import { DeviceAnchors } from "./device-anchors"
 import { DeviceBedSetup } from "./device-bed-setup"
+import { useProbeAnchor } from "./use-probe-anchor"
 import { DeviceFixtures } from "./device-fixtures"
 import { DeviceConfigurationCard } from "./device-configuration"
 import { DevicePanel } from "./device-panel"
@@ -45,6 +48,7 @@ export function DevicePage() {
   const { profile, deviceId } = useSelectedFixtureProfile()
   const workspace = useWorkspaceStore()
   const { map } = useDeviceHeightMap()
+  const probeAnchor = useProbeAnchor()
   // The bed setup shown, the profile's default one until another is chosen.
   const [shownBedSetup, setShownBedSetup] = useState<string | null>(null)
   const bedSetup = bedSetupOf(profile, shownBedSetup)
@@ -126,18 +130,30 @@ export function DevicePage() {
               loading={machine.anchors.reading}
               error={machine.anchors.error ?? undefined}
               action={
-                storesAnchors && (
-                  <ReadAnchorsButton
-                    reading={readAnchors.isPending}
-                    onRead={() =>
-                      readAnchors.mutate(undefined, {
-                        onSuccess: () =>
-                          toast.success("Stored anchors updated."),
-                        onError: (error) => toast.error(error.message),
-                      })
-                    }
-                  />
-                )
+                <>
+                  <ReasonButton
+                    label="Probe anchor"
+                    variant="outline"
+                    size="sm"
+                    reason={probeAnchor.reason}
+                    onClick={probeAnchor.run}
+                  >
+                    <Crosshair data-icon="inline-start" />
+                    Probe anchor
+                  </ReasonButton>
+                  {storesAnchors && (
+                    <ReadAnchorsButton
+                      reading={readAnchors.isPending}
+                      onRead={() =>
+                        readAnchors.mutate(undefined, {
+                          onSuccess: () =>
+                            toast.success("Stored anchors updated."),
+                          onError: (error) => toast.error(error.message),
+                        })
+                      }
+                    />
+                  )}
+                </>
               }
               writing={storesAnchors ? writing : undefined}
               onAlign={(bedOffset) => {

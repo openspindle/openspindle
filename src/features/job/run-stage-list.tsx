@@ -411,7 +411,7 @@ function operationResults(
       <>
         {facts.length > 0 && <HeightMapFacts facts={facts} />}
         {grid && <HeightMapGrid map={gridMap(grid)} compact />}
-        {found && <SaveAsAnchor position={found} />}
+        {found && <SaveAsAnchor position={found} plate={subject.plate} />}
       </>
     ),
   }

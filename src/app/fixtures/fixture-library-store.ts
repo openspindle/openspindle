@@ -341,6 +341,29 @@ export class FixtureLibraryStore implements DocumentTarget<FixtureLibrary> {
   }
 
   /**
+   * Moves the anchors of every bed setup of the selected profile by `delta` from its device's
+   * first anchor: where that anchor moved by the opposite, they stay where they were.
+   */
+  moveBedSetupAnchors([dx, dy]: readonly [number, number]) {
+    this.edit((library) => {
+      if (!Object.hasOwn(library.profiles, library.selectedId)) return library
+      const { bedSetups } = library.profiles[library.selectedId]
+      return this.withSelected(library, {
+        bedSetups: bedSetups.map((setup) => ({
+          ...setup,
+          anchors: setup.anchors.map((anchor) => ({
+            ...anchor,
+            offset: [
+              Number((anchor.offset[0] + dx).toFixed(6)) + 0,
+              Number((anchor.offset[1] + dy).toFixed(6)) + 0,
+            ],
+          })),
+        })),
+      })
+    }, null)
+  }
+
+  /**
    * Keeps a bed setup in a device's profile, such as one a plate set up on another computer
    * names, unless the profile has one of its id or holds as many as it can.
    */
