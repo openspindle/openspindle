@@ -1,7 +1,6 @@
 import type { AnchorConfiguration } from "@/machine/contract"
-import { toolpathBoundsOf } from "../compile/cutting-bounds"
-import { PLAIN_NC, withoutClosingPark } from "../compile/nc-unit"
 import type { NcPolicy } from "../compile/nc-unit"
+import { plateMachining } from "../compile/toolpath-bounds"
 import { error, operationSubject } from "../diagnostics"
 import type { Diagnostic, Issue, QuickFix } from "../diagnostics"
 import { kitForPlate } from "../fixtures/catalog"
@@ -37,6 +36,7 @@ import type {
   TouchOffIssueCode,
 } from "../probing/tasks/touch-off/rules"
 import type { Tool } from "../tools/tool"
+import { fileKind, pluginKind, templateKind } from "./kept-nc"
 import type {
   Operation,
   Phase,
@@ -70,14 +70,8 @@ export type ResolveContext = {
   readonly tools: readonly Tool[]
 }
 
-/**
- * The context for resolving kinds that keep their NC (files and plugins, `generated: false`):
- * the kit alone, as their NC never reads the tool library.
- */
-export const keptNcContext = (kit: FixtureKit): ResolveContext => ({
-  kit,
-  tools: [],
-})
+// Files and plugins resolve with the kit alone (`keptNcContext`), as design rules read them too.
+export { keptNcContext } from "./kept-nc"
 
 /** The connected machine, as far as running an operation depends on it. */
 export type RunContext = {
@@ -127,52 +121,6 @@ export interface OperationKind<TKind extends SourceKind> {
     plate: Plate,
     machine: RunContext
   ) => Diagnostic[]
-}
-
-const plain = (nc: string): ResolvedNc => ({
-  nc,
-  policy: PLAIN_NC,
-  reviewLines: [],
-})
-
-const fileKind: OperationKind<"file"> = {
-  kind: "file",
-  label: "NC file",
-  verbatim: true,
-  generated: false,
-  phase: () => "machining",
-  resolve: ({ source }, _plate, { kit }) =>
-    ok(plain(source.park ? source.nc : withoutClosingPark(source.nc, kit))),
-}
-
-const templateKind: OperationKind<"template"> = {
-  kind: "template",
-  label: "Plugin program",
-  verbatim: true,
-  generated: false,
-  phase: (operation) => operation.source.phase,
-  resolve: (operation) => ok(plain(operation.source.nc)),
-}
-
-const pluginKind: OperationKind<"plugin"> = {
-  kind: "plugin",
-  label: "Plugin operation",
-  verbatim: true,
-  generated: false,
-  phase: (operation) => operation.source.phase,
-  resolve: (operation) =>
-    operation.source.nc === null
-      ? fail(
-          error(
-            "operation-pending",
-            `Generate "${operation.name}" in its plugin before running it.`,
-            {
-              subject: operationSubject(operation.id),
-              fix: { kind: "edit-operation", operationId: operation.id },
-            }
-          )
-        )
-      : ok(plain(operation.source.nc)),
 }
 
 /**
@@ -366,7 +314,7 @@ const TASK_DIAGNOSTICS: {
     invalid: "the scan is invalid.",
     // Outline and order advice needs no strategy, so a machine without one still reports it.
     validate: (operation, plate, kit) => {
-      const toolpath = toolpathBoundsOf(machiningPrograms(plate, kit))
+      const toolpath = plateMachining(plate, kit).toolpath()
       const index = plate.operations.findIndex(
         (item) => item.id === operation.id
       )
@@ -452,6 +400,7 @@ const probingKind: OperationKind<"probing"> = {
       probe: probe.value,
       machine,
       context,
+      machining: plateMachining(plate, kit),
     })
     if (!generated?.ok)
       return fail(
@@ -507,25 +456,6 @@ export const resolveOperation = (
 
 export const operationPhase = (operation: Operation): Phase =>
   kindOf(operation).phase(operation)
-
-/**
- * The NC of a plate's operations outside the setup phase, those that machine it, in order; null
- * for one whose NC does not resolve. Where a plate cuts is measured from them
- * (`plateToolpathBounds`). Only kinds that keep their NC machine (the probing kinds are setup),
- * so they resolve without the library (`keptNcContext`).
- */
-export function machiningPrograms(
-  plate: Plate,
-  kit: FixtureKit = kitForPlate(plate)
-): (string | null)[] {
-  const context = keptNcContext(kit)
-  return plate.operations
-    .filter((operation) => operationPhase(operation) !== "setup")
-    .map((operation) => {
-      const resolved = kindOf(operation).resolve(operation, plate, context)
-      return resolved.ok ? resolved.value.nc : null
-    })
-}
 
 /** Advice about every operation of a plate (see OperationKind.validate). */
 export const validateOperations = (

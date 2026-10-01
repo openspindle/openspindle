@@ -85,6 +85,8 @@ export const Z_PROBE: ProbingStrategy<
     return null
   },
   parameters: () => Z_PROBE_PARAMETERS,
+  // M495 searches down as far as the firmware's tool rack Z, whatever the probe travel.
+  reads: () => ({ probeTravel: false, clearance: true }),
   defaults: plateTouchOffParams,
   generate: ({ params, plate, probe, machine }) => {
     const plan = planTouchOff(

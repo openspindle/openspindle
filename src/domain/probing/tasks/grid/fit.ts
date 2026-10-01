@@ -1,6 +1,5 @@
 import type { BedAnchor } from "@/domain/anchors/stored-anchors"
-import { plateWorkArea } from "../../../compile/toolpath-bounds"
-import type { WorkArea } from "../../../compile/toolpath-bounds"
+import type { PlateMachining, WorkArea } from "../../../compile/toolpath-bounds"
 import type { Plate } from "../../../plate/plate"
 import { roundMillimetres } from "../../../geometry/millimetres"
 import { rectSize } from "../../../geometry/rect"
@@ -40,14 +39,15 @@ export function fitGrid(
  */
 export function plateGridParams(
   plate: Plate,
-  parameters: GridSpecs
+  parameters: GridSpecs,
+  machining: PlateMachining
 ): GridParams {
   const params: GridParams = {
     ...defaultsOf(parameters),
     placement: { kind: "probe-position" },
     reviewAfterProbe: true,
   }
-  const area = plateWorkArea(plate)
+  const area = machining.workArea()
   if (!area.ok) return params
   return {
     ...params,

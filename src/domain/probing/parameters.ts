@@ -53,6 +53,13 @@ export type SpecValues<TSpecs extends ParameterSpecs> = {
     : number
 }
 
+/** Which parameters are read, by field: a number, or a pair per axis. */
+export type SpecReads<TSpecs extends ParameterSpecs> = {
+  readonly [TField in keyof TSpecs]: TSpecs[TField] extends PairSpec
+    ? readonly [x: boolean, y: boolean]
+    : boolean
+}
+
 const isPairSpec = (spec: ParameterSpec | PairSpec): spec is PairSpec =>
   Array.isArray(spec)
 
@@ -107,4 +114,16 @@ export function defaultsOf<TSpecs extends ParameterSpecs>(
       isPairSpec(spec) ? [spec[0].default, spec[1].default] : spec.default,
     ])
   ) as SpecValues<TSpecs>
+}
+
+/** Every one of the parameters read, a pair in both axes. */
+export function readsAll<TSpecs extends ParameterSpecs>(
+  specs: TSpecs
+): SpecReads<TSpecs> {
+  return Object.fromEntries(
+    Object.keys(specs).map((field) => [
+      field,
+      isPairSpec(specs[field]) ? [true, true] : true,
+    ])
+  ) as SpecReads<TSpecs>
 }

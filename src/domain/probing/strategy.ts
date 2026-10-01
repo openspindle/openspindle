@@ -6,13 +6,14 @@
  * (`MachineProbing.strategies`), listed besides them.
  */
 
+import type { PlateMachining } from "../compile/toolpath-bounds"
 import type { Issue } from "../diagnostics"
 import type { GCodeProgram } from "../nc/gcode"
 import type { ResolveContext } from "../operations/kinds"
 import type { ProbingSource, ProbingSourceOf } from "../operations/operation"
 import type { Plate } from "../plate/plate"
 import type { ProbeProfile, Tool } from "../tools/tool"
-import type { ParameterSpecs } from "./parameters"
+import type { ParameterSpecs, SpecReads } from "./parameters"
 import type { AnchorStart } from "./placement"
 import type { ProbeGrid, ProbeTouch } from "./preview"
 import type { ProbeProgram, ProbingSections } from "./probe"
@@ -58,6 +59,8 @@ export type StrategyInput<TParams> = {
   readonly probe: BoundProbe
   readonly machine: MachineProbing
   readonly context: ResolveContext
+  /** Where the plate's other operations cut, measured only if the strategy reads it. */
+  readonly machining: PlateMachining
 }
 
 /**
@@ -92,8 +95,17 @@ export interface ProbingStrategy<
   blocked?: (plate: Plate, machine: MachineProbing) => string | null
   /** The task's parameters with it on the machine: their ranges and defaults. */
   parameters: (machine: MachineProbing) => TSpecs
-  /** A new operation's parameters, fitted to the plate. */
-  defaults: (plate: Plate, parameters: TSpecs) => TParams
+  /**
+   * Which of those parameters it reads with an operation's parameters, so that its form leaves
+   * out the others; absent, it reads them all.
+   */
+  reads?: (params: TParams) => SpecReads<TSpecs>
+  /** A new operation's parameters, fitted to the plate and where it cuts. */
+  defaults: (
+    plate: Plate,
+    parameters: TSpecs,
+    machining: PlateMachining
+  ) => TParams
   generate: (input: StrategyInput<TParams>) => Generation
 }
 
