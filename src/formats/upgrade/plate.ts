@@ -8,9 +8,9 @@ import {
   strategyLabel,
   strategyOf,
 } from "@/domain/probing/strategies"
-import { isTool, probeProfile } from "@/domain/tools/tool"
+import { isProbe, isTool, probeProfile } from "@/domain/tools/tool"
 import type { Tool } from "@/domain/tools/tool"
-import { isProbe, libraryPreferences } from "@/domain/tools/tool-table"
+import { libraryPreferences } from "@/domain/tools/tool-table"
 import { upgradeTool } from "../tool-library/upgrade"
 import { isJsonObject } from "./json"
 import type { JsonObject } from "./json"

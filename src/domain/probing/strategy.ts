@@ -16,6 +16,7 @@ import type { ParameterSpecs, SpecReads } from "./parameters"
 import type { AnchorStart } from "./placement"
 import type { ProbeGrid, ProbeTouch } from "./preview"
 import type { ProbeProgram, ProbingSections } from "./probe"
+import type { GenericSpecs } from "./generic/specs"
 import type { GridSpecs } from "./tasks/grid/params"
 import type { OriginSpecs } from "./tasks/origin/params"
 import type { OutlineSpecs } from "./tasks/outline/params"
@@ -156,8 +157,8 @@ export interface MachineProbing {
   /** The T number the firmware needs a probe with this profile in; null where any number goes. */
   slot: (profile: ProbeProfile) => number | null
   readonly nc: ProbingNc
-  /** The machine's ranges and defaults for the generic strategies, by strategy id. */
-  readonly specs: Readonly<Record<string, ParameterSpecs>>
+  /** The machine's ranges and defaults for the generic strategies it runs, by strategy id. */
+  readonly specs: Partial<GenericSpecs>
   /** Strategies of the machine's firmware, offered besides the generic ones. */
   readonly strategies: readonly TaskStrategy[]
   /** How its NC reads as probing in a program's sections. */

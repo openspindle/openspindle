@@ -10,13 +10,13 @@ export type GenericSpecs = {
 
 /** Whether a machine gives a generic strategy the ranges and defaults it runs with. */
 export const hasSpecs = (machine: MachineProbing, id: keyof GenericSpecs) =>
-  Object.hasOwn(machine.specs, id)
+  machine.specs[id] !== undefined
 
 /**
- * A generic strategy's ranges and defaults on a machine. A machine keeps every strategy's by
- * strategy id, and a generic strategy's are its `GenericSpecs`.
+ * A generic strategy's ranges and defaults on a machine it runs on (`hasSpecs`), as a machine
+ * offers only the generic strategies it runs (`machineStrategies`).
  */
 export const specsOf = <TId extends keyof GenericSpecs>(
   machine: MachineProbing,
   id: TId
-) => machine.specs[id] as GenericSpecs[TId]
+): GenericSpecs[TId] => machine.specs[id]!
