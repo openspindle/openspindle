@@ -1,3 +1,4 @@
+import { toMicrometre } from "../../primitives"
 import type { OutlineSpecs } from "../../probing/tasks/outline/params"
 import type { TouchOffSpecs } from "../../probing/tasks/touch-off/params"
 import type { GenericSpecs } from "../../probing/generic/specs"
@@ -5,9 +6,10 @@ import type { ProbingNc } from "../../probing/strategy"
 import { CLEARANCE_Z, MACHINE_Z, anchorTravel } from "./wired-probe/travel"
 
 /**
- * Application limits, not a clearance check. The default travel is the one the firmware's own
- * Z probe uses on the Z1 (`coordinate.toolrack_z`): a probe change ends at the firmware's
- * clearance Z near the top of travel, and the search has to reach the stock from there.
+ * Surface touch's ranges on the Z1: application limits, not a clearance check. The default travel
+ * is the one the firmware's own Z probe uses on the Z1 (`coordinate.toolrack_z`): a probe change
+ * ends at the firmware's clearance Z near the top of travel, as anchored travel does, and the
+ * search has to reach the stock from there.
  */
 export const TOUCH_PARAMETERS: TouchOffSpecs = {
   probeTravel: {
@@ -19,7 +21,7 @@ export const TOUCH_PARAMETERS: TouchOffSpecs = {
     max: 150,
     step: 1,
     description:
-      "How far the probe searches down before the machine alarms. After a probe change it starts near the top of Z travel. The machine's own Z probe, run from a stored anchor with the work origin kept relative to one, searches to its tool rack Z instead.",
+      "How far the probe searches down before the machine alarms. After a probe change, or the travel to an anchor, it starts near the top of Z travel.",
   },
   clearance: {
     label: "Clearance height",
@@ -32,6 +34,13 @@ export const TOUCH_PARAMETERS: TouchOffSpecs = {
     description: "Lift above the probed surface once work Z is set.",
   },
 }
+
+/**
+ * A length as the firmware prints its own probing's values (ATCHandler's scripts): three
+ * decimals at most.
+ */
+export const firmwareMillimetres = (value: number) =>
+  String(toMicrometre(value))
 
 /**
  * The supplied Z1 configuration's probe speeds (mm/min) and back-off (mm) between the fast and

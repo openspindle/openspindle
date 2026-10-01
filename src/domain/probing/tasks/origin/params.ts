@@ -94,7 +94,7 @@ export function originParamsSchema(parameters: OriginSpecs) {
   return rangedSchema(OriginParamsSchema, parameters)
 }
 
-/** A new operation's parameters: an outside corner at the front left, with the probe's defaults. */
+/** A new operation's parameters: an outside corner at the front left, with the strategy's defaults. */
 export function defaultOriginParams(parameters: OriginSpecs): OriginParams {
   return {
     routine: "outside-corner",

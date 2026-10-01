@@ -7,6 +7,7 @@ import type { ProbingStrategy } from "../../../probing/strategy"
 import { plateGridParams } from "../../../probing/tasks/grid/fit"
 import type { GridParams, GridSpecs } from "../../../probing/tasks/grid/params"
 import { planGrid } from "../../../probing/tasks/grid/rules"
+import { firmwareMillimetres } from "../probing-nc"
 import { CLEARANCE_Z } from "../wired-probe/travel"
 
 /**
@@ -133,7 +134,7 @@ function firmwareBlock(
   { size, points, clearance }: GridPlan["params"],
   [x, y]: XY<"work">
 ): string {
-  const mm = (value: number) => String(Number(value.toFixed(3)) + 0)
+  const mm = firmwareMillimetres
   return `M495 X${mm(x)} Y${mm(y)} A${mm(size[0])} B${mm(size[1])} I${points[0]} J${points[1]} H${mm(clearance)}`
 }
 

@@ -61,8 +61,8 @@ export type StrategyInput<TParams> = {
 }
 
 /**
- * A way to do a probing task: which probes can run it on a machine, the ranges and defaults of
- * the task's parameters with it, and its NC.
+ * A way to do a probing task: which machines run it, which probes it probes with, the ranges and
+ * defaults of the task's parameters with it, and its NC.
  */
 export interface ProbingStrategy<
   TTask extends ProbingTask = ProbingTask,
@@ -74,8 +74,22 @@ export interface ProbingStrategy<
   readonly task: TTask
   readonly label: string
   readonly description: string
-  /** Whether a probe with this profile can run it on the machine. */
+  /**
+   * Whether a machine runs it, whatever the probe: a generic strategy needs the machine's ranges
+   * for it and the NC it is made of. Absent for a machine's own strategies, which it runs.
+   */
+  runsOn?: (machine: MachineProbing) => boolean
+  /**
+   * Whether it can probe with a probe of this profile: what the probe must sense or carry for
+   * it. Whether the machine's firmware lets that probe do the task is the machine's to say
+   * (`MachineProbing.probes`).
+   */
   accepts: (probe: ProbeProfile, machine: MachineProbing) => boolean
+  /**
+   * Why it cannot run on this plate, whatever its settings, as picking it shows; null where it
+   * can. Not a rule: generating its NC still fails on its own where it cannot.
+   */
+  blocked?: (plate: Plate, machine: MachineProbing) => string | null
   /** The task's parameters with it on the machine: their ranges and defaults. */
   parameters: (machine: MachineProbing) => TSpecs
   /** A new operation's parameters, fitted to the plate. */
@@ -116,11 +130,13 @@ export type ProbingNc = {
 }
 
 /**
- * How a machine probes: where its firmware needs each kind of probe, the NC generic strategies
- * are made of, the ranges they take on it, the strategies its firmware adds, and how its NC reads
- * as probing in any file.
+ * How a machine probes: which probes its firmware lets do which task and in which T number, the
+ * NC generic strategies are made of, the ranges they take on it, the strategies its firmware
+ * adds, and how its NC reads as probing in any file.
  */
 export interface MachineProbing {
+  /** Whether its firmware lets a probe with this profile do the task, whatever the strategy. */
+  probes: (task: ProbingTask, profile: ProbeProfile) => boolean
   /** The T number the firmware needs a probe with this profile in; null where any number goes. */
   slot: (profile: ProbeProfile) => number | null
   readonly nc: ProbingNc
