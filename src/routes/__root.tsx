@@ -6,6 +6,8 @@ import {
 import type { QueryClient } from "@tanstack/react-query"
 import { AppearanceProvider } from "@/components/appearance-provider"
 import { Toaster } from "@/components/ui/sonner"
+import { WorkLightControlProvider } from "@/components/work-light-control"
+import { WorkLightPreferencesProvider } from "@/components/work-light-preferences"
 import { ErrorReportHost } from "@/features/error-report/error-report-host"
 import { useUnsavedChanges } from "@/features/project/use-unsaved-changes"
 import { DialogHost } from "@/features/shell/dialog-host"
@@ -37,11 +39,15 @@ function RootLayout() {
     <>
       <HeadContent />
       <AppearanceProvider>
-        <Outlet />
-        <DialogHost />
-        <LoadIssuesDialog />
-        <ErrorReportHost />
-        <Toaster />
+        <WorkLightPreferencesProvider>
+          <WorkLightControlProvider>
+            <Outlet />
+            <DialogHost />
+            <LoadIssuesDialog />
+            <ErrorReportHost />
+            <Toaster />
+          </WorkLightControlProvider>
+        </WorkLightPreferencesProvider>
       </AppearanceProvider>
     </>
   )

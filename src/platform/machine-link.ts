@@ -19,7 +19,8 @@ function machineOver(peer: Peer<MachineContract>): MachineHost {
     discover: () => peer.call("machine.discover", undefined),
     connect: (request) => peer.call("machine.connect", request),
     disconnect: (request) => peer.call("machine.disconnect", request),
-    execute: (command) => peer.call("machine.execute", command),
+    execute: (command, signal) =>
+      peer.call("machine.execute", command, signal ? { signal } : {}),
     simulateBed: (bed) => peer.call("machine.simulateBed", bed),
     sendConsoleLine: (line) => peer.call("machine.sendConsoleLine", { line }),
     stop: () => peer.call("machine.stop", undefined),
@@ -30,6 +31,14 @@ function machineOver(peer: Peer<MachineContract>): MachineHost {
     readAnchors: (signal) =>
       peer.call("machine.readAnchors", undefined, signal ? { signal } : {}),
     writeAnchors: (request) => peer.call("machine.writeAnchors", request),
+    readConfiguration: (signal) =>
+      peer.call(
+        "machine.readConfiguration",
+        undefined,
+        signal ? { signal } : {}
+      ),
+    writeConfiguration: (request) =>
+      peer.call("machine.writeConfiguration", request),
     readHeightMap: (signal) =>
       peer.call("machine.readHeightMap", undefined, signal ? { signal } : {}),
     watchCamera: (listener) =>
@@ -72,6 +81,8 @@ function unreachableMachine(error: string | null): MachineHost {
     dismissJob: refuse,
     readAnchors: refuse,
     writeAnchors: refuse,
+    readConfiguration: refuse,
+    writeConfiguration: refuse,
     readHeightMap: refuse,
     watchCamera: (listener) => {
       listener({ kind: "status", status: "error" })

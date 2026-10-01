@@ -17,6 +17,7 @@ import {
 import type { AnchorWriting } from "./anchor-positions-form"
 import { DeviceAnchors } from "./device-anchors"
 import { DeviceFixtures } from "./device-fixtures"
+import { DeviceConfigurationCard } from "./device-configuration"
 import { DevicePanel } from "./device-panel"
 import { HeightMapCard } from "./height-map"
 import { useDeviceHeightMap } from "./height-map-dialog"
@@ -80,6 +81,7 @@ export function DevicePage() {
         openPicker={() => openDialog({ kind: "device" })}
         fixturePanel={
           <>
+            <DeviceConfigurationCard />
             <HeightMapCard
               map={map}
               onOpen={() => openDialog({ kind: "height-map" })}

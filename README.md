@@ -21,6 +21,7 @@ OpenSpindle is a desktop app for preparing, checking and running jobs on a Maker
 - The G-code exactly as the machine receives it, and a glossary of the Z1's codes (**Help › G-code Glossary**)
 - A run checklist, upload read-back and large programs sent in parts
 - Machine controls, a console to send the machine one line at a time, the machine's camera, its height map and its stored anchors
+- A firmware configuration editor with verified saves, a saved vacuum-power default, and work-light brightness for each appearance with an inactivity timer
 - A tool library with Fusion 360 import and Makera, Genmitsu, SpeTool, Dreanique and FoxAlien catalogs
 - STEP-NC project files, and NC export with the plate's setup
 - Built-in PCB preparation from KiCad Gerber and Excellon files, using your local pcb2gcode installation
@@ -53,7 +54,7 @@ Machine behaviour follows the source of [Makera's Z1 firmware](https://github.co
 - the probing programs: surface touch, outline trace, the Z1's height map and Z probe, and 3D probing
 - writing the stored anchors from the Device page
 
-Importing, previewing and saving never send anything to the machine, and Run lives only on the Job tab. Controls the machine's state does not allow are refused, and a command whose outcome is unknown is never retried. Stop does not replace the machine's emergency stop.
+Importing, previewing and saving projects never send anything to the machine, and Run lives only on the Job tab. The Device tab explicitly saves firmware configuration and vacuum defaults; startup settings take effect after a separate restart. Work-light preferences can adjust brightness while idle and turn the light off after the configured inactivity period. Controls the machine's state does not allow are refused, and a command whose outcome is unknown is never retried. Stop does not replace the machine's emergency stop.
 
 If something behaves differently, **Help › Export Protocol Trace…** saves the recent exchange with the machine. Please open an issue with what you saw and the trace.
 

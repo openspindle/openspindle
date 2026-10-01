@@ -2,6 +2,9 @@ import { defineContract } from "@openspindle/rpc"
 import { z } from "zod"
 import {
   AnchorConfigurationSchema,
+  FirmwareConfigurationSchema,
+  WriteConfigurationRequestSchema,
+  WriteConfigurationResultSchema,
   ConnectRequestSchema,
   ConsoleLineSchema,
   SimulatedBedSchema,
@@ -104,6 +107,16 @@ export const machineMethods = {
     params: none,
     result: AnchorConfigurationSchema,
     timeoutMs: 0,
+  },
+  "machine.readConfiguration": {
+    params: none,
+    result: FirmwareConfigurationSchema,
+    timeoutMs: 45_000,
+  },
+  "machine.writeConfiguration": {
+    params: WriteConfigurationRequestSchema,
+    result: WriteConfigurationResultSchema,
+    timeoutMs: 90_000,
   },
   "machine.readHeightMap": {
     params: none,

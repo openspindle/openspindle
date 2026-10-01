@@ -60,6 +60,7 @@ export const MachineFeaturesSchema = z.object({
   bedClean: z.boolean(),
   /** Stored anchors, which stock, fixtures and the work origin can be kept relative to. */
   anchors: z.boolean(),
+  configuration: z.boolean(),
 })
 export type MachineFeatures = z.infer<typeof MachineFeaturesSchema>
 
@@ -68,6 +69,8 @@ export const AVAILABILITY_KEYS = [
   "run",
   "readAnchors",
   "writeAnchors",
+  "readConfiguration",
+  "writeConfiguration",
   "readHeightMap",
   "stop",
   "reset",
@@ -92,6 +95,7 @@ export const ActivityKindSchema = z.enum([
   "stop",
   "anchors",
   "heightMap",
+  "configuration",
   "run",
 ])
 export const ActivitySchema = z.object({
@@ -111,6 +115,8 @@ export type DeferredOperation = z.infer<typeof DeferredOperationSchema>
 export const MachineSnapshotSchema = z.object({
   revision: z.int().nonnegative(),
   connection: z.object({
+    /** Changes on every connection, even to the same network address. */
+    id: z.string().uuid().nullable(),
     status: z.enum(["disconnected", "connecting", "connected"]),
     device: ConnectedDeviceSchema.nullable(),
     error: z.string().nullable(),
@@ -151,6 +157,7 @@ export function disconnectedSnapshot(
   return {
     revision,
     connection: {
+      id: null,
       status: "disconnected",
       device: null,
       error,

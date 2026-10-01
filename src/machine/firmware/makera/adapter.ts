@@ -21,6 +21,12 @@ import type {
 import { FRAME_TYPES, encodeFrame } from "./codec.ts"
 import { makeraRules, planMakeraCommand } from "./commands.ts"
 import { MakeraCompletion } from "./completion.ts"
+import {
+  MAKERA_CONFIGURATION_PATH,
+  MakeraConfigurationDownload,
+  readMakeraVacuumDefaultPower,
+  withMakeraVacuumDefaultPower,
+} from "./configuration.ts"
 import { changesToolBeforeSpindle, prepareMakeraProgram } from "./dialect.ts"
 import { parseMakeraHeightMap } from "./height-map.ts"
 import { MakeraInterpreter } from "./interpreter.ts"
@@ -206,6 +212,27 @@ export const makeraAdapter: FirmwareAdapter = {
   },
   prepareProgram: prepareMakeraProgram,
   job: makeraJob,
+  configuration: {
+    path: MAKERA_CONFIGURATION_PATH,
+    readAdmit: (telemetry) =>
+      (telemetry.state === "Idle" || telemetry.state === "Alarm") &&
+      telemetry.job === null
+        ? null
+        : "The device must be idle or halted with no active program.",
+    writeAdmit: (telemetry) => {
+      if (telemetry.state !== "Idle" || telemetry.job !== null)
+        return "The device must be idle with no active program."
+      if (telemetry.spindleOn !== false || telemetry.spindleRpm !== 0)
+        return "Stop the spindle before saving the device configuration."
+      return null
+    },
+    createDownload: () => new MakeraConfigurationDownload(),
+    createUpload: (bytes, md5) =>
+      new MakeraTransfer(bytes, md5, MAKERA_CONFIGURATION_PATH),
+    vacuumDefaultPower: readMakeraVacuumDefaultPower,
+    withVacuumDefaultPower: withMakeraVacuumDefaultPower,
+    afterRestart: true,
+  },
   anchors: {
     admit: (telemetry) =>
       telemetry.state === "Idle" && telemetry.job === null

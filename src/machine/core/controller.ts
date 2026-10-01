@@ -9,6 +9,7 @@ import {
   RUN_LIMITS,
   RunRequestSchema,
   WriteAnchorsRequestSchema,
+  WriteConfigurationRequestSchema,
   disconnectedSnapshot,
   isJobActive,
   isSimulator,
@@ -32,6 +33,8 @@ import type {
   RunRequest,
   Telemetry,
   WriteAnchorsResult,
+  FirmwareConfiguration,
+  WriteConfigurationResult,
 } from "../contract/index.ts"
 import { prepareResult } from "../firmware/adapter.ts"
 import type {
@@ -62,6 +65,10 @@ import {
 } from "./operations/job-runner.ts"
 import type { JobRunnerHooks } from "./operations/job-runner.ts"
 import { readAnchorConfiguration, readHeightMap } from "./operations/reads.ts"
+import {
+  readFirmwareConfiguration,
+  writeFirmwareConfiguration,
+} from "./operations/configuration.ts"
 import { writeAnchorConfiguration } from "./operations/writes.ts"
 import type { MachinePorts } from "./ports.ts"
 import { ProtocolTrace } from "./protocol-trace.ts"
@@ -182,7 +189,8 @@ export class MachineController {
   }[] = []
   /** Disconnect counts up: a connect still looking up the device's name then gives up. */
   private disconnects = 0
-  private transfer: TransferProtocol | null = null
+  private transfer: Pick<TransferProtocol, "cancel"> | null = null
+  private readonly connectionIds = new WeakMap<MachineSession, string>()
   private lockout: string | null = null
   /** A reset is waiting for the machine to come back; connecting or disconnecting ends it. */
   private restart: { cancelled: boolean } | null = null
@@ -422,12 +430,31 @@ export class MachineController {
 
   // ── Commands ───────────────────────────────────────────────────────────
 
-  async execute(input: unknown): Promise<MachineSnapshot> {
+  async execute(
+    input: unknown,
+    signal?: AbortSignal
+  ): Promise<MachineSnapshot> {
     const command = parse(MachineCommandSchema, input)
     this.admitNow({ key: command.type, command })
+    if (
+      (command.type === "lightBrightness" ||
+        command.type === "lightOffWhenIdle") &&
+      (!this.session ||
+        command.connectionId !== this.connectionId(this.session))
+    )
+      throw new MachineError(
+        "refused",
+        command.type === "lightBrightness"
+          ? "The device connection changed. Adjust the work light brightness again."
+          : "The device connection changed. No automatic work light off command was sent."
+      )
     if (command.type === "pause") this.tracker?.pauseRequested()
     await this.operate("command", COMMAND_LABELS[command.type], (context) =>
-      executeCommand(context, command)
+      executeCommand(
+        context,
+        command,
+        command.type === "lightOffWhenIdle" ? signal : undefined
+      )
     )
     return this.snapshot()
   }
@@ -734,6 +761,81 @@ export class MachineController {
     })
   }
 
+  private connectionId(session: MachineSession): string {
+    let id = this.connectionIds.get(session)
+    if (!id) {
+      id = crypto.randomUUID()
+      this.connectionIds.set(session, id)
+    }
+    return id
+  }
+
+  async readConfiguration(
+    signal?: AbortSignal
+  ): Promise<FirmwareConfiguration> {
+    if (signal?.aborted) throw cancelled()
+    this.admitNow({ key: "readConfiguration" })
+    return this.operate("configuration", "Reading configuration", (context) =>
+      readFirmwareConfiguration(
+        {
+          ...context,
+          signal: signal
+            ? AbortSignal.any([context.signal, signal])
+            : context.signal,
+        },
+        {
+          md5: this.ports.md5,
+          operationSignal: context.signal,
+          connectionId: this.connectionId(context.session),
+          transferring: (protocol) => {
+            this.transfer = protocol
+          },
+        }
+      )
+    )
+  }
+
+  async writeConfiguration(input: unknown): Promise<WriteConfigurationResult> {
+    const request = parse(WriteConfigurationRequestSchema, input)
+    this.admitNow({ key: "writeConfiguration" })
+    if (
+      !this.session ||
+      request.connectionId !== this.connectionId(this.session)
+    )
+      throw new MachineError(
+        "refused",
+        "The device connection changed. Read its configuration before saving."
+      )
+    return this.operate(
+      "configuration",
+      "Saving configuration",
+      async (context) => {
+        const configuration = await writeFirmwareConfiguration(
+          context,
+          request,
+          {
+            md5: this.ports.md5,
+            operationSignal: context.signal,
+            connectionId: this.connectionId(context.session),
+            transferring: (protocol) => {
+              this.transfer = protocol
+            },
+          },
+          () => {
+            // Whole-file editing can change anchors too. A later anchor read must refresh them.
+            this.anchors = { value: null, reading: false, error: null }
+            this.anchorsAttempted = false
+            this.publish()
+          }
+        )
+        return {
+          configuration,
+          afterRestart: this.adapter.configuration?.afterRestart ?? false,
+        }
+      }
+    )
+  }
+
   dispose() {
     this.session?.close(null)
     this.discovery.dispose()
@@ -900,6 +1002,11 @@ export class MachineController {
     return telemetry?.job != null && telemetry.state !== "Alarm"
   }
 
+  /** The firmware adapter defines when its configuration file can be read or saved. */
+  private configurationAdmission(kind: "readAdmit" | "writeAdmit") {
+    return this.adapter.configuration?.[kind] ?? null
+  }
+
   private admissionContext(): AdmissionContext {
     const session = this.session?.ready ? this.session : null
     const telemetry = session?.store.telemetry ?? null
@@ -917,6 +1024,8 @@ export class MachineController {
       writeAnchors: this.adapter.anchors?.write
         ? this.adapter.anchors.admit
         : null,
+      readConfiguration: this.configurationAdmission("readAdmit"),
+      writeConfiguration: this.configurationAdmission("writeAdmit"),
       limits: this.adapter.limits,
     }
   }
@@ -1161,6 +1270,7 @@ export class MachineController {
     return {
       revision,
       connection: {
+        id: ready ? this.connectionId(ready) : null,
         status,
         device: ready?.device ?? null,
         // Failed attempts while the machine restarts are expected, not errors.
@@ -1171,6 +1281,7 @@ export class MachineController {
         ? {
             ...this.adapter.features(ready.identity, telemetry),
             anchors: this.adapter.anchors !== undefined,
+            configuration: this.adapter.configuration !== undefined,
           }
         : null,
       telemetry,

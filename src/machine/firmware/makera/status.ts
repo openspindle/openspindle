@@ -251,3 +251,11 @@ export function parseModelLine(line: string): Identity | null | "unsupported" {
   if (!model || !/^Z1(?:\s?Pro)?$/i.test(match[1].trim())) return "unsupported"
   return { model, atc: (Number(match[3]) & ATC_FLAG) !== 0 }
 }
+
+/** Only the complete model response carries evidence of the controller's current state. */
+export function parseModelState(line: string): MachineState | null {
+  const match = /^model\s*=\s*[^,]+,\s*\d+,\s*\d+,\s*\d+,\s*([A-Za-z]+)$/.exec(
+    line.trim()
+  )
+  return MACHINE_STATES.find((state) => state === match?.[1]) ?? null
+}

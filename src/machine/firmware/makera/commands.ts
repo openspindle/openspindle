@@ -94,6 +94,14 @@ export function planMakeraCommand(
         action.enabled ? "M821" : "M822",
         (after) => after.lightOn === action.enabled
       )
+    case "lightBrightness":
+      // The firmware acknowledges the PWM value; telemetry reports only the light's on state.
+      return command(
+        `M821 S${Math.round((action.percent * 255) / 100)}`,
+        (after) => after.lightOn === true
+      )
+    case "lightOffWhenIdle":
+      return command("M822", (after) => after.lightOn === false)
     case "beep":
       return command(
         action.enabled ? "M861" : "M862",
@@ -157,7 +165,14 @@ export const makeraRules: FirmwareRules = {
       case "spindleStop":
         return telemetry.spindleRpm !== null && telemetry.laserMode !== true
       case "light":
+      case "lightBrightness":
         return telemetry.lightOn !== null
+      case "lightOffWhenIdle":
+        return (
+          telemetry.lightOn !== null &&
+          telemetry.spindleOn !== null &&
+          telemetry.spindleRpm !== null
+        )
       case "beep":
         return telemetry.beepOn !== null
       case "vacuum":
@@ -184,6 +199,20 @@ export const makeraRules: FirmwareRules = {
   command(action, telemetry) {
     const state = telemetry.state
     switch (action.type) {
+      case "lightOffWhenIdle":
+        if (state !== "Idle" || telemetry.job !== null)
+          return "Automatic work light off requires an idle machine with no active program."
+        if (telemetry.spindleOn !== false || telemetry.spindleRpm !== 0)
+          return "Automatic work light off requires the spindle to be stopped."
+        return telemetry.lightOn === true
+          ? null
+          : "The work light is already off."
+      case "lightBrightness":
+        if (state !== "Idle" || telemetry.job !== null)
+          return "Work light brightness requires an idle machine with no active program."
+        return action.onlyIfOn && telemetry.lightOn !== true
+          ? "The work light is off."
+          : null
       case "light":
       case "beep":
         // A halted controller answers these M-codes with "error:Alarm lock".

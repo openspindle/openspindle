@@ -1,5 +1,8 @@
 import type {
   AnchorConfiguration,
+  FirmwareConfiguration,
+  WriteConfigurationRequest,
+  WriteConfigurationResult,
   ConnectRequest,
   ConsoleEntry,
   DisconnectRequest,
@@ -48,7 +51,11 @@ export interface MachineHost {
   discover: () => Promise<NetworkDevice[]>
   connect: (request: ConnectRequest) => Promise<MachineSnapshot>
   disconnect: (request: DisconnectRequest) => Promise<MachineSnapshot>
-  execute: (command: MachineCommand) => Promise<MachineSnapshot>
+  /** Cancellation only prevents automatic idle-off before it is sent; sent commands still verify. */
+  execute: (
+    command: MachineCommand,
+    signal?: AbortSignal
+  ) => Promise<MachineSnapshot>
   /** Tells the simulator what the plate positions on its bed; only a simulator takes it. */
   simulateBed: (bed: SimulatedBed) => Promise<MachineSnapshot>
   /** Sends a line typed in the console; the console shows what the machine replies. */
@@ -62,6 +69,10 @@ export interface MachineHost {
   readAnchors: (signal?: AbortSignal) => Promise<AnchorConfiguration>
   /** Stores the anchors in the machine's configuration; what it reads back afterwards. */
   writeAnchors: (request: WriteAnchorsRequest) => Promise<WriteAnchorsResult>
+  readConfiguration: (signal?: AbortSignal) => Promise<FirmwareConfiguration>
+  writeConfiguration: (
+    request: WriteConfigurationRequest
+  ) => Promise<WriteConfigurationResult>
   readHeightMap: (signal?: AbortSignal) => Promise<HeightMap>
   watchCamera: (listener: (event: CameraEvent) => void) => () => void
   /** The machine console: its backlog at once, then new entries in batches. */

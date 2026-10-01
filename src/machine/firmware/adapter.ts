@@ -13,6 +13,7 @@ import type {
   JobWait,
   MachineCommand,
   MachineFeatures,
+  MachineState,
   NetworkDevice,
   PlateAssists,
   PrepareResult,
@@ -66,6 +67,18 @@ export const FAILURE_LINES: ReadonlySet<LineKind> = new Set([
 export const excerpt = (text: string) =>
   text.length > 240 ? `${text.slice(0, 239)}…` : text
 
+/** Switch state arrives on the diagnostic channel separately from ordinary status. */
+export type FirmwareDiagnostics = Pick<
+  Telemetry,
+  | "receivedAt"
+  | "spindleOn"
+  | "lightOn"
+  | "beepOn"
+  | "vacuumOn"
+  | "vacuumPower"
+  | "estop"
+>
+
 export type FirmwareEvent =
   | {
       readonly kind: "status"
@@ -75,7 +88,17 @@ export type FirmwareEvent =
       /** The report as the device sent it, for the protocol trace. */
       readonly raw: string
     }
-  | { readonly kind: "identity"; readonly identity: Identity }
+  | {
+      readonly kind: "diagnostics"
+      readonly telemetry: FirmwareDiagnostics
+      readonly raw: string
+    }
+  | {
+      readonly kind: "identity"
+      readonly identity: Identity
+      /** State reported by the model command itself, independent of bridge status. */
+      readonly state: MachineState | null
+    }
   | { readonly kind: "line"; readonly line: Line }
   /** Configuration text (a separate channel from command replies). */
   | { readonly kind: "config-line"; readonly text: string }
@@ -151,6 +174,19 @@ export interface TransferProtocol {
   /** Returns frames to send, or throws a TransferError. */
   receive: (frame: InboundFrame) => OutboundFrame[]
   /** Frames that abandon an in-flight transfer. */
+  cancel: () => OutboundFrame[]
+}
+
+/** Download of one bounded configuration file; the runner verifies its digest and text. */
+export interface DownloadProtocol {
+  /** The device acknowledged the end and closed the file. */
+  readonly finished: boolean
+  /** Available only after the download has finished. */
+  readonly bytes: Uint8Array
+  /** A checksum advertised by the device, or null when it reports a placeholder. */
+  readonly md5: string | null
+  start: () => OutboundFrame[]
+  receive: (frame: InboundFrame) => OutboundFrame[]
   cancel: () => OutboundFrame[]
 }
 
@@ -239,11 +275,11 @@ export interface FirmwareAdapter {
   readonly restart: OutboundFrame
   /** A line typed in the console, as the machine takes a command line. */
   consoleLine: (line: string) => OutboundFrame
-  /** What the machine has; whether it stores anchors follows from `anchors`. */
+  /** What the machine has; persisted settings follow from their optional capabilities. */
   features: (
     identity: Identity,
     telemetry: Telemetry | null
-  ) => Omit<MachineFeatures, "anchors">
+  ) => Omit<MachineFeatures, "anchors" | "configuration">
   /** Wire plan for a command, using the fresh telemetry it was admitted with. */
   plan: (command: MachineCommand, telemetry: Telemetry) => CommandPlan
   readonly rules: FirmwareRules
@@ -251,6 +287,17 @@ export interface FirmwareAdapter {
   readonly limits: ControlLimits
   prepareProgram: (source: string) => PreparedProgram
   readonly job: JobProtocol
+  /** A fixed firmware configuration file, downloaded and fully verified after a save. */
+  readonly configuration?: {
+    readonly path: string
+    readAdmit: (telemetry: Telemetry) => string | null
+    writeAdmit: (telemetry: Telemetry) => string | null
+    createDownload: () => DownloadProtocol
+    createUpload: (bytes: Uint8Array, md5: string) => TransferProtocol
+    vacuumDefaultPower: (content: string) => number | null
+    withVacuumDefaultPower: (content: string, percent: number) => string
+    readonly afterRestart: boolean
+  }
   /**
    * Reads the anchors the machine stores, one configuration value per key; absent when it
    * stores none.

@@ -2,11 +2,13 @@ import type { Telemetry } from "../../contract/index.ts"
 import { FAILURE_LINES, excerpt } from "../../firmware/adapter.ts"
 import type { FirmwareAdapter } from "../../firmware/adapter.ts"
 import type { Admission, AdmissionRequest } from "../admission.ts"
-import { MachineError } from "../errors.ts"
+import { MachineError, abortError } from "../errors.ts"
 import type { Clock } from "../ports.ts"
 import type { MachineSession } from "../session.ts"
 
 export const PREFLIGHT_MS = 3000
+const AUTOMATIC_READY_MS = 30000
+const IDENTITY_PROBE_MS = 1000
 
 /** What an operation may use; it owns the machine until it settles. */
 export type OperationContext = {
@@ -33,6 +35,67 @@ export function freshStatus(
     timeoutMessage,
     signal: context.signal,
   })
+}
+
+/** A status following a newly received diagnostic reply, for commands that depend on switches. */
+export function freshDiagnosticStatus(
+  context: OperationContext,
+  timeoutMessage: string
+): Promise<Telemetry> {
+  const { session } = context
+  const after = session.store.sequence
+  const diagnosticsAfter = session.diagnostics?.sequence ?? 0
+  session.requestStatus(true)
+  return session.store.waitFor(
+    () => (session.diagnostics?.sequence ?? 0) > diagnosticsAfter,
+    {
+      after,
+      timeoutMs: PREFLIGHT_MS,
+      timeoutMessage,
+      signal: context.signal,
+    }
+  )
+}
+
+/**
+ * The bridge may report the previous Idle state while the motion controller reboots.
+ * Require the model reply itself to report Idle, then a newer ordinary Idle status,
+ * before an automatic command takes ownership of acknowledgements after boot homing.
+ */
+export async function waitForAutomaticCommandReady(
+  context: OperationContext,
+  label: string
+): Promise<void> {
+  const { session, adapter, clock, signal } = context
+  if (session.identityReplyState === "Idle") return
+  const deadline = clock.now() + AUTOMATIC_READY_MS
+  const timeoutMessage = `The controller did not become ready for ${label}. No command was sent.`
+  while (clock.now() < deadline) {
+    if (signal.aborted) throw abortError(signal)
+    const after = session.store.sequence
+    // Only this read-only query is repeated. The automatic command is never retried.
+    session.send(adapter.queries.identity)
+    session.requestStatus(true)
+    try {
+      await session.store.waitFor(
+        (telemetry) =>
+          session.identityReplyState === "Idle" &&
+          telemetry.state === "Idle" &&
+          telemetry.job === null,
+        {
+          after,
+          timeoutMs: Math.min(IDENTITY_PROBE_MS, remaining(clock, deadline)),
+          timeoutMessage,
+          signal,
+        }
+      )
+      return
+    } catch (error) {
+      if (!(error instanceof MachineError) || error.code !== "timeout")
+        throw error
+    }
+  }
+  throw new MachineError("timeout", timeoutMessage)
 }
 
 export function requireAdmission(

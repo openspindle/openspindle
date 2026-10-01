@@ -16,6 +16,12 @@ import {
   setReference,
 } from "./automation.ts"
 import type { Grid, Step, ToolLengths } from "./automation.ts"
+import {
+  CONFIGURATION_PATH,
+  initialConfiguration,
+  savedSetting,
+  withSavedSetting,
+} from "./configuration.ts"
 import { TransferEndpoint } from "./transfer.ts"
 import type { TransferOptions } from "./transfer.ts"
 
@@ -174,8 +180,6 @@ export class SimulatedZ1 {
   private readonly send: Send
   private readonly log: (message: string) => void
   private readonly transfer: TransferEndpoint
-  /** The saved configuration's settings as text, as `config-get sd` and `config-set sd` see it. */
-  private readonly config: Map<string, string>
   /** Anchor 1 as the firmware loaded it when it started; `config-set` takes effect at a reboot. */
   private anchor1: [number, number]
   /** Where the machine is once the moves under way end; `position` is where it is now. */
@@ -204,6 +208,8 @@ export class SimulatedZ1 {
   private light = false
   private beep = false
   private vacuum = false
+  private vacuumPower = 0
+  private vacuumDefaultPower = 80
   private vacuumAuto = false
   private blowing = false
   private bedClean: boolean
@@ -238,12 +244,36 @@ export class SimulatedZ1 {
     this.homed = options.homed
     this.tool = options.tool
     this.bedClean = options.bedClean
-    this.config = new Map(
-      ANCHOR_KEYS.map((key, index) => [key, String(options.anchors[index])])
-    )
     this.anchor1 = [options.anchors[0], options.anchors[1]]
     this.transfer = new TransferEndpoint(send, options.transfer, log)
+    this.transfer.files.set(
+      CONFIGURATION_PATH,
+      initialConfiguration({
+        anchors: options.anchors,
+        feedRate: FEED_RATE,
+        seekRate: SEEK_RATE,
+        axisRates: AXIS_RATES,
+        park: PARK,
+        clearanceZ: CLEARANCE_Z,
+      })
+    )
+    this.loadVacuumDefaultPower()
     this.timer = setInterval(() => this.tick(), options.lineMs)
+  }
+
+  private get configuration() {
+    return this.transfer.files.get(CONFIGURATION_PATH) ?? new Uint8Array(0)
+  }
+
+  private loadVacuumDefaultPower() {
+    const saved = savedSetting(
+      this.configuration,
+      "switch.vacuum.default_on_value"
+    )
+    const value = saved === undefined ? NaN : Number(saved)
+    this.vacuumDefaultPower = Number.isFinite(value)
+      ? Math.max(0, Math.min(100, value))
+      : 80
   }
 
   dispose() {
@@ -380,7 +410,7 @@ export class SimulatedZ1 {
   private diagnose() {
     this.send(
       FRAME_TYPES.diagnostics,
-      `{S:${flag(this.spindleOn)},${this.targetRpm}|G:${flag(this.light)},${flag(this.beep)},0,${flag(this.vacuum)},${this.vacuum ? 100 : 0}|I:0}`
+      `{S:${flag(this.spindleOn)},${this.targetRpm}|G:${flag(this.light)},${flag(this.beep)},0,${flag(this.vacuum)},${this.vacuumPower}|I:0}`
     )
   }
 
@@ -410,7 +440,9 @@ export class SimulatedZ1 {
     switch (command) {
       case "config-get": {
         const [source, key = ""] = argument.split(/\s+/)
-        const value = this.config.get(key)
+        if (source !== "sd")
+          return this.lines(`${source} source does not exist`)
+        const value = savedSetting(this.configuration, key)
         this.lines(
           value === undefined
             ? `${source}: ${key} is not in config`
@@ -440,7 +472,10 @@ export class SimulatedZ1 {
           )
         if (source !== "sd")
           return this.lines(`${source} source does not exist`)
-        this.config.set(key, value)
+        this.transfer.files.set(
+          CONFIGURATION_PATH,
+          withSavedSetting(this.configuration, key, value)
+        )
         this.log(`config-set ${key} ${value} (loaded at the next reboot)`)
         this.lines(`${source}: ${key} has been set to ${value}`)
         return
@@ -624,9 +659,17 @@ export class SimulatedZ1 {
         }
         this.spindleOn = true
         this.targetRpm = word(code, "S") ?? this.targetRpm
+        if (this.vacuumAuto) {
+          this.vacuumPower = this.vacuumDefaultPower
+          this.vacuum = this.vacuumPower > 0
+        }
         return true
       case "5":
         this.spindleOn = false
+        if (this.vacuumAuto) {
+          this.vacuum = false
+          this.vacuumPower = 0
+        }
         return true
       case "821":
       case "822":
@@ -636,9 +679,14 @@ export class SimulatedZ1 {
       case "862":
         this.beep = m === "861"
         return true
-      case "851":
+      case "851": {
+        this.vacuumPower = Math.max(0, Math.min(100, word(code, "S") ?? 98))
+        this.vacuum = this.vacuumPower > 0
+        return true
+      }
       case "852":
-        this.vacuum = m === "851"
+        this.vacuum = false
+        this.vacuumPower = 0
         return true
       case "220":
         this.feedOverride = word(code, "S") ?? this.feedOverride
@@ -1146,10 +1194,13 @@ export class SimulatedZ1 {
     this.spindleOn = false
     this.targetRpm = 0
     // The firmware loads its saved configuration as it starts.
-    this.anchor1 = [
-      Number(this.config.get(ANCHOR_KEYS[0])),
-      Number(this.config.get(ANCHOR_KEYS[1])),
-    ]
+    const anchor = (index: 0 | 1) => {
+      const saved = savedSetting(this.configuration, ANCHOR_KEYS[index])
+      const value = saved === undefined ? NaN : Number(saved)
+      return Number.isFinite(value) ? value : this.options.anchors[index]
+    }
+    this.anchor1 = [anchor(0), anchor(1)]
+    this.loadVacuumDefaultPower()
     this.log("rebooted")
     this.onReboot()
   }

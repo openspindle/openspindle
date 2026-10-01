@@ -53,7 +53,9 @@ export function advertisedMd5(payload: Uint8Array): string | null {
   )
     throw new TransferError("Invalid uploaded-file checksum response.")
   const digest = text.trim().toLowerCase()
-  return /^[a-f0-9]{32}$/.test(digest) ? digest : null
+  return /^[a-f0-9]{32}$/.test(digest) && digest !== "0".repeat(32)
+    ? digest
+    : null
 }
 
 /**
