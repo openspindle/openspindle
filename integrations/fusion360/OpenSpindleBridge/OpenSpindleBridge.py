@@ -9,7 +9,7 @@ import adsk.cam
 import adsk.core
 
 from .bridge_server import (
-    BridgeError, MAX_PROGRAM_BYTES, MAX_PROGRAMS, NC_EXTENSIONS, SnapshotBridge,
+    BridgeError, MAX_PROGRAM_BYTES, MAX_PROGRAMS, NC_EXTENSIONS, PAIRED, SnapshotBridge,
 )
 
 
@@ -318,12 +318,28 @@ def _handle_request(action, program_id, ensure_live):
                 raise BridgeError(500, "The NC program was posted, but Fusion could not restore the previously active document.")
 
 
+def _close_connection_dialog():
+    # A pending request means Connect was clicked again: its dialog shows a new code.
+    if _bridge is None or _bridge.pending_pairing() is not None:
+        return
+    ui = _application().userInterface
+    try:
+        # Only the code dialog closes, never a command the user started since.
+        if ui.activeCommand == _CONNECTION_ID:
+            ui.terminateActiveCommand()
+    except Exception:
+        pass
+
+
 class _MainThreadHandler(adsk.core.CustomEventHandler):
     def __init__(self, requests):
         super().__init__()
         self.requests = requests
 
     def notify(self, args):
+        if args.additionalInfo == PAIRED:
+            _close_connection_dialog()
+            return
         self.requests.execute(args.additionalInfo, _handle_request)
 
 

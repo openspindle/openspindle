@@ -29,6 +29,8 @@ MAX_PROGRAMS = 100
 LIST_SECONDS = 8
 POST_SECONDS = 120
 NC_EXTENSIONS = frozenset((".nc", ".cnc", ".gcode", ".tap", ".ngc"))
+# Main-thread event info for a completed pairing; request events carry a UUID instead.
+PAIRED = "paired"
 _PROGRAM_PATH = re.compile(r"/v2/programs/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/post\Z")
 _PAIRING_CODE = re.compile(r"[0-9]{6}\Z")
 
@@ -67,7 +69,15 @@ def _error_payload(message):
 
 def _connection_open(connection):
     try:
-        readable, _, _ = select.select([connection], [], [], 0)
+        # select() rejects descriptors numbered 1024 or higher, which every new connection
+        # gets once a long Fusion session has leaked enough of its own. poll() has no such
+        # limit; Windows has no poll(), and its select() limits a set's size, not numbers.
+        if hasattr(select, "poll"):
+            poller = select.poll()
+            poller.register(connection, select.POLLIN)
+            readable = poller.poll(0)
+        else:
+            readable, _, _ = select.select([connection], [], [], 0)
         # This protocol accepts exactly one request per connection, with its
         # complete body consumed before dispatch. EOF or extra input cancels it.
         return not readable
@@ -373,6 +383,7 @@ class _SnapshotHTTPServer(ThreadingHTTPServer):
 class SnapshotBridge:
     def __init__(self, fire_event):
         self.token = secrets.token_urlsafe(32)
+        self._fire_event = fire_event
         self.requests = MainThreadRequests(fire_event)
         self._pairing_lock = threading.Lock()
         self._pairing = None
@@ -437,9 +448,15 @@ class SnapshotBridge:
                 return 401, {"error": "The code does not match the one shown in Fusion."}
             self._pairing = None
             self._announcement_changed.set()
-            # One bearer belongs to this Fusion session. Opening or failing a
-            # new connection request cannot revoke an already paired app.
-            return 200, {"token": self.token}
+        try:
+            # The code is used up, so the add-in closes the dialog showing it.
+            self._fire_event(PAIRED)
+        except Exception:
+            # A dialog left open is harmless: the user closes it.
+            pass
+        # One bearer belongs to this Fusion session. Opening or failing a
+        # new connection request cannot revoke an already paired app.
+        return 200, {"token": self.token}
 
     def _announce_pairing(self):
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as announcement:

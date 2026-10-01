@@ -34,8 +34,8 @@ third-party packages are required. Use a current Fusion release on Windows or ma
 
 The code can be used once and expires after two minutes. If it expires or five
 incorrect codes are entered, choose **Connect to OpenSpindle** again in Fusion.
-Each click replaces any previous connection request. You can close the Fusion
-code dialog after entering its code; closing it does not end the connection.
+Each click replaces any previous connection request. The Fusion code dialog
+closes by itself once OpenSpindle connects.
 
 The picker reads live program metadata without posting. Click **Refresh** after
 adding or renaming programs, or opening or closing documents. After changing
