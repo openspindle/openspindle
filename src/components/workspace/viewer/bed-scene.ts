@@ -1,6 +1,7 @@
 import * as THREE from "three"
 import { OrbitControls } from "three/addons/controls/OrbitControls.js"
 import { kitForSetup } from "@/domain/fixtures/catalog"
+import type { MachineCamera } from "@/domain/fixtures/fixture-kit"
 import type { Point3 } from "@/domain/nc/gcode"
 import type {
   ViewerPlate,
@@ -22,11 +23,15 @@ import { PlateView, bedGrid } from "./plate-view"
 import type { PlatePresentation, PlateViewContext } from "./plate-view"
 import { CLICK_TOLERANCE, SetupArranger } from "./setup-arranger"
 import type { ArrangeEvents, ArrangeView } from "./setup-arranger"
+import { along } from "./toolpath-view"
 import { ViewerAssets } from "./viewer-assets"
 import type { ModelMeshes } from "./viewer-assets"
 import { ViewerStage } from "./viewer-stage"
 
-/** The preset views; "camera" looks from where the machine's camera does (`cameraView`). */
+/**
+ * The preset views; "camera" is the view through the machine's camera (`FixtureKit.camera`),
+ * else the perspective.
+ */
 export type ViewMode = "perspective" | "top" | "front" | "camera"
 
 /** Viewer-wide display state; only the selected plate follows playback and selection. */
@@ -101,6 +106,13 @@ export class BedScene {
     3000
   )
   private readonly controls: OrbitControls
+  private view: ViewMode = "perspective"
+  /** The plates' machine's camera, while the view is through it. */
+  private machineCamera: MachineCamera | null = null
+  /** The view through the machine's camera: its lens, so in perspective. */
+  private readonly lens = new THREE.PerspectiveCamera(45, 4 / 3, 1, 3000)
+  /** Where the spindle last was along the bed's Y, which the machine's camera is level with. */
+  private spindleY: number | null = null
   private readonly assets: ViewerAssets
   private readonly context: PlateViewContext
   /**
@@ -189,6 +201,8 @@ export class BedScene {
         this.camera.left = centerX - halfWidth
         this.camera.right = centerX + halfWidth
         this.camera.updateProjectionMatrix()
+        this.lens.aspect = width / height
+        this.lens.updateProjectionMatrix()
       },
     })
     this.controls = new OrbitControls(this.camera, renderer.domElement)
@@ -284,8 +298,11 @@ export class BedScene {
         this.addView(plate, placement)
       }
     }
-    // Toolpath, setup and selection changes update geometry without moving the camera.
-    if (arrangementChanged) this.center()
+    // Toolpath, setup and selection changes update geometry without moving the camera; the view
+    // through the machine's camera is through that of the machine now shown, level with its tool.
+    if (arrangementChanged && this.view === "camera") this.setView(this.view)
+    else if (arrangementChanged) this.center()
+    else this.placeLens()
     this.arranger?.platesChanged()
     this.stage.invalidate()
   }
@@ -311,23 +328,66 @@ export class BedScene {
     for (const [id, view] of this.views)
       if (view.present(this.platePresentation(id))) changed = true
     if (changed) this.stage.invalidate()
+    this.placeLens()
   }
 
+  /** A preset, or the view through the first plate's machine's camera, else the perspective. */
   setView(view: ViewMode) {
-    this.camera.position
-      .copy(this.controls.target)
-      .add(new THREE.Vector3(...this.viewDirection(view)))
-    this.center()
-  }
-
-  /** A preset's direction; the camera's is its first plate's machine's, else the perspective. */
-  private viewDirection(view: ViewMode): Point3 {
-    if (view !== "camera") return VIEW_DIRECTIONS[view]
+    this.view = view
     const plate = this.plates.at(0)
     const kit = plate
       ? plateKit(plate)
       : kitForSetup({ deviceId: null, fixtures: [] })
-    return kit.cameraView ?? VIEW_DIRECTIONS.perspective
+    this.machineCamera = view === "camera" ? kit.camera : null
+    // The machine's camera is where it is mounted: it does not orbit, pan or zoom.
+    this.controls.enabled = !this.machineCamera
+    if (this.machineCamera) {
+      this.placeLens()
+      return
+    }
+    const direction = VIEW_DIRECTIONS[view === "camera" ? "perspective" : view]
+    this.camera.position
+      .copy(this.controls.target)
+      .add(new THREE.Vector3(...direction))
+    this.center()
+  }
+
+  /**
+   * Puts the lens where the machine's camera is. Fixed to the frame, the camera sees the bed move
+   * along Y under the spindle, so it is level with the tool: where the playhead has it on the
+   * selected plate, else where the machine reports it, else where it last was (at first, over
+   * the middle of the plates' beds).
+   */
+  private placeLens() {
+    const camera = this.machineCamera
+    if (!camera) return
+    const { selectedPlateId } = this.presentation
+    this.spindleY = this.toolY(selectedPlateId) ?? this.spindleY
+    const { min, max } = this.layout.bounds
+    const y = this.spindleY ?? (min[1] + max[1]) / 2
+    const x =
+      selectedPlateId === null ? 0 : (this.offsetOf(selectedPlateId) ?? 0)
+    const onBed = ([px, py, pz]: Point3) =>
+      new THREE.Vector3(px + x, py + y, pz)
+    this.lens.fov = camera.fov
+    this.lens.updateProjectionMatrix()
+    this.lens.up.set(0, 0, 1)
+    this.lens.position.copy(onBed(camera.position))
+    this.lens.lookAt(onBed(camera.target))
+    this.stage.invalidate()
+  }
+
+  /** Where the tool is along a plate's bed's Y: at the playhead, else where the machine reports it. */
+  private toolY(plateId: string | null): number | null {
+    const plate = this.plates.find(({ id }) => id === plateId)
+    if (!plate) return null
+    const { playhead } = this
+    const segment =
+      playhead && plate.machineProgram.segments.at(playhead.segment)
+    if (playhead && segment)
+      return along(segment, playhead.fraction)[1] + plate.workOrigin[1]
+    const { liveTool } = this.presentation
+    return liveTool?.plateId === plateId ? liveTool.position[1] : null
   }
 
   /**
@@ -442,9 +502,14 @@ export class BedScene {
     )
   }
 
+  /** What the view is drawn through: the machine camera's lens, else the preset's camera. */
+  private get eye(): THREE.Camera {
+    return this.machineCamera ? this.lens : this.camera
+  }
+
   private readonly frame = () => {
     const settling = this.controls.update()
-    this.stage.renderer.render(this.stage.scene, this.camera)
+    this.stage.renderer.render(this.stage.scene, this.eye)
     this.positionLabels()
     return settling
   }
@@ -473,7 +538,7 @@ export class BedScene {
   /** Puts an overlay element where a point shows, hidden when the point is out of view. */
   private pin(element: HTMLElement, point: Point3) {
     const { clientWidth: width, clientHeight: height } = this.container
-    const projected = this.projected.set(...point).project(this.camera)
+    const projected = this.projected.set(...point).project(this.eye)
     element.style.left = `${((projected.x + 1) * width) / 2}px`
     element.style.top = `${((1 - projected.y) * height) / 2}px`
     element.style.visibility =
@@ -533,7 +598,7 @@ export class BedScene {
         ((event.clientX - rect.left) / rect.width) * 2 - 1,
         -((event.clientY - rect.top) / rect.height) * 2 + 1
       ),
-      this.camera
+      this.eye
     )
     this.stage.scene.updateMatrixWorld(true)
   }

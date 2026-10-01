@@ -66,7 +66,10 @@ export type ToolModels = {
 }
 
 /** The point `fraction` of the way along a move. */
-const along = ({ start, end }: GCodeSegment, fraction: number): Point3 => [
+export const along = (
+  { start, end }: GCodeSegment,
+  fraction: number
+): Point3 => [
   start[0] + (end[0] - start[0]) * fraction,
   start[1] + (end[1] - start[1]) * fraction,
   start[2] + (end[2] - start[2]) * fraction,

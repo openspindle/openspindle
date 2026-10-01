@@ -34,6 +34,20 @@ export type KitRecolor = {
 }
 
 /**
+ * A camera fixed to the machine's frame: where its lens is and the point it looks at, in bed
+ * coordinates with the spindle over bed Y 0. The bed moves along Y under the spindle and the
+ * camera alike, so the camera is as far along the bed's Y as the spindle is.
+ */
+export type MachineCamera = {
+  readonly position: Point3
+  readonly target: Point3
+  /** Its picture's vertical field of view, in degrees. */
+  readonly fov: number
+  /** Its picture's width over its height. */
+  readonly aspect: number
+}
+
+/**
  * What a kind of machine is and comes with: its work area, bed and probing, the fixtures made for
  * it and its factory anchors. A device's fixture profile starts from its machine's kit and keeps
  * up with the kit's versions: each version adds fixtures or corrects them.
@@ -63,11 +77,8 @@ export abstract class FixtureKit {
    * tool changes); null when the preview does not follow it.
    */
   abstract readonly firmware: FirmwareModel | null
-  /**
-   * Where its camera looks at the bed from, as a direction from the bed's middle, for a view
-   * like the camera's; null when it has none.
-   */
-  abstract readonly cameraView: Point3 | null
+  /** Its camera, for a view like the camera's; null when it has none. */
+  abstract readonly camera: MachineCamera | null
   /** Its fixtures, in the order profiles list them. */
   abstract readonly fixtures: readonly KitFixture[]
   /**

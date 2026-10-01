@@ -7,7 +7,7 @@ import type { MachineOrigin } from "../../plate/work-origin"
 import type { MachineProbing } from "../../probing/strategy"
 import { PROBE_3D_TOOL, PROBE_TOOL } from "../../tools/tool-table"
 import { FixtureKit } from "../fixture-kit"
-import type { KitFixture, KitRecolor } from "../fixture-kit"
+import type { KitFixture, KitRecolor, MachineCamera } from "../fixture-kit"
 import { Z1DowelPin } from "./dowel-pin"
 import { Z1Firmware } from "./firmware"
 import { Z1FourthAxis } from "./fourth-axis"
@@ -66,8 +66,16 @@ export class MakeraZ1 extends FixtureKit {
     readers: { grids: g32Grids, touches: touchPoints },
   }
   readonly firmware = new Z1Firmware()
-  /** Nominal: from above the front of the enclosure, looking down across the bed. */
-  readonly cameraView: Point3 = [0, -320, 540]
+  /**
+   * On the frame left of the bed, level with the spindle in Y, looking along X 41° down; its
+   * stream's 640 × 480 picture. Measured from a picture of the L-bracket and the bed's holes.
+   */
+  readonly camera: MachineCamera = {
+    position: [-52, 0, 96],
+    target: [58, 0, 0],
+    fov: 45,
+    aspect: 4 / 3,
+  }
   readonly fixtures: readonly KitFixture[] = [
     { fixture: new Z1MdfBed(), addedIn: 1 },
     { fixture: new Z1FourthAxis(), addedIn: 1 },

@@ -1,23 +1,24 @@
 import { useMemo } from "react"
+import { cn } from "cn"
 import { bedPositionOf } from "@/app/workspace/machine-program"
 import { BedViewer } from "@/components/workspace/bed-viewer"
 import type {
   LiveTool,
   PlayheadSource,
 } from "@/components/workspace/bed-viewer"
+import { kitForSetup } from "@/domain/fixtures/catalog"
 import { useFreshTelemetry } from "@/platform/machine"
 import { useWorkspaceViewerPlates } from "./workspace-viewer-plates"
 import type { ShownPlate } from "./workspace-viewer-plates"
 
 const NO_SELECTION = () => {}
-/** The bed fills the camera's picture, as the camera sees it. */
-const CAMERA_ZOOM = 1.3
+const NO_SETUP = { deviceId: null, fixtures: [] }
 
 /**
- * What the machine's camera would see, on the simulator: the plate on its bed from where the
- * camera looks, with the tool the machine reports where it reports it. Following a job, the
- * playhead that follows the machine shows the tool and the path cut so far instead. Only to
- * look at.
+ * What the machine's camera would see, on the simulator: the plate on its bed through the
+ * camera's lens, the bed moved along Y under it as the machine moves it, with the tool the
+ * machine reports where it reports it. Following a job, the playhead that follows the machine
+ * shows the tool and the path cut so far instead. Only to look at.
  */
 export function SimulatedCamera({
   shown,
@@ -45,22 +46,29 @@ export function SimulatedCamera({
     const position = bedPositionOf(plate, [x, y, z - offset])
     return position && { plateId: plate.id, tool, position }
   }, [plate, x, y, z, offset, tool])
+  const aspect = kitForSetup(plate?.setup ?? NO_SETUP).camera?.aspect
   return (
-    <div className="pointer-events-none absolute inset-0">
-      <BedViewer
-        plates={plates}
-        selectedPlateId={plate?.id ?? null}
-        onSelectPlate={NO_SELECTION}
-        progress={100}
-        playhead={playhead}
-        showRapids={false}
-        showStock
-        view="camera"
-        resetKey={0}
-        zoom={CAMERA_ZOOM}
-        liveTool={liveTool}
-        labeled={false}
-      />
+    <div className="pointer-events-none absolute inset-0 flex justify-center">
+      {/* The camera's whole picture, as its stream is shown: with bars at its sides. */}
+      <div
+        className={cn("relative h-full max-w-full", !aspect && "w-full")}
+        style={{ aspectRatio: aspect }}
+      >
+        <BedViewer
+          plates={plates}
+          selectedPlateId={plate?.id ?? null}
+          onSelectPlate={NO_SELECTION}
+          progress={100}
+          playhead={playhead}
+          showRapids={false}
+          showStock
+          view="camera"
+          resetKey={0}
+          zoom={1}
+          liveTool={liveTool}
+          labeled={false}
+        />
+      </div>
     </div>
   )
 }
