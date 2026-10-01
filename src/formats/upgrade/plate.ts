@@ -3,7 +3,7 @@ import { PlateSchema, notice } from "@/domain/plate/plate"
 import type { PlateNotice } from "@/domain/plate/plate"
 import { isTool } from "@/domain/tools/tool"
 import type { Tool } from "@/domain/tools/tool"
-import { isProbe } from "@/domain/tools/tool-table"
+import { isProbe, libraryPreferences } from "@/domain/tools/tool-table"
 import { upgradeTool } from "../tool-library/upgrade"
 import { isJsonObject } from "./json"
 import type { JsonObject } from "./json"
@@ -28,6 +28,10 @@ function libraryTool(library: readonly unknown[], id: unknown): Tool | null {
   return isTool(tool) ? tool : null
 }
 
+/** The library's tools, brought up to date as reading brings them; invalid ones left out. */
+const libraryTools = (library: readonly unknown[]): Tool[] =>
+  library.map(upgradeTool).filter(isTool)
+
 /** Whether bindings bind a tool number, as an operation's `tools` hold them. */
 const binds = (bindings: readonly unknown[], local: number) =>
   bindings.some((binding) => isJsonObject(binding) && binding.local === local)
@@ -36,18 +40,18 @@ const binds = (bindings: readonly unknown[], local: number) =>
 const entryNumber = (entry: unknown) =>
   isJsonObject(entry) && typeof entry.number === "number" ? entry.number : -1
 
-/**
- * A tool table with an entry for a number, as binding it takes one: one it has already, else a
- * new one without a tool, in number order.
- */
+/** Whether a tool table has an entry for a number. */
+const hasEntry = (table: readonly unknown[], number: number) =>
+  table.some((entry) => isJsonObject(entry) && entry.number === number)
+
+/** A tool table with a new entry for a number, holding a tool or none, in number order. */
 function withEntry(
   table: readonly unknown[],
-  number: number
+  number: number,
+  toolId: string | null
 ): readonly unknown[] {
-  if (table.some((entry) => isJsonObject(entry) && entry.number === number))
-    return table
   const index = table.findIndex((entry) => entryNumber(entry) > number)
-  const entry = { number, toolId: null }
+  const entry = { number, toolId }
   return index < 0
     ? [...table, entry]
     : [...table.slice(0, index), entry, ...table.slice(index)]
@@ -106,10 +110,11 @@ function ballNotice(
  * export's payload, which holds the plate's setup, tool table and operations alike. Its
  * auto-level, auto Z-height, auto-scan and 3D probing operations become probing operations
  * (`upgradeProbingSource`); one that does not bind its probe binds it to the entry of that
- * number, which the table gains, without a tool, where it has none. A 3D probing set for another
- * ball than its probe's, or without a probe from the `library` (the tools the table's entries
- * name, as saved or as the app holds them), is a notice. What it does not recognize stays as it
- * is, for reading to leave out and report.
+ * number. Where the table has none it gains one, holding the probe of the `library` (the tools
+ * the table's entries name, as saved or as the app holds them) that adding the operation picks
+ * for that number (`libraryPreferences`), or no tool when it has none. A 3D probing set for
+ * another ball than its probe's, or without a probe from the library, is a notice. What it does
+ * not recognize stays as it is, for reading to leave out and report.
  */
 export function upgradePlate(
   plate: JsonObject,
@@ -117,6 +122,7 @@ export function upgradePlate(
 ): UpgradedPlate {
   if (!Array.isArray(plate.operations)) return { plate, notices: [] }
   let table = plate.tools
+  let tools: Tool[] | null = null
   const notices: string[] = []
   const operations = plate.operations.map((operation: unknown) => {
     if (!isJsonObject(operation) || !isJsonObject(operation.source))
@@ -132,7 +138,11 @@ export function upgradePlate(
       !binds(bindings, probe)
     ) {
       bindings = [...bindings, { local: probe, plate: probe }]
-      table = withEntry(table, probe)
+      if (!hasEntry(table, probe)) {
+        tools ??= libraryTools(library)
+        const preferred = libraryPreferences([probe], tools).get(probe)
+        table = withEntry(table, probe, preferred ?? null)
+      }
     }
     if (probe !== null && ball !== null) {
       const message = ballNotice(

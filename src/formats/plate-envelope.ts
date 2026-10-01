@@ -25,9 +25,10 @@ export const carriesPlate = (source: string) =>
 /**
  * The envelope version exports write: version 3 fixtures name their model's source, since
  * version 4 the wasteboard is one of them, since version 5 anchored probing travels at the
- * height the machine's probe travels at, and since version 6 probing operations are a task done
- * by a strategy with a probe from the tool table, their parameters hold a value per axis
- * together, and their placements their height apart from their offset.
+ * height the machine's probe travels at, and since version 6 probing operations are one kind, a
+ * task done by a strategy with a probe tool of the plate's table, 3D probing takes its ball from
+ * that probe, probing parameters hold a value per axis together, and placements their height
+ * apart from their offset.
  */
 export const PLATE_ENVELOPE_VERSION = 6
 
