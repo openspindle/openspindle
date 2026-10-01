@@ -6,8 +6,6 @@ import { tanstackRouter } from "@tanstack/router-plugin/vite"
 import viteReact from "@vitejs/plugin-react"
 import { defineConfig } from "electron-vite"
 import { appearanceInit } from "./tools/vite/appearance-init.ts"
-import { bundledPlugins } from "./tools/vite/bundled-plugins.ts"
-import { pluginFrame } from "./tools/vite/plugin-frame.ts"
 import { thirdPartyNotices } from "./tools/vite/third-party.ts"
 
 const path = (relative: string) =>
@@ -55,7 +53,7 @@ export default defineConfig(({ command }) => {
 
   return {
     main: {
-      plugins: [thirdPartyNotices("main"), bundledPlugins(), ...sentry("main")],
+      plugins: [thirdPartyNotices("main"), ...sentry("main")],
       resolve: { alias: { "@": path("./src") } },
       // The DSN error reports go to, from .env or the environment; it is not a secret. Without
       // one the app only logs errors.
@@ -89,7 +87,6 @@ export default defineConfig(({ command }) => {
         viteReact(),
         tailwindcss(),
         appearanceInit(),
-        pluginFrame({ alias }),
         rendererNotices,
         ...sentry("renderer"),
       ],

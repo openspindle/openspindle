@@ -1,186 +1,157 @@
 import { machineToBed } from "@/domain/anchors/stored-anchors"
-import { issueOf } from "@/domain/diagnostics"
-import type { Issue } from "@/domain/diagnostics"
-import type { Stock } from "@/domain/stock/stock"
-import type { XYZ } from "../../../geometry/frame"
-import { EPSILON } from "../../../geometry/millimetres"
+import { operationSubject } from "@/domain/diagnostics"
+import type { Point3 } from "@/domain/nc/gcode"
 import { contains, rectAt } from "../../../geometry/rect"
-import { TouchOffParamsSchema } from "./params"
-import type { TouchOffSpecs, TouchOffParams } from "./params"
-import { rangedSchema } from "../../parameters"
-import { resolvePlacement } from "../../placement"
-import type {
-  PlacementContext,
-  PlacementFailure,
-  ProbePlacement,
-  ProbeStart,
+import type { OperationRuleSubject, StageRule } from "../../../rules/stages"
+import { planTouchOff } from "./plan"
+import {
+  laterGrids,
+  placementContext,
+  touchesGridStarts,
 } from "../../placement"
-import type { ProbingPlan } from "../../probe"
-
-export type TouchOffIssueCode =
-  // Parameters
-  | "invalid-parameters"
-  // Anchor placement against the plate's anchor snapshot
-  | "anchor-snapshot-missing"
-  | "anchor-unavailable"
-  | "anchor-point-out-of-range"
-  | "factory-anchors"
-  // Stock and the plate's other operations
-  | "stock-unspecified"
-  | "point-outside-stock"
-  | "before-auto-level"
-
-/** Errors block NC generation or Run; warnings inform without blocking. */
-export type TouchOffIssue = Issue<TouchOffIssueCode>
-
-const zHeightError = issueOf<TouchOffIssueCode>("error")
-const zHeightWarning = issueOf<TouchOffIssueCode>("warning")
-
-/** The plate an auto Z-height operation belongs to. */
-export type TouchOffPlateContext = PlacementContext & {
-  stock: Pick<Stock, "width" | "depth" | "height"> | null
-  /** Bed position of the stock's minimum corner. */
-  stockAnchor: XYZ<"bed">
-}
-
-type Checked<TValue> =
-  ({ ok: true } & TValue) | { ok: false; issues: TouchOffIssue[] }
-/** Parameters and touch point that generation can render, or what blocks it. */
-export type PlannedTouchOff = Checked<ProbingPlan<TouchOffParams>>
+import type { ProbeStart } from "../../placement"
+import { editOperation } from "../../rules"
+import { strategySpecs } from "../../strategies"
 
 /**
- * Everything that prevents generating NC: the parameters, within the ranges of the machine's
- * probe (`parameters`), then the anchored touch point.
+ * A touch-off operation as its advice reads it: where it starts, null where the anchored point
+ * does not resolve (the compiler reports why). Null for another operation, a strategy the
+ * plate's machine does not have, or parameters that do not parse within its ranges (the
+ * compiler reports those too).
  */
-export function planTouchOff(
-  params: TouchOffParams,
-  plate: PlacementContext,
-  parameters: TouchOffSpecs
-): PlannedTouchOff {
-  const parsed = rangedSchema(TouchOffParamsSchema, parameters).safeParse(
-    params
-  )
-  if (!parsed.success)
-    return {
-      ok: false,
-      issues: parsed.error.issues.map((issue) =>
-        zHeightError("invalid-parameters", issue.message)
-      ),
-    }
-  const resolved = resolvePlacement(parsed.data.placement, plate)
-  if (!resolved.ok)
-    return { ok: false, issues: [PLACEMENT_ISSUES[resolved.error]] }
-  return { ok: true, params: parsed.data, start: resolved.value }
-}
-
-/** Issues to show while editing: generation blockers, anchor provenance and the stock. */
-export function validateTouchOff(
-  params: TouchOffParams,
-  plate: TouchOffPlateContext,
-  parameters: TouchOffSpecs
-): TouchOffIssue[] {
-  const plan = planTouchOff(params, plate, parameters)
-  if (
-    !plan.ok &&
-    plan.issues.some((issue) => issue.code === "invalid-parameters")
-  )
-    return plan.issues
-  const start = plan.ok ? plan.start : null
-  return [
-    ...(plan.ok ? [] : plan.issues),
-    ...(start?.kind === "anchor" && start.source === "factory"
-      ? [
-          zHeightWarning(
-            "factory-anchors",
-            "The anchor positions are factory defaults. Use Read anchors to verify them against the device before Run."
-          ),
-        ]
-      : []),
-    ...stockIssues(plate, start),
-  ]
-}
-
-/** An auto-level that runs after this operation, and whether it follows it directly. */
-export type LaterGrid = {
-  placement: ProbePlacement
-  /** Next in the plate without a Pause before, so the probe has not moved in between. */
-  adjacent: boolean
+function touchOffAdvice({
+  operation,
+  plate,
+  kit,
+}: OperationRuleSubject): { readonly start: ProbeStart | null } | null {
+  const { source } = operation
+  if (source.kind !== "probing" || source.task !== "touch-off") return null
+  const specs = strategySpecs(source, kit.probing)
+  if (!specs) return null
+  const plan = planTouchOff(source.params, placementContext(plate), specs)
+  if (plan.ok) return { start: plan.start }
+  return plan.issues.some((issue) => issue.code === "invalid-parameters")
+    ? null
+    : { start: null }
 }
 
 /**
- * Auto-level measures heights relative to its grid's first point, and the touch-off sets work Z
- * from the position without compensation. Work Z set after auto-level is therefore exact
- * anywhere; set before it, only where the grid starts.
+ * Where an anchored touch point is on the bed, and whether it is over the stock as placed; null
+ * without stock, from the probe position, or without the plate's anchor snapshot.
  */
-export function gridOrderIssues(
-  params: Pick<TouchOffParams, "placement">,
-  later: readonly LaterGrid[]
-): TouchOffIssue[] {
-  if (later.every((grid) => probesGridStart(params.placement, grid))) return []
-  return [
-    zHeightWarning(
-      "before-auto-level",
-      "A later auto-level measures heights from its grid's first point, so work Z is off by any height difference between that point and this one. Move Auto Z-height after Auto-level, or probe where the grid starts."
-    ),
-  ]
-}
-
-function probesGridStart(
-  touch: ProbePlacement,
-  { placement, adjacent }: LaterGrid
-): boolean {
-  // A grid from the probe's position starts where the probe is: above the point just touched.
-  if (placement.kind === "probe-position") return adjacent
-  return (
-    touch.kind === "anchor" &&
-    touch.anchorId === placement.anchorId &&
-    Math.abs(touch.offset[0] - placement.offset[0]) <= EPSILON &&
-    Math.abs(touch.offset[1] - placement.offset[1]) <= EPSILON
-  )
-}
-
-const PLACEMENT_ISSUES: Readonly<Record<PlacementFailure, TouchOffIssue>> = {
-  "anchor-snapshot-missing": zHeightError(
-    "anchor-snapshot-missing",
-    "Select an anchor snapshot for this plate's device."
-  ),
-  "anchor-unavailable": zHeightError(
-    "anchor-unavailable",
-    "The selected probe anchor is unavailable."
-  ),
-  "out-of-range": zHeightError(
-    "anchor-point-out-of-range",
-    "The anchored probe point exceeds the supported coordinate range."
-  ),
-}
-
-function stockIssues(
-  plate: TouchOffPlateContext,
-  start: ProbeStart | null
-): TouchOffIssue[] {
-  const { stock } = plate
-  if (!stock)
-    return [
-      zHeightWarning(
-        "stock-unspecified",
-        "The stock size is unspecified, so the touch point cannot be checked against it."
-      ),
-    ]
-  if (start?.kind !== "anchor" || !plate.anchorSetup) return []
+function touchOnStock(subject: OperationRuleSubject): {
+  readonly at: Point3
+  readonly onStock: boolean
+} | null {
+  const start = touchOffAdvice(subject)?.start
+  const { stock, stockAnchor, anchors } = subject.plate.setup
+  if (!stock || start?.kind !== "anchor" || !anchors) return null
   // Machine XY reaches the bed through the snapshot's registration, as the viewer places it.
-  const [x, y] = machineToBed(plate.anchorSetup)(start.machine)
-  const [stockX, stockY, stockZ] = plate.stockAnchor
-  const stockFootprint = rectAt<"bed">(
-    [stockX, stockY],
-    [stock.width, stock.depth]
-  )
-  if (contains(stockFootprint, [x, y])) return []
-  return [
-    zHeightWarning(
-      "point-outside-stock",
-      "The anchored probe point is off the stock as placed on the bed, so the probe would set work Z on another surface.",
-      // Beside the stock, at the height of what it stands on.
-      { places: [{ kind: "point", at: [x, y, stockZ] }] }
+  const [x, y] = machineToBed(anchors)(start.machine)
+  const [stockX, stockY, stockZ] = stockAnchor
+  return {
+    // Beside the stock, at the height of what it stands on.
+    at: [x, y, stockZ],
+    onStock: contains(
+      rectAt<"bed">([stockX, stockY], [stock.width, stock.depth]),
+      [x, y]
     ),
-  ]
+  }
 }
+
+/** The stock checks of a touch point: without stock, it cannot be placed on it. */
+const AUTO_Z_HEIGHT_STOCK_CHAIN = "auto-z-height/stock"
+
+const zHeightFactoryAnchors: StageRule<"operation"> = {
+  id: "auto-z-height/factory-anchors",
+  stage: "operation",
+  label: "Auto Z-height anchors read",
+  description:
+    "A touch point placed from the machine's factory default anchor positions lands wherever the device's own anchors differ from them.",
+  severity: "warning",
+  configurable: false,
+  test: (subject) => {
+    const start = touchOffAdvice(subject)?.start
+    return start?.kind !== "anchor" || start.source !== "factory"
+  },
+  explain: ({ first }) => ({
+    problem:
+      "The anchor positions are factory defaults. Use Read anchors to verify them against the device before Run.",
+    about: operationSubject(first.operation.id),
+  }),
+  fixes: editOperation,
+}
+
+const zHeightStockUnspecified: StageRule<"operation"> = {
+  id: "auto-z-height/stock-unspecified",
+  stage: "operation",
+  label: "Auto Z-height stock size",
+  description:
+    "A touch point is checked against the stock, which needs its size.",
+  severity: "warning",
+  configurable: false,
+  chain: AUTO_Z_HEIGHT_STOCK_CHAIN,
+  test: (subject) =>
+    !touchOffAdvice(subject) || subject.plate.setup.stock !== null,
+  explain: ({ first }) => ({
+    problem:
+      "The stock size is unspecified, so the touch point cannot be checked against it.",
+    about: operationSubject(first.operation.id),
+  }),
+  fixes: editOperation,
+}
+
+const pointOutsideStock: StageRule<"operation"> = {
+  id: "auto-z-height/point-outside-stock",
+  stage: "operation",
+  label: "Auto Z-height point on the stock",
+  description:
+    "An anchored touch point off the stock sets work Z on another surface.",
+  severity: "warning",
+  configurable: false,
+  chain: AUTO_Z_HEIGHT_STOCK_CHAIN,
+  test: (subject) => touchOnStock(subject)?.onStock ?? true,
+  explain: ({ first }) => {
+    const touch = touchOnStock(first)
+    return {
+      problem:
+        "The anchored probe point is off the stock as placed on the bed, so the probe would set work Z on another surface.",
+      about: operationSubject(first.operation.id),
+      ...(touch && { places: [{ kind: "point", at: touch.at } as const] }),
+    }
+  },
+  fixes: editOperation,
+}
+
+const zHeightBeforeAutoLevel: StageRule<"operation"> = {
+  id: "auto-z-height/before-auto-level",
+  stage: "operation",
+  label: "Auto Z-height after auto-level",
+  description:
+    "Work Z set before an auto-level is exact only where the auto-level's grid starts.",
+  severity: "warning",
+  configurable: false,
+  test: ({ operation, plate, kit }) => {
+    const { source } = operation
+    return (
+      source.kind !== "probing" ||
+      source.task !== "touch-off" ||
+      !strategySpecs(source, kit.probing) ||
+      touchesGridStarts(source.params.placement, laterGrids(plate, operation))
+    )
+  },
+  explain: ({ first }) => ({
+    problem:
+      "A later auto-level measures heights from its grid's first point, so work Z is off by any height difference between that point and this one. Move Auto Z-height after Auto-level, or probe where the grid starts.",
+    about: operationSubject(first.operation.id),
+  }),
+  fixes: editOperation,
+}
+
+/** The advice for a touch-off operation: its anchors, its point against the stock, its order. */
+export const TOUCH_OFF_RULES: readonly StageRule<"operation">[] = [
+  zHeightFactoryAnchors,
+  zHeightStockUnspecified,
+  pointOutsideStock,
+  zHeightBeforeAutoLevel,
+]

@@ -18,7 +18,7 @@ import type {
 import { problemMarkerId } from "./bed-viewer-layout"
 import type { LineRange } from "./bed-viewer-layout"
 import { BedScene } from "./viewer/bed-scene"
-import type { ViewMode } from "./viewer/bed-scene"
+import type { LiveTool, MachineOrigin, ViewMode } from "./viewer/bed-scene"
 import type { ArrangeEvents, ArrangeView } from "./viewer/setup-arranger"
 
 export type { Stock } from "@/domain/stock/stock"
@@ -28,7 +28,7 @@ export type {
   ViewerProblem,
   ViewerProblemRef,
 } from "@/components/workspace/viewer/viewer-input"
-export type { ViewMode } from "./viewer/bed-scene"
+export type { LiveTool, MachineOrigin, ViewMode } from "./viewer/bed-scene"
 export type {
   ArrangeDrag,
   ArrangeEvents,
@@ -67,6 +67,12 @@ type Props = {
   /** The problem shown: drawn stronger, and panned to when it is near an edge or beyond. */
   shownProblem?: ViewerProblemRef | null
   onSelectProblem?: (problem: ViewerProblem) => void
+  /** Where the connected machine keeps work zero, marked on one plate's bed. */
+  machineOrigin?: MachineOrigin | null
+  /** The tool the machine reports in its spindle, shown on one plate's bed. */
+  liveTool?: LiveTool | null
+  /** Plates carry their labels, which select them; not in a picture such as the camera's. */
+  labeled?: boolean
 }
 
 export function BedViewer({
@@ -90,6 +96,9 @@ export function BedViewer({
   problems,
   shownProblem,
   onSelectProblem,
+  machineOrigin,
+  liveTool,
+  labeled = true,
 }: Props) {
   const container = useRef<HTMLDivElement>(null)
   const labels = useRef(new Map<string, HTMLButtonElement>())
@@ -157,6 +166,8 @@ export function BedViewer({
       showStock,
       problems,
       shownProblem,
+      machineOrigin,
+      liveTool,
     })
   }, [
     selectedPlateId,
@@ -169,6 +180,8 @@ export function BedViewer({
     showStock,
     problems,
     shownProblem,
+    machineOrigin,
+    liveTool,
   ])
   // Playback moves the playhead every frame: the scene follows it without a render here.
   useEffect(() => {
@@ -207,27 +220,28 @@ export function BedViewer({
       aria-label="Interactive 3D plates and NC toolpaths"
     >
       <div className="pointer-events-none absolute inset-0 z-[1] overflow-hidden">
-        {plates.map((plate, index) => {
-          const label = plateLabel(plate, index)
-          return (
-            <Button
-              variant={plate.id === selectedPlateId ? "default" : "outline"}
-              className="pointer-events-auto invisible absolute -translate-x-1/2 -translate-y-1/2 shadow-sm"
-              key={plate.id}
-              ref={(element) => {
-                if (element) labels.current.set(plate.id, element)
-                else labels.current.delete(plate.id)
-              }}
-              type="button"
-              aria-label={`Select ${label}`}
-              aria-pressed={plate.id === selectedPlateId}
-              title={label}
-              onClick={() => onSelectPlate(plate.id)}
-            >
-              <span className="truncate">{label}</span>
-            </Button>
-          )
-        })}
+        {labeled &&
+          plates.map((plate, index) => {
+            const label = plateLabel(plate, index)
+            return (
+              <Button
+                variant={plate.id === selectedPlateId ? "default" : "outline"}
+                className="pointer-events-auto invisible absolute -translate-x-1/2 -translate-y-1/2 shadow-sm"
+                key={plate.id}
+                ref={(element) => {
+                  if (element) labels.current.set(plate.id, element)
+                  else labels.current.delete(plate.id)
+                }}
+                type="button"
+                aria-label={`Select ${label}`}
+                aria-pressed={plate.id === selectedPlateId}
+                title={label}
+                onClick={() => onSelectPlate(plate.id)}
+              >
+                <span className="truncate">{label}</span>
+              </Button>
+            )
+          })}
         {problems?.map((problem) => {
           const id = problemMarkerId(problem)
           const isError = problem.severity === "error"

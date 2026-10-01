@@ -1,5 +1,5 @@
 import type { OutlineParams, OutlineSpecs } from "../tasks/outline/params"
-import { planOutline } from "../tasks/outline/rules"
+import { planOutline } from "../tasks/outline/plan"
 import { roundOutward } from "../../compile/cutting-bounds"
 import { issueOf } from "../../diagnostics"
 import { formatMillimetres } from "../../geometry/millimetres"

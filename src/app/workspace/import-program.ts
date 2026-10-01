@@ -4,9 +4,15 @@ import type { Stock } from "@/domain/stock/stock"
 import { createOperation } from "@/domain/operations/operation"
 import { kitForSetup } from "@/domain/fixtures/catalog"
 import type { ProgramTool } from "@/domain/nc/cam-markers"
+import { markedStock } from "@/domain/nc/stock-markers"
 import { programTools } from "@/domain/nc/tool-comments"
 import { fitsWorkArea } from "@/domain/plate/placement"
-import { createPlate, createPlateSetup, notice } from "@/domain/plate/plate"
+import {
+  createPlate,
+  createPlateSetup,
+  notice,
+  withStockPlacement,
+} from "@/domain/plate/plate"
 import type { Plate, PlateSetup } from "@/domain/plate/plate"
 import { fail, newId, ok, plural } from "@/domain/primitives"
 import type { Result } from "@/domain/primitives"
@@ -24,6 +30,10 @@ import {
   upgradeEnvelopePayload,
 } from "@/formats/plate-envelope"
 import { describePath, readOptimistically } from "@/formats/optimistic-read"
+import {
+  retainedSourceField,
+  upgradePlateSources,
+} from "@/formats/project/upgrade"
 import { withNotices } from "@/formats/upgrade/plate"
 
 /**
@@ -48,7 +58,7 @@ export type ImportContext = {
    * describes the tools its later parts use.
    */
   readonly describedTools?: ReadonlyMap<number, ProgramTool>
-  /** Base for stock described by CAM markers; files without markers get none. */
+  /** Base for stock described by markers; files without markers get none. */
   readonly stock: Stock
   readonly placement?: PlatePlacement
   /** The setup plain programs keep of the empty plate they replace (see `keptSetup`). */
@@ -111,10 +121,10 @@ function filePlate(
 
 /**
  * Builds a plate from an NC file: a plain program, or an export with its setup and editable
- * operations. A plain program keeps the setup made on the empty plate it replaces, if any. An
- * export whose NC body was edited keeps its setup and becomes a single program, with a
- * notice. Exports of earlier versions from 4 open as the current one; other versions are
- * refused.
+ * operations. A plain program keeps the setup made on the empty plate it replaces, if any, else
+ * gets the stock its markers describe, where they put it. An export whose NC body was edited
+ * keeps its setup and becomes a single program, with a notice. Exports of earlier versions from
+ * 4 open as the current one; other versions are refused.
  */
 export function importProgram(
   fileName: string,
@@ -140,14 +150,17 @@ export function importProgram(
           context.describedTools
         )
       )
-    // The stock its CAM's markers describe; one its machine's work area cannot hold stays
-    // unspecified.
+    // The stock OpenSpindle's markers describe, where they put it, else the stock its CAM's
+    // markers describe; one its machine's work area cannot hold stays unspecified.
     const kit = kitForSetup({
       deviceId: context.placement?.deviceId ?? null,
       fixtures: context.placement?.fixtures ?? [],
     })
+    const lines = text.split(/\r\n?|\n/)
+    const marked = markedStock(lines, fileName, context.stock)
     const described =
-      kit.camMarkers?.stock(text.split(/\r\n?|\n/), fileName, context.stock) ??
+      marked?.stock ??
+      kit.camMarkers?.stock(lines, fileName, context.stock) ??
       null
     const stock =
       described && fitsWorkArea(described, kit.workArea) ? described : null
@@ -160,7 +173,12 @@ export function importProgram(
       filePlate(
         fileName,
         text,
-        setup,
+        marked
+          ? withStockPlacement(setup, marked.placement, {
+              workArea: kit.workArea,
+              anchors: kit.factoryAnchors(setup.deviceId),
+            })
+          : setup,
         context.tools,
         context.numberedTools,
         context.describedTools
@@ -173,17 +191,29 @@ export function importProgram(
     return fail(
       "It was exported by an earlier version of OpenSpindle, which this version cannot read."
     )
-  // An earlier version's payload becomes the current version before reading it optimistically.
+  // An earlier version's payload has its probing operations upgraded before reading it
+  // optimistically. Its other sources are read upgraded through the schema, so fields that
+  // leaves out are reported too.
   const upgraded =
     envelope.version < PLATE_ENVELOPE_VERSION
       ? upgradeEnvelopePayload(envelope.payload, context.tools)
       : { payload: envelope.payload, notices: [] }
   const rawPayload = upgraded.payload
-  const read = readOptimistically(PlateEnvelopeSchema, rawPayload)
+  const schema =
+    envelope.version < PLATE_ENVELOPE_VERSION
+      ? z.preprocess(upgradePlateSources, PlateEnvelopeSchema)
+      : PlateEnvelopeSchema
+  const read = readOptimistically(schema, rawPayload)
   if (!read.success)
     return fail(`Its embedded setup is invalid: ${z.prettifyError(read.error)}`)
   const exported = read.data
-  const leftOut = read.leftOut.map((path) => describePath(rawPayload, path))
+  const leftOut = read.leftOut
+    .filter(
+      (path) =>
+        envelope.version === PLATE_ENVELOPE_VERSION ||
+        !retainedSourceField(exported.operations, path)
+    )
+    .map((path) => describePath(rawPayload, path))
   const leftOutNotices = leftOut.length ? [notice(leftOutNotice(leftOut))] : []
   if (bodyChecksum(envelope.body) !== exported.bodyChecksum) {
     const plate = filePlate(

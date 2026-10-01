@@ -9,7 +9,6 @@ export const MenuCommandSchema = z.enum([
   "project.saveAndClose",
   "program.import",
   "fusion.import",
-  "plugins.manage",
   "models.manage",
   "tools.manage",
   "settings.open",

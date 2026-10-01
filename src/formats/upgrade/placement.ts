@@ -1,6 +1,6 @@
 import { isJsonObject } from "./json"
 
-/** The keys a format 6 placement has or may have, which no other key may take. */
+/** The keys a placement has or may have now, which no other key may take. */
 const PLACEMENT_KEYS: ReadonlySet<string> = new Set([
   "kind",
   "anchorId",
@@ -9,11 +9,11 @@ const PLACEMENT_KEYS: ReadonlySet<string> = new Set([
 ])
 
 /**
- * A probing placement as formats 4 and 5 saved it, in format 6: its height was its offset's Z,
- * and an anchor's offset held X and Y by name. A height it has already stays, and the offset's Z
- * is then left over. What else the offset held stays where reading reports it: in a probe
- * position's offset, or beside an anchor's keys unless one of them would take a key a placement
- * has, which leaves the placement as it is. Other placements stay as they are.
+ * A probing placement as earlier formats saved it, in the current one: its height was its
+ * offset's Z, and an anchor's offset held X and Y by name. A height it has already stays, and the
+ * offset's Z is then left over. What else the offset held stays where reading reports it: in a
+ * probe position's offset, or beside an anchor's keys unless one of them would take a key a
+ * placement has, which leaves the placement as it is. Other placements stay as they are.
  */
 export function upgradePlacement(placement: unknown): unknown {
   if (!isJsonObject(placement) || !isJsonObject(placement.offset))

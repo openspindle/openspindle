@@ -1,15 +1,16 @@
 import { isAnchorConfiguration } from "@/machine/contract"
+import type { RuleFixes } from "@/machine/contract"
 import { anchorsFromDevice, bedAnchors } from "@/domain/anchors/stored-anchors"
 import type {
   AnchorXY,
   StoredAnchor,
   StoredAnchorSetup,
 } from "@/domain/anchors/stored-anchors"
-import { WORK_ORIGIN_SUBJECT, error } from "../diagnostics"
-import type { Diagnostic } from "../diagnostics"
+import { WORK_ORIGIN_SUBJECT } from "../diagnostics"
+import type { QuickFix } from "../diagnostics"
 import type { FixtureKit } from "../fixtures/fixture-kit"
-import type { RunContext } from "../operations/kinds"
 import type { Point3 } from "../primitives"
+import type { RunRuleSubject, StageRule } from "../rules/stages"
 import type { Plate, PlateSetup } from "./plate"
 
 /** Bed coordinates are kept to the nanometre, without float noise or −0. */
@@ -194,54 +195,110 @@ export function workOriginNc(
   return origin ? kit.workOffsetNc(origin) : []
 }
 
-const readAnchors = (code: string, message: string): Diagnostic[] => [
-  error(`work-origin/${code}`, message, {
-    subject: WORK_ORIGIN_SUBJECT,
-    fix: { kind: "read-anchors" },
+/** The work origin Run's plate subject sets from an anchor; null for an operation, without a plate, or in bed coordinates. */
+function anchoredOrigin({
+  plate,
+  operation,
+}: RunRuleSubject): { setup: PlateSetup; origin: MachineOrigin } | null {
+  if (!plate || operation) return null
+  const origin = workOriginOnMachine(plate.setup)
+  return origin && { setup: plate.setup, origin }
+}
+
+/** The work origin's gates before Run: a failure stops its later ones. */
+const WORK_ORIGIN_CHAIN = "work-origin"
+
+/** What each of the work origin's failures offers: reading the connected device's anchors. */
+const readAnchors: RuleFixes<RunRuleSubject, QuickFix> = {
+  offer: () => [{ kind: "read-anchors" }],
+}
+
+const anchorsNotRead: StageRule<"run"> = {
+  id: "work-origin/anchors-not-read",
+  stage: "run",
+  label: "Work origin anchors read",
+  description:
+    "A work origin set from an anchor needs its anchors read from the connected device, which the plate is set up for; otherwise the work offset lands where the machine's anchor is not.",
+  severity: "error",
+  configurable: false,
+  chain: WORK_ORIGIN_CHAIN,
+  test: (subject) => {
+    const anchored = anchoredOrigin(subject)
+    if (!anchored) return true
+    const { anchors, deviceId } = anchored.setup
+    const connected = subject.machine.connectedDeviceId
+    return (
+      !!connected &&
+      deviceId === connected &&
+      anchors?.source === "firmware-config" &&
+      anchors.deviceId === connected
+    )
+  },
+  explain: ({ first }) => ({
+    problem: `The work origin is set from ${anchoredOrigin(first)?.origin.anchor.name ?? "an anchor"}: use Read anchors to load the connected device's anchors before Run.`,
+    about: WORK_ORIGIN_SUBJECT,
   }),
-]
+  fixes: readAnchors,
+}
+
+const liveAnchorsUnavailable: StageRule<"run"> = {
+  id: "work-origin/live-anchors-unavailable",
+  stage: "run",
+  label: "Work origin anchors loaded",
+  description:
+    "A work origin set from an anchor is checked against the connected device's current stored anchors, which Read anchors loads.",
+  severity: "error",
+  configurable: false,
+  chain: WORK_ORIGIN_CHAIN,
+  test: (subject) =>
+    !anchoredOrigin(subject) || isAnchorConfiguration(subject.machine.anchors),
+  explain: () => ({
+    problem:
+      "Use Read anchors to load the connected device's current stored anchors before Run.",
+    about: WORK_ORIGIN_SUBJECT,
+  }),
+  fixes: readAnchors,
+}
+
+const anchorsChanged: StageRule<"run"> = {
+  id: "work-origin/anchors-changed",
+  stage: "run",
+  label: "Work origin anchor unchanged",
+  description:
+    "The anchor a work origin is set from must still be where the connected device stores it; otherwise the work offset lands where the machine's anchor is not.",
+  severity: "error",
+  configurable: false,
+  chain: WORK_ORIGIN_CHAIN,
+  test: (subject) => {
+    const anchored = anchoredOrigin(subject)
+    const { connectedDeviceId, anchors } = subject.machine
+    if (!anchored || !connectedDeviceId || !isAnchorConfiguration(anchors))
+      return true
+    const { anchor } = anchored.origin
+    const live = anchorsFromDevice(anchors, connectedDeviceId).anchors.find(
+      (item) => item.id === anchor.id
+    )
+    return (
+      !!live &&
+      !live.machinePosition.some(
+        (value, axis) => Math.abs(value - anchor.machinePosition[axis]) > 1e-6
+      )
+    )
+  },
+  explain: () => ({
+    problem: "Stored anchors changed. Use Read anchors before Run.",
+    about: WORK_ORIGIN_SUBJECT,
+  }),
+  fixes: readAnchors,
+}
 
 /**
- * What blocks Run for a work origin set from an anchor: its anchors must have been read from
- * the connected device, which the plate is set up for, and still be the device's current ones;
- * otherwise the work offset would land where the machine's anchor is not.
+ * What Run needs of a work origin set from an anchor: its anchors read from the connected
+ * device, which the plate is set up for, and still the device's current ones; otherwise the work
+ * offset would land where the machine's anchor is not.
  */
-export function workOriginRunChecks(
-  setup: PlateSetup,
-  machine: RunContext
-): Diagnostic[] {
-  const origin = workOriginOnMachine(setup)
-  if (!origin) return []
-  const { anchors, deviceId } = setup
-  const connected = machine.connectedDeviceId
-  if (
-    !connected ||
-    deviceId !== connected ||
-    anchors?.source !== "firmware-config" ||
-    anchors.deviceId !== connected
-  )
-    return readAnchors(
-      "anchors-not-read",
-      `The work origin is set from ${origin.anchor.name}: use Read anchors to load the connected device's anchors before Run.`
-    )
-  if (!isAnchorConfiguration(machine.anchors))
-    return readAnchors(
-      "live-anchors-unavailable",
-      "Use Read anchors to load the connected device's current stored anchors before Run."
-    )
-  const live = anchorsFromDevice(machine.anchors, connected).anchors.find(
-    (anchor) => anchor.id === origin.anchor.id
-  )
-  const moved =
-    !live ||
-    live.machinePosition.some(
-      (value, axis) =>
-        Math.abs(value - origin.anchor.machinePosition[axis]) > 1e-6
-    )
-  if (moved)
-    return readAnchors(
-      "anchors-changed",
-      "Stored anchors changed. Use Read anchors before Run."
-    )
-  return []
-}
+export const WORK_ORIGIN_RULES: readonly StageRule<"run">[] = [
+  anchorsNotRead,
+  liveAnchorsUnavailable,
+  anchorsChanged,
+]

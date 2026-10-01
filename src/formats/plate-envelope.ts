@@ -23,23 +23,20 @@ export const carriesPlate = (source: string) =>
   source.startsWith(";@OPENSPINDLE|")
 
 /**
- * The envelope version exports write: version 3 fixtures name their model's source, since
- * version 4 the wasteboard is one of them, since version 5 anchored probing travels at the
- * height the machine's probe travels at, and since version 6 probing operations are one kind, a
- * task done by a strategy with a probe tool of the plate's table, 3D probing takes its ball from
- * that probe, probing parameters hold a value per axis together, and placements their height
- * apart from their offset.
+ * The envelope version exports write.
+ * Version 6 keeps PCB as a built-in operation source.
+ * Version 7 makes probing one kind of operation: a strategy doing a task with a probe tool.
  */
-export const PLATE_ENVELOPE_VERSION = 6
+export const PLATE_ENVELOPE_VERSION = 7
 
-/** The earliest version read besides the current one, which it becomes on import. */
+/** The oldest envelope version that can be upgraded on import. */
 export const OLDEST_PLATE_ENVELOPE_VERSION = 4
 
 /**
  * An export's payload of an earlier version, in the current one: its plate upgraded
  * (`upgradePlate`, with the importing app's tool `library`), and the notices that brings, for
- * the plate it imports as. What it still does not recognize (such as format 4's travel Z) is
- * left for reading to leave out and report, rather than rewritten field by field.
+ * the plate it imports as. What it still does not recognize (such as format 4's
+ * travel Z) is left for reading to leave out and report, rather than rewritten field by field.
  */
 export function upgradeEnvelopePayload(
   payload: unknown,

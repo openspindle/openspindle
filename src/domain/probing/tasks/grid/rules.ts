@@ -1,187 +1,23 @@
-import {
-  anchorsFromDevice,
-  isStoredAnchorSetup,
-  machineToBed,
-} from "@/domain/anchors/stored-anchors"
-import type { StoredAnchor } from "@/domain/anchors/stored-anchors"
+import { machineToBed } from "@/domain/anchors/stored-anchors"
+import { operationSubject } from "@/domain/diagnostics"
 import type { Area } from "@/domain/diagnostics"
 import type { Point3 } from "@/domain/nc/gcode"
 import type { Stock } from "@/domain/stock/stock"
-import { isAnchorConfiguration } from "@/machine/contract"
-import type { AnchorConfiguration } from "@/machine/contract"
-import { gridError, gridWarning } from "./issues"
-import type { GridIssue } from "./issues"
 import { EPSILON, formatMillimetres } from "../../../geometry/millimetres"
 import { boxRect, contains, rectAt } from "../../../geometry/rect"
-import { GridParamsSchema } from "./params"
-import type { GridSpecs, GridParams } from "./params"
-import { rangedSchema } from "../../parameters"
-import { resolvePlacement } from "../../placement"
-import type {
-  PlacementContext,
-  PlacementFailure,
-  ProbeStart,
-} from "../../placement"
+import type { OperationRuleSubject, StageRule } from "../../../rules/stages"
+import { checkGridParams, gridStart } from "./plan"
+import type { GridParams } from "./params"
+import { placementContext } from "../../placement"
+import type { PlacementContext, ProbeStart } from "../../placement"
+import { editOperation } from "../../rules"
+import { strategySpecs } from "../../strategies"
 
-/** The plate an auto-level operation belongs to. `Plate` satisfies it. */
+/** The plate a grid operation belongs to. `Plate` satisfies it. */
 export type GridPlateContext = PlacementContext & {
   stock: Pick<Stock, "width" | "depth" | "height"> | null
   /** Bed position of the stock's minimum corner. */
   stockAnchor: Point3
-}
-
-/** The connected machine, as far as running an anchored grid depends on it. */
-export type GridMachineContext = {
-  connectedDeviceId: string | null
-  /** Stored anchors from the connected device's latest successful read. */
-  anchors?: AnchorConfiguration | null
-}
-
-type Checked<TValue> =
-  ({ ok: true } & TValue) | { ok: false; issues: GridIssue[] }
-/** Parameters and grid start that generation can render, or what blocks it. */
-export type PlannedGrid = Checked<{
-  params: GridParams
-  start: ProbeStart
-}>
-
-/**
- * Everything that prevents generating NC: the parameters, within the ranges of the machine's
- * probe (`parameters`), and the grid start.
- */
-export function planGrid(
-  params: GridParams,
-  plate: PlacementContext,
-  parameters: GridSpecs
-): PlannedGrid {
-  const checked = checkParams(params, parameters)
-  if (!checked.ok) return checked
-  const resolved = resolveStart(checked.params, plate)
-  if (!resolved.ok) return resolved
-  return { ok: true, params: checked.params, start: resolved.start }
-}
-
-/** Issues to show while editing: generation blockers, anchor provenance and the stock fit. */
-export function validateGrid(
-  params: GridParams,
-  plate: GridPlateContext,
-  parameters: GridSpecs
-): GridIssue[] {
-  const checked = checkParams(params, parameters)
-  if (!checked.ok) return checked.issues
-  const resolved = resolveStart(checked.params, plate)
-  const start = resolved.ok ? resolved.start : null
-  return [
-    ...(resolved.ok ? [] : resolved.issues),
-    ...(start?.kind === "anchor" && start.source === "factory"
-      ? [
-          gridWarning(
-            "factory-anchors",
-            "The anchor positions are factory defaults. Use Read anchors to verify them against the device before Run."
-          ),
-        ]
-      : []),
-    ...stockIssues(checked.params, plate, start),
-  ]
-}
-
-const PLACEMENT_ISSUES: Readonly<Record<PlacementFailure, GridIssue>> = {
-  "anchor-snapshot-missing": gridError(
-    "anchor-snapshot-missing",
-    "Select an anchor snapshot for this plate's device."
-  ),
-  "anchor-unavailable": gridError(
-    "anchor-unavailable",
-    "The selected probe anchor is unavailable."
-  ),
-  "out-of-range": gridError(
-    "anchor-grid-out-of-range",
-    "The anchored probe grid exceeds the supported coordinate range."
-  ),
-}
-
-/**
- * Whether an anchored grid may run on the connected machine: the plate's snapshot must be a
- * firmware read from that device that still matches its stored anchors. Generation blockers
- * (validateGrid errors) block Run as well. At most one issue, the first failed gate.
- */
-export function gridRunIssues(
-  params: Pick<GridParams, "placement">,
-  plate: PlacementContext,
-  machine: GridMachineContext
-): GridIssue[] {
-  const { placement } = params
-  if (placement.kind === "probe-position") return []
-  const setup = plate.anchorSetup
-  const connected = machine.connectedDeviceId
-  if (
-    !connected ||
-    plate.deviceId !== connected ||
-    !isStoredAnchorSetup(setup) ||
-    setup.source !== "firmware-config" ||
-    setup.deviceId !== connected
-  )
-    return [
-      gridError(
-        "anchors-not-read",
-        "Use Read anchors to load this plate's connected device settings before Run."
-      ),
-    ]
-  if (!isAnchorConfiguration(machine.anchors))
-    return [
-      gridError(
-        "live-anchors-unavailable",
-        "Use Read anchors to load the connected device's current stored anchors before Run."
-      ),
-    ]
-  const live = anchorsFromDevice(machine.anchors, connected).anchors
-  const saved = ({ id, machinePosition: [x, y] }: StoredAnchor) =>
-    setup.anchors.some(
-      (anchor) =>
-        anchor.id === id &&
-        Math.abs(anchor.machinePosition[0] - x) <= EPSILON &&
-        Math.abs(anchor.machinePosition[1] - y) <= EPSILON
-    )
-  if (
-    !live.some((anchor) => anchor.id === placement.anchorId) ||
-    !live.every(saved)
-  )
-    return [
-      gridError(
-        "anchors-changed",
-        "Stored anchors changed. Use Read anchors before Run."
-      ),
-    ]
-  return []
-}
-
-function checkParams(
-  params: GridParams,
-  parameters: GridSpecs
-): Checked<{ params: GridParams }> {
-  const parsed = rangedSchema(GridParamsSchema, parameters).safeParse(params)
-  if (!parsed.success)
-    return {
-      ok: false,
-      issues: parsed.error.issues.map((issue) =>
-        gridError("invalid-parameters", issue.message)
-      ),
-    }
-  return { ok: true, params: parsed.data }
-}
-
-function resolveStart(
-  params: GridParams,
-  plate: PlacementContext
-): Checked<{ start: ProbeStart }> {
-  const resolved = resolvePlacement(
-    params.placement,
-    plate,
-    rectAt([0, 0], params.size)
-  )
-  if (!resolved.ok)
-    return { ok: false, issues: [PLACEMENT_ISSUES[resolved.error]] }
-  return { ok: true, start: resolved.value }
 }
 
 /**
@@ -204,44 +40,164 @@ function gridArea(
   }
 }
 
-function stockIssues(
-  params: GridParams,
-  plate: GridPlateContext,
-  start: ProbeStart | null
-): GridIssue[] {
-  const { stock } = plate
-  if (!stock)
-    return [
-      gridWarning(
-        "stock-unspecified",
-        "The stock size is unspecified, so the probe grid cannot be checked against it."
-      ),
-    ]
-  const [stockX, stockY, stockZ] = plate.stockAnchor
-  const grid = gridArea(params, plate, stockZ + stock.height, start)
-  const places = grid ? { places: [grid] } : {}
-  const [width, depth] = params.size
-  if (width > stock.width + EPSILON || depth > stock.depth + EPSILON)
-    return [
-      gridError(
-        "grid-exceeds-stock",
-        `The ${formatMillimetres(width)} × ${formatMillimetres(depth)} mm probe grid is larger than the ${formatMillimetres(stock.width)} × ${formatMillimetres(stock.depth)} mm stock.`,
-        places
-      ),
-    ]
-  if (
-    !grid ||
-    contains(
-      rectAt([stockX, stockY], [stock.width, stock.depth]),
+/**
+ * A grid operation's grid as its advice reads it: its parameters, its plate, and where the grid
+ * starts (null where that does not resolve, which the compiler reports). Null for another
+ * operation, a strategy the plate's machine does not have, or parameters that do not parse
+ * within its ranges (the compiler reports those too).
+ */
+function gridAdvice({ operation, plate, kit }: OperationRuleSubject): {
+  readonly params: GridParams
+  readonly plate: GridPlateContext
+  readonly start: ProbeStart | null
+} | null {
+  const { source } = operation
+  if (source.kind !== "probing" || source.task !== "grid") return null
+  const specs = strategySpecs(source, kit.probing)
+  if (!specs) return null
+  const checked = checkGridParams(source.params, specs)
+  if (!checked.ok) return null
+  const context: GridPlateContext = {
+    ...placementContext(plate),
+    stock: plate.setup.stock,
+    stockAnchor: plate.setup.stockAnchor,
+  }
+  const resolved = gridStart(checked.params, context)
+  return {
+    params: checked.params,
+    plate: context,
+    start: resolved.ok ? resolved.start : null,
+  }
+}
+
+/**
+ * A grid against the plate's stock, with where the grid is on the bed at the stock top (null
+ * from the probe position); null without stock.
+ */
+function gridOnStock(subject: OperationRuleSubject) {
+  const advice = gridAdvice(subject)
+  const stock = advice?.plate.stock
+  if (!advice || !stock) return null
+  const { params, plate, start } = advice
+  const top = plate.stockAnchor[2] + stock.height
+  return {
+    params,
+    stock,
+    stockAnchor: plate.stockAnchor,
+    grid: gridArea(params, plate, top, start),
+  }
+}
+
+const exceedsStock = (
+  { size: [width, depth] }: Pick<GridParams, "size">,
+  stock: Pick<Stock, "width" | "depth">
+) => width > stock.width + EPSILON || depth > stock.depth + EPSILON
+
+/** Where a failing grid is on the bed, when the plate knows. */
+const gridPlaces = (grid: Area | null | undefined) =>
+  grid ? { places: [grid] } : {}
+
+/** A grid's checks against the stock: without stock, or larger than it, the later ones do not apply. */
+const AUTO_LEVEL_STOCK_CHAIN = "auto-level/stock"
+
+const autoLevelFactoryAnchors: StageRule<"operation"> = {
+  id: "auto-level/factory-anchors",
+  stage: "operation",
+  label: "Auto-level anchors read",
+  description:
+    "A grid placed from the machine's factory default anchor positions lands wherever the device's own anchors differ from them.",
+  severity: "warning",
+  configurable: false,
+  test: (subject) => {
+    const start = gridAdvice(subject)?.start
+    return start?.kind !== "anchor" || start.source !== "factory"
+  },
+  explain: ({ first }) => ({
+    problem:
+      "The anchor positions are factory defaults. Use Read anchors to verify them against the device before Run.",
+    about: operationSubject(first.operation.id),
+  }),
+  fixes: editOperation,
+}
+
+const autoLevelStockUnspecified: StageRule<"operation"> = {
+  id: "auto-level/stock-unspecified",
+  stage: "operation",
+  label: "Auto-level stock size",
+  description: "A grid is checked against the stock, which needs its size.",
+  severity: "warning",
+  configurable: false,
+  chain: AUTO_LEVEL_STOCK_CHAIN,
+  test: (subject) => {
+    const advice = gridAdvice(subject)
+    return !advice || advice.plate.stock !== null
+  },
+  explain: ({ first }) => ({
+    problem:
+      "The stock size is unspecified, so the probe grid cannot be checked against it.",
+    about: operationSubject(first.operation.id),
+  }),
+  fixes: editOperation,
+}
+
+const gridExceedsStock: StageRule<"operation"> = {
+  id: "auto-level/grid-exceeds-stock",
+  stage: "operation",
+  label: "Auto-level grid within the stock size",
+  description:
+    "A grid larger than the stock probes beside it, where there is nothing to measure.",
+  severity: "error",
+  configurable: false,
+  chain: AUTO_LEVEL_STOCK_CHAIN,
+  test: (subject) => {
+    const fit = gridOnStock(subject)
+    return !fit || !exceedsStock(fit.params, fit.stock)
+  },
+  explain: ({ first }) => {
+    const fit = gridOnStock(first)
+    return {
+      problem: fit
+        ? `The ${formatMillimetres(fit.params.size[0])} × ${formatMillimetres(fit.params.size[1])} mm probe grid is larger than the ${formatMillimetres(fit.stock.width)} × ${formatMillimetres(fit.stock.depth)} mm stock.`
+        : "The probe grid is larger than the stock.",
+      about: operationSubject(first.operation.id),
+      ...gridPlaces(fit?.grid),
+    }
+  },
+  fixes: editOperation,
+}
+
+const gridOutsideStock: StageRule<"operation"> = {
+  id: "auto-level/grid-outside-stock",
+  stage: "operation",
+  label: "Auto-level grid on the stock",
+  description:
+    "An anchored grid that extends beyond the stock as placed on the bed probes beside it.",
+  severity: "warning",
+  configurable: false,
+  chain: AUTO_LEVEL_STOCK_CHAIN,
+  test: (subject) => {
+    const fit = gridOnStock(subject)
+    const grid = fit?.grid
+    if (!fit || !grid) return true
+    const [stockX, stockY] = fit.stockAnchor
+    return contains(
+      rectAt([stockX, stockY], [fit.stock.width, fit.stock.depth]),
       boxRect(grid)
     )
-  )
-    return []
-  return [
-    gridWarning(
-      "grid-outside-stock",
+  },
+  explain: ({ first }) => ({
+    problem:
       "The anchored probe grid extends beyond the stock as placed on the bed.",
-      places
-    ),
-  ]
+    about: operationSubject(first.operation.id),
+    ...gridPlaces(gridOnStock(first)?.grid),
+  }),
+  fixes: editOperation,
 }
+
+/** The advice for a grid operation: its anchors, and its grid against the stock. */
+export const GRID_RULES: readonly StageRule<"operation">[] = [
+  autoLevelFactoryAnchors,
+  autoLevelStockUnspecified,
+  gridExceedsStock,
+  gridOutsideStock,
+]

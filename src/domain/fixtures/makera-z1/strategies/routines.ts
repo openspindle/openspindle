@@ -19,7 +19,7 @@ import type {
 import {
   originStartOffset,
   planOrigin,
-} from "../../../probing/tasks/origin/rules"
+} from "../../../probing/tasks/origin/plan"
 import { fail, ok } from "../../../primitives"
 import type { Result } from "../../../primitives"
 import type { ParameterSpec } from "../../../probing/parameters"

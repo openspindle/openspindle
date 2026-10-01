@@ -2,8 +2,7 @@ import { z } from "zod"
 
 /**
  * A numeric parameter of a probing operation as its strategy describes it on a machine: its
- * label, default and the range it takes, with the fields of a plugin manifest's numeric
- * parameter.
+ * label, default and the range it takes, which its form and its validation share.
  */
 export type ParameterSpec = {
   readonly label: string

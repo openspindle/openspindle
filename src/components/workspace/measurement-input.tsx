@@ -8,8 +8,10 @@ import {
   InputGroupText,
 } from "@/components/ui/input-group"
 import { toMicrometre } from "@/domain/primitives"
+import type { Axis } from "@/machine/contract"
+import { AXIS_COLORS } from "./axis-label"
 
-export type MeasurementAxis = "X" | "Y" | "Z"
+export type MeasurementAxis = Axis
 export const DIMENSION_AXES = {
   width: "X",
   depth: "Y",
@@ -102,15 +104,7 @@ export function MeasurementInput({
       />
       {axis && (
         <InputGroupAddon align="inline-start" aria-hidden="true">
-          <InputGroupText
-            className={cn({
-              "text-red-600 dark:text-red-400": axis === "X",
-              "text-emerald-600 dark:text-emerald-400": axis === "Y",
-              "text-blue-600 dark:text-blue-400": axis === "Z",
-            })}
-          >
-            {axis}
-          </InputGroupText>
+          <InputGroupText className={AXIS_COLORS[axis]}>{axis}</InputGroupText>
         </InputGroupAddon>
       )}
       {unit && (

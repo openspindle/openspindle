@@ -15,9 +15,18 @@ import type {
   MachineFeatures,
   Telemetry,
 } from "@/machine/contract"
+import {
+  useCompiledPlate,
+  useSelectedPlate,
+} from "@/app/workspace/workspace-context"
 import { DeviceCamera } from "@/components/workspace/device-camera"
+import { SimulatedCamera } from "@/features/viewer/simulated-camera"
+import { Hint } from "@/components/workspace/hint"
 import { ReasonButton } from "@/components/workspace/reason-button"
 import { numberText, toolText } from "./device-format"
+
+const TOOL_OFFSET_HINT =
+  "The tool's length offset from the tool work Z was set with: where it met the tool setter, less where that tool did."
 
 /** The camera, live telemetry and the running program's progress, with pause and resume. */
 export function DeviceStatusCard({
@@ -35,12 +44,19 @@ export function DeviceStatusCard({
   reason: (key: AvailabilityKey, action?: MachineCommand) => string | null
   execute: (action: MachineCommand) => void
 }) {
+  const plate = useSelectedPlate()
+  const compiled = useCompiledPlate(plate)
+  const shown = plate && compiled ? { plate, compiled } : null
   return (
     <>
-      <DeviceCamera device={device} available={features?.camera === true} />
+      <DeviceCamera
+        device={device}
+        available={features?.camera === true}
+        simulated={<SimulatedCamera shown={shown} />}
+      />
       <Card size="sm" role="region" aria-label="Live machine status">
         <CardContent>
-          <dl className="grid grid-cols-3 gap-4 [&_dd]:font-numeric">
+          <dl className="grid grid-cols-4 gap-4 [&_dd]:font-numeric">
             <div className="flex flex-col gap-1">
               <dt className="text-muted-foreground">Feed rate</dt>
               <dd>
@@ -58,6 +74,15 @@ export function DeviceStatusCard({
             <div className="flex flex-col gap-1">
               <dt className="text-muted-foreground">Tool</dt>
               <dd>{toolText(telemetry?.tool)}</dd>
+            </div>
+            <div className="flex flex-col gap-1">
+              <dt className="text-muted-foreground">
+                <Hint text={TOOL_OFFSET_HINT}>Tool offset</Hint>
+              </dt>
+              <dd>
+                {numberText(telemetry?.toolOffset, 3)}{" "}
+                <span className="text-muted-foreground">mm</span>
+              </dd>
             </div>
           </dl>
         </CardContent>

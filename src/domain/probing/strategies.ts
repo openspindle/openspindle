@@ -114,6 +114,18 @@ export function strategyFor<TTask extends ProbingTask>(
 }
 
 /**
+ * The ranges a probing operation's strategy gives its parameters on a machine (`strategyFor`);
+ * null where the machine does not probe or has no such strategy.
+ */
+export function strategySpecs<TTask extends ProbingTask>(
+  source: ProbingSourceOf<TTask>,
+  machine: MachineProbing | null
+): TaskSpecs[TTask] | null {
+  const strategy = machine && strategyFor(source, machine)
+  return machine && strategy ? strategy.parameters(machine) : null
+}
+
+/**
  * A strategy that reads the parameters of any task: a strategy's `task` decides its parameters'
  * shape as a probing operation's does, which TypeScript cannot pair across the two unions. The
  * functions below check the tasks match and state the pairing with this one cast.

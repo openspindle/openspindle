@@ -17,8 +17,9 @@ import type {
 } from "../anchors/stored-anchors"
 import { plus } from "../geometry/frame"
 import type { XY } from "../geometry/frame"
-import { roundMillimetres } from "../geometry/millimetres"
+import { EPSILON, roundMillimetres } from "../geometry/millimetres"
 import type { Rect } from "../geometry/rect"
+import type { Operation } from "../operations/operation"
 import type { Plate } from "../plate/plate"
 import { workOriginOnMachine } from "../plate/work-origin"
 import { COORDINATE_LIMIT, fail, ok } from "../primitives"
@@ -88,7 +89,9 @@ export type PlacementContext = {
 }
 
 /** Where a plate's probing operations start: its device, anchor snapshot and work origin. */
-export const placementContext = ({ setup }: Pick<Plate, "setup">) => ({
+export const placementContext = ({
+  setup,
+}: Pick<Plate, "setup">): PlacementContext => ({
   deviceId: setup.deviceId,
   anchorSetup: setup.anchors ?? undefined,
   machineWorkOrigin: workOriginOnMachine(setup)?.position ?? null,
@@ -202,4 +205,54 @@ export function anchorPlacementAt(
       roundMillimetres(point[1] - anchor.position[1]),
     ],
   }
+}
+
+/** A grid that runs after an operation, and whether it follows it directly. */
+export type LaterGrid = {
+  readonly placement: ProbePlacement
+  /** Next in the plate without a Pause before, so the probe has not moved in between. */
+  readonly adjacent: boolean
+}
+
+/** The grids after an operation, which measure their heights from their own start. */
+export function laterGrids(plate: Plate, operation: Operation): LaterGrid[] {
+  const index = plate.operations.findIndex((item) => item.id === operation.id)
+  if (index < 0) return []
+  return plate.operations.slice(index + 1).flatMap((later, offset) =>
+    later.source.kind === "probing" && later.source.task === "grid"
+      ? [
+          {
+            placement: later.source.params.placement,
+            adjacent: offset === 0 && !later.stopBefore,
+          },
+        ]
+      : []
+  )
+}
+
+/**
+ * A grid measures heights relative to its first point, and a touch-off sets work Z from the
+ * position without compensation. Work Z set after the grid is therefore exact anywhere; set
+ * before it, only where the grid starts: whether each later grid starts where this placement
+ * touches.
+ */
+export function touchesGridStarts(
+  touch: ProbePlacement,
+  later: readonly LaterGrid[]
+): boolean {
+  return later.every((grid) => probesGridStart(touch, grid))
+}
+
+function probesGridStart(
+  touch: ProbePlacement,
+  { placement, adjacent }: LaterGrid
+): boolean {
+  // A grid from the probe's position starts where the probe is: above the point just touched.
+  if (placement.kind === "probe-position") return adjacent
+  return (
+    touch.kind === "anchor" &&
+    touch.anchorId === placement.anchorId &&
+    Math.abs(touch.offset[0] - placement.offset[0]) <= EPSILON &&
+    Math.abs(touch.offset[1] - placement.offset[1]) <= EPSILON
+  )
 }

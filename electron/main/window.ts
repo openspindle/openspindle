@@ -9,7 +9,6 @@ import {
 import type { BrowserWindowConstructorOptions, IpcMainEvent } from "electron"
 import { APP_ORIGIN } from "../../src/platform/contract/channels"
 import { log } from "./diagnostics/log"
-import { applyPermissionPolicy } from "./plugins/frame-security"
 
 /** Node's URL reports a "null" origin for custom schemes such as app://, so compare scheme and host. */
 function originOf(url: string): string | null {
@@ -41,12 +40,24 @@ const APP_PERMISSIONS: ReadonlySet<string> = new Set([
 ])
 
 /**
- * Session-wide defaults: no permissions beyond fullscreen and clipboard writes (and
- * none at all for plugin frames), no webviews.
+ * Session-wide defaults: only the main frame may use fullscreen and clipboard writes;
+ * no webviews or new windows.
  */
 export function hardenSessions() {
-  applyPermissionPolicy(session.defaultSession, APP_PERMISSIONS)
+  session.defaultSession.setPermissionRequestHandler(
+    (_contents, permission, callback, details) =>
+      callback(details.isMainFrame && APP_PERMISSIONS.has(permission))
+  )
+  session.defaultSession.setPermissionCheckHandler(
+    (_contents, permission, _origin, details) =>
+      details.isMainFrame && APP_PERMISSIONS.has(permission)
+  )
   app.on("web-contents-created", (_event, contents) => {
+    contents.setWebRTCIPHandlingPolicy("disable_non_proxied_udp")
+    contents.setWebRTCUDPPortRange({ min: 1, max: 1 })
+    contents.on("will-frame-navigate", (event) => {
+      if (!event.isMainFrame) event.preventDefault()
+    })
     contents.on("will-attach-webview", (event) => event.preventDefault())
     contents.setWindowOpenHandler(({ url }) => {
       if (ALLOWED_EXTERNAL.test(url)) void shell.openExternal(url)

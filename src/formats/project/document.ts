@@ -1,33 +1,25 @@
 import { z } from "zod"
 import { HeightMapSchema } from "@/machine/contract"
-import {
-  DesignRulesSchema,
-  defaultDesignRules,
-} from "@/domain/design-rules/rules"
 import { MODEL_LIMITS, ModelRecordSchema } from "@/domain/models/model"
 import type { ModelId } from "@/domain/models/model"
 import { PlateSchema } from "@/domain/plate/plate"
 import { EntityIdSchema, TextSchema } from "@/domain/primitives"
+import { RuleSettingsSchema } from "@/domain/rules/settings"
 import type { WorkspaceState } from "@/domain/workspace/workspace"
 import { libraryModelId } from "@/domain/fixtures/definitions"
 import { validateGlb } from "@/formats/models/glb"
 import { TOOL_MODEL_BYTES, isTool } from "@/domain/tools/tool"
 import type { Tool } from "@/domain/tools/tool"
 import { StockSchema } from "@/domain/stock/stock"
-import { PluginReferenceSchema } from "@/domain/workspace/plugin-reference"
-import type { PluginReference } from "@/domain/workspace/plugin-reference"
 import { fromBase64 } from "../base64-json"
 import { upgradeTool } from "../tool-library/upgrade"
-import { usedPluginIds } from "./plugin-reference"
 import { PROJECT_LIMITS } from "./step-nc"
 
 /**
- * Version 5: anchored probing travels at the height the machine's probe travels at. Version 6:
- * probing operations are one kind, a task done by a strategy with a probe tool of the plate's
- * table, and 3D probing takes its ball from that probe; probing parameters hold a value per axis
- * together, and placements their height apart from their offset.
+ * Version 7: PCB is built in, with rule settings and no plugin references.
+ * Version 8: probing is one kind of operation: a strategy doing a task with a probe tool.
  */
-export const PROJECT_SCHEMA_VERSION = 6
+export const PROJECT_SCHEMA_VERSION = 8
 
 /** The workspace fields a project stores exactly as the workspace holds them. */
 type WorkspaceData = Pick<
@@ -39,7 +31,7 @@ type WorkspaceData = Pick<
   | "defaultToolId"
   | "defaultStockId"
   | "heightMaps"
-  | "designRules"
+  | "ruleSettings"
 >
 
 /** A model the project's fixtures use: its record and display mesh (base64), never its uploaded file. */
@@ -56,14 +48,11 @@ export const ProjectModelSchema = z.strictObject({
 export type ProjectModel = z.infer<typeof ProjectModelSchema>
 
 /**
- * A saved project: the workspace's plates, libraries and selections, references to the
- * plugins its operations use (the plugins themselves are installed, never embedded), and the
- * models its fixtures use.
+ * A saved project: the workspace's plates, libraries and selections, and the models its fixtures use.
  */
 export type ProjectDocument = WorkspaceData & {
   readonly schemaVersion: typeof PROJECT_SCHEMA_VERSION
   readonly name: WorkspaceState["project"]["name"]
-  readonly plugins: readonly PluginReference[]
   readonly models: readonly ProjectModel[]
 }
 
@@ -140,12 +129,11 @@ function dangling(
   return [issue(`The ${label} is not in the project.`, path)]
 }
 
-/** Ids are unique, selections exist, height maps sit under their device, references are used. */
+/** Ids are unique, selections exist, height maps sit under their device, and models are used. */
 function consistencyIssues(document: ProjectDocument): Issue[] {
   const plateIds = document.plates.map((plate) => plate.id)
   const toolIds = document.tools.map((tool) => tool.id)
   const stockIds = document.stocks.map((stock) => stock.id)
-  const used = new Set(usedPluginIds(document.plates))
   const usedModels = new Set(projectModelIds(document.plates))
   return [
     ...duplicates(plateIds, "plates", "Plate"),
@@ -175,16 +163,6 @@ function consistencyIssues(document: ProjectDocument): Issue[] {
         issue("A height map is filed under another device.", "heightMaps", id)
       ),
     ...duplicates(
-      document.plugins.map((reference) => reference.id),
-      "plugins",
-      "Plugin"
-    ),
-    ...document.plugins
-      .filter((reference) => !used.has(reference.id))
-      .map((reference) =>
-        issue(`No operation uses the plugin "${reference.id}".`, "plugins")
-      ),
-    ...duplicates(
       document.models.map((model) => model.record.id),
       "models",
       "Model"
@@ -199,7 +177,7 @@ function consistencyIssues(document: ProjectDocument): Issue[] {
 
 /**
  * The project payload. Plates are the domain aggregate itself; the libraries, selections and
- * plugin references must be consistent with each other.
+ * models must be consistent with each other.
  */
 export const ProjectDocumentSchema = z
   .strictObject({
@@ -218,9 +196,8 @@ export const ProjectDocumentSchema = z
         (maps) => Object.keys(maps).length <= PROJECT_LIMITS.heightMaps,
         `A project holds at most ${PROJECT_LIMITS.heightMaps} height maps.`
       ),
-    /** The limits its plates are checked against; projects saved without them open with the defaults. */
-    designRules: DesignRulesSchema.default(defaultDesignRules),
-    plugins: z.array(PluginReferenceSchema).max(PROJECT_LIMITS.plugins),
+    /** How it reports its rules, and their limits; a project saved without them sets none. */
+    ruleSettings: RuleSettingsSchema.default(() => ({})),
     models: z.array(ProjectModelSchema).max(PROJECT_LIMITS.models),
   })
   .superRefine((document, context) => {
@@ -229,12 +206,11 @@ export const ProjectDocumentSchema = z
   }) satisfies z.ZodType<ProjectDocument>
 
 /**
- * The project a workspace saves; `plugins` usually comes from `referencedPlugins`, `models`
- * are the library models of `projectModelIds` that the library holds.
+ * The project a workspace saves; `models` are the library models of `projectModelIds`
+ * that the library holds.
  */
 export function projectDocument(
   state: WorkspaceState,
-  plugins: readonly PluginReference[],
   models: readonly ProjectModel[]
 ): ProjectDocument {
   const {
@@ -245,7 +221,7 @@ export function projectDocument(
     defaultToolId,
     defaultStockId,
     heightMaps,
-    designRules,
+    ruleSettings,
   } = state
   return {
     schemaVersion: PROJECT_SCHEMA_VERSION,
@@ -257,8 +233,7 @@ export function projectDocument(
     defaultToolId,
     defaultStockId,
     heightMaps,
-    designRules,
-    plugins,
+    ruleSettings,
     models,
   }
 }
@@ -271,9 +246,8 @@ export function projectWorkspace(
   const {
     schemaVersion: _schemaVersion,
     name,
-    plugins,
     models: _models,
     ...data
   } = document
-  return { ...data, project: { name, fileName, plugins } }
+  return { ...data, project: { name, fileName } }
 }

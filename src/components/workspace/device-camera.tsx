@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { isSimulator } from "@/machine/contract"
 import type { ConnectedDevice } from "@/machine/contract"
 import { useHost } from "@/platform/host-context"
 
@@ -35,7 +36,8 @@ export function CameraFeedButton({
 
 /**
  * The machine camera, streamed by the main process; the renderer opens no sockets. A card has
- * its buttons in a header; an overlay has them on the feed, Start and Stop in the middle.
+ * its buttons in a header; an overlay has them on the feed, Start and Stop in the middle. On
+ * the simulator, which has no camera, it shows `simulated` instead.
  */
 export function DeviceCamera({
   device,
@@ -44,6 +46,7 @@ export function DeviceCamera({
   hidden = false,
   className,
   actions,
+  simulated,
 }: {
   device: ConnectedDevice | null
   available: boolean
@@ -53,6 +56,8 @@ export function DeviceCamera({
   className?: string
   /** More buttons, after Fullscreen; an overlay's are `CameraFeedButton`s. */
   actions?: ReactNode
+  /** What the camera would see, drawn here when the device is the simulator. */
+  simulated?: ReactNode
 }) {
   const machine = useHost().machine
   const [attempt, setAttempt] = useState(0)
@@ -62,6 +67,7 @@ export function DeviceCamera({
   const panel = useRef<HTMLDivElement>(null)
   const urls = useRef(new Set<string>())
   const watching = attempt > 0 && available && !!device && !hidden
+  const simulator = !!device && isSimulator(device) && simulated !== undefined
   const active = phase === "connecting" || phase === "live"
   const fullscreenSupported =
     typeof document.documentElement.requestFullscreen === "function"
@@ -78,6 +84,11 @@ export function DeviceCamera({
   useEffect(() => {
     if (!watching) {
       setPhase("idle")
+      return
+    }
+    // The simulator has no camera to stream: its picture is drawn here.
+    if (simulator) {
+      setPhase("live")
       return
     }
     const created = urls.current
@@ -100,7 +111,7 @@ export function DeviceCamera({
       created.clear()
       setFrameUrl(null)
     }
-  }, [watching, machine, attempt])
+  }, [watching, machine, attempt, simulator])
 
   /** Older frames are released once the newest one is on screen. */
   const loaded = (url: string) => {
@@ -136,11 +147,15 @@ export function DeviceCamera({
     />
   )
   const statusRole = phase === "error" ? "alert" : "status"
+  const showing = simulator ? phase === "live" : !!frameUrl
+  const picture = simulator
+    ? phase === "live" && <div className="relative size-full">{simulated}</div>
+    : image
 
   if (variant === "overlay") {
     // Over a live picture the buttons show only while it is pointed at or focused.
     const reveal =
-      frameUrl &&
+      showing &&
       "opacity-0 transition-opacity group-hover/camera:opacity-100 group-focus-within/camera:opacity-100"
     return (
       <div
@@ -153,7 +168,7 @@ export function DeviceCamera({
         )}
         aria-label="Machine camera"
       >
-        {image}
+        {picture}
         <div
           className={cn(
             "absolute inset-0 flex flex-col items-center justify-center gap-3 p-6 text-center",
@@ -174,7 +189,7 @@ export function DeviceCamera({
             {phase === "live" && <Square />}
             {!active && <Play />}
           </CameraFeedButton>
-          {!frameUrl && (
+          {!showing && (
             <CardDescription role={statusRole}>{cameraStatus}</CardDescription>
           )}
         </div>
@@ -241,8 +256,8 @@ export function DeviceCamera({
         </CardAction>
       </CardHeader>
       <CardContent className="fullscreen:flex-1 relative flex aspect-video min-h-0 items-center justify-center overflow-hidden bg-neutral-950 p-0">
-        {image}
-        {!frameUrl && (
+        {picture}
+        {!showing && (
           <div
             className="flex flex-col items-center gap-3 p-6 text-center text-neutral-500"
             role={statusRole}

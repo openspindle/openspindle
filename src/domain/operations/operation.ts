@@ -5,6 +5,10 @@ import { OutlineParamsSchema } from "../probing/tasks/outline/params"
 import { TouchOffParamsSchema } from "../probing/tasks/touch-off/params"
 import { OriginParamsSchema } from "../probing/tasks/origin/params"
 import {
+  PCBOperationDataSchema,
+  OPERATION_DATA_BYTES,
+} from "../pcb/operation-data"
+import {
   EntityIdSchema,
   TextSchema,
   ToolNumberSchema,
@@ -17,7 +21,6 @@ export const OPERATION_LIMITS = {
   operationsPerPlate: 100,
   /** NC text in UTF-8 bytes (`utf8ByteLength`), as it is stored and exchanged. */
   ncBytes: 10 * MiB,
-  pluginDataBytes: 8 * MiB,
 } as const
 
 /** Control characters other than tab, line feed and carriage return. */
@@ -47,11 +50,6 @@ export const NcSchema = z
 
 export const PhaseSchema = z.enum(["setup", "machining", "finish"])
 export type Phase = z.infer<typeof PhaseSchema>
-
-export const ParameterValuesSchema = z
-  .record(z.string().min(1).max(200), z.union([z.number(), z.boolean()]))
-  .refine((values) => Object.keys(values).length <= 20, "Too many parameters.")
-export type ParameterValues = z.infer<typeof ParameterValuesSchema>
 
 /**
  * Maps a tool number the operation's own NC selects (`local`) to a number in the plate's
@@ -104,27 +102,25 @@ export const FileSourceSchema = z.object({
   park: z.boolean().default(true),
   /** Where the NC came from, for NC that can be updated from there; absent for a file. */
   origin: NcOriginSchema.optional(),
+  /** Retains the phase of NC imported from an earlier project format. */
+  phase: PhaseSchema.optional(),
 })
 
-/** A declarative plugin template; `nc` is the last generated program. */
-export const TemplateSourceSchema = z.object({
-  kind: z.literal("template"),
-  pluginId: TextSchema,
-  programId: TextSchema,
-  version: TextSchema,
-  values: ParameterValuesSchema,
-  phase: PhaseSchema,
-  nc: NcSchema,
+/** PCB source and recipe; `nc` is null until its toolpath is generated. */
+export const PcbSourceSchema = z.object({
+  kind: z.literal("pcb"),
+  data: PCBOperationDataSchema.refine(
+    (data) => utf8ByteLength(JSON.stringify(data)) <= OPERATION_DATA_BYTES,
+    "The PCB source exceeds the 8 MiB limit."
+  ),
+  nc: NcSchema.nullable(),
 })
 
-/** Plugin-owned data; `nc` is null until the plugin generates the program. */
-export const PluginSourceSchema = z.object({
-  kind: z.literal("plugin"),
-  pluginId: TextSchema,
-  version: TextSchema,
+/** An older source without generated NC, kept intact so saving never loses its data. */
+export const UnsupportedSourceSchema = z.object({
+  kind: z.literal("unsupported"),
   data: z.json(),
   phase: PhaseSchema,
-  nc: NcSchema.nullable(),
 })
 
 /**
@@ -171,8 +167,8 @@ export type ProbingSourceOf<TTask extends ProbingSource["task"]> = Extract<
 
 export const OperationSourceSchema = z.discriminatedUnion("kind", [
   FileSourceSchema,
-  TemplateSourceSchema,
-  PluginSourceSchema,
+  PcbSourceSchema,
+  UnsupportedSourceSchema,
   ProbingSourceSchema,
 ])
 export type OperationSource = z.infer<typeof OperationSourceSchema>
@@ -185,7 +181,7 @@ export type SourceOf<TKind extends SourceKind> = Extract<
 export const OperationSchema = z.object({
   id: EntityIdSchema,
   name: TextSchema,
-  /** Increments on every change; plugins save against the revision they read. */
+  /** Increments on every change; editors save against the revision they read. */
   revision: z.int().nonnegative(),
   /** Pause the program before this operation (a program stop the dialect maps). */
   stopBefore: z.boolean(),
@@ -193,14 +189,6 @@ export const OperationSchema = z.object({
   source: OperationSourceSchema,
 })
 export type Operation = z.infer<typeof OperationSchema>
-
-/** The plugin an operation comes from, for template and plugin operations. */
-export function operationPluginId(operation: Operation): string | null {
-  const { source } = operation
-  return source.kind === "template" || source.kind === "plugin"
-    ? source.pluginId
-    : null
-}
 
 export function createOperation(
   name: string,
@@ -217,7 +205,7 @@ export function createOperation(
   }
 }
 
-/** Every change goes through this so plugin saves can detect conflicts. */
+/** Every change goes through this so editors can detect conflicting saves. */
 export const revise = (
   operation: Operation,
   patch: Partial<Omit<Operation, "id" | "revision">>

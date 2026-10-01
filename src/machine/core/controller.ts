@@ -2,6 +2,8 @@ import { z } from "zod"
 import {
   COMMAND_LABELS,
   ConnectRequestSchema,
+  ConsoleLineSchema,
+  SimulatedBedSchema,
   DisconnectRequestSchema,
   MachineCommandSchema,
   RUN_LIMITS,
@@ -9,9 +11,11 @@ import {
   WriteAnchorsRequestSchema,
   disconnectedSnapshot,
   isJobActive,
+  isSimulator,
   isTerminalJobPhase,
   machineId,
   programInfo,
+  simulatedBedLine,
   programParts,
 } from "../contract/index.ts"
 import type {
@@ -49,6 +53,7 @@ import { DiscoveryService } from "./discovery.ts"
 import { MachineError, cancelled } from "./errors.ts"
 import type { PartedCompletion } from "./parted-completion.ts"
 import { executeCommand } from "./operations/command.ts"
+import { sendConsoleLine } from "./operations/console.ts"
 import type { OperationContext } from "./operations/context.ts"
 import {
   partPath,
@@ -415,6 +420,32 @@ export class MachineController {
     if (command.type === "pause") this.tracker?.pauseRequested()
     await this.operate("command", COMMAND_LABELS[command.type], (context) =>
       executeCommand(context, command)
+    )
+    return this.snapshot()
+  }
+
+  /** Sends a line typed in the console, admitted like any command; the console shows the reply. */
+  async sendConsoleLine(input: unknown): Promise<MachineSnapshot> {
+    const line = parse(ConsoleLineSchema, input)
+    this.admitNow({ key: "console" })
+    await this.operate("command", "Console command", (context) =>
+      sendConsoleLine(context, line)
+    )
+    return this.snapshot()
+  }
+
+  /**
+   * Tells the simulator what the plate positions on its bed, as a console line while idle; a
+   * machine is never sent one.
+   */
+  async simulateBed(input: unknown): Promise<MachineSnapshot> {
+    const bed = parse(SimulatedBedSchema, input)
+    const device = this.session?.device
+    if (!device || !isSimulator(device))
+      throw new MachineError("refused", "Only the simulator takes a bed.")
+    this.admitNow({ key: "console" })
+    await this.operate("command", "Simulated bed", (context) =>
+      sendConsoleLine(context, simulatedBedLine(bed))
     )
     return this.snapshot()
   }

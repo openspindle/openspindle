@@ -282,7 +282,7 @@ export function useImportFiles() {
         files,
         context(),
         importKit(workspace.state),
-        workspace.state.designRules
+        workspace.state.ruleSettings
       ),
     onSuccess: (plan) => {
       importPlanned(plan)

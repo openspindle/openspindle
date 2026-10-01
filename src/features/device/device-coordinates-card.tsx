@@ -17,13 +17,17 @@ import type {
   MachineCommand,
   Telemetry,
 } from "@/machine/contract"
+import { Hint } from "@/components/workspace/hint"
 import { ReasonButton } from "@/components/workspace/reason-button"
 import { axisKey, numberText } from "./device-format"
 import { ControlCard } from "./device-control-card"
 
 const AXES = ["X", "Y", "Z"] as const
 
-/** Work and machine coordinates for each axis, zeroing and homing. */
+const ORIGIN_HINT =
+  "Where the machine keeps work zero, in machine coordinates: the machine position less the work position, and in Z less the tool offset."
+
+/** Work and machine coordinates and the stored work zero for each axis, zeroing and homing. */
 export function DeviceCoordinatesCard({
   device,
   telemetry,
@@ -57,6 +61,9 @@ export function DeviceCoordinatesCard({
             <TableHead>Work · mm</TableHead>
             <TableHead>Machine · mm</TableHead>
             <TableHead>
+              <Hint text={ORIGIN_HINT}>Origin · mm</Hint>
+            </TableHead>
+            <TableHead>
               <span className="sr-only">Set work zero</span>
             </TableHead>
           </TableRow>
@@ -70,6 +77,9 @@ export function DeviceCoordinatesCard({
               </TableCell>
               <TableCell>
                 {numberText(telemetry?.machine?.[axisKey(axis)], 3)}
+              </TableCell>
+              <TableCell>
+                {numberText(telemetry?.workOrigin?.[axisKey(axis)], 3)}
               </TableCell>
               <TableCell>
                 <ReasonButton

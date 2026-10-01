@@ -8,18 +8,8 @@ export type GridIssueCode =
   | "anchor-snapshot-missing"
   | "anchor-unavailable"
   | "anchor-grid-out-of-range"
-  | "factory-anchors"
-  // Stock
-  | "stock-unspecified"
-  | "grid-exceeds-stock"
-  | "grid-outside-stock"
-  // Run against the connected machine
-  | "anchors-not-read"
-  | "live-anchors-unavailable"
-  | "anchors-changed"
 
-/** Errors block NC generation or Run; warnings inform without blocking. */
+/** What blocks generating a grid's NC; the compiler reports it. */
 export type GridIssue = Issue<GridIssueCode>
 
 export const gridError = issueOf<GridIssueCode>("error")
-export const gridWarning = issueOf<GridIssueCode>("warning")

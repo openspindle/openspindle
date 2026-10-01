@@ -3,7 +3,7 @@ import { COORDINATE_LIMIT } from "../../../primitives"
 import type { SpecsOf } from "../../parameters"
 import { ProbePlacementSchema } from "../../placement"
 
-/** The grid's numeric parameters, in form and plugin-manifest order. */
+/** The grid's numeric parameters, in form order. */
 export type GridField = "size" | "points" | "clearance"
 
 /** A strategy's grid parameters on a machine (`ProbingStrategy.parameters`). */

@@ -4,13 +4,13 @@ import type { JsonObject } from "./json"
 import { upgradePlacement } from "./placement"
 
 /**
- * The probe slots of the Z1, the only probes formats 4 and 5 knew: their probing operations'
- * NC selected T0, and 3D probing T9999.
+ * The probe slots of the Z1, the only probes earlier formats knew: their probing operations' NC
+ * selected T0, and 3D probing T9999.
  */
 const PROBE = 0
 const PROBE_3D = 9999
 
-/** One of format 5's probing kinds as format 6's probing operation. */
+/** One of the earlier formats' probing kinds as a probing operation. */
 type ProbingKind = {
   readonly task: "grid" | "touch-off" | "outline" | "origin"
   /** The tool number its NC selected, which the operation's probe now is. */
@@ -148,11 +148,12 @@ export type UpgradedSource = {
 }
 
 /**
- * An operation's source as formats 4 and 5 saved it, in format 6, when it is one of their four
- * probing kinds with parameters: one probing source of the task the kind did, the strategy that
- * writes the NC the kind wrote on this plate (`setup`), and the probe slot its NC selected. 3D
- * probing takes the ball of that probe rather than its own. Keys the source already has stay as
- * they are. Null for any other source.
+ * An operation's source as earlier formats saved it (projects before format 8, exports before
+ * version 7), in the current one, when it is one of their four probing kinds with parameters:
+ * one probing source of the task the kind did, the strategy that writes the NC the kind wrote on
+ * this plate (`setup`), and the probe slot its NC selected. 3D probing takes the ball of that
+ * probe rather than its own. Keys the source already has stay as they are. Null for any other
+ * source.
  */
 export function upgradeProbingSource(
   source: JsonObject,

@@ -19,7 +19,6 @@ import {
   suggestedProjectName,
 } from "@/features/project/project-file"
 import { useHost } from "@/platform/host-context"
-import { installedPluginsQuery } from "@/platform/plugins"
 import { encodeWorkspace } from "./encode-project"
 import { addProjectModels } from "./project-models"
 import {
@@ -65,11 +64,7 @@ export async function applyProject(
   const added = opened.added
     ? `Added ${plural(opened.added, "tool")} its plates use to your tool library.`
     : undefined
-  if (
-    candidate.leftOut.length ||
-    notices.length ||
-    candidate.missingPlugins.length
-  ) {
+  if (candidate.leftOut.length || notices.length) {
     openDialog({ kind: "project-report", report: { ...candidate, notices } })
     if (added) toast.info(added)
   } else
@@ -91,30 +86,24 @@ function missingModelsNote(missing: number): string | null {
 export function useSaveProject() {
   const host = useHost()
   const workspace = useWorkspaceStore()
-  const queryClient = useQueryClient()
   return useMutation({
     mutationKey: [...WORKSPACE_MUTATION, "save-project"],
     scope: workspaceScope,
     mutationFn: async () => {
       const state = workspace.state
-      const { contents, references, missing } = await encodeWorkspace(
-        state,
-        host,
-        queryClient
-      )
+      const { contents, missing } = await encodeWorkspace(state, host)
       const result = await host.files.save({
         kind: "project",
         suggestedName: suggestedProjectName(state.project.fileName),
         contents,
       })
-      return { result, state, references, missing }
+      return { result, state, missing }
     },
-    onSuccess: ({ result, state, references, missing }) => {
+    onSuccess: ({ result, state, missing }) => {
       if (result.status === "canceled") return
       workspace.dispatch({
         type: "project.saved",
         fileName: result.fileName,
-        plugins: references,
       })
       markProjectSaved(state)
       const note = missingModelsNote(missing)
@@ -134,7 +123,6 @@ export function useSaveProject() {
 export function useOpenProject() {
   const host = useHost()
   const workspace = useWorkspaceStore()
-  const queryClient = useQueryClient()
   const apply = useApplyProject()
   return useMutation({
     mutationKey: [...WORKSPACE_MUTATION, "open-project"],
@@ -151,10 +139,7 @@ export function useOpenProject() {
         if (result.status === "canceled") return null
         opened = result
       }
-      const plugins = await queryClient.ensureQueryData(
-        installedPluginsQuery(host.plugins)
-      )
-      const decoded = decodeProject(opened.contents, { plugins })
+      const decoded = decodeProject(opened.contents)
       if (!decoded.ok) throw new Error(decoded.error)
       // Models are added to the library only once opening is confirmed (applyProject), not here.
       return { ...decoded.value, notices: [], fileName: opened.fileName }

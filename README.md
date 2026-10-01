@@ -20,10 +20,10 @@ OpenSpindle is a desktop app for preparing, checking and running jobs on a Maker
 - Playback of the program as the firmware runs it, at its feeds, with depth and width of cut
 - The G-code exactly as the machine receives it, and a glossary of the Z1's codes (**Help › G-code Glossary**)
 - A run checklist, upload read-back and large programs sent in parts
-- Machine controls, the machine's camera, its height map and its stored anchors
+- Machine controls, a console to send the machine one line at a time, the machine's camera, its height map and its stored anchors
 - A tool library with Fusion 360 import and Makera, Genmitsu, SpeTool, Dreanique and FoxAlien catalogs
 - STEP-NC project files, and NC export with the plate's setup
-- Sandboxed plugins, and the PCB plugin for KiCad Gerber and Excellon files, which runs the pcb2gcode you install
+- Built-in PCB preparation from KiCad Gerber and Excellon files, using your local pcb2gcode installation
 - Error reports and logs under your control; no account or cloud service
 - A signed and notarized app for Apple silicon and Intel Macs that updates itself
 
@@ -53,7 +53,7 @@ Machine behaviour follows the source of [Makera's Z1 firmware](https://github.co
 - the auto-level, auto Z-height, auto-scan and 3D probing programs
 - writing the stored anchors from the Device page
 
-Importing, previewing and saving never send anything to the machine, and Run lives only on the Job tab. Controls the machine's state does not allow are refused, and a command whose outcome is unknown is never retried. No plugin can move the machine, change its settings or run a program. Stop does not replace the machine's emergency stop.
+Importing, previewing and saving never send anything to the machine, and Run lives only on the Job tab. Controls the machine's state does not allow are refused, and a command whose outcome is unknown is never retried. Stop does not replace the machine's emergency stop.
 
 If something behaves differently, **Help › Export Protocol Trace…** saves the recent exchange with the machine. Please open an issue with what you saw and the trace.
 
@@ -65,11 +65,11 @@ If something behaves differently, **Help › Export Protocol Trace…** saves th
 - [Stored anchors](docs/stored-anchors.md), [models](docs/models.md) and [design rules](docs/design-rules.md)
 - [Device controls](docs/device-controls.md), [running programs](docs/device-jobs.md) and [the height map](docs/device-height-map.md)
 - [Project files](docs/step-nc-projects.md) and [exported NC](docs/plate-definition.md)
-- For developers: [architecture](docs/architecture.md), [the workspace model](docs/workspace-model.md), [plugins](docs/plugins.md) and [releasing](docs/releasing.md)
+- For developers: [architecture](docs/architecture.md), [the workspace model](docs/workspace-model.md) and [releasing](docs/releasing.md)
 
 ## Contributing
 
-Contributions are welcome, from people and their coding agents: testing on a real Z1 (the open release pull request has a [build to try](docs/releasing.md#trying-the-next-release)), support for more machines, tool catalogs, plugins, testing on Windows, and fixes. [AGENTS.md](AGENTS.md) holds the project's conventions.
+Contributions are welcome, from people and their coding agents: testing on a real Z1 (the open release pull request has a [build to try](docs/releasing.md#trying-the-next-release)), support for more machines, tool catalogs, testing on Windows, and fixes. [AGENTS.md](AGENTS.md) holds the project's conventions.
 
 ### Development
 

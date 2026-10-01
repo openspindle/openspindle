@@ -1,25 +1,31 @@
 import { useMemo } from "react"
 import { toast } from "sonner"
+import { simulatedBedOf } from "@/app/workspace/machine-program"
 import { usePlateDiagnostics } from "@/app/workspace/use-plate-diagnostics"
 import {
   plateIndex,
   useWorkspaceStore,
 } from "@/app/workspace/workspace-context"
 import type { CompiledPlate } from "@/domain/compile/compile"
-import { runChecks } from "@/domain/operations/kinds"
 import { plateLabel } from "@/domain/plate/plate"
 import type { Plate } from "@/domain/plate/plate"
-import { workOriginRunChecks } from "@/domain/plate/work-origin"
+import { rulesOf } from "@/domain/rules/rules"
+import { runSubjects } from "@/domain/rules/stages"
 import { usePlateDesignRuleCheck } from "@/features/design-rules/design-rule-check"
-import { machineId, toDisplayName } from "@/machine/contract"
+import {
+  isSimulator,
+  machineId,
+  runRules,
+  toDisplayName,
+} from "@/machine/contract"
 import type { Availability } from "@/machine/contract"
 import type { Tool } from "@/domain/tools/tool"
 import {
   useDismissJob,
   useMachineCommand,
   useMachineSnapshot,
-  useReadAnchors,
   useRunProgram,
+  useSimulateBed,
   useStopMachine,
 } from "@/platform/machine"
 import { createJobSession, jobSessionStore } from "./job-session"
@@ -39,19 +45,19 @@ export function useRunChecklist(
   const device = snapshot.connection.device
   const connectedDeviceId = device ? machineId(device) : null
   const anchors = snapshot.anchors.value
-  const machineDiagnostics = useMemo(() => {
-    if (!plate) return []
-    const machine = { connectedDeviceId, anchors }
-    return [
-      ...workOriginRunChecks(plate.setup, machine),
-      ...runChecks(plate, machine),
-    ]
-  }, [plate, connectedDeviceId, anchors])
+  const runFailures = useMemo(
+    () =>
+      runRules(
+        rulesOf("run"),
+        runSubjects(plate, { connectedDeviceId, anchors })
+      ),
+    [plate, connectedDeviceId, anchors]
+  )
   return evaluateRunChecklist({
     plate,
     compiled,
     diagnostics,
-    machineDiagnostics,
+    runFailures,
     designRules,
     snapshot,
     check,
@@ -80,7 +86,6 @@ export type JobActions = {
   readonly stop: MachineAction
   /** Clears a finished job from the machine and ends this window's Run session. */
   readonly dismiss: MachineAction
-  readonly readAnchors: MachineAction
 }
 
 /** Every machine action of the Job tab, enabled by availability; failures become toasts. */
@@ -89,7 +94,6 @@ export function useJobActions(): JobActions {
   const command = useMachineCommand()
   const stop = useStopMachine()
   const dismiss = useDismissJob()
-  const anchors = useReadAnchors()
   const execute = (
     type: "pause" | "resume" | "confirmToolChange"
   ): MachineAction => ({
@@ -115,39 +119,41 @@ export function useJobActions(): JobActions {
           onError: report,
         }),
     },
-    readAnchors: {
-      reason: availabilityReason(availability.readAnchors),
-      pending: anchors.isPending,
-      run: () =>
-        anchors.mutate(undefined, {
-          onSuccess: () => toast.success("Stored anchors updated."),
-          onError: report,
-        }),
-    },
   }
 }
 
 /** Run: snapshots the plate into a new session, then sends exactly that program. */
 export function useRunJob() {
   const workspace = useWorkspaceStore()
+  const { device } = useMachineSnapshot().connection
   const run = useRunProgram()
+  const simulateBed = useSimulateBed()
   const start = (
     plate: Plate,
     compiled: CompiledPlate,
     library: readonly Tool[]
   ) => {
     const label = plateLabel(plate, plateIndex(workspace.state, plate.id))
-    const session = createJobSession(plate, label, compiled, library)
-    jobSessionStore.actions.begin(session)
-    run.mutate(
-      {
-        id: session.runId,
-        name: toDisplayName(label, "Plate"),
-        source: compiled.program.source,
-        assists: plate.setup.assists,
-      },
-      { onError: report }
-    )
+    const runPlate = () => {
+      const session = createJobSession(plate, label, compiled, library)
+      jobSessionStore.actions.begin(session)
+      run.mutate(
+        {
+          id: session.runId,
+          name: toDisplayName(label, "Plate"),
+          source: compiled.program.source,
+          assists: plate.setup.assists,
+        },
+        { onError: report }
+      )
+    }
+    // The simulator first takes what the plate positions on its bed, to probe against it.
+    const bed = device && isSimulator(device) ? simulatedBedOf(plate) : null
+    if (!bed) {
+      runPlate()
+      return
+    }
+    simulateBed.mutate(bed, { onSuccess: runPlate, onError: report })
   }
-  return { start, pending: run.isPending }
+  return { start, pending: run.isPending || simulateBed.isPending }
 }

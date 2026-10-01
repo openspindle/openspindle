@@ -79,7 +79,7 @@ export function FusionSource({ onDone }: { onDone: () => void }) {
         program,
         context(),
         importKit(workspace.state),
-        workspace.state.designRules
+        workspace.state.ruleSettings
       )
       if (!plan.ok) throw new Error(plan.error)
       return plan.value

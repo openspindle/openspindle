@@ -9,7 +9,7 @@ import type {
   TouchOffParams,
   TouchOffSpecs,
 } from "../../../probing/tasks/touch-off/params"
-import { planTouchOff } from "../../../probing/tasks/touch-off/rules"
+import { planTouchOff } from "../../../probing/tasks/touch-off/plan"
 import { TOUCH_PARAMETERS, firmwareMillimetres } from "../probing-nc"
 import { anchorTravel } from "../wired-probe/travel"
 

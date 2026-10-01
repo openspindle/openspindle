@@ -8,8 +8,8 @@ export const UPDATE_INSTALL_ITEM = "app.update.install"
 
 /**
  * Undo or Redo. In the window's page the renderer decides what it undoes: the typing of the
- * focused text field, or the edits of the section on show. A plugin view (a frame of its own)
- * and the developer tools undo their own typing.
+ * focused text field, or the edits of the section on show. The developer tools undo their
+ * own typing.
  */
 function historyItem(
   bus: MenuBus,
@@ -104,10 +104,6 @@ export function buildApplicationMenu(
     accelerator: "CmdOrCtrl+,",
     click: () => bus.emit("settings.open"),
   }
-  const plugins: MenuItemConstructorOptions = {
-    label: "Plugins…",
-    click: () => bus.emit("plugins.manage"),
-  }
   const models: MenuItemConstructorOptions = {
     label: "Models…",
     click: () => bus.emit("models.manage"),
@@ -125,7 +121,6 @@ export function buildApplicationMenu(
             ...updateItems,
             { type: "separator" },
             settings,
-            plugins,
             models,
             tools,
             { type: "separator" },
@@ -145,7 +140,6 @@ export function buildApplicationMenu(
     : [
         { type: "separator" },
         settings,
-        plugins,
         models,
         tools,
         { type: "separator" },

@@ -2,7 +2,7 @@ import { Wrench } from "lucide-react"
 import { cn } from "cn"
 import type { Tool } from "@/domain/tools/tool"
 
-/** What the image depends on: a library tool, or a plugin's tool (which has no photo). */
+/** What the image depends on: a full or partial library tool. */
 export type ToolImageSubject = Pick<Tool, "name"> & Partial<Pick<Tool, "image">>
 
 /** Show the tool's product photo when it has one; never infer a tool's shape. */

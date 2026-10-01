@@ -1,5 +1,5 @@
 import { useId, useMemo } from "react"
-import { FileCode2, Puzzle, RefreshCw } from "lucide-react"
+import { FileCode2, RefreshCw } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import {
@@ -9,7 +9,6 @@ import {
   FieldLabel,
 } from "@/components/ui/field"
 import { Switch } from "@/components/ui/switch"
-import { templateProgram } from "@/app/workspace/templates"
 import { useWorkspaceStore } from "@/app/workspace/workspace-context"
 import { placementAnchors } from "@/domain/probing/placement"
 import { strategyFor, strategyReads } from "@/domain/probing/strategies"
@@ -32,17 +31,11 @@ import { GridSettings } from "@/features/probing/grid-settings"
 import { OutlineSettings } from "@/features/probing/outline-settings"
 import { TouchOffSettings } from "@/features/probing/touch-off-settings"
 import { useFusionUpdate } from "@/features/fusion360/use-fusion-update"
+import { EditorView } from "@/features/pcb/editor"
 import { OriginSettings } from "@/features/probing/origin-settings"
 import type { WorkAreaFit } from "@/features/probing/probing-form"
-import { PluginFrame } from "@/features/plugins/plugin-frame"
-import { TemplateForm } from "@/features/plugins/template-form"
-import { useTemplateUpdate } from "@/features/plugins/use-template-update"
 import { openDialog } from "@/features/shell/dialogs"
 import { anchorDisplayName, bedAnchors } from "@/domain/anchors/stored-anchors"
-import { isPluginUsable } from "@/platform/contract/plugin-rpc"
-import type { PluginSummary } from "@/platform/contract/plugin-rpc"
-import { useInstalledPlugins } from "@/platform/plugins"
-import { usePrepareSelection } from "../plate-tree/use-prepare-selection"
 import { ProbingChoiceFields } from "./probing-choice-fields"
 
 type EditorProps<TKind extends OperationSource["kind"]> = {
@@ -153,109 +146,6 @@ function FileEditor({ plate, operation }: EditorProps<"file">) {
         </Field>
       )}
     </>
-  )
-}
-
-/** What the editor says of the plugin, beside the version that generated the operation. */
-function templateNote(plugin: PluginSummary, version: string): string | null {
-  if (plugin.incompatible) return plugin.incompatible
-  if (plugin.version !== version)
-    return `version ${plugin.version} is installed; apply to update.`
-  return null
-}
-
-function TemplateEditor({ plate, operation }: EditorProps<"template">) {
-  const { pluginId, programId, values, version } = operation.source
-  const plugins = useInstalledPlugins().data
-  const update = useTemplateUpdate()
-  if (!plugins) return null
-  const plugin = plugins.find((item) => item.id === pluginId)
-  const program = plugin ? templateProgram(plugin, programId) : undefined
-  if (!plugin || !program)
-    return (
-      <FieldDescription>
-        {pluginId} is not installed, so this program cannot be edited. Its NC is
-        kept and still runs.
-      </FieldDescription>
-    )
-  const note = templateNote(plugin, version)
-  return (
-    <div className="flex flex-col gap-3">
-      <FieldDescription>
-        {plugin.manifest.name} {version}
-        {note && ` · ${note}`}
-      </FieldDescription>
-      <TemplateForm
-        // Reset only when the saved values change (Apply, an update, undo): a rename or
-        // Pause before also revises the operation and must not discard unapplied edits.
-        key={JSON.stringify([programId, version, values])}
-        program={program}
-        values={values}
-        submitLabel="Apply"
-        disabled={!isPluginUsable(plugin)}
-        onSubmit={(next) =>
-          // The mutation reports failures itself.
-          update
-            .mutateAsync({ plateId: plate.id, operation, plugin, values: next })
-            .catch(() => undefined)
-        }
-      />
-    </div>
-  )
-}
-
-/** Why a plugin operation's editor cannot open. */
-function unavailableEditor(
-  pluginId: string,
-  plugin: PluginSummary | undefined
-): string {
-  if (!plugin)
-    return `${pluginId} is not installed. The operation keeps its data and NC; install the plugin to edit it.`
-  if (plugin.incompatible)
-    return `${plugin.manifest.name} cannot run: ${plugin.incompatible} The operation keeps its data and NC.`
-  if (!plugin.enabled)
-    return `${plugin.manifest.name} is disabled. Enable it to edit this operation.`
-  return `${plugin.manifest.name} has no editor for its operations.`
-}
-
-/** A plugin operation is edited in its plugin's own editor view. */
-function PluginEditor({ plate, operation }: EditorProps<"plugin">) {
-  const { pluginId } = operation.source
-  const plugins = useInstalledPlugins().data
-  const selection = usePrepareSelection()
-  if (!plugins) return null
-  const plugin = plugins.find((item) => item.id === pluginId)
-  const editor = plugin?.manifest.ui?.views.find(
-    (view) => view.slot === "operation.editor"
-  )
-  if (!plugin || !isPluginUsable(plugin) || !editor)
-    return (
-      <div className="flex flex-col gap-3">
-        <FieldDescription>
-          {unavailableEditor(pluginId, plugin)}
-        </FieldDescription>
-        <Button
-          variant="outline"
-          className="self-start"
-          onClick={() => openDialog({ kind: "plugins" })}
-        >
-          <Puzzle />
-          Manage plugins
-        </Button>
-      </div>
-    )
-  return (
-    <PluginFrame
-      plugin={plugin}
-      viewId={editor.id}
-      plateId={plate.id}
-      operationId={operation.id}
-      onClose={(select) => {
-        if (select)
-          selection.selectOperation(select.plateId, select.operationId)
-        else selection.selectPlate(plate.id)
-      }}
-    />
   )
 }
 
@@ -451,12 +341,15 @@ export function OperationEditor({
   switch (source.kind) {
     case "file":
       return <FileEditor plate={plate} operation={{ ...operation, source }} />
-    case "template":
+    case "pcb":
+      return <EditorView plateId={plate.id} operationId={operation.id} />
+    case "unsupported":
       return (
-        <TemplateEditor plate={plate} operation={{ ...operation, source }} />
+        <FieldDescription>
+          This operation has no generated program. Replace it with a supported
+          operation before running.
+        </FieldDescription>
       )
-    case "plugin":
-      return <PluginEditor plate={plate} operation={{ ...operation, source }} />
     case "probing":
       return (
         <ProbingEditor plate={plate} operation={{ ...operation, source }} />

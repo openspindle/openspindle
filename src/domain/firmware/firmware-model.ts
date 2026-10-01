@@ -23,4 +23,11 @@ export type FirmwareSetup = {
 export interface FirmwareModel {
   /** The firmware as the preview follows it, for one parse of a plate set up on the machine. */
   preview: (setup: FirmwareSetup) => GCodeFirmware
+  /**
+   * Where the tip of the tool work Z was set with is on the plate's bed at a machine position,
+   * as the preview places the firmware's moves.
+   */
+  bedPosition: (setup: FirmwareSetup, machine: Point3) => Point3
+  /** The machine position at which that tool's tip is at a point on the bed. */
+  machinePosition: (setup: FirmwareSetup, bed: Point3) => Point3
 }

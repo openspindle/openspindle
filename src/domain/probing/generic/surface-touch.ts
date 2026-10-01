@@ -4,7 +4,7 @@ import type {
   TouchOffParams,
   TouchOffSpecs,
 } from "../tasks/touch-off/params"
-import { planTouchOff } from "../tasks/touch-off/rules"
+import { planTouchOff } from "../tasks/touch-off/plan"
 import { formatMillimetres } from "../../geometry/millimetres"
 import { placementContext } from "../placement"
 import type { ProbingNc, ProbingStrategy } from "../strategy"

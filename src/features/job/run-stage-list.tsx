@@ -1,3 +1,4 @@
+import { Fragment } from "react"
 import type { ReactNode } from "react"
 import {
   CircleCheck,
@@ -17,6 +18,7 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { Spinner } from "@/components/ui/spinner"
+import { AxisLabel } from "@/components/workspace/axis-label"
 import { formatMillimetres } from "@/domain/geometry/millimetres"
 import type { Operation } from "@/domain/operations/operation"
 import {
@@ -44,9 +46,7 @@ import {
   HeightMapFacts,
   HeightMapGrid,
 } from "@/components/workspace/height-map-grid"
-import { operationKindLabel } from "@/features/plugins/use-operation-kind-label"
-import type { PluginSummary } from "@/platform/contract/plugin-rpc"
-import { useInstalledPlugins } from "@/platform/plugins"
+import { operationKindLabel } from "@/features/prepare/use-operation-kind-label"
 import { HeightMapReviewStep } from "./height-map-review-step"
 import { JobFaults, JobProgressDetails } from "./job-details"
 import type { JobActions } from "./job-hooks"
@@ -55,6 +55,7 @@ import type { JobSubject, JobView } from "./job-view"
 import { PausePrompt } from "./pause-prompt"
 import { RunChecklistCard } from "./run-checklist-card"
 import type { RunChecklist } from "./run-checklist"
+import { useReadAnchorsFix } from "@/features/prepare/quick-fix"
 import { runStages } from "./run-stages"
 import type { OperationStage, StageStatus } from "./run-stages"
 import { StageCard } from "./stage-card"
@@ -120,8 +121,7 @@ const mm = (value: number) => formatMillimetres(Number(value.toFixed(3)))
 function operationSummary(
   operation: Operation,
   subject: JobSubject,
-  tools: readonly Tool[],
-  plugins: readonly PluginSummary[] | undefined
+  tools: readonly Tool[]
 ): string {
   const { source } = operation
   const probing = source.kind === "probing" ? source : null
@@ -153,7 +153,7 @@ function operationSummary(
       const names = toolNames(operation, subject, tools)
       return names.length
         ? names.join(", ")
-        : `${operationKindLabel(operation, plugins)} with no tool change.`
+        : `${operationKindLabel(operation)} with no tool change.`
     }
   }
 }
@@ -246,21 +246,33 @@ function probe3dUnfinished(params: OriginParams, status: StageStatus) {
   }
 }
 
+/** A labelled value of an operation's results. */
+type Fact = { label: string; value: ReactNode }
+
+/** A machine Z, its axis in its colour. */
+function Height({ z }: { z: number }) {
+  return (
+    <>
+      <AxisLabel axis="Z" /> {mm(z)}
+    </>
+  )
+}
+
 /** Where a 3D probing routine set the work origin, from the contacts it reported. */
 function probe3dFacts(
   params: OriginParams,
   ball: number,
   { contacts }: ContactsMeasurement,
   status: StageStatus
-): { description: string; facts: { label: string; value: string }[] } {
+): { description: ReactNode; facts: Fact[] } {
   const result = originResult(params, ball, contacts)
   const set = (["X", "Y"] as const).flatMap((axis, index) => {
     const value = result.origin[index]
     return value === null ? [] : [{ axis, value }]
   })
-  const facts: { label: string; value: string }[] = []
+  const facts: Fact[] = []
   if (result.top !== null)
-    facts.push({ label: "Top", value: `Z ${mm(result.top)}` })
+    facts.push({ label: "Top", value: <Height z={result.top} /> })
   const size = result.size.filter((value) => value !== null)
   if (size.length)
     facts.push({
@@ -270,12 +282,32 @@ function probe3dFacts(
   facts.push({ label: "Contacts", value: String(contacts.length) })
   if (!result.complete || !set.length)
     return { description: probe3dUnfinished(params, status), facts }
-  const zero = set.map(({ axis }) => `${axis}0`).join(" ")
-  const at = set.map(({ axis, value }) => `${axis} ${mm(value)}`).join(" ")
-  const top = result.top === null ? "" : " and Z0 on the top it touched"
   const found = findsCorner(params.routine) ? "corner" : "center"
   return {
-    description: `Found the ${found} and set work ${zero} there, at machine ${at}${top}.`,
+    description: (
+      <>
+        Found the {found} and set work{" "}
+        {set.map(({ axis }) => (
+          <Fragment key={axis}>
+            <AxisLabel axis={axis} />0{" "}
+          </Fragment>
+        ))}
+        there, at machine
+        {set.map(({ axis, value }) => (
+          <Fragment key={axis}>
+            {" "}
+            <AxisLabel axis={axis} /> {mm(value)}
+          </Fragment>
+        ))}
+        {result.top !== null && (
+          <>
+            {" "}
+            and <AxisLabel axis="Z" />0 on the top it touched
+          </>
+        )}
+        .
+      </>
+    ),
     facts,
   }
 }
@@ -292,12 +324,11 @@ function sensorLabel(tool: number | null): string {
 function operationResults(
   stage: OperationStage,
   subject: JobSubject,
-  tools: readonly Tool[],
-  plugins: readonly PluginSummary[] | undefined
-): { description: string; details: ReactNode } {
+  tools: readonly Tool[]
+): { description: ReactNode; details: ReactNode } {
   const { operation, surface, grid, contacts, status } = stage
-  const facts: { label: string; value: string }[] = []
-  let description: string | null = null
+  const facts: Fact[] = []
+  let description: ReactNode = null
   const { source } = operation
   // The probe's ball, as the plate's table held it when the job ran.
   const probeId =
@@ -317,8 +348,21 @@ function operationResults(
   }
   if (surface) {
     const [x, y, z] = surface.machine
-    description = `Touched the stock top at machine X ${mm(x)} Y ${mm(y)} and set work Z0 there.`
-    facts.push({ label: "Stock top", value: `Z ${mm(z)}` })
+    const { work } = surface
+    description = (
+      <>
+        Touched the stock top at machine <AxisLabel axis="X" /> {mm(x)}{" "}
+        <AxisLabel axis="Y" /> {mm(y)}
+        {work && (
+          <>
+            , work <AxisLabel axis="X" /> {mm(work[0])} <AxisLabel axis="Y" />{" "}
+            {mm(work[1])},
+          </>
+        )}{" "}
+        and set work <AxisLabel axis="Z" />0 there.
+      </>
+    )
+    facts.push({ label: "Stock top", value: <Height z={z} /> })
   }
   if (grid) {
     const measured = grid.heights
@@ -335,7 +379,7 @@ function operationResults(
   for (const tool of stage.tools)
     facts.push({
       label: sensorLabel(tool.tool),
-      value: `Z ${mm(tool.machine[2])}`,
+      value: <Height z={tool.machine[2]} />,
     })
   const probing =
     source.kind === "probing" &&
@@ -344,8 +388,7 @@ function operationResults(
     description =
       "The machine reports its measurements only when it probes from a stored anchor with the work origin kept relative to one."
   return {
-    description:
-      description ?? operationSummary(operation, subject, tools, plugins),
+    description: description ?? operationSummary(operation, subject, tools),
     details: (
       <>
         {facts.length > 0 && <HeightMapFacts facts={facts} />}
@@ -364,13 +407,7 @@ function OperationItem({
   subject: JobSubject
   tools: readonly Tool[]
 }) {
-  const plugins = useInstalledPlugins().data
-  const { description, details } = operationResults(
-    stage,
-    subject,
-    tools,
-    plugins
-  )
+  const { description, details } = operationResults(stage, subject, tools)
   return (
     <StageItem
       title={stage.operation.name}
@@ -394,9 +431,8 @@ function RunningOperation({
   subject: JobSubject | null
   tools: readonly Tool[]
 }) {
-  const plugins = useInstalledPlugins().data
   const results =
-    stage && subject ? operationResults(stage, subject, tools, plugins) : null
+    stage && subject ? operationResults(stage, subject, tools) : null
   return (
     <StageCard
       title={stage?.operation.name ?? "Running"}
@@ -505,6 +541,7 @@ export function RunStageList({
   parts: number
 }) {
   const stages = runStages(view, subject)
+  const readAnchors = useReadAnchorsFix(subject?.plate.id ?? null)
   const operations = stages.operations
   const current =
     operations?.findIndex(
@@ -531,7 +568,7 @@ export function RunStageList({
           <RunChecklistCard
             parts={parts}
             checklist={checklist}
-            readAnchors={actions.readAnchors}
+            readAnchors={readAnchors}
           />
         ) : (
           <StageItem

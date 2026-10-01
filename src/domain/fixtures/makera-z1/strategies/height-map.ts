@@ -6,12 +6,12 @@ import type { GridPlan } from "../../../probing/probe"
 import type { ProbingStrategy } from "../../../probing/strategy"
 import { plateGridParams } from "../../../probing/tasks/grid/fit"
 import type { GridParams, GridSpecs } from "../../../probing/tasks/grid/params"
-import { planGrid } from "../../../probing/tasks/grid/rules"
+import { planGrid } from "../../../probing/tasks/grid/plan"
 import { firmwareMillimetres } from "../probing-nc"
 import { CLEARANCE_Z } from "../wired-probe/travel"
 
 /**
- * The grid bounds (those of the retired makera-wired-probe plugin). They are application
+ * The wired probe grid bounds. They are application
  * limits, not a clearance check; the included firmware configuration allows at most 15 × 15
  * points.
  */

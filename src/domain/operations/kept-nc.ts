@@ -1,6 +1,6 @@
 /**
- * The operation kinds that keep their NC (`generated: false`): NC files and plugins' programs and
- * operations. What they machine is where a plate cuts, which probing fits to, so nothing here
+ * The operation kinds that keep their NC (`generated: false`): NC files, PCB operations and
+ * sources of earlier formats that are no longer supported. What they machine is where a plate cuts, which probing fits to, so nothing here
  * reads probing: probing strategies measure a plate's machining through this module while the
  * registry of every kind (`OPERATION_KINDS`) holds their strategies.
  */
@@ -20,8 +20,8 @@ const plain = (nc: string): ResolvedNc => ({
 })
 
 /**
- * The context for resolving kinds that keep their NC (files and plugins, `generated: false`):
- * the kit alone, as their NC never reads the tool library.
+ * The context for resolving kinds that keep their NC (files and PCB, `generated: false`): the
+ * kit alone, as their NC never reads the tool library.
  */
 export const keptNcContext = (kit: FixtureKit): ResolveContext => ({
   kit,
@@ -33,32 +33,23 @@ export const fileKind: OperationKind<"file"> = {
   label: "NC file",
   verbatim: true,
   generated: false,
-  phase: () => "machining",
+  phase: ({ source }) => source.phase ?? "machining",
   resolve: ({ source }, _plate, { kit }) =>
     ok(plain(source.park ? source.nc : withoutClosingPark(source.nc, kit))),
 }
 
-export const templateKind: OperationKind<"template"> = {
-  kind: "template",
-  label: "Plugin program",
+export const pcbKind: OperationKind<"pcb"> = {
+  kind: "pcb",
+  label: "PCB",
   verbatim: true,
   generated: false,
-  phase: (operation) => operation.source.phase,
-  resolve: (operation) => ok(plain(operation.source.nc)),
-}
-
-export const pluginKind: OperationKind<"plugin"> = {
-  kind: "plugin",
-  label: "Plugin operation",
-  verbatim: true,
-  generated: false,
-  phase: (operation) => operation.source.phase,
+  phase: () => "machining",
   resolve: (operation) =>
     operation.source.nc === null
       ? fail(
           error(
             "operation-pending",
-            `Generate "${operation.name}" in its plugin before running it.`,
+            `Generate the toolpath for "${operation.name}" before running it.`,
             {
               subject: operationSubject(operation.id),
               fix: { kind: "edit-operation", operationId: operation.id },
@@ -68,10 +59,26 @@ export const pluginKind: OperationKind<"plugin"> = {
       : ok(plain(operation.source.nc)),
 }
 
+export const unsupportedKind: OperationKind<"unsupported"> = {
+  kind: "unsupported",
+  label: "Unavailable operation",
+  verbatim: false,
+  generated: false,
+  phase: ({ source }) => source.phase,
+  resolve: (operation) =>
+    fail(
+      error(
+        "operation-unsupported",
+        `"${operation.name}" has no generated NC and its source is no longer supported. Replace or remove this operation before running the plate.`,
+        { subject: operationSubject(operation.id) }
+      )
+    ),
+}
+
 const KEPT_NC_KINDS = {
   file: fileKind,
-  template: templateKind,
-  plugin: pluginKind,
+  pcb: pcbKind,
+  unsupported: unsupportedKind,
 }
 
 /**

@@ -8,7 +8,7 @@ export interface MessagePortTransportOptions {
   readonly transfer?: (message: RpcMessage) => Transferable[]
 }
 
-/** Transport for DOM MessagePorts (renderer ↔ main, host ↔ plugin frame, workers). */
+/** Transport for DOM MessagePorts (renderer ↔ main, workers). */
 export function messagePortTransport(
   port: MessagePort,
   options: MessagePortTransportOptions = {}

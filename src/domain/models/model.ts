@@ -1,6 +1,9 @@
 import { z } from "zod"
-import { Sha256Schema } from "@openspindle/plugin-core"
 import { Point3Schema, TextSchema } from "../primitives"
+
+const Sha256Schema = z
+  .string()
+  .regex(/^[a-f0-9]{64}$/, "Expected a SHA-256 digest.")
 
 const MiB = 1024 * 1024
 

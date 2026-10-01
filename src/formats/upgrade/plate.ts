@@ -106,8 +106,9 @@ function ballNotice(
 }
 
 /**
- * A plate's saved data as formats 4 and 5 saved it, in format 6: a project's plate, or an
- * export's payload, which holds the plate's setup, tool table and operations alike. Its
+ * A plate's saved data as earlier formats saved it (projects before format 8, exports before
+ * version 7), in the current one: a project's plate, or an export's payload, which holds the
+ * plate's setup, tool table and operations alike. Its
  * auto-level, auto Z-height, auto-scan and 3D probing operations become probing operations
  * (`upgradeProbingSource`); one that does not bind its probe binds it to the entry of that
  * number. Where the table has none it gains one, holding the probe of the `library` (the tools

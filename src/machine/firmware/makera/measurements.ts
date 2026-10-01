@@ -71,6 +71,8 @@ export class MakeraMeasurements {
    * are held until it ends, as a corner routine touches the top the same way before its sides.
    */
   private contacts: [number, number, number][] = []
+  /** The last contact's work X and Y, from the work origin reported with it. */
+  private lastWork: [number, number] | null = null
   private sides = false
   /** Where and when the routine's first contact came. */
   private started: { line: number | null; at: number } | null = null
@@ -131,11 +133,13 @@ export class MakeraMeasurements {
             target: "surface",
             tool: null,
             machine: last,
+            work: this.lastWork,
             ...this.started,
           })
         : false
     this.touchIndex = null
     this.contacts = []
+    this.lastWork = null
     this.sides = false
     this.started = null
     return surface
@@ -157,6 +161,8 @@ export class MakeraMeasurements {
     if (this.contacts.length >= MAX_ROUTINE_CONTACTS) return false
     this.started ??= { line, at: now }
     this.contacts.push(contact)
+    const origin = telemetry?.workOrigin
+    this.lastWork = origin ? [machineX - origin.x, machineY - origin.y] : null
     // A Z probe's contacts wait for its end; a 3D probing routine's show as they come.
     if (this.state === Z_PROBING && !this.sides) return false
     const measurement: ContactsMeasurement = {
@@ -187,6 +193,7 @@ export class MakeraMeasurements {
       target: "tool-sensor",
       tool: telemetry?.requestedTool ?? null,
       machine: contact,
+      work: null,
       line: telemetry?.job?.line ?? null,
       at: now,
     }

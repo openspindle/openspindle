@@ -2,6 +2,8 @@ import { z } from "zod"
 import {
   AnchorConfigurationSchema,
   ConnectRequestSchema,
+  ConsoleLineSchema,
+  SimulatedBedSchema,
   ConsoleEntrySchema,
   DisconnectRequestSchema,
   HeightMapSchema,
@@ -55,6 +57,16 @@ export const machineMethods = {
     params: MachineCommandSchema,
     result: MachineSnapshotSchema,
     timeoutMs: 120_000,
+  },
+  "machine.simulateBed": {
+    params: SimulatedBedSchema,
+    result: MachineSnapshotSchema,
+    timeoutMs: 30_000,
+  },
+  "machine.sendConsoleLine": {
+    params: z.object({ line: ConsoleLineSchema }),
+    result: MachineSnapshotSchema,
+    timeoutMs: 30_000,
   },
   // Never refused for the in-flight budget: Stop goes through however many calls wait.
   "machine.stop": {
