@@ -14,7 +14,7 @@ OpenSpindle is a desktop app for preparing, checking and running jobs on a Maker
 - Placement relative to the machine's stored anchors, with move, snap and lock in the 3D view
 - Import of `.nc`, `.cnc`, `.gcode`, `.tap` and `.ngc` programs from your CAM or from Finder, split into operations by tool or toolpath
 - Discover NC programs in Fusion 360, import them directly through the installable Python add-in, and update imported operations from them
-- Auto-level, auto Z-height and auto-scan with the Makera wired probe
+- Probing with the probes in your tool library: a surface touch that sets work Z, an outline traced with the probe's laser, and the Z1's own height map and Z probe
 - 3D probing with the Makera 3D Probe: the work origin at an outside or inside corner, or the center of a pocket or boss, on the stock or on a bracket or anything else on the bed
 - Design rules that catch what the Z1 would not run as written, with fixes, checked before Run and marked where they are in the 3D view
 - Playback of the program as the firmware runs it, at its feeds, with depth and width of cut
@@ -50,7 +50,7 @@ Machine behaviour follows the source of [Makera's Z1 firmware](https://github.co
 - tool changes, including the bare `M6` and `M3` lines pcb2gcode writes
 - Stop ending in Alarm
 - programs sent in parts
-- the auto-level, auto Z-height, auto-scan and 3D probing programs
+- the probing programs: surface touch, outline trace, the Z1's height map and Z probe, and 3D probing
 - writing the stored anchors from the Device page
 
 Importing, previewing and saving never send anything to the machine, and Run lives only on the Job tab. Controls the machine's state does not allow are refused, and a command whose outcome is unknown is never retried. Stop does not replace the machine's emergency stop.
@@ -59,7 +59,7 @@ If something behaves differently, **Help › Export Protocol Trace…** saves th
 
 ## Documentation
 
-- [Auto-level](docs/auto-level.md), [auto Z-height](docs/auto-z-height.md), [auto-scan](docs/auto-scan.md) and [3D probing](docs/3d-probing.md)
+- [Probing](docs/probing.md): [height map](docs/height-map.md), [touch-off](docs/touch-off.md), [outline trace](docs/outline-trace.md) and [3D probing](docs/3d-probing.md)
 - [PCB operations](docs/pcb.md) from KiCad Gerber and Excellon files, and setting up pcb2gcode
 - [Fusion 360](docs/fusion360.md): install the add-in, connect, and import and update NC programs
 - [Stored anchors](docs/stored-anchors.md), [models](docs/models.md) and [design rules](docs/design-rules.md)

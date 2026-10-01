@@ -1,8 +1,8 @@
 # Reading the current height map
 
-Open **Measured heights** from the Device page's Height map card, then choose **Retrieve M375.1**. During an auto-level job the Job tab's review step reads it automatically at the review pause and analyses it ([auto-level.md](auto-level.md)). The view shows the device, retrieval time, colour-coded values, minimum/maximum/range, missing measurements and the original firmware output. Snapshots are kept per device for the workspace; they are not attached to a plate or used to move its planned probing grid.
+Open **Measured heights** from the Device page's Height map card, then choose **Retrieve M375.1**. During a job that probes a height map the Job tab's review step reads it automatically at the review pause and analyses it ([height-map.md](height-map.md)). The view shows the device, retrieval time, colour-coded values, minimum/maximum/range, missing measurements and the original firmware output. Snapshots are kept per device for the workspace; they are not attached to a plate or used to move its planned probing grid.
 
-`machine.readHeightMap` sends exactly `M375.1` after a fresh status: never `M375`, which loads a saved grid and enables compensation, and never a probing or motion command. The read is admitted when the machine is Idle with no program, or while a job waits at a program pause (the auto-level review point). During any other program it is deferred until the program ends; the caller can cancel the deferred read.
+`machine.readHeightMap` sends exactly `M375.1` after a fresh status: never `M375`, which loads a saved grid and enables compensation, and never a probing or motion command. The read is admitted when the machine is Idle with no program, or while a job waits at a program pause (a height map's review point). During any other program it is deferred until the program ends; the caller can cancel the deferred read.
 
 The response has an 8 s deadline and must end with its acknowledgement. Stop cancels the read; rows that still arrive (and the late acknowledgement) are swallowed for 2 s so they cannot satisfy a later command, whose own telemetry proof is required anyway.
 
