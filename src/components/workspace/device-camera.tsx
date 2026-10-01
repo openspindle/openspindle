@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { isSimulator } from "@/machine/contract"
 import type { ConnectedDevice } from "@/machine/contract"
-import { useHost } from "@/platform/host-context"
+import { useMachineHost } from "@/platform/machine"
 
 type Phase = "idle" | "connecting" | "live" | "error"
 
@@ -59,7 +59,7 @@ export function DeviceCamera({
   /** What the camera would see, drawn here when the device is the simulator. */
   simulated?: ReactNode
 }) {
-  const machine = useHost().machine
+  const machine = useMachineHost()
   const [attempt, setAttempt] = useState(0)
   const [phase, setPhase] = useState<Phase>("idle")
   const [frameUrl, setFrameUrl] = useState<string | null>(null)

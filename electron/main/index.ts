@@ -7,13 +7,12 @@ import { Diagnostics, appInfo } from "./diagnostics/diagnostics"
 import { ErrorReports } from "./diagnostics/error-reports"
 import { log } from "./diagnostics/log"
 import { DiagnosticsSettingsStore } from "./diagnostics/settings"
-import { LastDevice } from "./machine/last-device"
 import { MachineHost } from "./machine/machine-host"
 import { MACHINE_STOP_ITEM, buildApplicationMenu } from "./menu"
 import { PcbService } from "./pcb/service"
 import { handleAppProtocol, registerAppScheme } from "./protocol"
 import { createHostHandlers } from "./rpc/host-handlers"
-import { serveHostConnections } from "./rpc/host-server"
+import { sendPort, serveHostConnections } from "./rpc/host-server"
 import { FileService } from "./services/file-service"
 import { FusionService } from "./services/fusion-service"
 import { KeptWorkspace } from "./services/kept-workspace"
@@ -116,14 +115,24 @@ function start(diagnostics: Diagnostics, openedFiles: OpenedFileBus) {
   const files = new FileService(currentWindow)
   const fusion = new FusionService()
   fusion.start()
-  const machine = new MachineHost(
-    (snapshot) => {
+  const machine: MachineHost = new MachineHost({
+    userData: app.getPath("userData"),
+    reports: diagnostics.reports,
+    onChange: (snapshot) => {
       const stop =
         Menu.getApplicationMenu()?.getMenuItemById(MACHINE_STOP_ITEM) ?? null
       if (stop) stop.enabled = snapshot.availability.stop.allowed
     },
-    new LastDevice(app.getPath("userData"))
-  )
+    // The page reaches the machine process directly: it gets a port to the new one.
+    onRestart: () => {
+      const window = currentWindow()
+      const port = window && machine.connectApp()
+      if (window && port) sendPort(window.webContents, "machine", port)
+    },
+  })
+  // The only thing a launch restores is the connection to the last used device, which the
+  // machine process tries as it starts.
+  machine.start()
   const entry = rendererEntry()
   const pcb = new PcbService(app.getPath("userData"), currentWindow)
   serveHostConnections({
@@ -132,7 +141,6 @@ function start(diagnostics: Diagnostics, openedFiles: OpenedFileBus) {
       fusion,
       menu,
       openedFiles,
-      machine: machine.app,
       storage,
       models,
       pcb,
@@ -141,6 +149,7 @@ function start(diagnostics: Diagnostics, openedFiles: OpenedFileBus) {
       diagnostics,
     }),
     isTrusted: trustedSender(currentWindow, entry.origin),
+    machine: () => machine.connectApp(),
   })
   const updates = new AppUpdates(currentWindow)
   Menu.setApplicationMenu(
@@ -148,7 +157,7 @@ function start(diagnostics: Diagnostics, openedFiles: OpenedFileBus) {
       menu,
       {
         stop: () => {
-          machine.system.stop().catch((error: unknown) => {
+          machine.stop().catch((error: unknown) => {
             log.error("Machine Stop failed", error)
           })
         },
@@ -164,7 +173,8 @@ function start(diagnostics: Diagnostics, openedFiles: OpenedFileBus) {
   )
   updates.start()
 
-  // The renderer flushes its last saves as the window closes; let them land first.
+  // The renderer flushes its last saves as the window closes; let them land first, and the
+  // machine process close the connection.
   let storageSettled = false
   app.on("will-quit", (event) => {
     if (storageSettled) {
@@ -176,20 +186,22 @@ function start(diagnostics: Diagnostics, openedFiles: OpenedFileBus) {
       return
     }
     event.preventDefault()
-    void Promise.all([storage.idle(), pcb.idle()]).finally(() => {
-      storageSettled = true
-      // From a later task: with nothing left to write, idle() settles while this event is still
-      // being emitted, and until it returns Electron ignores app.quit() as already quitting.
-      setImmediate(() => app.quit())
-    })
+    void Promise.all([storage.idle(), pcb.idle(), machine.close()]).finally(
+      () => {
+        storageSettled = true
+        // From a later task: with nothing left to write, idle() settles while this event is still
+        // being emitted, and until it returns Electron ignores app.quit() as already quitting.
+        setImmediate(() => app.quit())
+      }
+    )
   })
 
   mainWindow = createMainWindow({ preload: PRELOAD, entry, icon: DEV_ICON })
   const window = mainWindow
   // Closing the window quits the app, and every quit closes the window first, so the window
   // asks before it closes: about unsaved changes, then about a running job, which quitting
-  // leaves running. It asks in sheets, which leave the main process running (the machine
-  // connection polls on it): the close waits for the answers, and happens again once the user
+  // leaves running. It asks in sheets, which leave the main process running (the menu's Stop
+  // goes out from it): the close waits for the answers, and happens again once the user
   // agreed. Save… closes the window once the project is saved, and a running job is asked
   // about then. Nothing is kept from a cancelled close: the next one asks again.
   let asking = false
@@ -218,6 +230,4 @@ function start(diagnostics: Diagnostics, openedFiles: OpenedFileBus) {
   })
   // A crashed page kept nothing newer: the reload that follows starts a new project.
   window.webContents.on("render-process-gone", () => keptWorkspace.forget())
-  // The only thing a launch restores: the connection to the last used device.
-  void machine.reconnect()
 }

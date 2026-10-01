@@ -41,7 +41,7 @@ import type {
   MainError,
 } from "./contract/diagnostics"
 
-/** Machine access through the main process's machine controller. */
+/** Machine access through the machine process's controller. */
 export interface MachineHost {
   snapshot: () => Promise<MachineSnapshot>
   subscribe: (listener: (snapshot: MachineSnapshot) => void) => () => void
@@ -66,6 +66,17 @@ export interface MachineHost {
   watchCamera: (listener: (event: CameraEvent) => void) => () => void
   /** The machine console: its backlog at once, then new entries in batches. */
   watchConsole: (listener: (entries: ConsoleEntry[]) => void) => () => void
+}
+
+/**
+ * The machine process as the page reaches it, over a port of its own. A machine process that
+ * stopped and started again is another MachineHost: its snapshots' revisions and its console
+ * count from the start again.
+ */
+export interface MachineLink {
+  current: () => MachineHost
+  /** Called when `current` is another MachineHost. */
+  subscribe: (onChange: () => void) => () => void
 }
 
 /** Durable documents: files in the app's data folder. */
@@ -151,9 +162,12 @@ export interface PcbHost {
   ) => Promise<PcbGeneration>
 }
 
-/** The main process, as the renderer reaches it: every service is a typed RPC call. */
+/**
+ * The main process and the machine process, as the renderer reaches them: every service is a
+ * typed RPC call.
+ */
 export interface Host {
-  readonly machine: MachineHost
+  readonly machine: MachineLink
   readonly files: FileHost
   readonly fusion: FusionHost
   readonly storage: StoragePort

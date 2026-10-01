@@ -15,6 +15,7 @@ import type {
   MachineFeatures,
   NetworkDevice,
   PlateAssists,
+  PrepareResult,
   PreparedProgram,
   Telemetry,
 } from "../contract/index.ts"
@@ -95,6 +96,22 @@ export class ProgramError extends Error {
   constructor(message: string, line: number | null = null) {
     super(message)
     this.line = line
+  }
+}
+
+/**
+ * The normalized program the firmware would execute, or why it refuses it; throws only for a
+ * failure that is not the program's.
+ */
+export function prepareResult(
+  adapter: FirmwareAdapter,
+  source: string
+): PrepareResult {
+  try {
+    return { ok: true, program: adapter.prepareProgram(source) }
+  } catch (error) {
+    if (!(error instanceof ProgramError)) throw error
+    return { ok: false, error: error.message, line: error.line }
   }
 }
 

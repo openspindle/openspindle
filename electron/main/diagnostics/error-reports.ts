@@ -54,8 +54,8 @@ const localEventId = () => randomUUID().replaceAll("-", "")
  * this process too, over Sentry's IPC (IPCMode.Classic: no privileged sentry-ipc:// scheme,
  * whose fetches would bypass the page's content security policy).
  *
- * Unexpected errors of the main process are logged, reported and offered to the window,
- * which shows them; without a window, an uncaught exception shows in a message box.
+ * Unexpected errors of the main process and the machine process are logged, reported and offered
+ * to the window, which shows them; without a window, an uncaught exception shows in a message box.
  */
 export class ErrorReports {
   /** Whether this build reports errors: it was built with a Sentry DSN. */
@@ -102,10 +102,10 @@ export class ErrorReports {
       })
     }
     process.on("uncaughtException", (error) =>
-      this.mainError(error, "onuncaughtexception")
+      this.processError("main", error, "onuncaughtexception")
     )
     process.on("unhandledRejection", (reason) =>
-      this.mainError(reason, "onunhandledrejection")
+      this.processError("main", reason, "onunhandledrejection")
     )
   }
 
@@ -172,16 +172,22 @@ export class ErrorReports {
     }
   }
 
-  private mainError(
+  /**
+   * An unexpected error of the main process or of the machine process, which sends its own here,
+   * and its stopping: logged, reported, and offered to the window.
+   */
+  processError(
+    source: "main" | "machine",
     error: unknown,
-    mechanism: "onuncaughtexception" | "onunhandledrejection"
+    mechanism: "onuncaughtexception" | "onunhandledrejection" | "onexit"
   ) {
     const eventId = this.reporting
       ? Sentry.captureException(error, {
           mechanism: { type: `auto.node.${mechanism}`, handled: false },
+          captureContext: { tags: { process: source } },
         })
       : localEventId()
-    log.error(`Error ${eventId} in the main process`, error)
+    log.error(`Error ${eventId} in the ${source} process`, error)
     log.flushSync()
     const report: MainError = { eventId, error: errorSummary(error) }
     if (this.listeners.size) {

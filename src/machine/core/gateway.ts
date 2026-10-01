@@ -9,6 +9,7 @@ import type {
 } from "../contract/index.ts"
 import type { CameraEvent } from "./camera.ts"
 import type { MachineController } from "./controller.ts"
+import type { TraceEntry } from "./protocol-trace.ts"
 import { MachineError } from "./errors.ts"
 
 /** The app controls the machine; the system menu can read it and stop it. */
@@ -32,6 +33,11 @@ export class MachineGateway {
 
   subscribe(listener: (snapshot: MachineSnapshot) => void): () => void {
     return this.controller.subscribe(listener)
+  }
+
+  /** The recent exchange with the machine, for Help › Export Protocol Trace. */
+  protocolTrace(): readonly TraceEntry[] {
+    return this.controller.protocolTrace()
   }
 
   watchCamera(listener: (event: CameraEvent) => void): () => void {
@@ -86,7 +92,7 @@ export class MachineGateway {
     return this.controller.stop()
   }
 
-  prepare(input: unknown): PrepareResult {
+  prepare(input: unknown): Promise<PrepareResult> {
     this.requireApp()
     return this.controller.prepare(input)
   }

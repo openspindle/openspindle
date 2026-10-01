@@ -35,12 +35,12 @@ import { EmptyMedia } from "@/components/ui/empty"
 import { DEFAULT_KIT, kitForDevice } from "@/domain/fixtures/catalog"
 import { isLocalIPv4 } from "@/machine/contract"
 import type { ConnectTarget } from "@/machine/contract"
-import { useHost } from "@/platform/host-context"
 import {
   machineErrorCode,
   machineKeys,
   useConnectMachine,
   useDisconnectMachine,
+  useMachineHost,
   useMachineSnapshot,
 } from "@/platform/machine"
 
@@ -158,7 +158,7 @@ function LeavingJobDialog({
 }
 
 export function DevicePicker({ close }: { close: () => void }) {
-  const machine = useHost().machine
+  const machine = useMachineHost()
   const fieldId = useId()
   const snapshot = useMachineSnapshot()
   const device = snapshot.connection.device
