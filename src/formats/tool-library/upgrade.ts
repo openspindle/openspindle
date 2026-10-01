@@ -12,6 +12,7 @@ import {
   uniqueId,
 } from "@/domain/tools/tool"
 import type { ProbeProfile, Tool } from "@/domain/tools/tool"
+import { PROBE_3D_TOOL } from "@/domain/tools/tool-table"
 import { fusionTool } from "./fusion"
 
 /*
@@ -142,8 +143,9 @@ const BUNDLED_PROBES = new Map<unknown, ProbeProfile>([
 ])
 
 /**
- * The profile a version 4 record gets: a bundled Makera probe's as its catalog has it, the
- * profile any other probe starts with, none for anything else.
+ * The profile a version 4 record gets: a bundled Makera probe's as its catalog has it; a 3D
+ * probe's for any other probe numbered as the 3D probe's slot, which earlier versions bound
+ * there (`libraryPreferences`); the profile any other probe starts with; none for anything else.
  */
 function recordedProfile(value: Record<string, unknown>): ProbeProfile | null {
   const fresh =
@@ -154,7 +156,9 @@ function recordedProfile(value: Record<string, unknown>): ProbeProfile | null {
     record(source) && record(source.raw)
       ? BUNDLED_PROBES.get(source.raw.builtinId)
       : undefined
-  return bundled ? { ...bundled } : fresh
+  if (bundled) return { ...bundled }
+  const number = record(value.postProcess) ? value.postProcess.number : null
+  return number === PROBE_3D_TOOL ? { touch: "xyz", pointer: false } : fresh
 }
 
 /** A version 4 tool record as version 5: a probe gets a profile, any other tool none. */
