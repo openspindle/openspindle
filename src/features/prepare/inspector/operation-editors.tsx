@@ -12,7 +12,7 @@ import { Switch } from "@/components/ui/switch"
 import { templateProgram } from "@/app/workspace/templates"
 import { useWorkspaceStore } from "@/app/workspace/workspace-context"
 import { placementAnchors } from "@/domain/probing/placement"
-import { strategyFor } from "@/domain/probing/strategies"
+import { strategyFor, strategyReads } from "@/domain/probing/strategies"
 import type { MachineProbing } from "@/domain/probing/strategy"
 import { kitForPlate } from "@/domain/fixtures/catalog"
 import { closingParkCodes } from "@/domain/compile/nc-unit"
@@ -325,6 +325,7 @@ function TouchOffEditor({
       key={operation.id}
       value={source.params}
       parameters={strategy.parameters(machine)}
+      reads={strategyReads(strategy, source.params, machine)}
       anchors={anchorOptions(plate)}
       workArea={workArea}
       onChange={(params) => update({ ...source, params })}

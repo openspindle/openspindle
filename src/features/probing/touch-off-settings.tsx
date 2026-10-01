@@ -27,12 +27,15 @@ import type {
   WorkAreaFit,
 } from "@/features/probing/probing-form"
 import { rangedSchema } from "@/domain/probing/parameters"
+import type { SpecReads } from "@/domain/probing/parameters"
 import type { AnchorPlacement } from "@/domain/probing/placement"
 
 export type TouchOffSettingsProps = {
   value: TouchOffParams
   /** The touch-off's parameters on the machine's probe: defaults, ranges and descriptions. */
   parameters: TouchOffSpecs
+  /** The parameters the operation's strategy reads; the others are left out of the form. */
+  reads: SpecReads<TouchOffSpecs>
   /** Stored anchors of the plate's device that the touch point can be relative to. */
   anchors: readonly ProbingAnchorOption[]
   /** Where the plate cuts, or its stock without machining: Center touches its middle. */
@@ -70,6 +73,7 @@ function centerReason({ result, anchors }: WorkAreaFit) {
 export function TouchOffSettings({
   value,
   parameters,
+  reads,
   anchors,
   workArea,
   onChange,
@@ -81,6 +85,7 @@ export function TouchOffSettings({
       key={draft.key}
       value={value}
       parameters={parameters}
+      reads={reads}
       anchors={anchors}
       workArea={workArea}
       disabled={disabled}
@@ -92,6 +97,7 @@ export function TouchOffSettings({
 function TouchOffForm({
   value,
   parameters,
+  reads,
   anchors,
   workArea,
   onChange,
@@ -112,12 +118,14 @@ function TouchOffForm({
           </Hint>
         </FieldLegend>
         <FieldGroup className="gap-3">
-          <ParameterField
-            id={`${id}-probeTravel`}
-            parameter={parameters.probeTravel}
-            field={probingField(form, "probeTravel")}
-            disabled={disabled}
-          />
+          {reads.probeTravel && (
+            <ParameterField
+              id={`${id}-probeTravel`}
+              parameter={parameters.probeTravel}
+              field={probingField(form, "probeTravel")}
+              disabled={disabled}
+            />
+          )}
           <ParameterField
             id={`${id}-clearance`}
             parameter={parameters.clearance}
