@@ -2,6 +2,8 @@ import type { Point3 } from "@/domain/nc/gcode"
 import { isProbeSlot } from "@/domain/tools/tool-table"
 import { distanceAt, secondsAt, speedAt } from "./kinematics"
 import type { Trapezoid } from "./kinematics"
+import { gridOfMoves, visitNear } from "./spatial"
+import type { MoveGrid } from "./spatial"
 import { moveIndex, planSeconds, sourceLine } from "./spaces"
 import type {
   MoveIndex,
@@ -72,14 +74,19 @@ function touchesFrom({ count, kind, tool }: MotionPlan) {
 
 /**
  * Queries on a plan: times by binary search on when its moves start, points along moves by their
- * kinematics, and moves near a point by going through each move of a range. Its queries may be
- * called on their own, apart from the index.
+ * kinematics, and moves near a point through a grid of the moves in XY (`MoveGrid`). What a query
+ * needs beyond the plan, such as the grid or where the program's lines end in bytes, is made by
+ * its first call. Its queries may be called on their own, apart from the index.
  */
 export function indexPlan(plan: MotionPlan): PlanIndex {
   const { count, from, to, length, kind, routine, line, reportLine } = plan
   const { timing, checkpoints, shifts } = plan
   let ends: Float64Array | null = null
   let touches: Int32Array | null = null
+  let grid: MoveGrid | null = null
+  /** The query each move was last measured for by `near`, so that it is measured once. */
+  let measured: Uint32Array | null = null
+  let query = 0
 
   const trapezoid = (move: number): Trapezoid => ({
     length: length[move],
@@ -116,7 +123,8 @@ export function indexPlan(plan: MotionPlan): PlanIndex {
     return out
   }
 
-  const project = (move: MoveIndex, point: Point3) => {
+  /** Where along a move (0 to 1) it comes nearest to a point. */
+  const nearestFraction = (move: number, point: Point3) => {
     const first = move * 3
     let squared = 0
     let along = 0
@@ -125,17 +133,51 @@ export function indexPlan(plan: MotionPlan): PlanIndex {
       squared += delta ** 2
       along += (point[axis] - from[first + axis]) * delta
     }
-    const fraction = squared > 0 ? Math.max(0, Math.min(1, along / squared)) : 1
-    const nearest = pointOf(move, fraction)
-    return {
-      fraction,
-      distance: Math.hypot(
-        nearest[0] - point[0],
-        nearest[1] - point[1],
-        nearest[2] - point[2]
-      ),
-    }
+    return squared > 0 ? Math.max(0, Math.min(1, along / squared)) : 1
   }
+
+  /** How far a point is from a move's point at a fraction of it. */
+  const distanceAlong = (move: number, fraction: number, point: Point3) => {
+    const first = move * 3
+    let squared = 0
+    for (let axis = 0; axis < 3; axis++) {
+      const start = from[first + axis]
+      const along = start + (to[first + axis] - start) * fraction
+      squared += (along - point[axis]) ** 2
+    }
+    return Math.sqrt(squared)
+  }
+
+  /** Whether a point is beyond `radius` of the box around a move, along any axis. */
+  const outside = (move: number, point: Point3, radius: number) => {
+    const first = move * 3
+    for (let axis = 0; axis < 3; axis++) {
+      const a = from[first + axis]
+      const b = to[first + axis]
+      const value = point[axis]
+      if (value < Math.min(a, b) - radius || value > Math.max(a, b) + radius)
+        return true
+    }
+    return false
+  }
+
+  const project = (move: MoveIndex, point: Point3) => {
+    const fraction = nearestFraction(move, point)
+    return { fraction, distance: distanceAlong(move, fraction, point) }
+  }
+
+  /** The first checkpoint `before` is false for, as it is for every one after; null for none. */
+  const firstCheckpoint = (
+    before: (checkpoint: Checkpoint) => boolean
+  ): Checkpoint | null => {
+    const index = partition(0, checkpoints.length, (checkpoint) =>
+      before(checkpoints[checkpoint])
+    )
+    return index < checkpoints.length ? checkpoints[index] : null
+  }
+
+  /** When a move ends. */
+  const endOf = (move: number) => timing.start[move] + timing.duration[move]
 
   return {
     plan,
@@ -182,15 +224,30 @@ export function indexPlan(plan: MotionPlan): PlanIndex {
     },
     /** The moves of `within` that pass within `radius` of a point, nearest first. */
     near: (point, radius, within, limit) => {
-      const found: { move: MoveIndex; distance: number }[] = []
-      const end = Math.min(within.end, count)
-      for (let index = Math.max(0, within.first); index < end; index++) {
-        const move = moveIndex(index)
-        const { distance } = project(move, point)
-        if (distance <= radius) found.push({ move, distance })
+      grid ??= gridOfMoves(from, to, count)
+      measured ??= new Uint32Array(count)
+      const marks = measured
+      // A query's number marks the moves it measured; after the last number they start over.
+      if (++query === 0xffffffff) {
+        marks.fill(0)
+        query = 1
       }
+      const found: { move: MoveIndex; distance: number }[] = []
+      const first = Math.max(0, within.first)
+      const end = Math.min(within.end, count)
+      visitNear(grid, point[0], point[1], radius, first, end, (move) => {
+        if (marks[move] === query) return
+        marks[move] = query
+        if (outside(move, point, radius)) return
+        const distance = distanceAlong(
+          move,
+          nearestFraction(move, point),
+          point
+        )
+        if (distance <= radius) found.push({ move: moveIndex(move), distance })
+      })
       return found
-        .sort((a, b) => a.distance - b.distance)
+        .sort((a, b) => a.distance - b.distance || a.move - b.move)
         .slice(0, limit)
         .map(({ move }) => move)
     },
@@ -212,13 +269,13 @@ export function indexPlan(plan: MotionPlan): PlanIndex {
         )
       )
     },
-    checkpointAfter: (move): Checkpoint | null =>
-      checkpoints.find((checkpoint) => checkpoint.after === move) ?? null,
+    checkpointAfter: (move): Checkpoint | null => {
+      const found = firstCheckpoint(({ after }) => after < move)
+      return found?.after === move ? found : null
+    },
     /** The first checkpoint whose move ends at or after `time`. */
     nextCheckpoint: (time): Checkpoint | null =>
-      checkpoints.find(
-        ({ after }) => timing.start[after] + timing.duration[after] >= time
-      ) ?? null,
+      firstCheckpoint(({ after }) => endOf(after) < time),
     shiftAt: (move): Vec3 => {
       const index = partition(
         0,

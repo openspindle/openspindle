@@ -4,7 +4,9 @@ import type {
   FirmwareMove,
   GCodeFirmware,
   Point3,
+  ToolStatus,
 } from "@/domain/nc/gcode"
+import { UNKNOWN_TOOL } from "@/domain/motion/types"
 import type {
   FirmwareModel,
   FirmwareSetup,
@@ -41,9 +43,12 @@ const Z1 = {
   change: [48.78 + 132, 179.74],
   /** The tool setter, from anchor 1 (`fill_cali_scripts` on the Z1 and Z1 Pro). */
   setter: [181, 181],
-  /** `default_seek_rate` and `default_feed_rate`: G0, and G1 before any F. */
-  rapid: 2000,
-  feed: 1000,
+  /**
+   * `default_seek_rate` and `default_feed_rate`: G0, and G1 before any F. A machine's
+   * configuration may set others, which its motion limits hold.
+   */
+  rapid: Z1_MOTION.defaults.seek,
+  feed: Z1_MOTION.defaults.feed,
   /** `atc.probe.*`: the touches of a calibration and of the Z probe. */
   touch: { fast: 500, slow: 100, retract: 1 },
   /** `zprobe.*` (in mm/s there): grid probing, which moves between samples at four times fast. */
@@ -68,10 +73,17 @@ const M_CODES = new Set([6, 370, 494, 494.1, 494.2, 495])
 const runsOrigin = (code: number) =>
   Math.trunc(code) === ORIGIN_ROUTINE && code !== ORIGIN_ROUTINE
 
-const RAPID = { rapid: true, feed: Z1.rapid } as const
+/** G0, at the seek rate in effect. */
+const RAPID = { rapid: true } as const
 
 type XY = readonly [number, number]
 type Style = Omit<FirmwareMove, "end">
+
+/** What the Z1 reports for a tool it holds, as the tool change that asked for it left it. */
+const holding = (tool: number): ToolStatus => ({ tool, target: tool })
+
+/** The tool the Z1 reports with none measured in the spindle (M493.2 T-1). */
+const NO_TOOL = -1
 
 /** Machine coordinates on a plate's bed, in the preview's coordinates, and what probing meets. */
 class Z1Frame {
@@ -201,11 +213,18 @@ class Moves {
 
 /**
  * The Z1's firmware for one parse of a plate: which tool it holds (none at first, as Run clears
- * it so that the first change always runs) and how its routines move.
+ * it so that the first change always runs), how its routines move and what it reports (`T:`).
+ * Until the first change that is a tool the preview cannot tell: Run leaves the tool the machine
+ * reports as it was.
  */
 class Z1Preview implements GCodeFirmware {
   /** `default_seek_rate`, which an F in G0 mode sets, and `default_feed_rate`. */
   readonly rates = { seek: Z1.rapid, feed: Z1.feed }
+  /** Tools the preview cannot tell: the one held, and the one last asked for. */
+  readonly initialStatus: ToolStatus = {
+    tool: UNKNOWN_TOOL,
+    target: UNKNOWN_TOOL,
+  }
   private readonly frame: Z1Frame
   private active: number | null = null
 
@@ -249,12 +268,14 @@ class Z1Preview implements GCodeFirmware {
     const [x, y] = frame.machineXY([moves.at[0], moves.at[1]])
     const target = frame.xy([value("X", x), value("Y", y)])
     const z = frame.z(value("Z", frame.machineZ(moves.at[2])))
-    // Its F sets the feed, as any move's does.
+    // Its F sets the feed, as any move's does; without one it moves at the feed in effect.
     const given = words.get("F")
-    const feed = given && given > 0 ? given * scale : block.feed
+    const feed = given && given > 0 ? given * scale : null
     moves.to(
       [target[0], target[1], z],
-      block.motion === 0 ? RAPID : { rapid: false, feed: feed ?? Z1.feed }
+      block.motion === 0
+        ? RAPID
+        : { rapid: false, ...(feed === null ? {} : { feed }) }
     )
     return { moves: moves.list, ...(feed === null ? {} : { feed }) }
   }
@@ -375,9 +396,11 @@ class Z1Preview implements GCodeFirmware {
     const offset: Point3 = [...block.offset]
     const start: Point3 = [...moves.at]
     let reached = true
+    /** Whether it touched the top, which sets work Z. */
+    const top = { touched: false }
     const { slow, retract } = Z1.touch
     const rapid = { ...RAPID, tool }
-    const down = { rapid: true, feed: Z1.rapid * descent, tool }
+    const down = { ...RAPID, seekScale: descent, tool }
     const touch = { rapid: false, feed: slow, tool }
     const again = { rapid: false, feed: slow / 2, tool }
     const axis = (index: 0 | 1, value: number): Point3 => {
@@ -390,6 +413,7 @@ class Z1Preview implements GCodeFirmware {
       moves.z(moves.at[2] + retract, rapid)
       this.search(moves, [0, 0, Z1.search], touch)
       offset[2] = moves.at[2]
+      top.touched = true
       moves.z(start[2], rapid)
       return true
     }
@@ -488,7 +512,14 @@ class Z1Preview implements GCodeFirmware {
         break
       }
     }
-    return { effect: { moves: moves.list, offset }, reached }
+    return {
+      effect: {
+        moves: moves.list,
+        offset,
+        ...(top.touched ? { setsWorkZ: true } : {}),
+      },
+      reached,
+    }
   }
 
   /** G10 L20: the current position becomes the given work coordinates. */
@@ -501,7 +532,7 @@ class Z1Preview implements GCodeFirmware {
       const value = words.get(letter)
       if (value !== undefined) offset[axis] = position[axis] - value * scale
     })
-    return { moves: [], offset }
+    return { moves: [], offset, ...(words.has("Z") ? { setsWorkZ: true } : {}) }
   }
 
   /** G28 on the Z1 parks: up to the clearance, then over to its X and Y (ATCHandler). */
@@ -513,16 +544,19 @@ class Z1Preview implements GCodeFirmware {
   /** M6: the manual tool change, then calibrating the new tool; a held tool changes nothing. */
   private change(block: FirmwareBlock, moves: Moves): FirmwareEffect {
     const next = block.selectedTool
-    if (next !== this.active) this.toolChange(moves, block.tool, next, false)
+    if (next === this.active) return { moves: [], tool: next }
+    this.toolChange(moves, block.tool, next, false)
     this.active = next
-    return { moves: moves.list, tool: next }
+    return { moves: moves.list, tool: next, status: holding(next) }
   }
 
   /**
    * `fill_change_scripts` and `fill_cali_scripts`: up to the clearance and over to where the
-   * change waits, then with the new tool over the tool setter, a fast touch, back, a slow touch
-   * and up to the safe height. Unless the firmware's automation changed it, back up to the
-   * clearance and over to where the change began.
+   * change waits for the user, then with the new tool over the tool setter, a fast touch, back,
+   * a slow touch and up to the safe height. Unless the firmware's automation changed it, back up
+   * to the clearance and over to where the change began. On the way to the change it reports the
+   * tool it held and the one asked for; from the user's confirmation no tool (M493.2 T-1) until
+   * calibration has measured the new one (M493.2 T<new>).
    */
   private toolChange(
     moves: Moves,
@@ -532,27 +566,32 @@ class Z1Preview implements GCodeFirmware {
   ) {
     const { frame } = this
     const [x, y] = moves.at
-    moves.z(frame.z(Z1.clearanceZ), { ...RAPID, tool: from })
-    moves.xy(frame.fromAnchor(Z1.change), { ...RAPID, tool: from })
-    const style = { ...RAPID, tool: to }
+    // Before its first change, the Z1 reports a tool the preview cannot tell.
+    const held = this.active ?? UNKNOWN_TOOL
+    const asked = { tool: from, status: { tool: held, target: to } }
+    moves.z(frame.z(Z1.clearanceZ), { ...RAPID, ...asked })
+    moves.xy(frame.fromAnchor(Z1.change), { ...RAPID, ...asked, wait: "tool" })
+    const measuring = { tool: to, status: { tool: NO_TOOL, target: to } }
+    const style = { ...RAPID, ...measuring }
     moves.z(frame.z(Z1.clearanceZ), style)
     moves.xy(frame.fromAnchor(Z1.setter), style)
-    this.touches(moves, to)
+    this.touches(moves, measuring)
     moves.z(frame.z(Z1.safeZ), style)
     if (automation) return
-    moves.z(frame.z(Z1.clearanceZ), style)
-    moves.xy([x, y], style)
+    const back = { ...RAPID, tool: to, status: holding(to) }
+    moves.z(frame.z(Z1.clearanceZ), back)
+    moves.xy([x, y], back)
   }
 
   /** A fast touch, back off, a slow touch: calibration's and the Z probe's (G38 distances). */
-  private touches(moves: Moves, tool: number) {
+  private touches(moves: Moves, by: Pick<Style, "tool" | "status">) {
     const { fast, slow, retract } = Z1.touch
-    this.search(moves, [0, 0, Z1.search], { rapid: false, feed: fast, tool })
-    moves.z(moves.at[2] + retract, { ...RAPID, tool })
+    this.search(moves, [0, 0, Z1.search], { ...by, rapid: false, feed: fast })
+    moves.z(moves.at[2] + retract, { ...by, ...RAPID })
     this.search(moves, [0, 0, -1 - retract], {
+      ...by,
       rapid: false,
       feed: slow,
-      tool,
     })
   }
 
@@ -582,57 +621,65 @@ class Z1Preview implements GCodeFirmware {
       vy + offset[1],
     ]
     const clearance = this.frame.z(Z1.clearanceZ)
-    let tool = block.tool
-    if (margin || zProbe || leveling) {
-      if (this.active !== PROBE_TOOL)
-        this.toolChange(moves, block.tool, PROBE_TOOL, true)
-      this.active = tool = PROBE_TOOL
-      const style = { ...RAPID, tool }
-      if (margin) {
-        const [left, front] = work(x, y)
-        const [right, back] = work(words.get("C")!, words.get("D")!)
-        const trace = { rapid: false, feed: Z1.marginFeed, tool }
-        moves.z(clearance, style)
-        moves.xy([left, front], style)
-        moves.xy([left, back], trace)
-        moves.xy([right, back], trace)
-        moves.xy([right, front], trace)
-        moves.xy([left, front], trace)
-      }
-      if (zProbe) {
-        moves.z(clearance, style)
-        moves.xy(work(x + words.get("O")!, y + words.get("F")!), style)
-        this.touches(moves, tool)
-        offset[2] = moves.at[2] - Z1.probeHeight
-        moves.z(moves.at[2] + Z1.touch.retract, style)
-      }
-      if (leveling) {
-        moves.xy(work(x, y), style)
-        const grid = new Map([
-          ["R", 1],
-          ["X", 0],
-          ["Y", 0],
-          ...["A", "B", "I", "J", "H"].map(
-            (letter) => [letter, words.get(letter)!] as const
-          ),
-        ])
-        this.grid({ ...block, words: grid, tool }, moves)
-      }
+    const probes = margin || zProbe || leveling
+    if (probes && this.active !== PROBE_TOOL)
+      this.toolChange(moves, block.tool, PROBE_TOOL, true)
+    if (probes) this.active = PROBE_TOOL
+    // With the probe, it reports holding it, as its change left it.
+    const by: Pick<Style, "tool" | "status"> = probes
+      ? { tool: PROBE_TOOL, status: holding(PROBE_TOOL) }
+      : { tool: block.tool }
+    const style = { ...RAPID, ...by }
+    if (margin) {
+      const [left, front] = work(x, y)
+      const [right, back] = work(words.get("C")!, words.get("D")!)
+      const trace = { rapid: false, feed: Z1.marginFeed, ...by }
+      moves.z(clearance, style)
+      moves.xy([left, front], style)
+      moves.xy([left, back], trace)
+      moves.xy([right, back], trace)
+      moves.xy([right, front], trace)
+      moves.xy([left, front], trace)
+    }
+    if (zProbe) {
+      moves.z(clearance, style)
+      moves.xy(work(x + words.get("O")!, y + words.get("F")!), style)
+      this.touches(moves, by)
+      offset[2] = moves.at[2] - Z1.probeHeight
+      moves.z(moves.at[2] + Z1.touch.retract, style)
+    }
+    if (leveling) {
+      moves.xy(work(x, y), style)
+      const grid = new Map([
+        ["R", 1],
+        ["X", 0],
+        ["Y", 0],
+        ...["A", "B", "I", "J", "H"].map(
+          (letter) => [letter, words.get(letter)!] as const
+        ),
+      ])
+      this.grid({ ...block, words: grid, tool: PROBE_TOOL }, moves, by.status)
     }
     if (words.has("P")) {
-      moves.z(clearance, { ...RAPID, tool })
-      moves.xy(work(x, y), { ...RAPID, tool })
+      moves.z(clearance, style)
+      moves.xy(work(x, y), style)
     }
-    return { moves: moves.list, offset, tool }
+    return {
+      moves: moves.list,
+      offset,
+      ...(zProbe ? { setsWorkZ: true } : {}),
+      ...by,
+    }
   }
 
   /**
    * G32 R1 (CartGridStrategy::doProbe): from the probe's position offset by X and Y, over the
    * grid's start at its height, a fast touch and back, then down to H above that touch. It
    * probes the start once more, then every sample in turn: over it at that height, down to it
-   * slowly and back. False for grids the preview does not follow.
+   * slowly and back. False for grids the preview does not follow. The firmware reports `status`
+   * while it probes, its status before the block when absent.
    */
-  private grid(block: FirmwareBlock, moves: Moves) {
+  private grid(block: FirmwareBlock, moves: Moves, status?: ToolStatus) {
     const { words } = block
     if (words.get("R") !== 1) return false
     const [dx, dy, width, depth] = ["X", "Y", "A", "B"].map((letter) =>
@@ -660,6 +707,7 @@ class Z1Preview implements GCodeFirmware {
       feed: fast,
       tool: block.tool,
       probePoint,
+      ...(status ? { status } : {}),
     })
     moves.xy(start, style(0))
     const first = frame.surface(moves.at)

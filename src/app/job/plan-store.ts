@@ -1,38 +1,117 @@
-import { firmwareSetup, machineProgram } from "@/app/workspace/machine-program"
+import { firmwareSetup } from "@/app/workspace/firmware-setup"
 import { kitForPlate } from "@/domain/fixtures/catalog"
 import type { FixtureKit } from "@/domain/fixtures/fixture-kit"
+import type { FirmwareModel } from "@/domain/firmware/firmware-model"
 import type { MachineLimits } from "@/domain/motion/limits"
 import { planMotion } from "@/domain/motion/plan"
 import { indexPlan } from "@/domain/motion/plan-index"
 import type { MotionPlan, PlanIndex } from "@/domain/motion/types"
+import { parseGCode } from "@/domain/nc/gcode"
 import type { GCodeProgram } from "@/domain/nc/gcode"
-import type { Plate } from "@/domain/plate/plate"
+import type { Plate, PlateSetup } from "@/domain/plate/plate"
 import { fingerprint } from "@/lib/fingerprint"
 import type { FirmwareConfiguration } from "@/machine/contract"
 
-/** A plate's program as its machine moves through it (`machineProgram`). */
-export function machineProgramOf(
-  plate: Plate,
-  program: GCodeProgram
-): GCodeProgram {
-  return machineProgram(plate, program)
+/**
+ * How many setups each program keeps its machine program for: the least recently used goes
+ * first, unless it holds a pinned plan. Enough for the setup a Run was sent with and the plate
+ * as it is edited since.
+ */
+const SETUPS_PER_PROGRAM = 4
+
+/** A program placed by one setup: its machine program, and that program's plans by limits key. */
+type Placed = {
+  readonly program: GCodeProgram
+  /** The setup's fingerprint, part of its plans' keys. */
+  readonly setup: string
+  readonly plans: Map<string, MotionPlan>
 }
 
-/**
- * Each machine program's plans, by the key of the limits they are timed by. A machine program
- * stands for its program and the setup it was placed by, which it is parsed again for.
- */
-const plans = new WeakMap<GCodeProgram, Map<string, MotionPlan>>()
+/** Each program's placements by the plate's kit and setup (`setupOf`), the most recently used last. */
+const placements = new WeakMap<GCodeProgram, Map<string, Placed>>()
+
+/** Each setup's firmware setup as JSON, made once per setup object. */
+const setupJson = new WeakMap<PlateSetup, string>()
+
+/** Each program's source fingerprint, part of its plans' keys. */
+const sources = new WeakMap<GCodeProgram, string>()
 
 /** How many holders, such as a Run's session, each plan has (`pinPlan`). */
 const pins = new Map<MotionPlan, number>()
 
 const indexes = new WeakMap<MotionPlan, PlanIndex>()
 
+/** Where a plate is on its machine (`firmwareSetup`), as JSON. */
+function setupOf(plate: Plate, kit: FixtureKit) {
+  let json = setupJson.get(plate.setup)
+  if (json === undefined) {
+    json = JSON.stringify(firmwareSetup(plate, kit))
+    setupJson.set(plate.setup, json)
+  }
+  return json
+}
+
+/** Whether any of a placement's plans is held (`pinPlan`). */
+const pinned = ({ plans }: Placed) =>
+  [...plans.values()].some((plan) => pins.has(plan))
+
+/**
+ * A plate's program placed by its setup: parsed with the plate's firmware once, and kept while
+ * the setup is among the program's last few (`SETUPS_PER_PROGRAM`) or holds a pinned plan.
+ */
+function placedOf(
+  plate: Plate,
+  program: GCodeProgram,
+  kit: FixtureKit,
+  firmware: FirmwareModel
+): Placed {
+  const setup = setupOf(plate, kit)
+  const key = `${kit.id}\n${setup}`
+  const placed = placements.get(program) ?? new Map<string, Placed>()
+  placements.set(program, placed)
+  const cached = placed.get(key)
+  if (cached) {
+    placed.delete(key)
+    placed.set(key, cached)
+    return cached
+  }
+  const made: Placed = {
+    program: parseGCode(
+      program.source,
+      program.name,
+      firmware.preview(firmwareSetup(plate, kit))
+    ),
+    setup: fingerprint(setup),
+    plans: new Map(),
+  }
+  placed.set(key, made)
+  for (const [other, entry] of placed) {
+    if (placed.size <= SETUPS_PER_PROGRAM) break
+    if (other !== key && !pinned(entry)) placed.delete(other)
+  }
+  return made
+}
+
+/**
+ * A plate's program as its machine moves through it: with its firmware's own moves (tool
+ * changes, probing, moves in machine coordinates), placed by the plate's setup. Parsed once per
+ * program and setup (`placedOf`); the program itself when the preview does not follow the
+ * machine's firmware.
+ */
+export function machineProgramOf(
+  plate: Plate,
+  program: GCodeProgram
+): GCodeProgram {
+  const kit = kitForPlate(plate)
+  const { firmware } = kit
+  if (!firmware) return program
+  return placedOf(plate, program, kit, firmware).program
+}
+
 /**
  * The plan of the moves a plate's machine makes for its program, timed by `limits`; built once per
- * program, setup and limits. Null without limits, or when the preview does not follow the plate's
- * machine's firmware.
+ * program, setup and limits, on the machine program the viewer draws (`machineProgramOf`). Null
+ * without limits, or when the preview does not follow the plate's machine's firmware.
  */
 export function planFor(
   plate: Plate,
@@ -42,19 +121,17 @@ export function planFor(
   const kit = kitForPlate(plate)
   const { firmware } = kit
   if (!limits || !firmware) return null
-  const machine = machineProgramOf(plate, program)
-  const timed = plans.get(machine) ?? new Map<string, MotionPlan>()
-  plans.set(machine, timed)
-  const cached = timed.get(limits.key)
+  const placed = placedOf(plate, program, kit, firmware)
+  const cached = placed.plans.get(limits.key)
   if (cached) return cached
-  const key = [
-    kit.id,
-    fingerprint(JSON.stringify(firmwareSetup(plate, kit))),
-    limits.key,
-    fingerprint(program.source),
-  ].join("|")
-  const plan = planMotion(key, machine, firmware.motion, limits)
-  timed.set(limits.key, plan)
+  let source = sources.get(program)
+  if (source === undefined) {
+    source = fingerprint(program.source)
+    sources.set(program, source)
+  }
+  const key = [kit.id, placed.setup, limits.key, source].join("|")
+  const plan = planMotion(key, placed.program, firmware.motion, limits)
+  placed.plans.set(limits.key, plan)
   return plan
 }
 
@@ -83,8 +160,8 @@ export function limitsFor(
 }
 
 /**
- * Keeps a plan from being dropped while something holds it, such as the session of the Run it
- * was sent with. The function returned lets go of it.
+ * Keeps a plan, and the machine program it is of, from being dropped while something holds it,
+ * such as the session of the Run it was sent with. The function returned lets go of it.
  */
 export function pinPlan(plan: MotionPlan): () => void {
   pins.set(plan, (pins.get(plan) ?? 0) + 1)

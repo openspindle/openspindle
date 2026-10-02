@@ -17,16 +17,18 @@ export type PlanSubject = {
 
 /**
  * The limits a plate's machine moves by: its device's configuration while that device is
- * connected and its configuration read, else its machine's defaults.
+ * connected and its configuration read, else its machine's defaults. The same limits while
+ * neither the plate's machine nor its configuration changes.
  */
 export function useMotionLimits(plate: Plate | null): MachineLimits | null {
   const { connection } = useMachineSnapshot()
   const configuration = useCachedConfiguration(connection.id)
   const { device } = connection
+  const kit = plate && kitForPlate(plate)
   const own = !!plate && !!device && plate.setup.deviceId === machineId(device)
   return useMemo(
-    () => plate && limitsFor(kitForPlate(plate), own ? configuration : null),
-    [plate, own, configuration]
+    () => kit && limitsFor(kit, own ? configuration : null),
+    [kit, own, configuration]
   )
 }
 

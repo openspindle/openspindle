@@ -13,13 +13,20 @@ import type { NcBlockProblem } from "@/machine/contract"
 
 export type Point3 = [number, number, number]
 
+/**
+ * The tools a machine's firmware reports (`T:`): the one it takes to be in the spindle, -1 for
+ * none, and the one a tool change asks for.
+ */
+export type ToolStatus = { readonly tool: number; readonly target: number }
+
 export interface GCodeSegment {
   start: Point3
   end: Point3
   rapid: boolean
   /**
    * Rate in mm/min: the last F, else 3000 for a rapid and 600 for a feed move, or as a firmware
-   * keeps its rates (`GCodeFirmware.rates`).
+   * keeps its rates (`GCodeFirmware.rates`), times a program's override (M220), which probing
+   * moves do not take.
    */
   feed: number
   /** One-based source line, including blank lines and comments. */
@@ -36,18 +43,45 @@ export interface GCodeSegment {
    * a firmware may only place in machine coordinates (G53).
    */
   routine?: true
+  /** A chord of an arc (G2, G3), which the preview draws the arc with. */
+  arc?: true
+  /** A G53 block's own move, which the firmware places in machine coordinates. */
+  machine?: true
+  /**
+   * Whose default rate it moves at, where the program set none: its firmware's seek rate or
+   * feed (`GCodeFirmware.rates`), which a machine's configuration may set otherwise.
+   */
+  defaultRate?: "seek" | "feed"
+  /**
+   * The tools its firmware reports while it moves (`ToolStatus`), from the firmware's status
+   * (`GCodeFirmware.initialStatus`). Absent, the tool reported is the move's own and the one
+   * asked for unknown.
+   */
+  statusTool?: number
+  statusTarget?: number
+  /** The machine waits for the user after it: for a tool change, at the position it waits at. */
+  wait?: "tool"
 }
 
 /** A move a machine's firmware makes for a block, in the program's work coordinates. */
 export type FirmwareMove = {
   readonly end: Point3
   readonly rapid: boolean
-  /** mm/min, for timing. */
-  readonly feed: number
+  /**
+   * mm/min, for timing. Absent, it moves at the rate in effect: a rapid at the seek rate, times
+   * `seekScale`, and any other move at the feed.
+   */
+  readonly feed?: number
+  /** For a rapid without a feed, its share of the seek rate, as an override sets it. */
+  readonly seekScale?: number
   readonly probing?: true
   readonly probePoint?: number
   /** The tool in the spindle; the active tool when absent. */
   readonly tool?: number
+  /** What the firmware reports while it moves; its status before the block when absent. */
+  readonly status?: ToolStatus
+  /** The machine waits for the user after it. */
+  readonly wait?: "tool"
 }
 
 /** What a machine's firmware does for a block: its moves, and what it leaves set. */
@@ -55,10 +89,14 @@ export type FirmwareEffect = {
   readonly moves: readonly FirmwareMove[]
   /** The work offset afterwards, shifting absolute targets as G92 does (G10 L20 sets it). */
   readonly offset?: Point3
+  /** Whether it sets work Z, as a touch of the stock's top does, even to the Z it was. */
+  readonly setsWorkZ?: true
   /** The tool in the spindle afterwards. */
   readonly tool?: number
   /** The feed afterwards, in mm/min: the firmware reads a claimed block's F its own way. */
   readonly feed?: number
+  /** What the firmware reports afterwards (`ToolStatus`). */
+  readonly status?: ToolStatus
 }
 
 /** A block as a machine's firmware reads it, with the preview's state before it. */
@@ -100,9 +138,15 @@ export interface GCodeFirmware {
   run: (block: FirmwareBlock) => FirmwareEffect | null
   /**
    * Its rates, mm/min, where it keeps G0's apart from the feed as Smoothieware does: `seek` for
-   * G0, which an F read in G0 mode sets instead of the feed, and `feed` before any F.
+   * G0, which an F read in G0 mode sets instead of the feed, and `feed` before any F. Moves at
+   * either until the program sets it are marked so (`GCodeSegment.defaultRate`).
    */
   readonly rates?: { readonly seek: number; readonly feed: number }
+  /**
+   * What it reports at the program's start (`ToolStatus`), which its blocks change
+   * (`FirmwareEffect.status`); absent, the preview leaves what it reports out.
+   */
+  readonly initialStatus?: ToolStatus
 }
 
 /** The lines a program holds that cannot run as written: the first, and how many. */
@@ -110,6 +154,15 @@ export type UnreadableLines = {
   readonly line: number
   readonly problem: NcBlockProblem
   readonly count: number
+}
+
+/** A work offset a program sets, from a segment on (`GCodeProgram.offsets`). */
+export type ProgramOffset = {
+  /** The first segment it applies to: the next one after the block that set it. */
+  readonly segment: number
+  readonly offset: Point3
+  /** Its block set work Z, even to the Z it was (`FirmwareEffect.setsWorkZ`, G92 Z). */
+  readonly setsWorkZ?: true
 }
 
 export interface GCodeProgram {
@@ -122,6 +175,13 @@ export interface GCodeProgram {
   tools: number[]
   /** Lines the preview leaves out as they cannot run as written; null when every line can. */
   unreadable: UnreadableLines | null
+  /**
+   * The work offsets in effect, as G92 and a firmware's blocks set them (`FirmwareEffect.offset`),
+   * in segment order: one from the first segment, [0, 0, 0] unless a block before it sets
+   * another, then one for each change and for each block that sets work Z. A segment's points
+   * less its offset are where they are in the machine's work coordinates.
+   */
+  offsets: readonly ProgramOffset[]
 }
 
 /** A move's feed without an F word before it, in mm/min: a rapid's, and a feed move's. */
@@ -290,22 +350,31 @@ export function parseGCode(
   let feed: number | null = null
   /** G0's rate, where the firmware keeps it apart from the feed. */
   let seek = firmware?.rates?.seek ?? null
+  /** Whether the program set G0's rate, which is the firmware's own until it does. */
+  let seekSet = false
   let feedOverride = 1
   let selectedTool = 1
   let tool = 1
   let spindle = 0
   let spindleRunning = false
   let stopped = false
+  /** What the firmware reports, where the preview follows it. */
+  let status = firmware?.initialStatus ?? null
+  const offsets: ProgramOffset[] = [{ segment: 0, offset: [0, 0, 0] }]
   /** Whether a move found the preview's segments full, which ends it. */
   const segmentLimit = { reached: false }
 
-  /** A programmed move, or a firmware's with its own feed and tool, and whether a routine's. */
+  /**
+   * A programmed move, or a firmware's with its own feed, tool and status, and what kind: a
+   * routine's, a G53 block's own or an arc's chord. A move too short to draw passes a wait it
+   * carries on to the move before it.
+   */
   const append = (
     end: Point3,
     rapid: boolean,
     line: number,
     made?: FirmwareMove,
-    routine = false
+    kind?: "routine" | "machine" | "arc"
   ) => {
     if (segments.length >= MAX_SEGMENTS) {
       segmentLimit.reached = true
@@ -313,30 +382,62 @@ export function parseGCode(
     }
     if (length(position, end) < EPSILON) {
       position = [...end]
+      const before = segments.at(-1)
+      if (made?.wait && before) before.wait = made.wait
       return
     }
-    const nominalFeed =
-      made?.feed ??
-      (rapid
-        ? (seek ?? feed ?? RAPID_FEED)
-        : (feed ?? firmware?.rates?.feed ?? DEFAULT_FEED))
+    let nominalFeed: number
+    let defaultRate: GCodeSegment["defaultRate"]
+    if (made?.feed !== undefined) nominalFeed = made.feed
+    else if (rapid) {
+      nominalFeed = (seek ?? feed ?? RAPID_FEED) * (made?.seekScale ?? 1)
+      if (firmware?.rates && !seekSet) defaultRate = "seek"
+    } else {
+      nominalFeed = feed ?? firmware?.rates?.feed ?? DEFAULT_FEED
+      if (firmware?.rates && feed === null) defaultRate = "feed"
+    }
     const movedBy = made?.tool ?? tool
-    segments.push({
+    const reported = made?.status ?? status
+    const segment: GCodeSegment = {
       start: [...position],
       end: [...end],
       rapid,
-      feed: nominalFeed * feedOverride,
+      // A probe searches at its own feed, whatever the override.
+      feed: made?.probing ? nominalFeed : nominalFeed * feedOverride,
       line,
       tool: movedBy,
       spindle: spindleRunning ? spindle : 0,
-      ...(made?.probing ? { probing: true } : {}),
-      ...(made?.probePoint === undefined
-        ? {}
-        : { probePoint: made.probePoint }),
-      ...(routine ? { routine: true } : {}),
-    })
+    }
+    if (made?.probing) segment.probing = true
+    if (made?.probePoint !== undefined) segment.probePoint = made.probePoint
+    if (kind === "routine") segment.routine = true
+    else if (kind === "machine") segment.machine = true
+    else if (kind === "arc") segment.arc = true
+    if (defaultRate) segment.defaultRate = defaultRate
+    if (reported) {
+      segment.statusTool = reported.tool
+      segment.statusTarget = reported.target
+    }
+    if (made?.wait) segment.wait = made.wait
+    segments.push(segment)
     tools.add(movedBy)
     position = [...end]
+  }
+
+  /** The work offset from the next segment on, and whether its block set work Z. */
+  const setOffset = (next: Point3, setsWorkZ: boolean) => {
+    const changed = next.some((value, axis) => value !== offset[axis])
+    offset = [...next]
+    if (!changed && !setsWorkZ) return
+    const last = offsets[offsets.length - 1]
+    const z = setsWorkZ || (last.segment === segments.length && last.setsWorkZ)
+    const entry: ProgramOffset = {
+      segment: segments.length,
+      offset: [...next],
+      ...(z ? { setsWorkZ: true } : {}),
+    }
+    if (last.segment === segments.length) offsets[offsets.length - 1] = entry
+    else offsets.push(entry)
   }
 
   for (
@@ -386,7 +487,7 @@ export function parseGCode(
         coordinateSet = true
         omitMotion = true
       } else if (g === 92.1) {
-        offset = [0, 0, 0]
+        setOffset([0, 0, 0], false)
         omitMotion = true
       } else if (g === 80) motion = null
       else if (
@@ -400,12 +501,21 @@ export function parseGCode(
         if (g >= 81 && g <= 89) motion = null
       }
     }
+    // Where G0 has its own rate, a block starting with F is G1's, as Smoothieware reads it.
+    if (
+      seek !== null &&
+      !gCodes.length &&
+      block.words.find(({ letter }) => letter !== "N")?.letter === "F"
+    )
+      motion = 1
     // A block the firmware claims has F as the firmware reads it, such as a probing feed.
     if (words.has("F") && !claimed.length) {
       const value = words.get("F")! * scale
       if (value > 0 && Number.isFinite(value)) {
-        if (seek !== null && motion === 0) seek = value
-        else feed = value
+        if (seek !== null && motion === 0) {
+          seek = value
+          seekSet = true
+        } else feed = value
       }
     }
     const sIsOverride = mCodes.some(
@@ -447,19 +557,18 @@ export function parseGCode(
       // A block the preview cannot follow is left out.
       if (!effect) continue
       // In machine coordinates (G53) alone, its moves are its own; any other code runs a routine.
-      const routine = !(
-        claimed.length === 1 &&
-        gCodes.includes(53) &&
-        firmware.handles("G", 53)
-      )
+      const own =
+        claimed.length === 1 && gCodes.includes(53) && firmware.handles("G", 53)
       for (const made of effect.moves)
-        append(made.end, made.rapid, line, made, routine)
-      if (effect.offset) offset = [...effect.offset]
+        append(made.end, made.rapid, line, made, own ? "machine" : "routine")
+      if (effect.offset || effect.setsWorkZ)
+        setOffset(effect.offset ?? offset, !!effect.setsWorkZ)
       if (effect.feed !== undefined) feed = effect.feed
       if (effect.tool !== undefined) {
         tool = effect.tool
         tools.add(tool)
       }
+      if (effect.status) status = effect.status
       continue
     }
     // Words the preview does not know leave the block out.
@@ -488,10 +597,12 @@ export function parseGCode(
     )
       omitMotion = true
     if (coordinateSet) {
+      const next: Point3 = [...offset]
       ;(["X", "Y", "Z"] as const).forEach((axis, axisIndex) => {
         if (words.has(axis))
-          offset[axisIndex] = position[axisIndex] - words.get(axis)! * scale
+          next[axisIndex] = position[axisIndex] - words.get(axis)! * scale
       })
+      setOffset(next, words.has("Z"))
     }
     const hasAxes = ["X", "Y", "Z"].some((axis) => words.has(axis))
     const hasArc = motion === 2 || motion === 3
@@ -527,7 +638,7 @@ export function parseGCode(
         position = target
         continue
       }
-      for (const point of points) append(point, false, line)
+      for (const point of points) append(point, false, line, undefined, "arc")
     } else append(target, motion === 0, line)
   }
 
@@ -559,5 +670,6 @@ export function parseGCode(
       ...firstUnreadable,
       count: unreadableCount,
     },
+    offsets,
   }
 }
