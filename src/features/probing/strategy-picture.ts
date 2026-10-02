@@ -7,6 +7,7 @@ import {
 } from "three/webgpu"
 import { LineSegments2 } from "three/addons/lines/webgpu/LineSegments2.js"
 import { LineSegmentsGeometry } from "three/addons/lines/LineSegmentsGeometry.js"
+import { fitIsometric } from "@/lib/isometric-view"
 import { disposeObjects } from "@/lib/three-assets"
 import type { SceneMove, ScenePart, StrategyScene } from "./strategy-scene"
 
@@ -33,9 +34,6 @@ const LOOK = {
   dot: { radius: 0.9, lift: 0.05 },
   shaft: { radius: 0.45, length: 16 },
 } as const
-
-/** Where the camera looks from, towards what is probed: isometric, from the front right. */
-const VIEW = new THREE.Vector3(1, -1, 1).normalize()
 
 /** How much room the picture leaves around what it frames, as a share of it. */
 const MARGIN = 0.18
@@ -187,10 +185,7 @@ function sceneOf({ parts, moves, touches, tip, ball }: StrategyScene) {
   return scene
 }
 
-/**
- * An orthographic camera from `VIEW`, Z up so that what stands upright stands upright in the
- * picture, centred on and framing where the probe moves and touches, with `MARGIN` around.
- */
+/** The isometric view, centred on and framing where the probe moves and touches. */
 function cameraFor({ moves, touches, tip, ball }: StrategyScene) {
   const points = [
     ...moves.flatMap(({ start, end }) => [start, end]),
@@ -199,27 +194,11 @@ function cameraFor({ moves, touches, tip, ball }: StrategyScene) {
     [tip[0], tip[1], tip[2] + 2 * ball] as const,
   ].map((point) => new THREE.Vector3(...point))
   const camera = new THREE.OrthographicCamera()
-  camera.up.set(0, 0, 1)
-  camera.position.copy(VIEW)
-  camera.lookAt(0, 0, 0)
-  camera.updateMatrixWorld()
-  // Where the points are across and up the picture, and along the view.
-  const view = camera.matrixWorldInverse
-  const box = new THREE.Box3()
-  for (const point of points) box.expandByPoint(point.applyMatrix4(view))
-  const size = box.getSize(new THREE.Vector3())
-  const aspect = PICTURE.width / PICTURE.height
-  const height = Math.max(size.y, size.x / aspect, 10) * (1 + MARGIN)
-  const width = height * aspect
-  const centre = box.getCenter(new THREE.Vector3())
-  camera.left = centre.x - width / 2
-  camera.right = centre.x + width / 2
-  camera.bottom = centre.y - height / 2
-  camera.top = centre.y + height / 2
-  // From in front of everything drawn, whatever its depth.
-  camera.near = -1000 - box.max.z
-  camera.far = 1000 - box.min.z
-  camera.updateProjectionMatrix()
+  fitIsometric(camera, points, {
+    aspect: PICTURE.width / PICTURE.height,
+    margin: MARGIN,
+    least: 10,
+  })
   return camera
 }
 

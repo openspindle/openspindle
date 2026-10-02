@@ -18,16 +18,14 @@ import {
   inFixtureFrame,
   materialsOf,
 } from "@/lib/three-assets"
+import { boxCorners, fitIsometric } from "@/lib/isometric-view"
 import { useHost } from "@/platform/host-context"
 
 /** A thumbnail's size, in CSS pixels. */
 export const FIXTURE_THUMBNAIL = { width: 192, height: 144 } as const
 
-/** Seen from the front, right and above, as the fixture's model preview shows it. */
-const VIEW_DIRECTION = new THREE.Vector3(0.55, -1, 0.75).normalize()
-const FIELD_OF_VIEW = 30
-/** Room left around the model, as a share of the view. */
-const MARGIN = 1.08
+/** Room left around the model, as a share of its size: it is seen isometrically. */
+const MARGIN = 0.08
 /** The renderer is released after this long without a picture to draw. */
 const IDLE_MS = 5000
 /** Pictures kept; a device holds a few dozen fixtures at most. */
@@ -105,45 +103,11 @@ function fixtureContent(
   return box
 }
 
-/** Points the camera at the box from the view direction, near enough that it fills the view. */
-function fit(camera: THREE.PerspectiveCamera, box: THREE.Box3) {
-  const center = box.getCenter(new THREE.Vector3())
-  const right = new THREE.Vector3()
-    .crossVectors(camera.up, VIEW_DIRECTION)
-    .normalize()
-  const up = new THREE.Vector3().crossVectors(VIEW_DIRECTION, right)
-  const tall = Math.tan(THREE.MathUtils.degToRad(FIELD_OF_VIEW) / 2) / MARGIN
-  const wide = tall * camera.aspect
-  let distance = 1
-  const corner = new THREE.Vector3()
-  for (const x of [box.min.x, box.max.x])
-    for (const y of [box.min.y, box.max.y])
-      for (const z of [box.min.z, box.max.z]) {
-        corner.set(x, y, z).sub(center)
-        const depth = corner.dot(VIEW_DIRECTION)
-        distance = Math.max(
-          distance,
-          depth + Math.abs(corner.dot(right)) / wide,
-          depth + Math.abs(corner.dot(up)) / tall
-        )
-      }
-  camera.position.copy(center).addScaledVector(VIEW_DIRECTION, distance)
-  camera.near = distance / 100
-  camera.far = distance * 100
-  camera.lookAt(center)
-  camera.updateProjectionMatrix()
-}
-
 /** The offscreen renderer, its lights and camera. */
 class Studio {
   private readonly renderer: THREE.WebGLRenderer
   private readonly scene = new THREE.Scene()
-  private readonly camera = new THREE.PerspectiveCamera(
-    FIELD_OF_VIEW,
-    FIXTURE_THUMBNAIL.width / FIXTURE_THUMBNAIL.height,
-    0.1,
-    10000
-  )
+  private readonly camera = new THREE.OrthographicCamera()
 
   constructor() {
     this.renderer = new THREE.WebGLRenderer({
@@ -162,7 +126,6 @@ class Studio {
     const key = new THREE.DirectionalLight(0xffffff, 1.4)
     key.position.set(-60, -100, 140)
     this.scene.add(key)
-    this.camera.up.set(0, 0, 1)
   }
 
   /** The GPU dropped the context (a driver reset); a new studio draws again. */
@@ -181,7 +144,14 @@ class Studio {
     this.scene.add(content)
     try {
       content.updateMatrixWorld(true)
-      fit(this.camera, new THREE.Box3().setFromObject(content, true))
+      fitIsometric(
+        this.camera,
+        boxCorners(new THREE.Box3().setFromObject(content, true)),
+        {
+          aspect: FIXTURE_THUMBNAIL.width / FIXTURE_THUMBNAIL.height,
+          margin: MARGIN,
+        }
+      )
       const { width, height } = FIXTURE_THUMBNAIL
       this.renderer.setPixelRatio(window.devicePixelRatio)
       this.renderer.setSize(width, height, false)
