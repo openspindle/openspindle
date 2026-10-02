@@ -1,30 +1,31 @@
+import type { MachineLimits } from "../../src/domain/motion/limits.ts"
+
 export const CONFIGURATION_PATH = "/sd/config.txt"
 
 type ConfigurationDefaults = {
   readonly anchors: readonly [number, number, number, number]
-  readonly feedRate: number
-  readonly seekRate: number
-  readonly axisRates: readonly [number, number, number]
+  /** The motion settings it starts with, as `configZ1.default` sets them. */
+  readonly limits: MachineLimits
   readonly park: readonly [number, number]
   readonly clearanceZ: number
 }
 
 /** Representative development data, independent of any machine's downloaded configuration. */
 export function initialConfiguration(defaults: ConfigurationDefaults) {
+  const { limits } = defaults
   return new TextEncoder().encode(`# OpenSpindle Z1 simulator configuration
 # Development defaults, not a configuration for a real machine.
 # Saved edits persist until the simulator process exits.
-# Anchor and vacuum defaults are loaded on reset; motion uses built-in defaults.
+# Motion, anchor and vacuum settings are loaded on reset.
 
-# Motion: speeds in mm/min
-default_feed_rate                 ${defaults.feedRate}
-default_seek_rate                 ${defaults.seekRate}
-x_axis_max_speed                 ${defaults.axisRates[0]}
-y_axis_max_speed                 ${defaults.axisRates[1]}
-z_axis_max_speed                 ${defaults.axisRates[2]}
-acceleration                    100
-z_acceleration                  50
-junction_deviation              0.05
+# Motion: speeds in mm/min, as configZ1.default sets them
+default_feed_rate                 ${limits.feed}
+default_seek_rate                 ${limits.seek}
+alpha_max_rate                    ${limits.axisRate[0].toFixed(1)}
+beta_max_rate                     ${limits.axisRate[1].toFixed(1)}
+gamma_max_rate                    ${limits.axisRate[2].toFixed(1)}
+acceleration                      ${limits.acceleration}
+junction_deviation                ${limits.junctionDeviation}
 
 # Anchors and parking positions, in machine coordinates
 coordinate.anchor1_x            ${defaults.anchors[0]}
@@ -44,6 +45,8 @@ zprobe.slow_feedrate             5
 zprobe.probe_height              5
 spindle.enable                  true
 spindle.max_rpm                 18000
+spindle.delay_on_s              ${limits.spindleDelay.on.toFixed(1)}
+spindle.delay_off_s             ${limits.spindleDelay.off.toFixed(1)}
 
 # Default vacuum power for Follow spindle, loaded on reset
 switch.vacuum.default_on_value   80

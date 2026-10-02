@@ -7,12 +7,18 @@
 
 type Xyz = [number, number, number]
 
-/** One script line: echoed, then what running it prints. */
+/**
+ * One script line: echoed, then what running it prints. Where it moves the machine
+ * (`output` sets `mpos`), the simulator queues the move: G0 at the seek rate, G38 at its F.
+ */
 export type Step = {
   /** The script line as the firmware echoes it; null for output without one. */
   readonly echo: string | null
+  /** The script line it runs, which a routine that runs its lines unechoed leaves out of `echo`. */
+  readonly runs?: string
   /** Printed after the echo, "ok" included; evaluated when the step runs. */
   readonly output: (machine: AutomationMachine) => string[]
+  /** How long it takes besides its move, at the machine's speed. */
   readonly ms: number
   /** Holds the queue until the tool change is confirmed (M490.1). */
   readonly waitsForTool?: number
@@ -148,15 +154,13 @@ function calibrate(tool: number, sensor: [number, number], ms: number): Step[] {
     move(`G53 G0 Z${f3(CLEARANCE_Z)}`, ms, { z: CLEARANCE_Z }, false),
     move(
       `G53 G0 X${f3(sensor[0])} Y${f3(sensor[1])}`,
-      ms * 3,
+      ms,
       { x: sensor[0], y: sensor[1] },
       false
     ),
-    touch(`G38.6 Z${f3(TOOLRACK_Z)} F${f3(FAST)}`, ms * 8, () => sensorZ(tool)),
+    touch(`G38.6 Z${f3(TOOLRACK_Z)} F${f3(FAST)}`, ms, () => sensorZ(tool)),
     rise(RETRACT, ms),
-    touch(`G38.6 Z${f3(-1 - RETRACT)} F${f3(SLOW)}`, ms * 3, () =>
-      sensorZ(tool)
-    ),
+    touch(`G38.6 Z${f3(-1 - RETRACT)} F${f3(SLOW)}`, ms, () => sensorZ(tool)),
     {
       // set_tool_offset: the contact just made, from the reference once there is one.
       echo: "M493.1",
@@ -191,7 +195,7 @@ export function changeTool(
     move(`G53 G0 Z${f3(CLEARANCE_Z)}`, ms, { z: CLEARANCE_Z }, false),
     move(
       `G53 G0 X${f3(position[0])} Y${f3(position[1])}`,
-      ms * 3,
+      ms,
       { x: position[0], y: position[1] },
       false
     ),
@@ -231,10 +235,10 @@ export function probeZ(x: number, y: number, ms: number): Step[] {
     say("M497.5", ms),
     say("M494.1", ms),
     move(`G53 G0 Z${f3(CLEARANCE_Z)}`, ms, { z: CLEARANCE_Z }, false),
-    move(`G90 G0 X${f3(x)} Y${f3(y)}`, ms * 3, { x, y }, true),
-    touch(`G38.2 Z${f3(TOOLRACK_Z)} F${f3(FAST)}`, ms * 8, surfaceUnder),
+    move(`G90 G0 X${f3(x)} Y${f3(y)}`, ms, { x, y }, true),
+    touch(`G38.2 Z${f3(TOOLRACK_Z)} F${f3(FAST)}`, ms, surfaceUnder),
     rise(RETRACT, ms),
-    touch(`G38.2 Z${f3(-1 - RETRACT)} F${f3(SLOW)}`, ms * 3, surfaceUnder),
+    touch(`G38.2 Z${f3(-1 - RETRACT)} F${f3(SLOW)}`, ms, surfaceUnder),
     {
       echo: "G10 L20 P0 Z0.000",
       ms,
@@ -319,7 +323,7 @@ export function levelGrid(
   return [
     say("M497.6", ms),
     say("M494.0", ms),
-    move(`G90 G0 X${f3(x)} Y${f3(y)}`, ms * 3, { x, y }, true),
+    move(`G90 G0 X${f3(x)} Y${f3(y)}`, ms, { x, y }, true),
     {
       echo: `G32R1X0Y0A${f3(width)}B${f3(depth)}I${columns}J${rows}H${f3(height)}`,
       ms: ms * 4,
@@ -398,12 +402,12 @@ export function originRoutine(code: string, start: Xyz, ms: number): Step[] {
   const steps: Step[] = []
   const line = (
     echo: string,
-    output: (machine: AutomationMachine) => string[],
-    wait = ms
+    output: (machine: AutomationMachine) => string[]
   ) =>
     steps.push({
       echo: queued ? echo : null,
-      ms: wait,
+      runs: echo,
+      ms,
       output: (machine) => [...output(machine), "ok"],
     })
   const at = (
@@ -425,14 +429,10 @@ export function originRoutine(code: string, start: Xyz, ms: number): Step[] {
   /** Down beside a side at a tenth of the speed, as the firmware comes down (M220 S10). */
   const descend = (over?: (machine: AutomationMachine) => void) => {
     line("M220S10", () => [])
-    line(
-      `G90 G0 Z${f3(-dz)}`,
-      (machine) => {
-        over?.(machine)
-        return at(machine, undefined, undefined, workZ(machine))
-      },
-      ms * 3
-    )
+    line(`G90 G0 Z${f3(-dz)}`, (machine) => {
+      over?.(machine)
+      return at(machine, undefined, undefined, workZ(machine))
+    })
     line("M220S100", () => [])
   }
   line("M494.1", () => [])
@@ -440,14 +440,10 @@ export function originRoutine(code: string, start: Xyz, ms: number): Step[] {
   // The top, twice, then back up to the height the routine started at; a pocket has none.
   if (subcode !== 9) {
     for (const pass of [0, 1]) {
-      line(
-        `G38.2 Z${f3(TOOLRACK_Z)} F${f3(SLOW)}`,
-        (machine) => {
-          at(machine, undefined, undefined, surfaceUnder(machine))
-          return report(machine)
-        },
-        ms * (pass ? 3 : 8)
-      )
+      line(`G38.2 Z${f3(TOOLRACK_Z)} F${f3(SLOW)}`, (machine) => {
+        at(machine, undefined, undefined, surfaceUnder(machine))
+        return report(machine)
+      })
       line("G10 L20 P0 Z0", (machine) => {
         setReference(machine.lengths)
         machine.offset[2] = machine.mpos[2]
@@ -489,8 +485,7 @@ export function originRoutine(code: string, start: Xyz, ms: number): Step[] {
         (machine) => {
           machine.mpos[axis] = contact
           return report(machine)
-        },
-        ms * 3
+        }
       )
       if (!pass) retract()
     }
@@ -541,10 +536,8 @@ export function originRoutine(code: string, start: Xyz, ms: number): Step[] {
     line(`G53 G0 Z${f3(sz)}`, (machine) =>
       at(machine, undefined, undefined, sz)
     )
-    line(
-      "G90 G0 X0.0Y0.0",
-      (machine) => at(machine, machine.offset[0], machine.offset[1]),
-      ms * 3
+    line("G90 G0 X0.0Y0.0", (machine) =>
+      at(machine, machine.offset[0], machine.offset[1])
     )
     return steps
   }
