@@ -4,6 +4,7 @@
  * (UDP 3333) and serves the camera WebSocket. Never point it at real hardware.
  * The app runs one of its own as well (Settings › General › Z1 Simulator device).
  */
+import { createWriteStream } from "node:fs"
 import { parseArgs } from "node:util"
 import { startCamera } from "./camera.ts"
 import { DEFAULT_SIMULATOR_OPTIONS, serveSimulator } from "./server.ts"
@@ -19,7 +20,7 @@ const { values } = parseArgs({
     unhomed: { type: "boolean", default: false },
     tool: { type: "string", default: "1" },
     anchors: { type: "string", default: "-192.4,-194.3,88.5,45" },
-    "line-ms": { type: "string", default: "40" },
+    "line-ms": { type: "string", default: "2" },
     speed: { type: "string", default: "1" },
     "no-done-snapshot": { type: "boolean", default: false },
     "fail-at-line": { type: "string" },
@@ -30,6 +31,7 @@ const { values } = parseArgs({
     "placeholder-md5": { type: "boolean", default: false },
     "corrupt-upload": { type: "boolean", default: false },
     "stall-after": { type: "string" },
+    truth: { type: "string" },
     help: { type: "boolean", default: false },
   },
 })
@@ -45,7 +47,7 @@ if (values.help) {
   --unhomed                start with unhomed axes (play reports it and halts)
   --tool <n>               active tool at start (default 1; 0 is the probe, --tool=-1 none)
   --anchors <x,y,dx,dy>    anchor 1 and anchor 2's offset from it (default -192.4,-194.3,88.5,45)
-  --line-ms <n>            milliseconds per played line (default 40)
+  --line-ms <n>            milliseconds the player takes to read a line (default 2)
   --speed <n>              move this many times faster than the machine (default 1)
   --no-done-snapshot       P disappears without the completion snapshot
   --fail-at-line <n>       halt with a probe failure at this program line
@@ -56,6 +58,7 @@ if (values.help) {
   --placeholder-md5        advertise a placeholder MD5 on readback
   --corrupt-upload         corrupt the stored file (readback must fail)
   --stall-after <ms>       stop answering status this long after a connection
+  --truth <file>           write what the machine truly does at each status query (JSON lines)
 Keyboard: s = stall/unstall status, h = halt, e = press/release the E-stop, q = quit`)
   process.exit(0)
 }
@@ -72,6 +75,7 @@ const log = (message: string) =>
   console.log(`${new Date().toISOString().slice(11, 23)}  ${message}`)
 const port = Number(values.port)
 const stallAfter = values["stall-after"]
+const truth = values.truth ? createWriteStream(values.truth) : null
 
 const simulator = await serveSimulator({
   name: values.name,
@@ -96,6 +100,7 @@ const simulator = await serveSimulator({
       placeholderMd5: values["placeholder-md5"],
       corrupt: values["corrupt-upload"],
     },
+    truth: truth && ((record) => truth.write(`${JSON.stringify(record)}\n`)),
   },
   log,
   onConnect: (device) => {
@@ -119,7 +124,8 @@ const camera = startCamera(Number(values["camera-port"]), log)
 const shutdown = () => {
   simulator.close()
   camera.close()
-  process.exit(0)
+  if (truth) truth.end(() => process.exit(0))
+  else process.exit(0)
 }
 process.on("SIGINT", shutdown)
 

@@ -1,4 +1,9 @@
+import {
+  Z1_DEFAULT_LIMITS,
+  readZ1MotionLimits,
+} from "../../src/domain/fixtures/makera-z1/motion.ts"
 import { SETTER_RADIUS } from "../../src/domain/fixtures/makera-z1/tool-setter.ts"
+import type { MachineLimits } from "../../src/domain/motion/limits.ts"
 import { readSimulatedBedLine } from "../../src/machine/contract/simulator.ts"
 import type { SimulatedBed } from "../../src/machine/contract/simulator.ts"
 import { FRAME_TYPES } from "../../src/machine/firmware/makera/codec.ts"
@@ -22,8 +27,26 @@ import {
   savedSetting,
   withSavedSetting,
 } from "./configuration.ts"
+import { MotionQueue, sweepOf } from "./motion-queue.ts"
+import type { Arc, QueuedMove, Xyz } from "./motion-queue.ts"
 import { TransferEndpoint } from "./transfer.ts"
 import type { TransferOptions } from "./transfer.ts"
+
+/** What the machine truly does at a status query, to check what the app makes of the status by. */
+export type TruthRecord = {
+  readonly at: number
+  readonly state: string
+  /** The program line of the block under way; null when none runs. */
+  readonly line: number | null
+  /** Whether that block is a G1, G2 or G3's. */
+  readonly g123: boolean
+  /** Where the machine is, moving or not. */
+  readonly mpos: Xyz
+  /** The line the status reports (P:); null without a program. */
+  readonly reported: number | null
+  /** The block's number among those queued since the program started; null when none runs. */
+  readonly blockIndex: number | null
+}
 
 export type SimulatorOptions = {
   readonly model: 3 | 4
@@ -34,7 +57,7 @@ export type SimulatorOptions = {
   readonly tool: number
   /** Anchor 1's machine X and Y, then anchor 2's offset from it (`coordinate.*`). */
   readonly anchors: readonly [number, number, number, number]
-  /** Milliseconds per played program line, moves taking their own time on top. */
+  /** Milliseconds the player takes to read a program line. */
   readonly lineMs: number
   /** How many times faster than the machine it moves at start. */
   readonly speed: number
@@ -55,23 +78,12 @@ export type SimulatorOptions = {
    */
   readonly estop: boolean
   readonly transfer: TransferOptions
+  /** Given what the machine truly does at each status query (`--truth`); null for none. */
+  readonly truth: ((record: TruthRecord) => void) | null
 }
 
 type Send = (type: number, payload?: Uint8Array | string) => void
-type Xyz = [number, number, number]
 type Progress = { line: number; percent: number; elapsed: number }
-/** A G2 or G3 arc in X and Y: the centre it turns about and the angle it sweeps. */
-type Arc = { readonly centre: [number, number]; readonly sweep: number }
-/** A move under way from `from` to `to`, starting when the one before it ends. */
-type Motion = {
-  readonly from: Xyz
-  readonly to: Xyz
-  readonly startedAt: number
-  readonly ms: number
-  /** mm/min, as the status reports it. */
-  readonly rate: number
-  readonly arc: Arc | null
-}
 
 type Player = {
   readonly path: string
@@ -79,16 +91,21 @@ type Player = {
   readonly bytes: number
   /** Played with -v: each played line's reply goes to the host. */
   readonly verbose: boolean
+  /** How many moves the queue had taken before this program's first. */
+  readonly firstBlock: number
   index: number
   played: number
   startedAt: number
   pausedAt: number | null
   pausedMs: number
+  /** Asked to suspend: the moves queued end first (the firmware's Wait). */
+  suspending: boolean
   suspended: boolean
   /**
-   * The line the status reports (Player::on_get_public_data): the line of the feed move (G1,
-   * G2, G3) under way or last, never a rapid's, a probe's or a routine's; once the player
-   * suspends, the lines played so far, which an M600 is not among yet. It stays after a resume.
+   * The line the status reports (Player::on_get_public_data): the line of the feed block (G1,
+   * G2, G3) a status query last found under way, never a rapid's, a probe's or a routine's; once
+   * the player suspends, the lines played so far, which an M600 is not among yet. It stays after
+   * a resume.
    */
   reported: number
   toolWait: boolean
@@ -103,12 +120,14 @@ const ANCHOR_KEYS = [
   "coordinate.anchor2_offset_y",
 ] as const
 const MAX_TEXT_FRAME = 512
-/** configZ1.default: G0's rate, G1's without an F, and the most each axis goes (mm/min). */
-const SEEK_RATE = 2000
-const FEED_RATE = 1000
+/** How often the player and the scripts run, in milliseconds. */
+const TICK_MS = 5
+/** The most lines the player reads at one turn, however long the turn took. */
+const MAX_LINES = 500
+/** `zprobe.slow_feedrate` (1.5 mm/s), which a G38 without an F searches at, in mm/min. */
+const PROBE_RATE = 90
 /** The spindle fan's power while blowing gives the spindle air, as `PlaySpindleFanValue`. */
 const SPINDLE_AIR_POWER = 80
-const AXIS_RATES: Xyz = [1200, 1200, 600]
 /** `coordinate.clearance_x` and `_y`: where G28 parks. */
 const PARK: [number, number] = [-11.6, -14.6]
 const f4 = (value: number) => value.toFixed(4)
@@ -121,64 +140,13 @@ const word = (line: string, letter: string) => {
   )
   return match ? Number(match[1]) : null
 }
-
-/**
- * How long a move of `length` mm takes at `rate` mm/min, no axis going faster than its own rate
- * (Robot::append_milestone), without acceleration.
- */
-function moveMs(delta: Xyz, length: number, rate: number) {
-  if (length <= 0) return 0
-  let limited = Math.max(rate, 1)
-  delta.forEach((distance, axis) => {
-    if (distance)
-      limited = Math.min(
-        limited,
-        (AXIS_RATES[axis] * length) / Math.abs(distance)
-      )
-  })
-  return (length / limited) * 60_000
-}
-
-/** The angle a G2 (clockwise) or G3 arc sweeps about `centre`: a whole turn back to its start. */
-function sweepOf(
-  from: Xyz,
-  to: Xyz,
-  centre: [number, number],
-  clockwise: boolean
-) {
-  const start = Math.atan2(from[1] - centre[1], from[0] - centre[0])
-  let sweep = Math.atan2(to[1] - centre[1], to[0] - centre[0]) - start
-  if (clockwise && sweep >= -1e-9) sweep -= 2 * Math.PI
-  if (!clockwise && sweep <= 1e-9) sweep += 2 * Math.PI
-  return sweep
-}
-
-/** Where a move is `fraction` of the way along it. */
-function along({ from, to, arc }: Motion, fraction: number): Xyz {
-  const z = from[2] + (to[2] - from[2]) * fraction
-  if (!arc)
-    return [
-      from[0] + (to[0] - from[0]) * fraction,
-      from[1] + (to[1] - from[1]) * fraction,
-      z,
-    ]
-  const [cx, cy] = arc.centre
-  const start = Math.hypot(from[0] - cx, from[1] - cy)
-  const radius = start + (Math.hypot(to[0] - cx, to[1] - cy) - start) * fraction
-  const angle = Math.atan2(from[1] - cy, from[0] - cx) + arc.sweep * fraction
-  return [cx + radius * Math.cos(angle), cy + radius * Math.sin(angle), z]
-}
-
-/** The rate a script line moves at: its F, else G0's. */
-function scriptRate(echo: string | null) {
-  const feed = echo === null ? null : word(echo, "F")
-  return feed !== null && feed > 0 ? feed : SEEK_RATE
-}
+/** M220's override, which the firmware keeps from 10 to 1000 %. */
+const overrideOf = (percent: number) => Math.min(1000, Math.max(10, percent))
 
 /**
  * A fake Makera Z1 for development. It reproduces the firmware behaviour the app
  * depends on (Kernel status fields, Player lifecycle, SimpleShell replies, ATC waits,
- * the ESP32 file transfer); it is a development tool, not a test oracle.
+ * the ESP32 file transfer, the planner's motion); it is a development tool, not a test oracle.
  */
 export class SimulatedZ1 {
   homed: boolean
@@ -187,7 +155,7 @@ export class SimulatedZ1 {
   /** Whether the E-stop is pressed (`pressEstop`). */
   estop = false
   answeringStatus = true
-  /** How many times faster than the machine it moves; a change applies from the next move. */
+  /** How many times faster than the machine it moves; a change applies from the next block. */
   speed: number
   /** Called when a reset reboots the controller; the connection drops with it. */
   onReboot: () => void = () => {}
@@ -197,17 +165,25 @@ export class SimulatedZ1 {
   private readonly transfer: TransferEndpoint
   /** Anchor 1 as the firmware loaded it when it started; `config-set` takes effect at a reboot. */
   private anchor1: [number, number]
-  /** Where the machine is once the moves under way end; `position` is where it is now. */
+  /** Where the machine is once the moves queued end (Robot's machine_position); `position` is where it is now. */
   private readonly mpos: Xyz = [-200, -150, -5]
   private offset: Xyz = [-100, -100, -20]
+  /** The limits the firmware loaded from its configuration when it started. */
+  private limits: MachineLimits = Z1_DEFAULT_LIMITS
   /** The moves under way and queued, which the player and scripts wait for. */
-  private motions: Motion[] = []
+  private queue = new MotionQueue(Z1_DEFAULT_LIMITS, () => this.speed)
+  /** What waits for the moves queued to end (Conveyor::wait_for_idle), in order. */
+  private readonly drains: {
+    readonly since: number
+    readonly then: (at: number) => void
+  }[] = []
   /** G90 or G91 (Robot.cpp's absolute_mode), which G0 to G3 follow and C reports. */
   private absolute = true
   /** The modal motion (G0 to G3) that axis words alone move in; null before any. */
   private motionMode: number | null = null
-  /** The last F, in mm/min. */
-  private feed: number | null = null
+  /** G0's rate and G1 to G3's, in mm/min; an F sets the one of the modal motion. */
+  private seekRate = Z1_DEFAULT_LIMITS.seek
+  private feedRate = Z1_DEFAULT_LIMITS.feed
   /** What the app says its plate positions on the bed; null until it says. */
   private bed: SimulatedBed | null = null
   /** The tool lengths the firmware keeps in EEPROM; T reports the offset. */
@@ -231,10 +207,22 @@ export class SimulatedZ1 {
   private antiStatic = false
   private tool: number
   private requestedTool = 0
+  /** Homing, and an ATC machine's tool change, which take a set time rather than the queue's. */
   private motionUntil = 0
   private motionState: "Home" | "Run" = "Run"
+  private homing: { from: Xyz; startedAt: number; ms: number } | null = null
   private cleaningUntil = 0
   private player: Player | null = null
+  /** Lines the player may read before its next turn, a fraction of one included. */
+  private reading = 0
+  private lastTick = Date.now()
+  /**
+   * When what the player or a routine does at this turn happens: as the dwell or the moves it
+   * waited for ended, which may be before the turn; null outside a turn (`time`).
+   */
+  private readAt: number | null = null
+  /** When the moves ended that something last waited for. */
+  private drainedAt = 0
   /** The firmware's script queue (a tool change, M495), which holds the player while it runs. */
   private automation: {
     steps: Step[]
@@ -244,7 +232,7 @@ export class SimulatedZ1 {
   } | null = null
   private abortSnapshot: Progress | null = null
   private abortPolls = 0
-  /** What motion and bed cleaning finish later; a halt or a reboot ends them first. */
+  /** What homing, a tool change and bed cleaning finish later; a halt or a reboot ends them first. */
   private readonly pending = new Set<ReturnType<typeof setTimeout>>()
   private readonly timer: ReturnType<typeof setInterval>
 
@@ -266,19 +254,18 @@ export class SimulatedZ1 {
       CONFIGURATION_PATH,
       initialConfiguration({
         anchors: options.anchors,
-        feedRate: FEED_RATE,
-        seekRate: SEEK_RATE,
-        axisRates: AXIS_RATES,
+        limits: Z1_DEFAULT_LIMITS,
         park: PARK,
         clearanceZ: CLEARANCE_Z,
       })
     )
     this.loadVacuumDefaultPower()
+    this.loadMotion()
     if (options.estop) {
       this.estop = true
       this.bootHoming()
     }
-    this.timer = setInterval(() => this.tick(), options.lineMs)
+    this.timer = setInterval(() => this.tick(), TICK_MS)
   }
 
   /**
@@ -315,6 +302,20 @@ export class SimulatedZ1 {
     this.vacuumDefaultPower = Number.isFinite(value)
       ? Math.max(0, Math.min(100, value))
       : 80
+  }
+
+  /** The motion settings the firmware loads from its configuration as it starts, and an empty queue. */
+  private loadMotion() {
+    this.limits = readZ1MotionLimits(
+      new TextDecoder().decode(this.configuration),
+      "simulator"
+    )
+    this.queue = new MotionQueue(this.limits, () => this.speed)
+    this.seekRate = this.limits.seek
+    this.feedRate = this.limits.feed
+    this.log(
+      `motion: seek ${this.limits.seek}, feed ${this.limits.feed}, axes ${this.limits.axisRate.join("/")} mm/min, ${this.limits.acceleration} mm/s²`
+    )
   }
 
   dispose() {
@@ -383,8 +384,10 @@ export class SimulatedZ1 {
     if (this.halted) return "Alarm"
     const player = this.player
     if (player?.suspended) return "Pause"
+    if (player?.suspending) return "Wait"
     if (player?.toolWait) return "Tool"
     if (now < this.motionUntil) return this.motionState
+    if (!this.queue.idle(now)) return "Run"
     if (now < this.cleaningUntil) return "Run"
     if (this.spindleOn) return "Run"
     if (player && player.doneAt === null && now >= player.dwellUntil)
@@ -412,25 +415,36 @@ export class SimulatedZ1 {
   }
 
   statusText(now = Date.now()): string {
-    const mpos = this.position(now)
+    const state = this.state(now)
+    // Kernel: the position under way and the feed only while it runs or homes; otherwise where
+    // the moves queued end.
+    const live = state === "Run" || state === "Home"
+    const mpos = live ? this.position(now) : [...this.mpos]
     // mcs2wcs: less the work offset, and in Z the tool offset.
     const wpos = mpos.map(
       (value, index) =>
         value - this.offset[index] - (index === 2 ? this.lengths.offset : 0)
     )
-    const rate = this.motions.find(
-      (motion) => now >= motion.startedAt && now < motion.startedAt + motion.ms
-    )?.rate
+    const running = this.queue.current(now)
+    const move = running?.block.payload.move
+    const player = this.player
+    // Player::on_get_public_data: the query finds a G1, G2 or G3 block under way and reports
+    // its line; not while a routine plays.
+    if (player && player.doneAt === null && !this.automation && move?.g123)
+      player.reported = move.line
     const rpm = this.spindleOn ? this.targetRpm : 0
     const toolField = this.options.atc
       ? `|T:${this.tool},${f3(this.lengths.offset)}`
       : `|T:${this.tool},${f3(this.lengths.offset)},${this.requestedTool}`
     const progress = this.progress(now)
+    // Conveyor's feed under way is its block's planned speed; then the modal rate and the override.
+    const feed = live && running ? running.block.nominal * 60 : 0
+    const modal = this.motionMode === 0 ? this.seekRate : this.feedRate
     return [
-      `<${this.state(now)}`,
+      `<${state}`,
       `|MPos:${mpos.map(f4).join(",")},0.0000,0.0000`,
       `|WPos:${wpos.map(f4).join(",")},0.0000,0.0000`,
-      `|F:${f1(rate ?? 0)},${f1(this.feed ?? FEED_RATE)},${f1(this.feedOverride)}`,
+      `|F:${f1(feed)},${f1(modal)},${f1(this.feedOverride)}`,
       `|S:${f1(rpm)},${f1(this.targetRpm)},${f1(this.spindleOverride)},${flag(this.vacuumAuto)},32.5,38.1,${flag(this.blowing)},${flag(this.bedClean)},0,${flag(this.antiStatic)}`,
       toolField,
       // Kernel.cpp prints the laser module as "|L:%d, %d, %d, %1.1f,%1.1f" (milling mode here).
@@ -445,7 +459,31 @@ export class SimulatedZ1 {
 
   private reportStatus() {
     if (!this.answeringStatus) return
-    this.send(FRAME_TYPES.status, this.statusText())
+    const now = Date.now()
+    this.send(FRAME_TYPES.status, this.statusText(now))
+    if (this.options.truth) this.options.truth(this.truth(now))
+  }
+
+  /** What the machine truly does at `now`, the status just reported. */
+  private truth(now: number): TruthRecord {
+    const running = this.queue.current(now)
+    const move = running?.block.payload.move
+    const player = this.player
+    return {
+      at: now,
+      state: this.state(now),
+      line: move ? move.line : null,
+      g123: move?.g123 ?? false,
+      mpos: this.position(now),
+      reported: player
+        ? player.doneAt === null
+          ? player.reported
+          : player.lines.length
+        : null,
+      blockIndex: running
+        ? running.block.payload.index - (player?.firstBlock ?? 0)
+        : null,
+    }
   }
 
   private diagnose() {
@@ -561,17 +599,20 @@ export class SimulatedZ1 {
           lines,
           bytes: data.length,
           verbose: /[Vv]/.test(options),
+          firstBlock: this.queue.count,
           index: 0,
           played: 0,
           startedAt: Date.now(),
           pausedAt: null,
           pausedMs: 0,
+          suspending: false,
           suspended: false,
           reported: 0,
           toolWait: false,
           dwellUntil: 0,
           doneAt: null,
         }
+        this.reading = 0
         this.lines(`  File size ${data.length}`)
         this.log(`playing ${path} (${lines.length} lines)`)
         return
@@ -579,8 +620,9 @@ export class SimulatedZ1 {
       case "suspend":
         if (!player || player.doneAt !== null)
           return this.lines("Can not suspend when not playing file!")
-        if (player.suspended) return this.lines("Already suspended!")
-        this.suspend("Suspending , waiting for queue to empty...")
+        if (player.suspended || player.suspending)
+          return this.lines("Already suspended!")
+        this.suspend(null)
         return
       case "resume":
         if (!player?.suspended) return this.lines("Not suspended")
@@ -631,18 +673,11 @@ export class SimulatedZ1 {
     if (code === "$H") {
       this.halted = false
       const from = this.position()
+      this.stopMotion()
       this.mpos.fill(0)
-      this.motions = [
-        {
-          from,
-          to: [0, 0, 0],
-          startedAt: Date.now(),
-          ms: 1500,
-          rate: SEEK_RATE,
-          arc: null,
-        },
-      ]
+      this.homing = { from, startedAt: Date.now(), ms: 1500 }
       this.move(1500, "Home", () => {
+        this.homing = null
         this.homed = true
         this.ok(text)
       })
@@ -664,7 +699,7 @@ export class SimulatedZ1 {
         this.mpos[index] = Number(
           (this.mpos[index] + Number(axis[2])).toFixed(4)
         )
-        this.travel(from, word(code, "F") ?? SEEK_RATE)
+        this.queueMove(from, word(code, "F") ?? this.seekRate, 0, false)
       }
       this.ok(text)
       return
@@ -701,7 +736,17 @@ export class SimulatedZ1 {
       this.ok(text)
       return
     }
-    if (!this.motion(code, (line) => this.lines(line))) return
+    const probe = /^G0*38\.([2-5])(?!\d)/.exec(code)?.[1]
+    if (probe !== undefined) {
+      this.probe(
+        code,
+        Number(probe),
+        (line) => this.lines(line),
+        () => this.ok(text)
+      )
+      return
+    }
+    this.motion(code, 0)
     if (this.machineCode(code)) this.ok(text)
     else this.lines("error:Unsupported command")
   }
@@ -748,9 +793,11 @@ export class SimulatedZ1 {
         this.vacuum = false
         this.vacuumPower = 0
         return true
-      case "220":
-        this.feedOverride = word(code, "S") ?? this.feedOverride
+      case "220": {
+        const percent = word(code, "S")
+        if (percent !== null) this.feedOverride = overrideOf(percent)
         return true
+      }
       case "223":
         this.spindleOverride = word(code, "S") ?? this.spindleOverride
         return true
@@ -792,69 +839,105 @@ export class SimulatedZ1 {
     this.later(milliseconds, done)
   }
 
-  /** Where the machine is now: along the move under way, else where the last one ended. */
+  /** Where the machine is now: homing, along the block under way, else where the moves queued end. */
   private position(now = Date.now()): Xyz {
-    for (const motion of this.motions) {
-      if (now >= motion.startedAt + motion.ms) continue
-      if (now < motion.startedAt) return [...motion.from]
-      return along(motion, (now - motion.startedAt) / motion.ms)
+    const homing = this.homing
+    if (homing && now < homing.startedAt + homing.ms) {
+      const fraction = Math.max(0, (now - homing.startedAt) / homing.ms)
+      return [0, 1, 2].map(
+        (axis) =>
+          homing.from[axis] + (this.mpos[axis] - homing.from[axis]) * fraction
+      ) as Xyz
     }
-    return [...this.mpos]
+    return this.queue.position(now) ?? [...this.mpos]
   }
 
   /**
    * The machine goes from `from` to where `mpos` now is, at `rate` mm/min (about an arc's
-   * centre), once the moves before it end. The player and scripts wait for it; returns how long
-   * that is.
+   * centre), once the moves before it end; `line` is the program line it was read from.
    */
-  private travel(from: Xyz, rate: number, arc: Arc | null = null): number {
-    const to: Xyz = [...this.mpos]
-    const dz = to[2] - from[2]
-    const xy = arc
-      ? Math.abs(arc.sweep) *
-        Math.hypot(from[0] - arc.centre[0], from[1] - arc.centre[1])
-      : Math.hypot(to[0] - from[0], to[1] - from[1])
-    const delta: Xyz = arc
-      ? [xy, 0, dz]
-      : [to[0] - from[0], to[1] - from[1], dz]
-    const ms = moveMs(delta, Math.hypot(xy, dz), rate) / this.speed
-    const now = Date.now()
-    if (ms <= 0) return Math.max(0, this.motionUntil - now)
-    const startedAt = Math.max(now, this.motionUntil)
-    this.motions = [
-      ...this.motions.filter((motion) => motion.startedAt + motion.ms > now),
-      { from, to, startedAt, ms, rate, arc },
-    ]
-    this.motionState = "Run"
-    this.motionUntil = startedAt + ms
-    return this.motionUntil - now
+  private queueMove(
+    from: Xyz,
+    rate: number,
+    line: number,
+    g123: boolean,
+    arc: Arc | null = null
+  ) {
+    const move: QueuedMove = {
+      from,
+      to: [...this.mpos],
+      arc,
+      rate,
+      line,
+      g123,
+      touches: false,
+    }
+    this.queue.push(move, this.time())
   }
 
-  /** The machine stops where it is: the moves under way and queued are dropped. */
+  /** When what the player, a routine or a command does now happens (`readAt`). */
+  private time() {
+    return this.readAt ?? Date.now()
+  }
+
+  /** G0 to G3's rate, with the override (Robot: M220 scales them all). */
+  private get modalRate() {
+    const rate = this.motionMode === 0 ? this.seekRate : this.feedRate
+    return (rate * this.feedOverride) / 100
+  }
+
+  /** The machine stops where it is: the moves under way and queued are dropped, and nothing waits for them. */
   private stopMotion() {
-    const [x, y, z] = this.position()
+    const now = Date.now()
+    const [x, y, z] = this.position(now)
+    this.queue.stop(now)
     this.mpos[0] = x
     this.mpos[1] = y
     this.mpos[2] = z
-    this.motions = []
+    this.homing = null
     this.motionUntil = 0
+    this.drains.length = 0
   }
 
-  /** G0's rate, else the feed with its override. */
-  private get rate() {
-    if (this.motionMode === 0) return SEEK_RATE
-    return ((this.feed ?? FEED_RATE) * this.feedOverride) / 100
+  /**
+   * Runs `then` once the moves queued have all ended, as the firmware waits for idle, given when
+   * they did; at once when they have. Meanwhile the machine starts what is queued.
+   */
+  private afterDrain(then: (at: number) => void) {
+    const at = this.time()
+    const now = Date.now()
+    this.queue.flush(now)
+    if (this.drains.length || !this.queue.idle(now))
+      this.drains.push({ since: at, then })
+    else then(at)
+  }
+
+  /** Runs what waits for the moves to end, once they have, as of when they did. */
+  private drained(now: number) {
+    while (this.drains.length) {
+      if (!this.queue.idle(now)) {
+        this.queue.flush(now)
+        return
+      }
+      const { since, then } = this.drains.shift()!
+      const at = Math.min(now, this.queue.settled(since))
+      this.drainedAt = at
+      this.readAt = at
+      then(at)
+      this.readAt = null
+    }
   }
 
   /** G28 on the Z1 parks: up to the clearance, then over to its X and Y (ATCHandler). */
   private park() {
+    const rate = (this.seekRate * this.feedOverride) / 100
     const from: Xyz = [...this.mpos]
     this.mpos[2] = CLEARANCE_Z
-    this.travel(from, SEEK_RATE)
+    this.queueMove(from, rate, 0, false)
     const up: Xyz = [...this.mpos]
     this.mpos[0] = PARK[0]
     this.mpos[1] = PARK[1]
-    this.travel(up, SEEK_RATE)
+    this.queueMove(up, rate, 0, false)
   }
 
   /** The grid the last G32 probed (A/B size, I/J points); a fixed 5 × 4 grid before any. */
@@ -882,52 +965,106 @@ export class SimulatedZ1 {
 
   // ── Player ─────────────────────────────────────────────────────────────
 
-  private suspend(message: string) {
+  /**
+   * Player::suspend_command: the moves queued end (Wait), then the player suspends with the
+   * lines it has played, or `played`.
+   */
+  private suspend(played: number | null) {
     const player = this.player
     if (!player) return
-    this.lines(message)
-    player.suspended = true
-    player.reported = player.index
-    player.pausedAt = Date.now()
-    this.lines("Suspended, resume to continue playing")
+    this.lines("Suspending , waiting for queue to empty...")
+    player.suspending = true
+    this.afterDrain(() => {
+      if (this.player !== player) return
+      player.suspending = false
+      player.suspended = true
+      player.reported = played ?? player.index
+      player.pausedAt = Date.now()
+      this.lines(
+        "now save current pos...",
+        "Suspended, resume to continue playing"
+      )
+    })
+  }
+
+  /** Whether the player waits: for a pause, a tool, a dwell, the moves, room in the queue or a routine. */
+  private holdsPlayer(now: number) {
+    const player = this.player
+    return (
+      !player ||
+      this.halted ||
+      player.suspending ||
+      player.suspended ||
+      player.toolWait ||
+      player.doneAt !== null ||
+      now < player.dwellUntil ||
+      now < this.motionUntil ||
+      this.drains.length > 0 ||
+      this.automation !== null ||
+      this.queue.full
+    )
   }
 
   private tick() {
-    const player = this.player
     const now = Date.now()
-    if (!player || this.halted) return
+    const since = this.lastTick
+    this.lastTick = now
+    if (this.halted) return
+    this.queue.advance(now)
+    this.drained(now)
+    const player = this.player
+    if (!player || this.drains.length) return
     if (this.automation) {
-      this.automate(now)
+      this.automate(now, since)
       return
     }
     if (player.doneAt !== null) {
       if (now - player.doneAt >= 1000) this.finish()
       return
     }
-    if (
-      player.suspended ||
-      player.toolWait ||
-      now < player.dwellUntil ||
-      now < this.motionUntil
+    if (this.holdsPlayer(now)) {
+      this.reading = 0
+      return
+    }
+    // Player::on_main_loop: a line each `lineMs`, while the queue has room for its moves; read
+    // from when the program started, a dwell or a wait for the moves ended since the turn before.
+    this.reading = Math.min(
+      MAX_LINES,
+      this.reading + ((now - since) * this.speed) / this.options.lineMs
     )
-      return
-    if (player.index >= player.lines.length) {
-      this.done()
-      return
+    const resumed = Math.max(
+      player.startedAt,
+      player.dwellUntil,
+      this.drainedAt
+    )
+    this.readAt = resumed > since && resumed <= now ? resumed : now
+    while (this.reading >= 1 && !this.holdsPlayer(now)) {
+      this.reading--
+      if (player.index >= player.lines.length) {
+        this.afterDrain(() => this.done())
+        break
+      }
+      const line = player.lines[player.index]
+      player.index++
+      player.played += line.length + 1
+      if (this.options.failAtLine === player.index) {
+        this.readAt = null
+        this.halt(2, "ALARM: Probe failed to complete")
+        return
+      }
+      this.play(line)
     }
-    const line = player.lines[player.index]
-    player.index++
-    player.played += line.length + 1
-    if (this.options.failAtLine === player.index) {
-      this.halt(2, "ALARM: Probe failed to complete")
-      return
-    }
-    this.play(line)
+    this.readAt = null
   }
 
   /** A played line's reply: to the host with -v, otherwise to the firmware's null stream. */
   private reply(text: string) {
     if (this.player?.verbose) this.lines(text)
+  }
+
+  /** The player stands still for `seconds` from `at` (G4, the spindle's delays). */
+  private dwell(at: number, seconds: number) {
+    if (this.player) this.player.dwellUntil = at + (seconds * 1000) / this.speed
   }
 
   private play(line: string) {
@@ -938,86 +1075,128 @@ export class SimulatedZ1 {
       .trim()
     if (!code) return
     if (/^M0*600\b/.test(code)) {
-      this.suspend("Suspending , waiting for queue to empty...")
       // suspend_command saves the lines played before this one.
-      player.reported = player.index - 1
+      this.suspend(player.index - 1)
       this.reply("ok")
       return
     }
     // ATCHandler acts only on an M6 with its T word; a bare M6 (or T) does nothing. CAM writes
-    // it spaced or not ("T2 M6", "T2M6"), as the dispatcher splits a line.
+    // it spaced or not ("T2 M6", "T2M6"), as the dispatcher splits a line. It waits for the
+    // moves before it to end, as the other routines do.
     const toolChange = /M0*6(?![\d.])/.test(code) ? word(code, "T") : null
     if (toolChange !== null) {
-      this.spindleOn = false
-      // ATCHandler: M6 for the active tool's number does nothing, not even the measurement.
-      if (toolChange === this.tool) {
-        this.log(`M6 T${toolChange} skipped: T${toolChange} is the active tool`)
-      } else if (this.options.atc) {
-        this.requestedTool = toolChange
-        this.move(2000, "Run", () => {
-          this.tool = toolChange
-          this.lines("Done ATC")
-        })
-      } else {
-        this.requestedTool = toolChange
-        this.automate(
-          Date.now(),
-          changeTool(
-            toolChange,
-            this.changePosition,
-            this.sensor,
-            this.stepMs,
-            [this.mpos[0], this.mpos[1]]
-          )
-        )
-      }
-      this.reply("ok")
+      this.afterDrain(() => {
+        this.changeToolTo(toolChange)
+        this.reply("ok")
+      })
       return
     }
     if (/^M0*495\b/.test(code)) {
-      this.firmwareProbing(code)
-      this.reply("ok")
+      this.afterDrain(() => {
+        this.firmwareProbing(code)
+        this.reply("ok")
+      })
       return
     }
     // M480.n: the 3D probe's corner and centre routines, from where the probe is.
     if (/^M0*480\.\d+/.test(code)) {
-      this.automate(
-        Date.now(),
-        originRoutine(code, [...this.mpos], this.stepMs)
-      )
-      this.reply("ok")
+      this.afterDrain((at) => {
+        this.runRoutine(originRoutine(code, [...this.mpos], this.stepMs), at)
+        this.reply("ok")
+      })
       return
     }
-    const moving = this.motionUntil
-    if (!this.motion(code, (text) => this.reply(text))) return
-    // A feed move's block carries its line; rapids, probes and routines do not.
-    if (
-      this.motionUntil !== moving &&
-      (this.motionMode ?? 0) >= 1 &&
-      !/^G0*38\./.test(code)
-    )
-      player.reported = player.index
-    if (/^M0*5\b/.test(code)) player.dwellUntil = Date.now() + 1500
-    if (/^G0*4\b/.test(code))
-      player.dwellUntil = Date.now() + (word(code, "P") ?? 0) * 1000
+    const probe = /^G0*38\.([2-5])(?!\d)/.exec(code)?.[1]
+    if (probe !== undefined) {
+      this.probe(
+        code,
+        Number(probe),
+        (text) => this.reply(text),
+        () => this.reply("ok")
+      )
+      return
+    }
+    // SpindleControl waits for the moves to end before M3, and before M5 with the spindle on;
+    // PWMSpindleControl then dwells its delay when the spindle turns on or off.
+    const spindle = /^M0*([35])(?![\d.])/.exec(code)?.[1]
+    if (spindle === "3" || (spindle === "5" && this.spindleOn)) {
+      this.afterDrain((at) => {
+        const wasOn = this.spindleOn
+        const known = this.machineCode(code)
+        if (!this.halted && this.spindleOn !== wasOn)
+          this.dwell(
+            at,
+            this.spindleOn
+              ? this.limits.spindleDelay.on
+              : this.limits.spindleDelay.off
+          )
+        this.reply(known ? "ok" : "error:Unsupported command")
+      })
+      return
+    }
+    // G4 waits for the moves, then dwells P seconds (grbl_mode) and S whole seconds more.
+    if (/^G0*4(?![\d.])/.test(code)) {
+      const seconds = (word(code, "P") ?? 0) + Math.trunc(word(code, "S") ?? 0)
+      if (seconds > 0)
+        this.afterDrain((at) => {
+          this.dwell(at, seconds)
+          this.reply("ok")
+        })
+      else this.reply("ok")
+      return
+    }
+    if (/^M0*(?:400|2|30)(?![\d.])/.test(code)) {
+      this.afterDrain(() =>
+        this.reply(this.machineCode(code) ? "ok" : "error:Unsupported command")
+      )
+      return
+    }
+    this.motion(code, player.index)
     this.reply(this.machineCode(code) ? "ok" : "error:Unsupported command")
   }
 
+  /** M6 for a tool other than the active one: an ATC machine changes it, a manual one runs its scripts. */
+  private changeToolTo(tool: number) {
+    this.spindleOn = false
+    // ATCHandler: M6 for the active tool's number does nothing, not even the measurement.
+    if (tool === this.tool) {
+      this.log(`M6 T${tool} skipped: T${tool} is the active tool`)
+      return
+    }
+    this.requestedTool = tool
+    if (this.options.atc)
+      this.move(2000 / this.speed, "Run", () => {
+        this.tool = tool
+        this.lines("Done ATC")
+      })
+    else
+      this.runRoutine(
+        changeTool(tool, this.changePosition, this.sensor, this.stepMs, [
+          this.mpos[0],
+          this.mpos[1],
+        ]),
+        this.time()
+      )
+  }
+
   /**
-   * What a line does to the modes and where the machine goes (Robot, ZProbe), whether it is
-   * played or typed in the console: G90 and G91, F, G0 to G3, G53, G28, G10, G32 and the
-   * probe's G38.2 to G38.5. `say` writes to the line's stream. Whether the line goes on to its
-   * acknowledgement: a probe search that alarms does not.
+   * What a line does to the modes and where the machine goes (Robot), whether it is played or
+   * typed in the console: G90 and G91, F, G0 to G3, G53, G28, G10 and G32. Its moves go to the
+   * queue, from `line` of the program (0 for the console's); G28 and G32 wait for the moves
+   * before them to end.
    */
-  private motion(code: string, say: (text: string) => void): boolean {
+  private motion(code: string, line: number) {
     const mode = /\bG0*9([01])(?![\d.])/.exec(code)?.[1]
     if (mode !== undefined) this.absolute = mode === "0"
-    const feed = word(code, "F")
-    if (feed !== null && feed > 0) this.feed = feed
     const motion = /\bG0*([0-3])(?![\d.])/.exec(code)?.[1]
     if (motion !== undefined) this.motionMode = Number(motion)
-    const probe = /^G0*38\.([2-5])(?!\d)/.exec(code)?.[1]
-    if (probe !== undefined) return this.probe(code, Number(probe), say)
+    // Robot::process_move: an F sets G0's rate in G0, otherwise G1 to G3's.
+    const feed = word(code, "F")
+    if (feed !== null && feed > 0) {
+      if (this.motionMode === 0) this.seekRate = feed
+      else this.feedRate = feed
+    }
+    const g123 = this.motionMode !== null && this.motionMode >= 1
     const from: Xyz = [...this.mpos]
     const machineMove = /^G0*53\b/.test(code)
     if (machineMove) {
@@ -1025,9 +1204,9 @@ export class SimulatedZ1 {
         const value = word(code, axis)
         if (value !== null) this.mpos[index] = value
       }
-      this.travel(from, this.rate)
+      this.queueMove(from, this.modalRate, line, g123)
     }
-    if (/^G0*28(?![\d.])/.test(code)) this.park()
+    if (/^G0*28(?![\d.])/.test(code)) this.afterDrain(() => this.park())
     // G10 L2 sets the work origin; L20 names the current position.
     if (/^G0*10\b/.test(code) && word(code, "P") === 0)
       for (const [index, axis] of ["X", "Y", "Z"].entries()) {
@@ -1038,7 +1217,7 @@ export class SimulatedZ1 {
         if (word(code, "L") === 20)
           this.offset[index] = this.mpos[index] - value
       }
-    if (/^G0*32\b/.test(code)) this.recordProbe(code)
+    if (/^G0*32\b/.test(code)) this.afterDrain(() => this.recordProbe(code))
     // Axis words move in the modal motion, but not a code's own (G4, G10, G28, G32, G92).
     const moves =
       !machineMove &&
@@ -1057,9 +1236,8 @@ export class SimulatedZ1 {
           )
         else this.mpos[index] += value
       }
-      this.travel(from, this.rate, this.arc(code, from))
+      this.queueMove(from, this.modalRate, line, g123, this.arc(code, from))
     }
-    return true
   }
 
   /** A G2 or G3 move's arc from `from` to `mpos`, about I and J from its start (G17); else null. */
@@ -1073,41 +1251,56 @@ export class SimulatedZ1 {
   }
 
   /**
-   * G38.2 to G38.5 (ZProbe probe_XYZ): X Y Z are distances in either distance mode. Going down,
-   * the probe meets the tool sensor under it, else the stock top; G38.2 and G38.4 halt with a
-   * probe failure when it meets nothing. The contact goes to the line's stream (`say`). Whether
-   * the line goes on to its acknowledgement.
+   * G38.2 to G38.5 (ZProbe::probe_XYZ): X Y Z are distances in either distance mode, searched at
+   * F without the override. It waits for the moves before it to end; going down, the probe
+   * meets the tool sensor under it, else the stock top, and the touch stops it there at once.
+   * Once it has stopped, the contact goes to the line's stream (`say`) and the line is `done`;
+   * G38.2 and G38.4 halt with a probe failure when it meets nothing.
    */
   private probe(
     code: string,
     subcode: number,
-    say: (text: string) => void
-  ): boolean {
-    const target = this.mpos.map(
-      (value, index) => value + (word(code, "XYZ"[index]) ?? 0)
-    ) as Xyz
-    const surface = this.surfaceAt(target[0], target[1])
-    const toward = subcode === 2 || subcode === 3
-    if (toward && this.mpos[2] <= surface) {
-      this.halt(3, "Error:ZProbe triggered before move, aborting command.")
-      return false
-    }
-    const met = toward && target[2] <= surface
-    if (met) target[2] = surface
-    const from: Xyz = [...this.mpos]
-    for (const index of [0, 1, 2]) this.mpos[index] = target[index]
-    const ms = this.travel(from, this.feed ?? FEED_RATE)
-    say(`[PRB:${f3(target[0])},${f3(target[1])},${f3(target[2])}:${flag(met)}]`)
-    if (met) {
-      this.log(`probe contact at machine Z ${f3(surface)}`)
-      return true
-    }
-    // Meeting nothing, it searches its whole distance, then alarms.
-    if (subcode === 2 || subcode === 4) {
-      this.later(ms, () => this.halt(3, "ALARM: Probe fail"))
-      return false
-    }
-    return true
+    say: (text: string) => void,
+    done: () => void
+  ) {
+    this.afterDrain((at) => {
+      const target = this.mpos.map(
+        (value, index) => value + (word(code, "XYZ"[index]) ?? 0)
+      ) as Xyz
+      const surface = this.surfaceAt(target[0], target[1])
+      const toward = subcode === 2 || subcode === 3
+      if (toward && this.mpos[2] <= surface) {
+        this.halt(3, "Error:ZProbe triggered before move, aborting command.")
+        return
+      }
+      const met = toward && target[2] <= surface
+      if (met) target[2] = surface
+      const from: Xyz = [...this.mpos]
+      for (const index of [0, 1, 2]) this.mpos[index] = target[index]
+      // Probe moves carry no line (Robot::delta_move).
+      this.queue.push(
+        {
+          from,
+          to: target,
+          arc: null,
+          rate: word(code, "F") ?? PROBE_RATE,
+          line: 0,
+          g123: false,
+          touches: met,
+        },
+        at
+      )
+      this.afterDrain(() => {
+        say(
+          `[PRB:${f3(target[0])},${f3(target[1])},${f3(target[2])}:${flag(met)}]`
+        )
+        if (met) this.log(`probe contact at machine Z ${f3(surface)}`)
+        // Meeting nothing, it searches its whole distance, then alarms.
+        if (!met && (subcode === 2 || subcode === 4))
+          this.halt(3, "ALARM: Probe fail")
+        else done()
+      })
+    })
   }
 
   /**
@@ -1142,6 +1335,7 @@ export class SimulatedZ1 {
     return [this.anchor1[0] + 48.78 + 132, this.anchor1[1] + 179.74]
   }
 
+  /** How long a script line takes besides its moves, at the machine's speed. */
   private get stepMs() {
     return Math.max(this.options.lineMs * 2, 30)
   }
@@ -1177,28 +1371,67 @@ export class SimulatedZ1 {
       this.probedGrid = grid
       steps.push(...levelGrid(x, y, grid, this.stepMs))
     }
-    this.automate(Date.now(), steps)
+    this.runRoutine(steps, this.time())
+  }
+
+  /** The firmware's script queue takes a routine's steps, from `at`. */
+  private runRoutine(steps: Step[], at: number) {
+    this.automation = { steps, index: 0, nextAt: at, waiting: false }
   }
 
   /**
-   * ATCHandler::on_main_loop: one script line per turn, echoed with what it prints; a wait for
-   * the tool change holds it; "Done ATC" when the queue is empty. Starts a queue when given one.
+   * ATCHandler::on_main_loop: the script lines due since the turn before (`since`), each echoed
+   * with what it prints, as of when the one before it was done. Their moves go to the queue: a
+   * probe's search and a wait for the tool change start once the moves before them have ended,
+   * and the search reports its contact once it has touched; a wait for the tool change holds
+   * the scripts. "Done ATC" when the moves have ended.
    */
-  private automate(now: number, steps?: Step[]) {
-    if (steps) {
-      this.automation = { steps, index: 0, nextAt: now, waiting: false }
-      return
+  private automate(now: number, since: number) {
+    for (let steps = 0; steps < MAX_LINES; steps++) {
+      const automation = this.automation
+      const player = this.player
+      if (
+        !automation ||
+        !player ||
+        automation.waiting ||
+        now < automation.nextAt ||
+        this.drains.length
+      )
+        return
+      const at = Math.min(
+        now,
+        Math.max(since, automation.nextAt, this.drainedAt)
+      )
+      this.readAt = at
+      this.step(automation, player, at)
+      this.readAt = null
     }
-    const automation = this.automation
-    const player = this.player
-    if (!automation || !player || automation.waiting || now < automation.nextAt)
-      return
+  }
+
+  /** Runs a routine's next step at `now`. */
+  private step(
+    automation: NonNullable<SimulatedZ1["automation"]>,
+    player: Player,
+    now: number
+  ) {
     if (automation.index >= automation.steps.length) {
-      this.automation = null
-      this.lines("Done ATC")
+      this.afterDrain(() => {
+        if (this.automation !== automation) return
+        this.automation = null
+        this.lines("Done ATC")
+      })
       return
     }
     const step = automation.steps[automation.index]
+    const script = step.echo ?? step.runs ?? ""
+    const probing = /^G0*38\./.test(script)
+    if (
+      (probing || step.waitsForTool !== undefined) &&
+      !this.queue.idle(Date.now())
+    ) {
+      this.afterDrain(() => {})
+      return
+    }
     automation.index++
     const from: Xyz = [...this.mpos]
     const machine = {
@@ -1210,11 +1443,35 @@ export class SimulatedZ1 {
     }
     const output = step.output(machine)
     this.tool = machine.tool
-    // A script line that moves takes its time, at its F or G0's rate.
-    const moved = this.mpos.some((value, index) => value !== from[index])
-    const ms = moved ? this.travel(from, scriptRate(step.echo)) : 0
-    automation.nextAt = now + Math.max(step.ms, ms)
-    this.lines(...(step.echo === null ? [] : [step.echo]), ...output)
+    // The routines come down slower by the override (M220 S10), which scales their G0s too.
+    const percent = /^M0*220(?![\d.])/.test(script) ? word(script, "S") : null
+    if (percent !== null) this.feedOverride = overrideOf(percent)
+    const echo = step.echo === null ? [] : [step.echo]
+    const pause = step.ms / this.speed
+    automation.nextAt = now + pause
+    if (this.mpos.some((value, index) => value !== from[index]))
+      this.queue.push(
+        {
+          from,
+          to: [...this.mpos],
+          arc: null,
+          rate: probing
+            ? (word(script, "F") ?? PROBE_RATE)
+            : (this.seekRate * this.feedOverride) / 100,
+          line: 0,
+          g123: false,
+          touches: probing,
+        },
+        now
+      )
+    if (probing) {
+      // ZProbe reports the contact once the touch has stopped the probe.
+      this.lines(...echo)
+      this.afterDrain((at) => {
+        this.lines(...output)
+        automation.nextAt = at + pause
+      })
+    } else this.lines(...echo, ...output)
     if (step.waitsForTool !== undefined) {
       automation.waiting = true
       player.toolWait = true
@@ -1224,7 +1481,7 @@ export class SimulatedZ1 {
     }
   }
 
-  /** Player::on_main_loop end of file: queue idle, done snapshot burst, job complete. */
+  /** Player::on_main_loop end of file, once the moves have ended: done snapshot burst, job complete. */
   private done() {
     const player = this.player
     if (!player) return
@@ -1233,7 +1490,7 @@ export class SimulatedZ1 {
       this.finish()
       return
     }
-    player.doneAt = Date.now()
+    player.doneAt = this.time()
     for (let index = 0; index < 3; index++) this.reportStatus()
     this.beep = false
     if (this.bedClean) {
@@ -1272,6 +1529,9 @@ export class SimulatedZ1 {
     this.abortSnapshot = null
     this.spindleOn = false
     this.targetRpm = 0
+    this.feedOverride = 100
+    this.motionMode = null
+    this.absolute = true
     // The firmware loads its saved configuration as it starts.
     const anchor = (index: 0 | 1) => {
       const saved = savedSetting(this.configuration, ANCHOR_KEYS[index])
@@ -1280,6 +1540,7 @@ export class SimulatedZ1 {
     }
     this.anchor1 = [anchor(0), anchor(1)]
     this.loadVacuumDefaultPower()
+    this.loadMotion()
     this.bootHoming()
     this.log("rebooted")
     this.onReboot()
