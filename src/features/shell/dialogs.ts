@@ -34,7 +34,7 @@ export type WorkspaceDialog =
       /** Opens the PCB importer directly. */
       readonly preset?: "pcb"
     }
-  /** A probing operation from a probe of the tool library and a strategy it runs. */
+  /** A probing operation from a strategy and a probe of the tool library that performs it. */
   | { readonly kind: "probing" }
   /** Starting a new project over unsaved changes: save them, discard them, or cancel. */
   | { readonly kind: "new-project" }

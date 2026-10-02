@@ -9,16 +9,22 @@ import {
 import { kitForSetup } from "@/domain/fixtures/catalog"
 import type { Operation } from "@/domain/operations/operation"
 import { createPlate, createPlateSetup } from "@/domain/plate/plate"
-import { newProbingOperation, strategiesFor } from "@/domain/probing/strategies"
+import {
+  newProbingOperation,
+  runsWith,
+  strategyById,
+  strategyUnsupported,
+} from "@/domain/probing/strategies"
 import { probeProfile } from "@/domain/tools/tool"
 import type { WorkspaceCommand } from "@/domain/workspace/workspace"
 
 /**
  * Probing an anchor with the 3D probe: a plate, "Probe anchor", on the shown profile's default
- * bed setup, holding one 3D probing operation of its machine that finds an inside corner
- * front-left from where the probe is, as at Anchor 1 (the L-bracket's inner corner), opened on
- * the Job tab to run. Its result there keeps what it found as an anchor (`SaveAsAnchor`).
- * `reason` says why it cannot, such as a library without a 3D probe; null when it can.
+ * bed setup, holding one Inside corner operation with the first library probe that can perform
+ * it on its machine, which finds the corner front-left from where the probe is, as at Anchor 1
+ * (the L-bracket's inner corner), opened on the Job tab to run. Its result there keeps what it
+ * found as an anchor (`SaveAsAnchor`). `reason` says why it cannot, such as a library without a
+ * 3D probe; null when it can.
  */
 export function useProbeAnchor(): { reason: string | null; run: () => void } {
   const workspace = useWorkspaceStore()
@@ -28,16 +34,19 @@ export function useProbeAnchor(): { reason: string | null; run: () => void } {
   const placement = profilePlacement(fixtures.state)
   const kit = kitForSetup(placement)
   const machine = kit.probing
-  const probe = library.find((tool) => probeProfile(tool)?.touch === "xyz")
-  const profile = probe ? probeProfile(probe) : null
-  const strategy =
-    machine && profile
-      ? strategiesFor(machine, profile).find(({ task }) => task === "origin")
+  const strategy = strategyById("inside-corner")
+  const probe =
+    machine && strategy
+      ? library.find((tool) => {
+          const profile = probeProfile(tool)
+          return profile !== null && runsWith(strategy, profile, machine)
+        })
       : undefined
-  let reason: string | null = null
-  if (!machine) reason = `The ${kit.name} has no probing.`
-  else if (!probe) reason = "The tool library has no 3D probe."
-  else if (!strategy) reason = `The ${kit.name} cannot find a corner with it.`
+  let reason: string | null = `The ${kit.name} has no probing.`
+  if (machine && strategy)
+    reason =
+      strategyUnsupported(strategy, machine) ??
+      (probe ? null : "The tool library has no 3D probe.")
   return {
     reason,
     run: () => {
@@ -62,7 +71,6 @@ export function useProbeAnchor(): { reason: string | null; run: () => void } {
                 ...source,
                 params: {
                   ...source.params,
-                  routine: "inside-corner",
                   corner: "front-left",
                   placement: { kind: "probe-position" },
                 },

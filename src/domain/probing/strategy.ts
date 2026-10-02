@@ -1,9 +1,10 @@
 /**
- * Probing operations as a probe tool and a strategy: the user picks a probe from the tool library,
- * then one of the strategies it can run on the plate's machine, then that strategy's settings.
- * Generic strategies are OpenSpindle's own toolpaths, made of the machine's probing NC
- * (`MachineProbing.nc`); a machine adds strategies of its own for what its firmware does
- * (`MachineProbing.strategies`), listed besides them.
+ * Probing operations as a strategy and a probe tool: the user picks what the operation is to do,
+ * its strategy (an outside corner, a touch-off, a height map…), then one of the library's probes
+ * that can do it on the plate's machine, then its settings. A method performs strategies: either
+ * OpenSpindle's own NC, made of the machine's probing NC (`MachineProbing.nc`), or a cycle of
+ * the machine's firmware (`MachineProbing.cycles`). A machine supports a strategy where it has a
+ * method for it; which method runs is the machine's to decide, not the user's.
  */
 
 import type { PlateMachining } from "../compile/toolpath-bounds"
@@ -32,12 +33,34 @@ export type ProbingTask = ProbingSource["task"]
 export type TaskParams<TTask extends ProbingTask> =
   ProbingSourceOf<TTask>["params"]
 
-/** The ranges and defaults a strategy gives a task's numeric parameters. */
+/** The ranges and defaults a method gives a task's numeric parameters. */
 export type TaskSpecs = {
   readonly grid: GridSpecs
   readonly "touch-off": TouchOffSpecs
   readonly outline: OutlineSpecs
   readonly origin: OriginSpecs
+}
+
+/** The strategies OpenSpindle knows, by id, as operations store them (`PROBING_STRATEGIES`). */
+export type StrategyId =
+  | "outside-corner"
+  | "inside-corner"
+  | "pocket-center"
+  | "boss-center"
+  | "touch-off"
+  | "height-map"
+  | "outline-trace"
+
+/**
+ * What the user wants a probing operation to do, whoever performs it: find a corner or a centre
+ * and set the work origin there, touch off the stock top, probe a height map, trace an outline.
+ * Its task decides the operation's parameters.
+ */
+export type ProbingStrategy = {
+  readonly id: StrategyId
+  readonly task: ProbingTask
+  readonly label: string
+  readonly description: string
 }
 
 /** The probe an operation selects: the T number its NC selects and the library probe bound there. */
@@ -47,38 +70,40 @@ export type BoundProbe = {
   readonly profile: ProbeProfile
 }
 
-/** A strategy's NC for a planned operation, or why there is none. */
+/** A method's NC for a planned operation, or why there is none. */
 export type Generation =
   | { readonly ok: true; readonly program: ProbeProgram }
   | { readonly ok: false; readonly issues: readonly Issue[] }
 
-/** What a strategy writes its NC from. */
+/** What a method writes its NC from. */
 export type StrategyInput<TParams> = {
   readonly params: TParams
   readonly plate: Plate
   readonly probe: BoundProbe
   readonly machine: MachineProbing
-  /** Where the plate's other operations cut, measured only if the strategy reads it. */
+  /** Where the plate's other operations cut, measured only if the method reads it. */
   readonly machining: PlateMachining
 }
 
 /**
- * A way to do a probing task: which machines run it, which probes it probes with, the ranges and
- * defaults of the task's parameters with it, and its NC.
+ * A way to perform strategies of one task: OpenSpindle's own NC, or a cycle of a machine's
+ * firmware. It says which machines run it, which probes it probes with, the ranges and defaults
+ * of the task's parameters with it, and its NC.
  */
-export interface ProbingStrategy<
+export interface ProbingMethod<
   TTask extends ProbingTask = ProbingTask,
   TParams = unknown,
   TSpecs extends ParameterSpecs = ParameterSpecs,
 > {
-  /** Stored in the operation: generic strategies' ids are plain, a machine's are prefixed. */
+  /** Internal, never stored: generic methods' ids are plain, a machine's are prefixed. */
   readonly id: string
   readonly task: TTask
-  readonly label: string
+  /** The strategies it performs, of its task. */
+  readonly strategies: readonly StrategyId[]
   readonly description: string
   /**
-   * Whether a machine runs it, whatever the probe: a generic strategy needs the machine's ranges
-   * for it and the NC it is made of. Absent for a machine's own strategies, which it runs.
+   * Whether a machine runs it, whatever the probe: a generic method needs the machine's ranges
+   * for it and the NC it is made of. Absent for a machine's own cycles, which it runs.
    */
   runsOn?: (machine: MachineProbing) => boolean
   /**
@@ -94,10 +119,15 @@ export interface ProbingStrategy<
    */
   refuses?: (tool: Tool, number: number | null) => string | null
   /**
-   * Why it cannot run on this plate, whatever its settings, as picking it shows; null where it
-   * can. Not a rule: generating its NC still fails on its own where it cannot.
+   * Why it cannot run on this plate, with an operation's parameters where given and otherwise
+   * whatever they are; null where it can. Another method of the strategy runs instead where
+   * there is one (`methodFor`); generating its NC still fails on its own where it cannot.
    */
-  blocked?: (plate: Plate, machine: MachineProbing) => string | null
+  blocked?: (
+    plate: Plate,
+    machine: MachineProbing,
+    params?: TParams
+  ) => string | null
   /** The task's parameters with it on the machine: their ranges and defaults. */
   parameters: (machine: MachineProbing) => TSpecs
   /**
@@ -105,25 +135,26 @@ export interface ProbingStrategy<
    * out the others; absent, it reads them all.
    */
   reads?: (params: TParams) => SpecReads<TSpecs>
-  /** A new operation's parameters, fitted to the plate and where it cuts. */
+  /** A new operation's parameters for a strategy, fitted to the plate and where it cuts. */
   defaults: (
     plate: Plate,
     parameters: TSpecs,
-    machining: PlateMachining
+    machining: PlateMachining,
+    strategy: StrategyId
   ) => TParams
   generate: (input: StrategyInput<TParams>) => Generation
 }
 
 /**
- * A strategy of one of `TTask`, with that task's parameters and specs: what registries hold, as
- * a strategy of one task's parameters is no strategy of any parameters. Its `task` tells which.
+ * A method of one of `TTask`, with that task's parameters and specs: what registries hold, as a
+ * method of one task's parameters is no method of any parameters. Its `task` tells which.
  */
-export type TaskStrategy<TTask extends ProbingTask = ProbingTask> = {
-  [TKey in TTask]: ProbingStrategy<TKey, TaskParams<TKey>, TaskSpecs[TKey]>
+export type TaskMethod<TTask extends ProbingTask = ProbingTask> = {
+  [TKey in TTask]: ProbingMethod<TKey, TaskParams<TKey>, TaskSpecs[TKey]>
 }[TTask]
 
 /**
- * The machine's NC that generic strategies are made of: readying a probe, its pointer and
+ * The machine's NC that generic methods are made of: readying a probe, its pointer and
  * indicator, travel to an anchored start, and the touch motion its firmware configures.
  */
 export type ProbingNc = {
@@ -148,19 +179,19 @@ export type ProbingNc = {
 
 /**
  * How a machine probes: which probes its firmware lets do which task and in which T number, the
- * NC generic strategies are made of, the ranges they take on it, the strategies its firmware
- * adds, and how its NC reads as probing in any file.
+ * NC generic methods are made of, the ranges they take on it, its firmware's own cycles, and how
+ * its NC reads as probing in any file.
  */
 export interface MachineProbing {
-  /** Whether its firmware lets a probe with this profile do the task, whatever the strategy. */
+  /** Whether its firmware lets a probe with this profile do the task, whatever the method. */
   probes: (task: ProbingTask, profile: ProbeProfile) => boolean
   /** The T number the firmware needs a probe with this profile in; null where any number goes. */
   slot: (profile: ProbeProfile) => number | null
   readonly nc: ProbingNc
-  /** The machine's ranges and defaults for the generic strategies it runs, by strategy id. */
+  /** The machine's ranges and defaults for the generic methods it runs, by method id. */
   readonly specs: Partial<GenericSpecs>
-  /** Strategies of the machine's firmware, offered besides the generic ones. */
-  readonly strategies: readonly TaskStrategy[]
+  /** Its firmware's own cycles, preferred to the generic methods for the strategies they perform. */
+  readonly cycles: readonly TaskMethod[]
   /** How its NC reads as probing in a program's sections. */
   readonly sections: ProbingSections
   /** Where any NC file probes, as the machine's firmware reads it: previews. */

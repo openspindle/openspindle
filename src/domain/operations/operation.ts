@@ -124,8 +124,8 @@ export const UnsupportedSourceSchema = z.object({
 })
 
 /**
- * A probing strategy's id: a generic strategy's is plain ("surface-touch"), a machine's is
- * prefixed with the machine ("makera-z1/height-map").
+ * A probing strategy's id, such as "touch-off" (`PROBING_STRATEGIES`). Any such string parses:
+ * one OpenSpindle does not know does not resolve (`probing-unsupported`).
  */
 export const StrategyIdSchema = z
   .string()
@@ -140,7 +140,10 @@ const probingSource = <TTask extends string, TParams extends z.ZodType>(
   z.object({
     kind: z.literal("probing"),
     task: z.literal(task),
-    /** The strategy that writes its NC, found among the plate's machine's when compiling. */
+    /**
+     * What it does, its strategy; the plate's machine's method for it writes its NC when
+     * compiling.
+     */
     strategy: StrategyIdSchema,
     /** The T number its NC selects the probe by, which its tool binding maps into the plate's table. */
     probe: ToolNumberSchema,
@@ -148,10 +151,10 @@ const probingSource = <TTask extends string, TParams extends z.ZodType>(
   })
 
 /**
- * Built-in probing: a probe tool and a strategy that writes the NC from these parameters when
- * compiling. What the operation does, its `task`, decides the parameters: a height grid, a
- * touch-off that sets work Z, an outline traced with a pointer, or a work origin found with a 3D
- * probe.
+ * Built-in probing: a strategy and a probe tool, whose NC the machine's method for the strategy
+ * writes from these parameters when compiling. The strategy's task decides the parameters: a
+ * height grid, a touch-off that sets work Z, an outline traced with a pointer, or a work origin
+ * found with a 3D probe.
  */
 export const ProbingSourceSchema = z.discriminatedUnion("task", [
   probingSource("grid", GridParamsSchema),

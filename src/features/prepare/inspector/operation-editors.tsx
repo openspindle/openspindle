@@ -11,7 +11,12 @@ import {
 import { Switch } from "@/components/ui/switch"
 import { useWorkspaceStore } from "@/app/workspace/workspace-context"
 import { placementAnchors } from "@/domain/probing/placement"
-import { strategyFor, strategyReads } from "@/domain/probing/strategies"
+import {
+  methodFor,
+  methodReads,
+  methodSpecs,
+  strategyById,
+} from "@/domain/probing/strategies"
 import type { MachineProbing } from "@/domain/probing/strategy"
 import { kitForPlate } from "@/domain/fixtures/catalog"
 import { closingParkCodes } from "@/domain/compile/nc-unit"
@@ -208,7 +213,7 @@ function usePick(
   }
 }
 
-/** A probing task's settings editor: its operation, on a machine that has its strategy. */
+/** A probing task's settings editor: its operation, on a machine that supports its strategy. */
 type TaskEditorProps<TSource> = {
   plate: Plate
   operation: ProbingOperation & { source: TSource }
@@ -224,13 +229,13 @@ function GridEditor({
   const pick = usePick(plate, operation.id, "point")
   const workArea = useWorkArea(plate)
   const { source } = operation
-  const strategy = strategyFor(source, machine)
-  if (!strategy) return null
+  const parameters = methodSpecs(source, machine, plate)
+  if (!parameters) return null
   return (
     <GridSettings
       key={operation.id}
       value={source.params}
-      parameters={strategy.parameters(machine)}
+      parameters={parameters}
       anchors={anchorOptions(plate)}
       workArea={workArea}
       pick={pick}
@@ -248,14 +253,15 @@ function TouchOffEditor({
   const pick = usePick(plate, operation.id, "point")
   const workArea = useWorkArea(plate)
   const { source } = operation
-  const strategy = strategyFor(source, machine)
-  if (!strategy) return null
+  // The method follows the settings: an anchored start can let the machine's own cycle touch off.
+  const method = methodFor(source, machine, plate)
+  if (!method) return null
   return (
     <TouchOffSettings
       key={operation.id}
       value={source.params}
-      parameters={strategy.parameters(machine)}
-      reads={strategyReads(strategy, source.params, machine)}
+      parameters={method.parameters(machine)}
+      reads={methodReads(method, source.params, machine)}
       anchors={anchorOptions(plate)}
       workArea={workArea}
       pick={pick}
@@ -274,13 +280,13 @@ function OutlineEditor({
   const edges = useMemo(() => itemEdges(plate.setup), [plate.setup])
   const pick = usePick(plate, operation.id, "edges")
   const { source } = operation
-  const strategy = strategyFor(source, machine)
-  if (!strategy) return null
+  const parameters = methodSpecs(source, machine, plate)
+  if (!parameters) return null
   return (
     <OutlineSettings
       key={operation.id}
       value={source.params}
-      parameters={strategy.parameters(machine)}
+      parameters={parameters}
       outline={outline}
       edges={edges}
       hasStock={!!plate.setup.stock}
@@ -290,7 +296,7 @@ function OutlineEditor({
   )
 }
 
-/** An origin task's settings: the routine, and where it starts. */
+/** An origin task's settings: what its strategy finds, and where it starts. */
 function OriginEditor({
   plate,
   operation,
@@ -299,13 +305,13 @@ function OriginEditor({
   const update = useSourceUpdate(plate, operation.id, operation.revision)
   const pick = usePick(plate, operation.id, "point")
   const { source } = operation
-  const strategy = strategyFor(source, machine)
-  if (!strategy) return null
+  const parameters = methodSpecs(source, machine, plate)
+  if (!parameters) return null
   return (
     <OriginSettings
       key={operation.id}
       value={source.params}
-      parameters={strategy.parameters(machine)}
+      parameters={parameters}
       anchors={anchorOptions(plate)}
       pick={pick}
       onChange={(params) => update({ ...source, params })}
@@ -314,13 +320,14 @@ function OriginEditor({
 }
 
 /**
- * A probing operation's probe and strategy, then its task's settings. Without the strategy on the
- * plate's machine it has no settings; its diagnostic above says why.
+ * A probing operation's strategy and probe, then its task's settings. Without a method for its
+ * strategy on the plate's machine it has no settings; its diagnostic above says why.
  */
 function ProbingEditor({ plate, operation }: EditorProps<"probing">) {
   const machine = kitForPlate(plate).probing
-  const strategy = machine && strategyFor(operation.source, machine)
-  if (!machine || !strategy) return null
+  const strategy = strategyById(operation.source.strategy)
+  if (!machine || !strategy || !methodFor(operation.source, machine, plate))
+    return null
   return (
     <>
       <ProbingChoiceFields

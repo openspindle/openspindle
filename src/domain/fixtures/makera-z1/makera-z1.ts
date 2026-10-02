@@ -62,15 +62,17 @@ export class MakeraZ1 extends FixtureKit {
    * The firmware selects a Z touch probe, such as Makera's wired Probe 2.0, as T0 and the 3D
    * probe as T9999, its own number for it. It finds origins with T9999 active (its 3D probing
    * routines, M480) and probes everything else with T0 active, the probe's laser (M494) too, as
-   * its NC grammar reads them (`readZ1Block`). Besides the generic strategies it offers its own
-   * auto-leveling (G32, M495), its Z probe (M495) and its 3D probing routines (M480).
+   * its NC grammar reads them (`readZ1Block`). Its firmware's cycles perform the height map
+   * (auto-leveling, G32 and M495), the touch-off where it starts at a stored anchor on a plate
+   * whose program sets work X and Y (the Z probe, M495), and the four origin strategies (the 3D
+   * probing routines, M480); the generic touch-off and outline trace do the rest.
    */
   readonly probing: MachineProbing = {
     probes: (task, { touch }) => touch === (task === "origin" ? "xyz" : "z"),
     slot: ({ touch }) => (touch === "z" ? PROBE_TOOL : PROBE_3D_TOOL),
     nc: Z1_PROBING_NC,
     specs: Z1_GENERIC_SPECS,
-    strategies: [HEIGHT_MAP, Z_PROBE, ROUTINES],
+    cycles: [HEIGHT_MAP, Z_PROBE, ROUTINES],
     sections: Z1_PROBING_SECTIONS,
     readers: { grids: g32Grids, touches: touchPoints },
   }

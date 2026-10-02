@@ -50,7 +50,7 @@ const PLACEMENT_ISSUES: Readonly<Record<PlacementFailure, GridIssue>> = {
   ),
 }
 
-/** The parameters within the ranges the strategy gives them (`parameters`), or why not. */
+/** The parameters within the ranges the method gives them (`parameters`), or why not. */
 export function checkGridParams(
   params: GridParams,
   parameters: GridSpecs

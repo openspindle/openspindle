@@ -67,8 +67,8 @@ export abstract class FixtureKit {
   abstract readonly bed: MachineBed
   /**
    * How it probes with the probes of the tool library: the tool numbers its firmware needs them
-   * in, the NC generic strategies are made of, its firmware's own strategies and how its NC reads
-   * as probing; null for a machine that does not probe.
+   * in, the NC generic methods are made of, its firmware's own cycles and how its NC reads as
+   * probing; null for a machine that does not probe.
    */
   abstract readonly probing: MachineProbing | null
   /**

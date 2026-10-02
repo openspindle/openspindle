@@ -4,7 +4,7 @@ import type { XY } from "../../../geometry/frame"
 import { formatMillimetres } from "../../../geometry/millimetres"
 import { workOriginOnMachine } from "../../../plate/work-origin"
 import { placementAnchors, placementContext } from "../../../probing/placement"
-import type { BoundProbe, ProbingStrategy } from "../../../probing/strategy"
+import type { BoundProbe, ProbingMethod } from "../../../probing/strategy"
 import { plateTouchOffParams } from "../../../probing/tasks/touch-off/fit"
 import type {
   TouchOffParams,
@@ -15,8 +15,8 @@ import { TOUCH_PARAMETERS, firmwareMillimetres } from "../probing-nc"
 import { anchorTravel } from "../wired-probe/travel"
 
 /**
- * Surface touch's ranges on the Z1 (`TOUCH_PARAMETERS`), whose probe travel says that the
- * firmware's Z probe searches down to its tool rack Z instead.
+ * The generic touch-off's ranges on the Z1 (`TOUCH_PARAMETERS`), whose probe travel says that
+ * the firmware's Z probe searches down to its tool rack Z instead.
  */
 const Z_PROBE_PARAMETERS: TouchOffSpecs = {
   ...TOUCH_PARAMETERS,
@@ -56,7 +56,7 @@ const PRECAUTIONS = [
 /** The firmware's Z probe goes to its X Y in work coordinates, which only an anchored start has. */
 const NOT_ANCHORED = issueOf<"work-origin-not-anchored">("error")(
   "work-origin-not-anchored",
-  "The firmware's Z probe touches only at a stored anchor, on a plate whose program sets work X and Y from its anchors. Touch at an anchor and read the plate's anchors from its device, or use Surface touch."
+  "The machine's Z probe touches only at a stored anchor, on a plate whose program sets work X and Y from its anchors: touch at an anchor, and read the plate's anchors from its device."
 )
 
 /**
@@ -78,26 +78,29 @@ function firmwareLift({ clearance }: Pick<TouchOffParams, "clearance">) {
 /**
  * The Z1 firmware's own Z probe with a Z touch probe in T0, which reports the touch as it goes:
  * from a stored anchor on a plate whose program sets work X and Y (`workOriginOnMachine`), where
- * the touch point has work coordinates. M495 switches the probe's laser itself.
+ * the touch point has work coordinates. M495 switches the probe's laser itself. Elsewhere the
+ * generic touch-off runs the strategy (`methodFor`).
  */
-export const Z_PROBE: ProbingStrategy<
+export const Z_PROBE: ProbingMethod<
   "touch-off",
   TouchOffParams,
   TouchOffSpecs
 > = {
   id: "makera-z1/z-probe",
   task: "touch-off",
-  label: "Z probe (Z1 firmware)",
+  strategies: ["touch-off"],
   description:
-    "Touch the stock top with the machine's own Z probe at a stored anchor and set work Z there; the machine reports the touch.",
+    "The machine's own Z probe touches at a stored anchor, sets work Z there and reports the touch.",
   accepts: ({ touch }) => touch === "z",
-  // Its settings choose the anchor later; the plate decides whether an anchored start can have
-  // work coordinates at all.
-  blocked: (plate) => {
+  // The plate decides whether an anchored start can have work coordinates at all, and the
+  // operation's settings whether it starts at an anchor.
+  blocked: (plate, _machine, params) => {
     if (!placementAnchors(plate.setup).length)
-      return "The firmware's Z probe touches only at a stored anchor: select an anchor snapshot for this plate's device."
+      return "The machine's Z probe touches only at a stored anchor: select an anchor snapshot for this plate's device."
     if (!workOriginOnMachine(plate.setup))
-      return "The firmware's Z probe touches only on a plate whose program sets work X and Y from its anchors: read them from the plate's device, or keep the work origin relative to one."
+      return "The machine's Z probe touches only on a plate whose program sets work X and Y from its anchors: read them from the plate's device, or keep the work origin relative to one."
+    if (params && params.placement.kind !== "anchor")
+      return "The machine's Z probe touches only at a stored anchor: touch at an anchor."
     return null
   },
   parameters: () => Z_PROBE_PARAMETERS,

@@ -9,11 +9,11 @@ import {
 } from "../../placement"
 import type { ProbeStart } from "../../placement"
 import { editOperation } from "../../rules"
-import { strategySpecs } from "../../strategies"
+import { methodSpecs } from "../../strategies"
 
 /**
  * A 3D probing operation's start as its advice reads it; null for another operation, a strategy
- * the plate's machine does not have, or parameters or an anchored start that do not resolve
+ * the plate's machine does not support, or parameters or an anchored start that do not resolve
  * (the compiler reports those).
  */
 function probingStart({
@@ -23,7 +23,7 @@ function probingStart({
 }: OperationRuleSubject): ProbeStart | null {
   const { source } = operation
   if (source.kind !== "probing" || source.task !== "origin") return null
-  const specs = strategySpecs(source, kit.probing)
+  const specs = methodSpecs(source, kit.probing, plate)
   if (!specs) return null
   const plan = planOrigin(source.params, placementContext(plate), specs)
   return plan.ok ? plan.start : null
@@ -69,7 +69,7 @@ const probe3dBeforeAutoLevel: StageRule<"operation"> = {
     if (
       source.kind !== "probing" ||
       source.task !== "origin" ||
-      !strategySpecs(source, kit.probing)
+      !methodSpecs(source, kit.probing, plate)
     )
       return true
     const { routine, placement } = source.params

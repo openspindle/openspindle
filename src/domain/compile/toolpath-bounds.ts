@@ -25,7 +25,7 @@ export type {
 
 /**
  * Where a plate's machining cuts, as probing fits to it, measured from the NC of its operations
- * outside the setup phase (`machiningPrograms`) when first read: a probing strategy reads it only
+ * outside the setup phase (`machiningPrograms`) when first read: a probing method reads it only
  * where it needs it.
  */
 export type PlateMachining = {

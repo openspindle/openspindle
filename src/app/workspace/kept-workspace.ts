@@ -10,6 +10,7 @@ import { PROJECT_LIMITS } from "@/formats/project/step-nc"
 import { upgradeWorkspaceSources } from "@/formats/project/upgrade"
 import { upgradeBedFrame } from "@/formats/upgrade/bed-frame"
 import { isJsonObject } from "@/formats/upgrade/json"
+import { upgradeStrategies } from "@/formats/upgrade/strategies"
 import { KEPT_WORKSPACE_MAX_LENGTH } from "@/platform/contract/window"
 import type { WindowHost } from "@/platform/host"
 import { log } from "@/app/errors/log"
@@ -20,8 +21,11 @@ import {
 } from "./project-session"
 import type { WorkspaceStore } from "./store"
 
-/** The kept workspace's version; a page before bed coordinates were from Anchor 1 kept none. */
-const KEPT_VERSION = 2
+/**
+ * The kept workspace's version: 2 since bed coordinates are from Anchor 1 (a page before kept
+ * none), 3 since probing strategies are what an operation does.
+ */
+const KEPT_VERSION = 3
 
 /**
  * What a page kept, with its plates in bed coordinates from Anchor 1: a page that kept no version
@@ -36,9 +40,25 @@ function inBedFrame(kept: unknown): unknown {
     return kept
   return {
     ...kept,
-    version: KEPT_VERSION,
+    version: 2,
     plates: kept.plates.map((plate: unknown) =>
       isJsonObject(plate) ? upgradeBedFrame(plate) : plate
+    ),
+  }
+}
+
+/**
+ * What a page kept, with its probing operations' strategies being what they do: a page of
+ * version 2 kept them as who writes their NC (`upgradeStrategies`).
+ */
+function withCurrentStrategies(kept: unknown): unknown {
+  if (!isJsonObject(kept) || kept.version !== 2 || !Array.isArray(kept.plates))
+    return kept
+  return {
+    ...kept,
+    version: KEPT_VERSION,
+    plates: kept.plates.map((plate: unknown) =>
+      isJsonObject(plate) ? upgradeStrategies(plate).plate : plate
     ),
   }
 }
@@ -63,7 +83,7 @@ function withRuleSettings(kept: unknown): unknown {
  * refuse it.
  */
 const KeptSchema = z.preprocess(
-  (kept) => inBedFrame(withRuleSettings(kept)),
+  (kept) => withCurrentStrategies(inBedFrame(withRuleSettings(kept))),
   z.object({
     version: z.literal(KEPT_VERSION),
     plates: z.array(PlateSchema).max(PROJECT_LIMITS.plates),

@@ -9,7 +9,8 @@ import type { Result } from "../primitives"
 import { boundProbe } from "../probing/bound-probe"
 import {
   generateProbing,
-  strategyFor,
+  methodFor,
+  strategyById,
   strategyLabel,
 } from "../probing/strategies"
 import type { ProbingTask } from "../probing/strategy"
@@ -55,7 +56,7 @@ export { keptNcContext } from "./kept-nc"
  * Strategy per operation source kind: how it becomes NC, its phase, and whether a lone
  * operation may be emitted byte-for-byte. New kinds register here. Kinds resolve with the kit
  * of the plate's machine (`kitForPlate`) and the tool library (`ResolveContext`): a probing
- * operation's strategy writes its NC on the machine with the probe the plate's table holds for
+ * operation's method writes its NC on the machine with the probe the plate's table holds for
  * it. The operation and run rules check an operation while editing and before Run.
  */
 export interface OperationKind<TKind extends SourceKind> {
@@ -82,23 +83,27 @@ export interface OperationKind<TKind extends SourceKind> {
 }
 
 /**
- * A probing operation on a machine that does not probe, or whose strategy the plate's machine
- * does not offer for its task, named by its label (`strategyLabel`). The operation's inspector
- * shows it; its editor has no settings to add.
+ * A probing operation on a machine that does not probe, or does not support its strategy (has no
+ * method for it), named by its label (`strategyLabel`): also a strategy OpenSpindle does not
+ * know, by its id, or one of another task than the operation's. The operation's inspector shows
+ * it; its editor has no settings to add.
  */
-const unsupported = (
-  operation: ProbingOperation,
-  kit: FixtureKit
-): Diagnostic =>
-  error(
-    "probing-unsupported",
-    kit.probing
-      ? `${operation.name}: the ${kit.name} does not offer ${strategyLabel(operation.source.strategy)} for this operation.`
-      : `${operation.name}: the ${kit.name} does not probe.`,
-    { subject: operationSubject(operation.id) }
-  )
+function unsupported(operation: ProbingOperation, kit: FixtureKit): Diagnostic {
+  const { name, source } = operation
+  const label = strategyLabel(source.strategy)
+  const strategy = strategyById(source.strategy)
+  const otherTask = strategy !== null && strategy.task !== source.task
+  let message = `${name}: the ${kit.name} does not probe.`
+  if (kit.probing && otherTask)
+    message = `${name}: the ${kit.name} does not support ${label} for this operation.`
+  else if (kit.probing)
+    message = `${name}: the ${kit.name} does not support ${label}.`
+  return error("probing-unsupported", message, {
+    subject: operationSubject(operation.id),
+  })
+}
 
-/** Why a task's NC was not generated, where its strategy gives no reason. */
+/** Why a task's NC was not generated, where its method gives no reason. */
 const INVALID: { readonly [TTask in ProbingTask]: string } = {
   grid: "the probe grid is invalid.",
   "touch-off": "the touch-off is invalid.",
@@ -107,11 +112,12 @@ const INVALID: { readonly [TTask in ProbingTask]: string } = {
 }
 
 /**
- * Probing operations: a setup operation whose NC its strategy writes, and is kept verbatim, on
- * the plate's machine with the probe the plate's table holds in the number the operation
- * selects. Without the strategy it does not resolve (`probing-unsupported`), nor without a probe
- * the strategy runs with there (`probing-probe`, also where the strategy refuses that tool); an
- * operation whose NC the strategy does not generate reports its first issue (`probing-invalid`).
+ * Probing operations: a setup operation whose NC the method that performs its strategy on the
+ * plate's machine writes (`methodFor`), and is kept verbatim, with the probe the plate's table
+ * holds in the number the operation selects. Without such a method it does not resolve
+ * (`probing-unsupported`), nor without a probe the method runs with there (`probing-probe`, also
+ * where the method refuses that tool); an operation whose NC the method does not generate reports
+ * its first issue (`probing-invalid`).
  */
 const probingKind: OperationKind<"probing"> = {
   kind: "probing",
@@ -124,15 +130,15 @@ const probingKind: OperationKind<"probing"> = {
     const { source } = operation
     const { kit } = context
     const machine = kit.probing
-    const strategy = machine && strategyFor(source, machine)
-    if (!machine || !strategy) return fail(unsupported(operation, kit))
+    const method = machine && methodFor(source, machine, plate)
+    if (!machine || !method) return fail(unsupported(operation, kit))
     const subject = operationSubject(operation.id)
     const edit: QuickFix = { kind: "edit-operation", operationId: operation.id }
     const probe = boundProbe(
       operation,
       plate,
       context.tools,
-      strategy,
+      method,
       machine,
       kit.name
     )
@@ -151,7 +157,7 @@ const probingKind: OperationKind<"probing"> = {
     // The entry the operation's binding maps its probe number to, which holds the probe.
     const table =
       operation.tools.find((item) => item.local === source.probe)?.plate ?? null
-    const refused = strategy.refuses?.(probe.value.tool, table)
+    const refused = method.refuses?.(probe.value.tool, table)
     if (refused)
       return fail(
         error("probing-probe", `${operation.name}: ${refused}`, {
@@ -159,7 +165,7 @@ const probingKind: OperationKind<"probing"> = {
           fix: { kind: "assign-tool", toolNumber: table },
         })
       )
-    const generated = generateProbing(strategy, source, {
+    const generated = generateProbing(method, source, {
       plate,
       probe: probe.value,
       machine,

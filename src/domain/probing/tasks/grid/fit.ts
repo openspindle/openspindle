@@ -9,7 +9,7 @@ import { anchorPlacementAt, placementAnchors } from "../../placement"
 import type { AnchorPlacement, ProbePlacement } from "../../placement"
 
 /**
- * The grid that covers the work area, within the sizes the strategy takes: its size,
+ * The grid that covers the work area, within the sizes the method takes: its size,
  * and its start at the area's lower-left corner when the plate has anchors. Without anchors the
  * placement stays as it is.
  */
@@ -35,7 +35,7 @@ export function fitGrid(
 /**
  * A new height grid's parameters for a plate: the grid over the area its job cuts (its stock when
  * it machines nothing), starting at a stored anchor when the plate has them. Without a work area
- * it takes the strategy's defaults at the probe position.
+ * it takes the method's defaults at the probe position.
  */
 export function plateGridParams(
   plate: Plate,

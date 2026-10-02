@@ -11,7 +11,7 @@ import type { GridParams } from "./params"
 import { placementContext } from "../../placement"
 import type { PlacementContext, ProbeStart } from "../../placement"
 import { editOperation } from "../../rules"
-import { strategySpecs } from "../../strategies"
+import { methodSpecs } from "../../strategies"
 
 /** The plate a grid operation belongs to. `Plate` satisfies it. */
 export type GridPlateContext = PlacementContext & {
@@ -43,7 +43,7 @@ function gridArea(
 /**
  * A grid operation's grid as its advice reads it: its parameters, its plate, and where the grid
  * starts (null where that does not resolve, which the compiler reports). Null for another
- * operation, a strategy the plate's machine does not have, or parameters that do not parse
+ * operation, a strategy the plate's machine does not support, or parameters that do not parse
  * within its ranges (the compiler reports those too).
  */
 function gridAdvice({ operation, plate, kit }: OperationRuleSubject): {
@@ -53,7 +53,7 @@ function gridAdvice({ operation, plate, kit }: OperationRuleSubject): {
 } | null {
   const { source } = operation
   if (source.kind !== "probing" || source.task !== "grid") return null
-  const specs = strategySpecs(source, kit.probing)
+  const specs = methodSpecs(source, kit.probing, plate)
   if (!specs) return null
   const checked = checkGridParams(source.params, specs)
   if (!checked.ok) return null

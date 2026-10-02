@@ -11,12 +11,12 @@ import {
 } from "../../placement"
 import type { ProbeStart } from "../../placement"
 import { editOperation } from "../../rules"
-import { strategySpecs } from "../../strategies"
+import { methodSpecs } from "../../strategies"
 
 /**
  * A touch-off operation as its advice reads it: where it starts, null where the anchored point
  * does not resolve (the compiler reports why). Null for another operation, a strategy the
- * plate's machine does not have, or parameters that do not parse within its ranges (the
+ * plate's machine does not support, or parameters that do not parse within its ranges (the
  * compiler reports those too).
  */
 function touchOffAdvice({
@@ -26,7 +26,7 @@ function touchOffAdvice({
 }: OperationRuleSubject): { readonly start: ProbeStart | null } | null {
   const { source } = operation
   if (source.kind !== "probing" || source.task !== "touch-off") return null
-  const specs = strategySpecs(source, kit.probing)
+  const specs = methodSpecs(source, kit.probing, plate)
   if (!specs) return null
   const plan = planTouchOff(source.params, placementContext(plate), specs)
   if (plan.ok) return { start: plan.start }
@@ -136,7 +136,7 @@ const zHeightBeforeAutoLevel: StageRule<"operation"> = {
     return (
       source.kind !== "probing" ||
       source.task !== "touch-off" ||
-      !strategySpecs(source, kit.probing) ||
+      !methodSpecs(source, kit.probing, plate) ||
       touchesGridStarts(source.params.placement, laterGrids(plate, operation))
     )
   },

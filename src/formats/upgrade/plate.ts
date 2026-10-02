@@ -3,11 +3,7 @@ import { MAKERA_Z1_ID } from "@/domain/fixtures/makera-z1/makera-z1"
 import { EPSILON, formatMillimetres } from "@/domain/geometry/millimetres"
 import { PlateSchema, notice } from "@/domain/plate/plate"
 import type { PlateNotice } from "@/domain/plate/plate"
-import {
-  runsWith,
-  strategyLabel,
-  strategyOf,
-} from "@/domain/probing/strategies"
+import { runsWith, strategyById } from "@/domain/probing/strategies"
 import { isProbe, isTool, probeProfile } from "@/domain/tools/tool"
 import type { Tool } from "@/domain/tools/tool"
 import { libraryPreferences } from "@/domain/tools/tool-table"
@@ -16,6 +12,11 @@ import { upgradeBedFrame } from "./bed-frame"
 import { isJsonObject } from "./json"
 import type { JsonObject } from "./json"
 import { upgradeProbingSource } from "./probing"
+import {
+  currentStrategy,
+  earlierStrategyLabel,
+  upgradeStrategies,
+} from "./strategies"
 
 /** What upgrading a plate's saved data makes of it. */
 export type UpgradedPlate = {
@@ -105,17 +106,19 @@ const Z1_PROBING =
   FIXTURE_KITS.find((kit) => kit.id === MAKERA_Z1_ID)?.probing ?? null
 
 /**
- * What an operation of an earlier kind (named by its `label`) should tell the user when it now
- * probes with a strategy that cannot run with the probe in its table entry (`T<number>`) on the
- * Z1 (`runsWith`): nothing for a tool that is no probe of known profile, which resolving reports.
+ * What an operation of an earlier kind (named by its `label`) should tell the user when the
+ * strategy its probing `source` is now (`currentStrategy`) cannot run with the probe in its table
+ * entry (`T<number>`) on the Z1 (`runsWith`): nothing for a tool that is no probe of known
+ * profile, which resolving reports.
  */
 function probeNotice(
   label: string,
-  strategyId: string,
+  source: JsonObject,
   { number, tool }: ReturnType<typeof boundTool>
 ): string | null {
   const profile = tool && probeProfile(tool)
-  const strategy = Z1_PROBING && strategyOf(strategyId, Z1_PROBING)
+  const id = currentStrategy(source)
+  const strategy = id === null ? null : strategyById(id)
   if (!tool || !profile || !Z1_PROBING || !strategy) return null
   if (runsWith(strategy, profile, Z1_PROBING)) return null
   return `${label} is now ${strategy.label}, which cannot probe with ${tool.name} in T${number}: assign a probe it runs with.`
@@ -166,32 +169,55 @@ function upgradeGroups(groups: unknown): unknown {
 }
 
 /**
- * A plate's saved data as earlier formats saved it (projects before format 9, exports before
- * version 8), in the current one: a project's plate, or an export's payload, which holds the
- * plate's setup, tool table and operations alike. Its operations take their current shape
- * (`upgradeOperations`), then its bed positions move to bed coordinates from Anchor 1
- * (`upgradeBedFrame`).
+ * The steps that bring a plate's saved data up to the current format, in order:
+ * - `operations`: its operations take their current shape (`upgradeOperations`), for projects
+ *   before format 8 and exports before version 7;
+ * - `bed-frame`: its bed positions move to bed coordinates from Anchor 1 (`upgradeBedFrame`),
+ *   before format 9 and version 8;
+ * - `strategies`: its probing operations name their strategy by what it does
+ *   (`upgradeStrategies`), before format 10 and version 9.
+ */
+export type PlateUpgrade = "operations" | "bed-frame" | "strategies"
+
+/**
+ * A plate's saved data as earlier formats saved it (projects before format 10, exports before
+ * version 9), in the current one: a project's plate, or an export's payload, which holds the
+ * plate's setup, tool table and operations alike. It takes the steps from the first its format
+ * needs (`from`) on, and no earlier one: a step changes what the formats before it saved, as the
+ * bed frame's moves positions. The names it gives as saved are those the plate was saved with.
  */
 export function upgradePlate(
   saved: JsonObject,
-  library: readonly unknown[]
+  library: readonly unknown[],
+  from: PlateUpgrade
 ): UpgradedPlate {
-  const upgraded = upgradeOperations(saved, library)
-  return { ...upgraded, plate: upgradeBedFrame(upgraded.plate) }
+  const operations =
+    from === "operations"
+      ? upgradeOperations(saved, library)
+      : { plate: saved, notices: [], savedNames: new Map<string, string>() }
+  const strategies = upgradeStrategies(
+    from === "strategies" ? operations.plate : upgradeBedFrame(operations.plate)
+  )
+  return {
+    plate: strategies.plate,
+    notices: operations.notices,
+    // The names before the operations step stand over those it gave.
+    savedNames: new Map([...strategies.savedNames, ...operations.savedNames]),
+  }
 }
 
 /**
  * A plate's saved data with operations of earlier formats (projects before format 8, exports
- * before version 7) in their current shape. Its
- * auto-level, auto Z-height, auto-scan and 3D probing operations become probing operations
- * (`upgradeProbingSource`), and one still named after its kind is named after its strategy, as
- * a new one is; one that does not bind its probe binds it to the entry of that number. Where the
- * table has none it gains one, holding the probe of the `library` (the tools the table's entries
- * name, as saved or as the app holds them) that adding the operation picks for that number
- * (`libraryPreferences`), or no tool when it has none. A probe there that the strategy cannot run
- * with is a notice, and so is a 3D probing set for another ball than its probe's, or without a
- * probe from the library. Its groups hold its grids' sections by their current name. What it
- * does not recognize stays as it is, for reading to leave out and report.
+ * before version 7) in the shape of format 8. Its auto-level, auto Z-height, auto-scan and 3D
+ * probing operations become probing operations (`upgradeProbingSource`), and one still named after
+ * its kind is named after its strategy, as format 8 named a new one (`earlierStrategyLabel`); one
+ * that does not bind its probe binds it to the entry of that number. Where the table has none it
+ * gains one, holding the probe of the `library` (the tools the table's entries name, as saved or
+ * as the app holds them) that adding the operation picks for that number (`libraryPreferences`),
+ * or no tool when it has none. A probe there that the strategy it is now cannot run with is a
+ * notice, and so is a 3D probing set for another ball than its probe's, or without a probe from
+ * the library. Its groups hold its grids' sections by their current name. What it does not
+ * recognize stays as it is, for reading to leave out and report.
  */
 function upgradeOperations(
   saved: JsonObject,
@@ -230,17 +256,17 @@ function upgradeOperations(
       const bound = boundTool(bindings, table, probe, library)
       // A probe the strategy cannot run with is wrong whatever its ball.
       const message =
-        (strategy === null ? null : probeNotice(label, strategy, bound)) ??
+        probeNotice(label, upgraded.source, bound) ??
         (ball === null ? null : ballNotice(ball, bound))
       if (message) notices.push(message)
     }
     // The inspector renames an operation named after its strategy along with it.
-    const renamed = strategy !== null && operation.name === label
+    const strategyLabel =
+      strategy === null ? null : earlierStrategyLabel(strategy)
+    const renamed = strategyLabel !== null && operation.name === label
     if (renamed && typeof operation.id === "string")
       savedNames.set(operation.id, label)
-    const named = renamed
-      ? { ...operation, name: strategyLabel(strategy) }
-      : operation
+    const named = renamed ? { ...operation, name: strategyLabel } : operation
     return bindings === operation.tools
       ? { ...named, source: upgraded.source }
       : { ...named, tools: bindings, source: upgraded.source }

@@ -6,7 +6,7 @@ import type { ProbingNc } from "../../probing/strategy"
 import { CLEARANCE_Z, MACHINE_Z, anchorTravel } from "./wired-probe/travel"
 
 /**
- * Surface touch's ranges on the Z1: application limits, not a clearance check. The default travel
+ * The generic touch-off's ranges on the Z1: application limits, not a clearance check. The default travel
  * is the one the firmware's own Z probe uses on the Z1 (`coordinate.toolrack_z`): a probe change
  * ends at the firmware's clearance Z near the top of travel, as anchored travel does, and the
  * search has to reach the stock from there.
@@ -81,7 +81,7 @@ export const TRACE_PARAMETERS: OutlineSpecs = {
 }
 
 /**
- * The Z1's probing NC that generic strategies are made of, as its firmware (1.1.2) runs it: the
+ * The Z1's probing NC that generic methods are made of, as its firmware (1.1.2) runs it: the
  * probe change and the probe's laser are ATCHandler.cpp's, the touch speeds and the clearance
  * `src/configZ1.default`'s, as Makera sets them on the Z1 and Z1 Pro.
  */
@@ -105,8 +105,8 @@ export const Z1_PROBING_NC: ProbingNc = {
   touch: TOUCH_OFF_MOTION,
 }
 
-/** The Z1's ranges and defaults for the generic strategies. */
+/** The Z1's ranges and defaults for the generic methods. */
 export const Z1_GENERIC_SPECS: GenericSpecs = {
-  "surface-touch": TOUCH_PARAMETERS,
-  "outline-trace": TRACE_PARAMETERS,
+  touch: TOUCH_PARAMETERS,
+  outline: TRACE_PARAMETERS,
 }

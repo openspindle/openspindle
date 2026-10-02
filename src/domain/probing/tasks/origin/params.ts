@@ -4,10 +4,12 @@ import { COORDINATE_LIMIT } from "../../../primitives"
 import { defaultsOf, rangedSchema } from "../../parameters"
 import type { SpecsOf } from "../../parameters"
 import { ProbePlacementSchema } from "../../placement"
+import type { StrategyId } from "../../strategy"
 
 /**
  * What a 3D probing operation finds: a corner of the stock (outside) or of a pocket (inside),
- * or the centre of a pocket or of a boss such as the stock itself.
+ * or the centre of a pocket or of a boss such as the stock itself. Each is an origin strategy of
+ * the same id, which decides it (`originRoutine`).
  */
 export const PROBE_3D_ROUTINES = [
   "outside-corner",
@@ -25,6 +27,14 @@ export const PROBE_3D_ROUTINE_LABELS: Readonly<Record<Probe3dRoutine, string>> =
     "pocket-center": "Pocket center",
     "boss-center": "Boss center",
   }
+
+/** The routine an origin strategy runs; null for a strategy of another task. */
+export function originRoutine(id: StrategyId): Probe3dRoutine | null {
+  return PROBE_3D_ROUTINES.find((routine) => routine === id) ?? null
+}
+
+/** The origin strategy that runs a routine. */
+export const originStrategy = (routine: Probe3dRoutine): StrategyId => routine
 
 /** A corner as seen from the front of the machine: front is −Y, left is −X. */
 export const PROBE_3D_CORNERS = [
@@ -57,17 +67,18 @@ export const PROBE_3D_AXES_LABELS: Readonly<Record<Probe3dAxes, string>> = {
 /** The routine's numeric parameters, in form order. */
 export type OriginField = "distance" | "depth"
 
-/** A strategy's 3D probing parameters on a machine (`ProbingStrategy.parameters`). */
+/** A method's 3D probing parameters on a machine (`ProbingMethod.parameters`). */
 export type OriginSpecs = SpecsOf<OriginParams, OriginField>
 
 const storedLength = z.number().positive().max(COORDINATE_LIMIT)
 
 /**
  * A built-in 3D probing operation, as stored for any machine. Its NC is derived from these
- * parameters at compile time, within the ranges of its strategy (`originParamsSchema`), and from
+ * parameters at compile time, within the ranges of its method (`originParamsSchema`), and from
  * the ball of the probe it selects. Every routine keeps every field; each reads those it needs.
  */
 export const OriginParamsSchema = z.strictObject({
+  /** What it finds: its strategy's routine (`originRoutine`), which choosing the strategy sets. */
   routine: Probe3dRoutineSchema,
   /** The corner an outside or inside corner routine finds. */
   corner: Probe3dCornerSchema,
@@ -89,12 +100,15 @@ export const OriginParamsSchema = z.strictObject({
 
 export type OriginParams = z.infer<typeof OriginParamsSchema>
 
-/** The parameters within the ranges of a strategy, as its form and its NC take them. */
+/** The parameters within the ranges of a method, as its form and its NC take them. */
 export function originParamsSchema(parameters: OriginSpecs) {
   return rangedSchema(OriginParamsSchema, parameters)
 }
 
-/** A new operation's parameters: an outside corner at the front left, with the strategy's defaults. */
+/**
+ * A new operation's parameters: an outside corner at the front left, with the method's defaults.
+ * The operation's strategy sets the routine (`originRoutine`).
+ */
 export function defaultOriginParams(parameters: OriginSpecs): OriginParams {
   return {
     routine: "outside-corner",

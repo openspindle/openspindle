@@ -53,7 +53,10 @@ export function Unavailable({
   )
 }
 
-/** A source to add an operation from, or a step towards one, as a list item that is a button. */
+/**
+ * A source to add an operation from, or a step towards one, as a list item that is a button.
+ * Without `onSelect`, it only shows, such as the step already taken.
+ */
 export function SourceItem({
   icon,
   title,
@@ -66,18 +69,21 @@ export function SourceItem({
   description: string
   /** Why it is unavailable; null (the default) when it is available. */
   reason?: string | null
-  onSelect: () => void
+  onSelect?: () => void
 }) {
   return (
     <Unavailable label={title} reason={reason}>
       <Item
+        variant={onSelect ? "default" : "outline"}
         render={
-          <Button
-            variant="ghost"
-            className="h-auto whitespace-normal"
-            type="button"
-            disabled={reason !== null}
-          />
+          onSelect ? (
+            <Button
+              variant="ghost"
+              className="h-auto whitespace-normal"
+              type="button"
+              disabled={reason !== null}
+            />
+          ) : undefined
         }
         className="text-left"
         onClick={onSelect}

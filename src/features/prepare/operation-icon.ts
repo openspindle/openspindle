@@ -1,5 +1,4 @@
 import {
-  ArrowDownToDot,
   ArrowDownToLine,
   Axis3d,
   CircuitBoard,
@@ -8,8 +7,7 @@ import {
   SquareDashed,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
-import type { Operation, ProbingSource } from "@/domain/operations/operation"
-import { GENERIC_STRATEGIES } from "@/domain/probing/strategies"
+import type { Operation } from "@/domain/operations/operation"
 import type { ProbingTask } from "@/domain/probing/strategy"
 
 /** The probing operations' icons by task. */
@@ -22,16 +20,13 @@ const PROBING_ICONS: Record<ProbingTask, LucideIcon> = {
 
 /**
  * A probing strategy's icon, wherever it is offered or its operations are listed: its task's,
- * and for a machine's own touch-off, such as the Z1 firmware's Z probe, one apart from Surface
- * touch.
+ * whatever performs it.
  */
-export function probingIcon({
+export const probingIcon = ({
   task,
-  strategy,
-}: Pick<ProbingSource, "task" | "strategy">): LucideIcon {
-  const generic = GENERIC_STRATEGIES.some((item) => item.id === strategy)
-  return task === "touch-off" && !generic ? ArrowDownToDot : PROBING_ICONS[task]
-}
+}: {
+  readonly task: ProbingTask
+}): LucideIcon => PROBING_ICONS[task]
 
 /** An operation's icon, shared by the tree, inspector and job view. */
 export function operationIcon(operation: Operation): LucideIcon {

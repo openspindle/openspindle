@@ -6,14 +6,14 @@ import { ProbePlacementSchema } from "../../placement"
 /** The grid's numeric parameters, in form order. */
 export type GridField = "size" | "points" | "clearance"
 
-/** A strategy's grid parameters on a machine (`ProbingStrategy.parameters`). */
+/** A method's grid parameters on a machine (`ProbingMethod.parameters`). */
 export type GridSpecs = SpecsOf<GridParams, GridField>
 
 const storedLength = z.number().positive().max(COORDINATE_LIMIT)
 const storedCount = z.int().min(2).max(COORDINATE_LIMIT)
 
 /**
- * A height grid's parameters, as stored for any machine. Its strategy writes the NC from them at
+ * A height grid's parameters, as stored for any machine. Its method writes the NC from them at
  * compile time, within the ranges it gives them on the plate's machine
  * (`rangedSchema(GridParamsSchema, parameters)`).
  */

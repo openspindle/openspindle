@@ -7,11 +7,11 @@ import type {
 import { planTouchOff } from "../tasks/touch-off/plan"
 import { formatMillimetres } from "../../geometry/millimetres"
 import { placementContext } from "../placement"
-import type { ProbingNc, ProbingStrategy } from "../strategy"
+import type { ProbingMethod, ProbingNc } from "../strategy"
 import { hasSpecs, specsOf } from "./specs"
 
 const INTRODUCTION = [
-  "; Surface touch",
+  "; Touch off",
   "; Touches the stock top and sets work Z0 there with G10 L20.",
   "; REQUIRE: homed machine, installed/calibrated probe, tested probe signal.",
 ]
@@ -55,29 +55,29 @@ function touchOff(
 /**
  * OpenSpindle's own touch-off: from the probe position, or from an anchored start the machine
  * travels to, a fast G38.2 touch down, a back-off and a slow touch, then work Z0 at the contact
- * (G10 L20) and up to the clearance. It always touches with G38.2, also from an anchored start in
- * work coordinates, where a machine's firmware may have a Z probe of its own (a strategy of the
- * machine's).
+ * (G10 L20) and up to the clearance. It touches with G38.2 wherever it starts, so a machine's own
+ * Z probe cycle runs the touch-off instead where it can (`methodFor`).
  */
-export const SURFACE_TOUCH: ProbingStrategy<
+export const GENERIC_TOUCH: ProbingMethod<
   "touch-off",
   TouchOffParams,
   TouchOffSpecs
 > = {
-  id: "surface-touch",
+  id: "touch",
   task: "touch-off",
-  label: "Surface touch",
-  description: "Touch the stock top with the probe and set work Z there.",
-  runsOn: (machine) => hasSpecs(machine, "surface-touch"),
+  strategies: ["touch-off"],
+  description:
+    "Touches down with the probe from where it is or from a stored anchor, fast then slowly, and sets work Z at the contact.",
+  runsOn: (machine) => hasSpecs(machine, "touch"),
   // Any touch probe touches down along Z; a pointer is not used.
   accepts: () => true,
-  parameters: (machine) => specsOf(machine, "surface-touch"),
+  parameters: (machine) => specsOf(machine, "touch"),
   defaults: plateTouchOffParams,
   generate: ({ params, plate, probe, machine }) => {
     const plan = planTouchOff(
       params,
       placementContext(plate),
-      specsOf(machine, "surface-touch")
+      specsOf(machine, "touch")
     )
     if (!plan.ok) return plan
     const { start } = plan

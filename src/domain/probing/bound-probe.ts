@@ -8,11 +8,11 @@ import type {
   BoundProbe,
   MachineProbing,
   ProbingTask,
-  TaskStrategy,
+  TaskMethod,
 } from "./strategy"
 
 /**
- * Why a probing operation has no probe its strategy can run with, and the plate's table entry
+ * Why a probing operation has no probe its method can run with, and the plate's table entry
  * that assigning another tool to fixes, if any.
  */
 export type ProbeFailure = {
@@ -31,10 +31,10 @@ const ACTIONS: { readonly [TTask in ProbingTask]: string } = {
 /**
  * The probe a probing operation selects, as its plate's table holds it: the operation's binding
  * of its probe number, the table entry that binding maps it to, and the library tool the entry
- * holds, among `tools`. The tool must be a probe of known profile that the strategy runs with
- * on the machine (`runsWith`), in the number the machine's firmware needs a probe of that profile
- * in; failing, it says whether the tool is no probe, a probe of unknown profile, one the
- * strategy cannot probe with or one the machine does not let do the task, and where a profile is
+ * holds, among `tools`. The tool must be a probe of known profile that the method runs with on
+ * the machine, in the number the machine's firmware needs a probe of that profile in; failing,
+ * it says whether the tool is no probe, a probe of unknown profile, one the method cannot probe
+ * with or one the machine does not let do the task, and where a profile is
  * at fault, that the tool library corrects it. The library is read only through the table, as
  * compiling's cache expects.
  */
@@ -42,7 +42,7 @@ export function boundProbe(
   operation: Operation & { readonly source: ProbingSource },
   plate: Plate,
   tools: readonly Tool[],
-  strategy: TaskStrategy,
+  method: TaskMethod,
   machine: MachineProbing,
   machineName: string
 ): Result<BoundProbe, ProbeFailure> {
@@ -76,14 +76,14 @@ export function boundProbe(
       message: `${named} holds ${tool.name}, a probe of unknown profile: say what it touches in the tool library, or assign another probe.`,
       toolNumber,
     })
-  if (!strategy.accepts(profile, machine))
+  if (!method.accepts(profile, machine))
     return fail({
-      message: `${named} holds ${tool.name}, which this strategy cannot probe with: assign a probe it runs with, or correct the probe's profile in the tool library.`,
+      message: `${named} holds ${tool.name}, which cannot probe for this operation: assign a probe that can, or correct the probe's profile in the tool library.`,
       toolNumber,
     })
-  if (!machine.probes(strategy.task, profile))
+  if (!machine.probes(method.task, profile))
     return fail({
-      message: `${named} holds ${tool.name}, but the ${machineName} does not ${ACTIONS[strategy.task]} with a probe like it: assign another probe, or correct the probe's profile in the tool library.`,
+      message: `${named} holds ${tool.name}, but the ${machineName} does not ${ACTIONS[method.task]} with a probe like it: assign another probe, or correct the probe's profile in the tool library.`,
       toolNumber,
     })
   const slot = machine.slot(profile)

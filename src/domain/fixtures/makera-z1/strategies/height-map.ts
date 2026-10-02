@@ -3,7 +3,7 @@ import type { XY } from "../../../geometry/frame"
 import type { AnchorStart } from "../../../probing/placement"
 import { placementContext } from "../../../probing/placement"
 import type { GridPlan } from "../../../probing/probe"
-import type { BoundProbe, ProbingStrategy } from "../../../probing/strategy"
+import type { BoundProbe, ProbingMethod } from "../../../probing/strategy"
 import { plateGridParams } from "../../../probing/tasks/grid/fit"
 import type { GridParams, GridSpecs } from "../../../probing/tasks/grid/params"
 import { planGrid } from "../../../probing/tasks/grid/plan"
@@ -147,12 +147,12 @@ function firmwareBlock(
  * X and Y (`workOriginOnMachine`), the firmware's own auto-leveling (M495) runs it in work
  * coordinates, reporting as it goes.
  */
-export const HEIGHT_MAP: ProbingStrategy<"grid", GridParams, GridSpecs> = {
+export const HEIGHT_MAP: ProbingMethod<"grid", GridParams, GridSpecs> = {
   id: "makera-z1/height-map",
   task: "grid",
-  label: "Height map (Z1 firmware)",
+  strategies: ["height-map"],
   description:
-    "Probe a height grid on the stock surface; the machine compensates later cuts for it.",
+    "The machine probes the grid itself, reports the height map and compensates later cuts for it.",
   accepts: ({ touch }) => touch === "z",
   parameters: () => GRID_PARAMETERS,
   defaults: plateGridParams,

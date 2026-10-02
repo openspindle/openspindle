@@ -6,10 +6,10 @@ import type { SpecsOf } from "../../parameters"
 /** The trace's numeric parameters. */
 export type OutlineField = "travelZ" | "feed"
 
-/** A strategy's trace parameters on a machine (`ProbingStrategy.parameters`). */
+/** A method's trace parameters on a machine (`ProbingMethod.parameters`). */
 export type OutlineSpecs = SpecsOf<OutlineParams, OutlineField>
 
-/** A sanity bound for stored feeds, mm/min; the strategy sets the usable range. */
+/** A sanity bound for stored feeds, mm/min; the method sets the usable range. */
 const storedFeed = z.number().positive().max(100_000)
 
 /** The most edges one outline traces. */
@@ -29,7 +29,7 @@ export const OutlineTargetSchema = z.discriminatedUnion("kind", [
 export type OutlineTarget = z.infer<typeof OutlineTargetSchema>
 
 /**
- * An outline's parameters, as stored for any machine. Its strategy traces its target at compile
+ * An outline's parameters, as stored for any machine. Its method traces its target at compile
  * time, within the ranges it gives them on the plate's machine (`rangedSchema`).
  */
 export const OutlineParamsSchema = z.strictObject({

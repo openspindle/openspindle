@@ -19,11 +19,17 @@ import {
 import type { ProbingOperation } from "@/domain/operations/kinds"
 import type { Plate } from "@/domain/plate/plate"
 import {
+  PROBING_STRATEGIES,
   runsWith,
-  strategiesFor,
   strategyBlocked,
+  strategyUnsupported,
+  withStrategy,
 } from "@/domain/probing/strategies"
-import type { MachineProbing, TaskStrategy } from "@/domain/probing/strategy"
+import type {
+  MachineProbing,
+  ProbingStrategy,
+  StrategyId,
+} from "@/domain/probing/strategy"
 import { formatToolNumber } from "@/domain/tools/format"
 import { probeProfile } from "@/domain/tools/tool"
 import type { Tool } from "@/domain/tools/tool"
@@ -50,12 +56,14 @@ const ballText = ({ diameter }: Tool) =>
     : `Ø ${formatToolNumber(diameter, "millimeters")} mm ball`
 
 /**
- * A probing operation's probe and strategy, each changeable among those that go with the other:
- * the library probes its strategy runs with on the machine (`runsWith`), and the strategies of
- * its task that run with its probe. A strategy keeps the operation's parameters, which its own
- * ranges then check. A probe goes in the number the machine's firmware needs it in, replacing
- * what the plate's table holds there for every operation that uses it, as assigning a tool does;
- * a probe that would replace another operation's says so while the pointer rests on it.
+ * A probing operation's strategy, then its probe: the strategies of its task the machine
+ * supports, a select only where there is more than one, those that cannot run on the plate
+ * disabled with why; and the library probes that can perform the strategy on the machine
+ * (`runsWith`). Another strategy keeps the operation's other parameters (`withStrategy`), and a
+ * name that is still the strategy's label follows it. A probe goes in the number the machine's
+ * firmware needs it in, replacing what the plate's table holds there for every operation that
+ * uses it, as assigning a tool does; a probe that would replace another operation's says so while
+ * the pointer rests on it.
  */
 export function ProbingChoiceFields({
   plate,
@@ -66,7 +74,7 @@ export function ProbingChoiceFields({
   plate: Plate
   operation: ProbingOperation
   machine: MachineProbing
-  strategy: TaskStrategy
+  strategy: ProbingStrategy
 }) {
   const id = useId()
   const workspace = useWorkspaceStore()
@@ -112,15 +120,13 @@ export function ProbingChoiceFields({
       }
     }),
   ]
-  const runs = profile
-    ? strategiesFor(machine, profile).filter(
-        (item) => item.task === source.task
-      )
-    : []
-  const strategies = runs.includes(strategy) ? runs : [strategy, ...runs]
-  const strategyOptions: Option<string>[] = strategies.map((item) => {
+  const strategies = PROBING_STRATEGIES.filter(
+    (item) =>
+      item.task === source.task && strategyUnsupported(item, machine) === null
+  )
+  const strategyOptions: Option<StrategyId>[] = strategies.map((item) => {
     const reason =
-      item === strategy ? null : strategyBlocked(item, plate, machine)
+      item.id === strategy.id ? null : strategyBlocked(item, plate, machine)
     return reason === null
       ? { value: item.id, label: item.label }
       : { value: item.id, label: item.label, disabled: true, reason }
@@ -158,14 +164,16 @@ export function ProbingChoiceFields({
       },
     ])
   }
-  const changeStrategy = (nextId: string) => {
+  const changeStrategy = (nextId: StrategyId) => {
     const next = strategies.find((item) => item.id === nextId)
-    if (!next || next === strategy) return
+    const nextSource =
+      next && next.id !== strategy.id && withStrategy(source, next)
+    if (!next || !nextSource) return
     dispatch([
       {
         type: "operation.source",
         ...target,
-        source: { ...source, strategy: next.id },
+        source: nextSource,
         expectedRevision: operation.revision,
       },
       // A name that is still the strategy's follows it.
@@ -177,6 +185,21 @@ export function ProbingChoiceFields({
 
   return (
     <FieldGroup className="gap-3">
+      {strategies.length > 1 && (
+        <Field orientation="horizontal" className={ROW}>
+          <FieldLabel htmlFor={`${id}-strategy`}>
+            <Hint text={strategy.description}>Strategy</Hint>
+          </FieldLabel>
+          <OptionSelect
+            id={`${id}-strategy`}
+            className="w-full min-w-0"
+            aria-description={strategy.description}
+            options={strategyOptions}
+            value={strategy.id}
+            onValueChange={changeStrategy}
+          />
+        </Field>
+      )}
       <Field orientation="horizontal" className={ROW}>
         <FieldLabel htmlFor={`${id}-probe`}>
           <Hint text={probeHint}>Probe</Hint>
@@ -211,19 +234,6 @@ export function ProbingChoiceFields({
             </SelectGroup>
           </SelectContent>
         </Select>
-      </Field>
-      <Field orientation="horizontal" className={ROW}>
-        <FieldLabel htmlFor={`${id}-strategy`}>
-          <Hint text={strategy.description}>Strategy</Hint>
-        </FieldLabel>
-        <OptionSelect
-          id={`${id}-strategy`}
-          className="w-full min-w-0"
-          aria-description={strategy.description}
-          options={strategyOptions}
-          value={strategy.id}
-          onValueChange={changeStrategy}
-        />
       </Field>
     </FieldGroup>
   )

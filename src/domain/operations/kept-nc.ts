@@ -1,8 +1,8 @@
 /**
  * The operation kinds that keep their NC (`generated: false`): NC files, PCB operations and
  * sources of earlier formats that are no longer supported. What they machine is where a plate cuts, which probing fits to, so nothing here
- * reads probing: probing strategies measure a plate's machining through this module while the
- * registry of every kind (`OPERATION_KINDS`) holds their strategies.
+ * reads probing: probing methods measure a plate's machining through this module while the
+ * registry of every kind (`OPERATION_KINDS`) holds their methods.
  */
 
 import { PLAIN_NC, withoutClosingPark } from "../compile/nc-unit"

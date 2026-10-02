@@ -3,16 +3,16 @@ import { COORDINATE_LIMIT } from "../../../primitives"
 import type { SpecsOf } from "../../parameters"
 import { ProbePlacementSchema } from "../../placement"
 
-/** The touch-off parameters that a strategy gives ranges and defaults. */
+/** The touch-off parameters that a method gives ranges and defaults. */
 export type TouchOffField = "probeTravel" | "clearance"
 
-/** A strategy's touch-off parameters on a machine (`ProbingStrategy.parameters`). */
+/** A method's touch-off parameters on a machine (`ProbingMethod.parameters`). */
 export type TouchOffSpecs = SpecsOf<TouchOffParams, TouchOffField>
 
 const storedLength = z.number().positive().max(COORDINATE_LIMIT)
 
 /**
- * A touch-off's parameters, as stored for any machine. Its strategy writes the NC from them at
+ * A touch-off's parameters, as stored for any machine. Its method writes the NC from them at
  * compile time, within the ranges it gives them on the plate's machine (`rangedSchema`).
  */
 export const TouchOffParamsSchema = z.strictObject({

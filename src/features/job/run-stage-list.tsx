@@ -33,7 +33,8 @@ import {
 import { placementHeight } from "@/domain/probing/placement"
 import { outlineTarget } from "@/domain/probing/tasks/outline/params"
 import { itemEdges, sameEdge } from "@/domain/plate/item-edges"
-import { SURFACE_TOUCH } from "@/domain/probing/generic/surface-touch"
+import { kitForPlate } from "@/domain/fixtures/catalog"
+import { methodFor } from "@/domain/probing/strategies"
 import {
   PROBE_3D_TOOL,
   PROBE_TOOL,
@@ -411,14 +412,21 @@ function operationResults(
       label: sensorLabel(tool.tool),
       value: <Height z={tool.machine[2]} />,
     })
-  const probing =
+  if (
+    !surface &&
+    !grid &&
+    status === "done" &&
     source.kind === "probing" &&
     (source.task === "touch-off" || source.task === "grid")
-  if (!surface && !grid && status === "done" && probing)
+  ) {
+    // OpenSpindle's own touch-off reports nothing; the machine's cycles report from an anchor.
+    const machine = kitForPlate(subject.plate).probing
+    const method = machine && methodFor(source, machine, subject.plate)
     description =
-      source.strategy === SURFACE_TOUCH.id
-        ? "The machine does not report a surface touch's measurement: it touches with G38.2."
+      machine && method && !machine.cycles.includes(method)
+        ? "The machine does not report this touch's measurement: it touches with G38.2."
         : "The machine reports its measurements only when it probes from a stored anchor with the work origin kept relative to one."
+  }
   return {
     description: description ?? operationSummary(operation, subject, tools),
     details: (

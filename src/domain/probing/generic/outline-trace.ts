@@ -12,7 +12,7 @@ import type { Point3 } from "../../primitives"
 import { defaultsOf } from "../parameters"
 import { placementContext, resolvePlacement } from "../placement"
 import type { PlacementFailure } from "../placement"
-import type { MachineProbing, ProbingStrategy } from "../strategy"
+import type { BoundProbe, MachineProbing, ProbingMethod } from "../strategy"
 import { hasSpecs, specsOf } from "./specs"
 
 const INTRODUCTION = [
@@ -101,7 +101,7 @@ function traceEdges(
   params: OutlineParams,
   edges: readonly ItemEdge[],
   plate: Plate,
-  probe: Parameters<ProbingStrategy["generate"]>[0]["probe"],
+  probe: BoundProbe,
   machine: MachineProbing
 ) {
   const { pointer } = machine.nc
@@ -148,19 +148,20 @@ function traceEdges(
  * coordinates from its lower-left corner at the trace feed, and a pause to check it if the
  * operation asks for one. Nothing touches, so the job reviews no measurement.
  */
-export const OUTLINE_TRACE: ProbingStrategy<
+export const GENERIC_TRACE: ProbingMethod<
   "outline",
   OutlineParams,
   OutlineSpecs
 > = {
-  id: "outline-trace",
+  id: "outline",
   task: "outline",
-  label: "Outline trace",
-  description: "Trace the edges of the plate's work area before cutting.",
+  strategies: ["outline-trace"],
+  description:
+    "Traces the plate's work area, or chosen edges of its stock and fixtures, with the probe's pointer.",
   runsOn: (machine) =>
-    machine.nc.pointer !== null && hasSpecs(machine, "outline-trace"),
+    machine.nc.pointer !== null && hasSpecs(machine, "outline"),
   accepts: (probe) => probe.pointer,
-  parameters: (machine) => specsOf(machine, "outline-trace"),
+  parameters: (machine) => specsOf(machine, "outline"),
   // A plate without cuts has its stock's outline to trace.
   defaults: (plate, parameters, machining) => ({
     ...defaultsOf(parameters),
@@ -184,7 +185,7 @@ export const OUTLINE_TRACE: ProbingStrategy<
         toolpath: () => machining.toolpath(),
         edges: () => itemEdges(plate.setup),
       },
-      specsOf(machine, "outline-trace")
+      specsOf(machine, "outline")
     )
     if (!plan.ok) return plan
     if (plan.trace.kind === "edges")

@@ -8,6 +8,7 @@ import {
   defaultOriginParams,
   findsCorner,
   originFields,
+  originRoutine,
   setsWorkXY,
   setsWorkZ,
 } from "../../../probing/tasks/origin/params"
@@ -23,7 +24,7 @@ import { fail, ok, toolNumberText } from "../../../primitives"
 import type { Result } from "../../../primitives"
 import type { ParameterSpec } from "../../../probing/parameters"
 import { placementContext } from "../../../probing/placement"
-import type { BoundProbe, ProbingStrategy } from "../../../probing/strategy"
+import type { BoundProbe, ProbingMethod } from "../../../probing/strategy"
 import type { Tool } from "../../../tools/tool"
 import { ORIGIN_ROUTINE, routineSubcode } from "../3d-probe/blocks"
 import { firmwareMillimetres } from "../probing-nc"
@@ -80,7 +81,7 @@ function ballOf({ diameter }: Tool, held: string): Result<number, string> {
     )
   if (diameter < BALL.min || diameter > BALL.max)
     return fail(
-      `${held} has a ${formatMillimetres(diameter)} mm ball, but the 3D probing routines take ${BALL.min} to ${BALL.max} mm: correct it in the tool library, or assign another probe.`
+      `${held} has a ${formatMillimetres(diameter)} mm ball, but the machine finds corners and centers only with a ${BALL.min} to ${BALL.max} mm ball: correct it in the tool library, or assign another probe.`
     )
   return ok(diameter)
 }
@@ -190,14 +191,20 @@ function routineBlock(
 /**
  * The Z1 firmware's 3D probing routines (ATCHandler's M480), with a 3D touch probe in T9999, the
  * firmware's tool number for it, and its ball: corners and centres found from where the probe
- * starts, which set the work origin there and report each contact.
+ * starts, which set the work origin there and report each contact. One cycle performs the four
+ * origin strategies, each its routine (`params.routine`, which the strategy sets).
  */
-export const ROUTINES: ProbingStrategy<"origin", OriginParams, OriginSpecs> = {
-  id: "makera-z1/routines",
+export const ROUTINES: ProbingMethod<"origin", OriginParams, OriginSpecs> = {
+  id: "makera-z1/m480",
   task: "origin",
-  label: "3D probing (Z1 routines)",
+  strategies: [
+    "outside-corner",
+    "inside-corner",
+    "pocket-center",
+    "boss-center",
+  ],
   description:
-    "Find a corner or center with the 3D probe and set the work origin there.",
+    "The machine's own probing cycle finds the corner or center with the 3D probe, sets the work origin there and reports each contact.",
   accepts: ({ touch }) => touch === "xyz",
   refuses: (tool, number) => {
     const ball = ballOf(tool, `${tool.name} in ${toolNumberText(number)}`)
@@ -205,7 +212,10 @@ export const ROUTINES: ProbingStrategy<"origin", OriginParams, OriginSpecs> = {
   },
   parameters: () => ROUTINE_PARAMETERS,
   reads: (params) => originFields(params.routine, params.axes),
-  defaults: (_plate, parameters) => defaultOriginParams(parameters),
+  defaults: (_plate, parameters, _machining, strategy) => ({
+    ...defaultOriginParams(parameters),
+    routine: originRoutine(strategy) ?? "outside-corner",
+  }),
   generate: ({ params, plate, probe, machine }) => {
     const plan = planOrigin(params, placementContext(plate), ROUTINE_PARAMETERS)
     if (!plan.ok) return plan

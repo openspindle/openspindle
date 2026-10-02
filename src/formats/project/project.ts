@@ -9,6 +9,7 @@ import type { Tool } from "@/domain/tools/tool"
 import { describePath, readOptimistically } from "../optimistic-read"
 import { isJsonObject } from "../upgrade/json"
 import { upgradePlate, withNotices } from "../upgrade/plate"
+import type { PlateUpgrade } from "../upgrade/plate"
 import { PROJECT_SCHEMA_VERSION, ProjectDocumentSchema } from "./document"
 import type { ProjectDocument } from "./document"
 import { retainedSourceField, upgradeWorkspaceSources } from "./upgrade"
@@ -114,13 +115,23 @@ function currentPayload(payload: Record<string, unknown>) {
   }
 }
 
+/** The first step a plate of an earlier project format needs (`PlateUpgrade`). */
+function firstUpgrade(schemaVersion: number): PlateUpgrade {
+  if (schemaVersion < 8) return "operations"
+  return schemaVersion < 9 ? "bed-frame" : "strategies"
+}
+
 /**
  * An earlier project's plates in the current format: upgraded (`upgradePlate`, with the
- * project's tool library), each with the notices that brings, and the names of the operations
- * it renamed as saved, by instruction id. What it still does not recognize (such as format 4's
- * travel Z) is left for reading to leave out and report, rather than rewritten field by field.
+ * project's tool library, from the first step its format needs), each with the notices that
+ * brings, and the names of the operations it renamed as saved, by instruction id. What it still
+ * does not recognize (such as format 4's travel Z) is left for reading to leave out and report,
+ * rather than rewritten field by field.
  */
-function withUpgradedPlates(payload: Record<string, unknown>): {
+function withUpgradedPlates(
+  payload: Record<string, unknown>,
+  from: PlateUpgrade
+): {
   readonly payload: Record<string, unknown>
   readonly savedNames: ReadonlyMap<string, string>
 } {
@@ -129,7 +140,11 @@ function withUpgradedPlates(payload: Record<string, unknown>): {
   if (!Array.isArray(payload.plates)) return { payload, savedNames }
   const plates = payload.plates.map((item: unknown) => {
     if (!isJsonObject(item)) return item
-    const { plate, notices, savedNames: names } = upgradePlate(item, library)
+    const {
+      plate,
+      notices,
+      savedNames: names,
+    } = upgradePlate(item, library, from)
     for (const [operationId, name] of names)
       savedNames.set(`${String(item.id)}/${operationId}`, name)
     return notices.length && Array.isArray(plate.notices)
@@ -165,7 +180,10 @@ function readPayload(
   // read the converted fields optimistically there.
   const { payload: current, savedNames } =
     schemaVersion < PROJECT_SCHEMA_VERSION
-      ? withUpgradedPlates(currentPayload(payload as Record<string, unknown>))
+      ? withUpgradedPlates(
+          currentPayload(payload as Record<string, unknown>),
+          firstUpgrade(schemaVersion)
+        )
       : { payload, savedNames: new Map<string, string>() }
   const schema =
     schemaVersion < PROJECT_SCHEMA_VERSION

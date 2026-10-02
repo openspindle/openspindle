@@ -3,7 +3,7 @@ import type { ProbeStart } from "./placement"
 import type { GridParams } from "./tasks/grid/params"
 import type { OriginParams } from "./tasks/origin/params"
 
-/** A probing operation's NC as a strategy writes it, and where a job pauses in it. */
+/** A probing operation's NC as a method writes it, and where a job pauses in it. */
 export type ProbeProgram = {
   /** Newline-terminated NC. */
   readonly nc: string
