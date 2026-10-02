@@ -25,7 +25,10 @@ import {
 } from "@/features/probing/probe-tools"
 import { AppDialog } from "@/features/shell/app-dialog"
 import { useImportContext } from "@/features/shell/use-import"
-import { SourceItem } from "./source-item"
+import { ItemGroup } from "@/components/ui/item"
+import type { FixtureKit } from "@/domain/fixtures/fixture-kit"
+import { useStrategyPicture } from "@/features/probing/use-strategy-picture"
+import { StrategyItem } from "./strategy-item"
 import { useAddOperation } from "./use-add-operation"
 import type { AddedOperation } from "./use-add-operation"
 
@@ -133,40 +136,77 @@ export function ProbingSteps({
           All sources
         </Button>
       )}
+      {/* Setting up a job: inspection may join it as a group of its own. */}
       <FieldSet>
-        <FieldLegend>Strategy</FieldLegend>
-        {PROBING_STRATEGIES.map((strategy) => {
-          const Icon = probingIcon(strategy)
-          const offer = strategyOffer(strategy, plate, machine, library)
-          return (
-            <SourceItem
+        <FieldLegend>Setup</FieldLegend>
+        <ItemGroup className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          {PROBING_STRATEGIES.map((strategy) => (
+            <StrategyChoice
               key={strategy.id}
-              icon={<Icon />}
-              title={strategy.label}
-              description={strategy.description}
-              note={"tool" in offer ? offer.replaces : null}
-              reason={"reason" in offer ? offer.reason : null}
-              onSelect={() => {
+              strategy={strategy}
+              plate={plate}
+              kit={kit}
+              library={library}
+              onSelect={(tool) => {
                 if (
-                  "tool" in offer &&
                   add((target) =>
-                    probingOperation(target, offer.tool, strategy, machine)
+                    probingOperation(target, tool, strategy, machine)
                   )
                 )
                   onAdded()
               }}
             />
-          )
-        })}
+          ))}
+        </ItemGroup>
       </FieldSet>
     </div>
+  )
+}
+
+/**
+ * A strategy as Probing offers it for the plate (`strategyOffer`), with a picture of how it
+ * probes with the probe it adds the operation with, or else with the first that can perform it.
+ */
+function StrategyChoice({
+  strategy,
+  plate,
+  kit,
+  library,
+  onSelect,
+}: {
+  strategy: ProbingStrategy
+  plate: Plate
+  kit: FixtureKit
+  library: readonly Tool[]
+  onSelect: (tool: Tool) => void
+}) {
+  const machine = kit.probing!
+  const offer = strategyOffer(strategy, plate, machine, library)
+  const shown =
+    "tool" in offer
+      ? offer.tool
+      : (strategyProbes(strategy, library, machine).at(0)?.tool ?? null)
+  const picture = useStrategyPicture(strategy, shown, kit, library)
+  const Icon = probingIcon(strategy)
+  return (
+    <StrategyItem
+      title={strategy.label}
+      description={strategy.description}
+      picture={picture}
+      icon={<Icon />}
+      note={"tool" in offer ? offer.replaces : null}
+      reason={"reason" in offer ? offer.reason : null}
+      onSelect={() => {
+        if ("tool" in offer) onSelect(offer.tool)
+      }}
+    />
   )
 }
 
 /** Probing from the toolbar: the picker on its own. */
 export function ProbingPicker({ onClose }: { onClose: () => void }) {
   return (
-    <AppDialog title="Probing" onClose={onClose}>
+    <AppDialog title="Probing" width="wide" onClose={onClose}>
       <ProbingSteps onAdded={onClose} />
     </AppDialog>
   )
