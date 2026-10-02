@@ -5,6 +5,7 @@ import {
   ViewerToolbar,
   useViewerCamera,
 } from "@/features/viewer/viewer-toolbar"
+import { useVisualStyle } from "@/features/viewer/visual-style"
 import { useWorkspaceViewerPlates } from "@/features/viewer/workspace-viewer-plates"
 import type { JobSubject } from "./job-view"
 import { useFreshTelemetry } from "@/platform/machine"
@@ -27,6 +28,7 @@ export function JobViewer({
   const plates = useWorkspaceViewerPlates(shown)
   const dispatch = useDispatch()
   const camera = useViewerCamera()
+  const [style] = useVisualStyle()
   const telemetry = useFreshTelemetry()
   const machineOrigin = useMachineOrigin(shown?.plate ?? null, telemetry)
   return (
@@ -39,6 +41,7 @@ export function JobViewer({
         showRapids={false}
         showStock
         view={camera.view}
+        style={style}
         resetKey={camera.resetKey}
         zoom={camera.zoom}
         onZoomChange={camera.setZoom}

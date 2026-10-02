@@ -19,6 +19,7 @@ import { problemMarkerId } from "./bed-viewer-layout"
 import type { LineRange } from "./bed-viewer-layout"
 import { BedScene } from "./viewer/bed-scene"
 import type { LiveTool, MachineOrigin, ViewMode } from "./viewer/bed-scene"
+import type { VisualStyle } from "./viewer/solid-style"
 import type { ArrangeEvents, ArrangeView } from "./viewer/setup-arranger"
 
 export type { Stock } from "@/domain/stock/stock"
@@ -28,6 +29,7 @@ export type {
   ViewerProblemRef,
 } from "@/components/workspace/viewer/viewer-input"
 export type { LiveTool, MachineOrigin, ViewMode } from "./viewer/bed-scene"
+export type { VisualStyle } from "./viewer/solid-style"
 export type {
   ArrangeDrag,
   ArrangeEvents,
@@ -56,6 +58,8 @@ type Props = {
   showRapids: boolean
   showStock: boolean
   view: ViewMode
+  /** How the solids are drawn; smoothly shaded by default. */
+  style?: VisualStyle
   resetKey: number
   zoom: number
   onZoomChange?: (zoom: number) => void
@@ -87,6 +91,7 @@ export function BedViewer({
   showRapids,
   showStock,
   view,
+  style = "smooth",
   resetKey,
   zoom,
   onZoomChange,
@@ -207,6 +212,9 @@ export function BedViewer({
   useEffect(() => {
     sceneRef.current?.setZoom(zoom)
   }, [zoom, resetKey])
+  useEffect(() => {
+    sceneRef.current?.setStyle(style)
+  }, [style])
 
   return (
     <div

@@ -25,6 +25,7 @@ import {
   useWorkspaceProblems,
   viewerProblem,
 } from "@/features/viewer/viewer-problems"
+import { useVisualStyle } from "@/features/viewer/visual-style"
 import { useWorkspaceViewerPlates } from "@/features/viewer/workspace-viewer-plates"
 import {
   holdsViolation,
@@ -174,6 +175,7 @@ export function PrepareViewer() {
   const plate = useSelectedPlate()
   const selection = usePrepareSelection()
   const camera = useViewerCamera()
+  const [style] = useVisualStyle()
   const focus = useProblemFocus()
   const shown = useShownProblem()
   const highlighted = useHighlightedLines(shown?.diagnostic ?? null)
@@ -253,6 +255,7 @@ export function PrepareViewer() {
         showRapids={false}
         showStock
         view={camera.view}
+        style={style}
         resetKey={camera.resetKey}
         zoom={camera.zoom}
         onZoomChange={camera.setZoom}

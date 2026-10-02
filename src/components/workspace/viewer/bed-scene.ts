@@ -29,6 +29,8 @@ import { PlateView, bedGrid } from "./plate-view"
 import type { PlatePresentation, PlateViewContext } from "./plate-view"
 import { CLICK_TOLERANCE, SetupArranger } from "./setup-arranger"
 import type { ArrangeEvents, ArrangeLabel, ArrangeView } from "./setup-arranger"
+import { SolidStyle } from "./solid-style"
+import type { VisualStyle } from "./solid-style"
 import { GLOW } from "./touch-marker"
 import { ViewerAssets } from "./viewer-assets"
 import type { ModelMeshes } from "./viewer-assets"
@@ -138,6 +140,8 @@ export class BedScene {
   /** The scene through the eye, its glow bloomed over it (`renderPipeline`). */
   private readonly scenePass: PassNode
   private readonly pipeline: RenderPipeline
+  /** How the solids are drawn: smoothly, or toon shaded with their edges. */
+  private readonly solids: SolidStyle
   private readonly camera = new THREE.OrthographicCamera(
     -190,
     190,
@@ -247,6 +251,8 @@ export class BedScene {
     const { renderer } = this.stage
     this.scenePass = pass(this.stage.scene, this.camera)
     this.pipeline = glowingPipeline(renderer, this.scenePass)
+    this.solids = new SolidStyle(renderer.getPixelRatio())
+    this.stage.scene.add(this.solids.group)
     this.controls = new OrbitControls(this.camera, renderer.domElement)
     this.controls.target.copy(bedCenter)
     // Damping stays off; if enabled, frames continue until the controls settle.
@@ -378,6 +384,12 @@ export class BedScene {
     this.placeLens()
   }
 
+  /** Draws the solids in `style` from the next frame. */
+  setStyle(style: VisualStyle) {
+    this.solids.set(style)
+    this.stage.invalidate()
+  }
+
   /** A preset, or the view through the first plate's machine's camera, else the perspective. */
   setView(view: ViewMode) {
     this.view = view
@@ -486,6 +498,7 @@ export class BedScene {
     this.controls.dispose()
     for (const view of this.views.values()) view.dispose()
     this.views.clear()
+    this.solids.dispose()
     this.assets.dispose()
     this.pipeline.dispose()
     this.stage.dispose()
@@ -555,6 +568,7 @@ export class BedScene {
   private readonly frame = () => {
     const settling = this.controls.update()
     this.scenePass.camera = this.eye
+    this.solids.update(this.stage.scene, this.eye)
     this.pipeline.render()
     this.positionLabels()
     return settling

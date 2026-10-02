@@ -1,10 +1,28 @@
 import { useState } from "react"
-import { Layers3, Maximize, Minus, MousePointer2, Plus } from "lucide-react"
+import {
+  Cuboid,
+  Cylinder,
+  Layers3,
+  Maximize,
+  Minus,
+  MousePointer2,
+  Plus,
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Separator } from "@/components/ui/separator"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import type { ViewMode } from "@/components/workspace/bed-viewer"
+import { isVisualStyle, useVisualStyle } from "./visual-style"
 
 /** Limits match the viewer's orbit controls, which report wheel zoom through onZoomChange. */
 const ZOOM = { min: 0.2, max: 12, step: 0.25 } as const
@@ -103,6 +121,49 @@ export function ViewerToolbar({ camera }: { camera: ViewerCamera }) {
       >
         <Maximize />
       </Button>
+      <Separator />
+      <VisualStyleMenu />
     </Card>
+  )
+}
+
+/** The 3D views' visual style, from a menu beside the toolbar; its button shows the one chosen. */
+function VisualStyleMenu() {
+  const [style, setStyle] = useVisualStyle()
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        render={
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Visual style"
+            title="Visual style"
+          />
+        }
+      >
+        {style === "edges" ? <Cuboid /> : <Cylinder />}
+      </DropdownMenuTrigger>
+      <DropdownMenuContent side="right" className="w-56">
+        <DropdownMenuGroup>
+          <DropdownMenuLabel>Visual style</DropdownMenuLabel>
+          <DropdownMenuRadioGroup
+            value={style}
+            onValueChange={(value) => {
+              if (isVisualStyle(value)) setStyle(value)
+            }}
+          >
+            <DropdownMenuRadioItem value="smooth">
+              <Cylinder />
+              Smooth Shades
+            </DropdownMenuRadioItem>
+            <DropdownMenuRadioItem value="edges">
+              <Cuboid />
+              Shaded Edges
+            </DropdownMenuRadioItem>
+          </DropdownMenuRadioGroup>
+        </DropdownMenuGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }
