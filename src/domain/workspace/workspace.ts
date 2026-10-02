@@ -11,7 +11,12 @@ import {
   revise,
 } from "../operations/operation"
 import type { Operation, OperationSource } from "../operations/operation"
-import { PlateSchema, PlateSetupSchema, plateLabel } from "../plate/plate"
+import {
+  PlateSchema,
+  PlateSetupSchema,
+  plateLabel,
+  withStockChange,
+} from "../plate/plate"
 import type { Group, Plate, PlateSetup } from "../plate/plate"
 import {
   addFixture,
@@ -332,7 +337,12 @@ function syncAnchors(plate: Plate, sync: DeviceAnchors): Plate {
  * origin, the stock, fixtures), unless the patch places it itself.
  */
 function patchedSetup(setup: PlateSetup, patch: Partial<PlateSetup>) {
-  const next = { ...setup, ...patch }
+  // Stock is placed as a new plate's, and a work origin on its top stays there, unless the
+  // patch places them itself.
+  const next =
+    "stockAnchor" in patch || "workOrigin" in patch
+      ? { ...setup, ...patch }
+      : withStockChange(setup, { ...setup, ...patch })
   if (!("anchors" in patch)) return next
   const carried = withAnchors({ ...next, anchors: setup.anchors }, next.anchors)
   return { ...carried, ...patch }

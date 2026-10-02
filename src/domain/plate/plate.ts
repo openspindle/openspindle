@@ -242,6 +242,46 @@ export function createPlateSetup(options: {
 }
 
 /**
+ * A setup with the stock it now has placed as a new plate's: stock where there was none keeps
+ * its front-left bottom corner where the setup kept it, resting on what carries it there (a
+ * wasteboard under it, else the bed), with the work origin on its top front-left corner; a work
+ * origin on the stock's top stays on it as the stock's height changes. Otherwise unchanged.
+ */
+export function withStockChange(
+  before: PlateSetup,
+  setup: PlateSetup
+): PlateSetup {
+  const { stock } = setup
+  if (!stock) return setup
+  if (!before.stock) {
+    const [x, y] = setup.stockAnchor
+    const rest = stockSupportHeight(
+      setup.fixtures,
+      [x, y],
+      stock,
+      kitForSetup(setup).tableTop
+    )
+    return {
+      ...setup,
+      stockAnchor: [x, y, rest],
+      workOrigin: [x, y, toMicrometre(rest + stock.height)],
+      workOriginAnchor: setup.stockRelativeTo ?? null,
+    }
+  }
+  const top = before.stockAnchor[2] + before.stock.height
+  if (
+    stock.height === before.stock.height ||
+    Math.abs(before.workOrigin[2] - top) > 0.0005
+  )
+    return setup
+  const [x, y] = setup.workOrigin
+  return {
+    ...setup,
+    workOrigin: [x, y, toMicrometre(setup.stockAnchor[2] + stock.height)],
+  }
+}
+
+/**
  * The setup with its stock where its program puts it (`placement`, read from its markers): its
  * front-left bottom corner at the offsets from its anchor, where the plate's anchors, else
  * `machine.anchors`, have that anchor and the stock then overlaps the work area; else where it
