@@ -251,7 +251,7 @@ export class BedScene {
     const { renderer } = this.stage
     this.scenePass = pass(this.stage.scene, this.camera)
     this.pipeline = glowingPipeline(renderer, this.scenePass)
-    this.solids = new SolidStyle(renderer.getPixelRatio())
+    this.solids = new SolidStyle()
     this.stage.scene.add(this.solids.group)
     this.controls = new OrbitControls(this.camera, renderer.domElement)
     this.controls.target.copy(bedCenter)

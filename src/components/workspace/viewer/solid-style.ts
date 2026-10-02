@@ -3,14 +3,10 @@ import { LineSegments2 } from "three/addons/lines/webgpu/LineSegments2.js"
 import { LineSegmentsGeometry } from "three/addons/lines/LineSegmentsGeometry.js"
 import {
   cameraProjectionMatrix,
-  length,
-  max,
   modelViewMatrix,
   normalLocal,
   positionLocal,
-  screenSize,
   transformNormalToView,
-  uniform,
   vec4,
 } from "three/tsl"
 import { Line2NodeMaterial, MeshBasicNodeMaterial } from "three/webgpu"
@@ -23,10 +19,11 @@ import { materialsOf } from "@/lib/three-assets"
 export type VisualStyle = "smooth" | "edges"
 
 /**
- * What "edges" draws: its line colour, and widths in CSS pixels of creases and of outlines. An
- * outline is drawn past the silhouette, where a crease there reaches half its width.
+ * What "edges" draws: its line colour, and how wide its creases and outlines are in the scene,
+ * mm, so that they look thinner further off, as the solids do. An outline is drawn past the
+ * silhouette, where a crease there reaches half its width.
  */
-const EDGES = { color: 0x23282e, crease: 0.75, outline: 0.75 } as const
+const EDGES = { color: 0x23282e, width: 0.3 } as const
 
 /**
  * How far creases are drawn towards the eye, mm: off the faces they lie on, which would hide them
@@ -89,28 +86,15 @@ function shadesTexture() {
   return texture
 }
 
-/** A width in physical pixels, which the outlines take. */
-const pixels = (value: number) => uniform(value)
-
-/**
- * A solid's outline: its back faces pushed out across the screen, `width` past its silhouette,
- * drawn behind it.
- */
-function outlineMaterial(width: ReturnType<typeof pixels>) {
+/** A solid's outline: its back faces pushed out by `EDGES.width`, drawn behind it. */
+function outlineMaterial() {
   const material = new MeshBasicNodeMaterial({
     color: EDGES.color,
     side: THREE.BackSide,
   })
-  const clip = cameraProjectionMatrix
-    .mul(modelViewMatrix)
-    .mul(vec4(positionLocal, 1))
-  // Which way the surface faces across the screen, in pixels.
-  const across = cameraProjectionMatrix
-    .mul(vec4(transformNormalToView(normalLocal), 0))
-    .xy.mul(screenSize)
-  const direction = across.div(max(length(across), 1e-6))
-  const offset = direction.mul(width).mul(2).div(screenSize).mul(clip.w)
-  material.vertexNode = vec4(clip.xy.add(offset), clip.z, clip.w)
+  const view = modelViewMatrix.mul(vec4(positionLocal, 1))
+  const out = transformNormalToView(normalLocal).mul(EDGES.width)
+  material.vertexNode = cameraProjectionMatrix.mul(vec4(view.xyz.add(out), 1))
   return material
 }
 
@@ -155,21 +139,17 @@ export class SolidStyle {
   private readonly shades = shadesTexture()
   /** Towards the eye by `CREASE_LIFT`, for this frame. */
   private readonly lift = new THREE.Matrix4()
-  private readonly outlineWidth: ReturnType<typeof pixels>
-  private readonly outline: MeshBasicNodeMaterial
-  private readonly crease: Line2NodeMaterial
+  private readonly outline = outlineMaterial()
+  private readonly crease = new Line2NodeMaterial({
+    color: EDGES.color,
+    linewidth: EDGES.width,
+    worldUnits: true,
+    // Lines this thin, covered in part by multisampling, would break up into dots.
+    alphaToCoverage: false,
+  })
 
-  /** `pixelRatio`: physical pixels per CSS pixel, which lines are drawn in. */
-  constructor(pixelRatio: number) {
+  constructor() {
     this.group.name = "solid-style"
-    this.outlineWidth = pixels(EDGES.outline * pixelRatio)
-    this.outline = outlineMaterial(this.outlineWidth)
-    this.crease = new Line2NodeMaterial({
-      color: EDGES.color,
-      linewidth: EDGES.crease * pixelRatio,
-      // Lines this thin, covered in part by multisampling, would break up into dots.
-      alphaToCoverage: false,
-    })
   }
 
   set(style: VisualStyle) {
