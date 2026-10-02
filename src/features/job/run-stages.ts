@@ -6,6 +6,7 @@ import type {
   JobMeasurement,
   TouchMeasurement,
 } from "@/machine/contract"
+import { playedLine } from "./job-view"
 import type { JobSubject, JobView } from "./job-view"
 
 /**
@@ -137,8 +138,9 @@ function reachedOperations(view: Exclude<JobView, { kind: "idle" }>) {
   }
   if ("point" in view && view.point)
     reached = Math.max(reached, operationAt(stages, view.point.line))
-  const line = view.job.progress?.line
-  if (line !== undefined) reached = Math.max(reached, operationAt(stages, line))
+  // Past a pause it resumed from, the machine plays on where the reported line does not show.
+  const line = playedLine(view.job, subject)
+  if (line !== null) reached = Math.max(reached, operationAt(stages, line))
   const withMeasurements = stages.map((stage, index) => {
     const latest = [...(measured.get(index) ?? [])].reverse()
     return {

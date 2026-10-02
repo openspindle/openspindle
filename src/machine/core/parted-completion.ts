@@ -82,6 +82,8 @@ export class PartedCompletion implements CompletionTracker {
   private playedBytes = 0
   /** Where the previous part ended, until the one playing reports progress. */
   private carried: Telemetry["job"] = null
+  /** The line after the last pause a part before resumed from, in program lines. */
+  private carriedResume: number | null = null
   /** How the job ended between parts, where no part's tracker follows the machine. */
   private ended: { phase: JobPhase; error: string | null } | null = null
   /** The next part went to a start; until it begins, no other start gets it. */
@@ -136,6 +138,8 @@ export class PartedCompletion implements CompletionTracker {
       const part = this.parts[this.index]
       const { update } = previous
       this.carried = this.progress(update.progress) ?? this.carried
+      this.carriedResume =
+        mapLine(part, update.resumedLine) ?? this.carriedResume
       this.faults.push(...update.faults.map(mapFault(part)))
       this.measurements.push(...update.measurements.map(mapMeasurement(part)))
       this.elapsedSeconds += update.progress?.elapsedSeconds ?? 0
@@ -182,6 +186,8 @@ export class PartedCompletion implements CompletionTracker {
     return {
       phase,
       progress: this.progress(inner?.progress ?? null) ?? this.carried,
+      resumedLine:
+        mapLine(part, inner?.resumedLine ?? null) ?? this.carriedResume,
       wait: inner?.wait
         ? { ...inner.wait, line: mapLine(part, inner.wait.line) }
         : null,

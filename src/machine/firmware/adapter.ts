@@ -202,6 +202,8 @@ export class TransferError extends Error {}
 export type CompletionUpdate = {
   readonly phase: JobPhase
   readonly progress: Telemetry["job"]
+  /** The line after the last program pause the job resumed from (`JobState.resumedLine`). */
+  readonly resumedLine: number | null
   readonly wait: JobWait | null
   readonly faults: readonly JobFault[]
   readonly measurements: readonly JobMeasurement[]

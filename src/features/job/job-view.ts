@@ -249,6 +249,41 @@ export function jobSubject(
   return selected
 }
 
+/** A compiled program's lines, split once per program. */
+const programLines = new WeakMap<CompiledPlate, readonly string[]>()
+
+const linesOf = (compiled: CompiledPlate) => {
+  let lines = programLines.get(compiled)
+  if (!lines) {
+    lines = compiled.program.source.split(/\r?\n/)
+    programLines.set(compiled, lines)
+  }
+  return lines
+}
+
+/** Whether a program line does anything: not blank, nor only comments. */
+const executes = (text: string) =>
+  text.replace(/\([^)]*\)|;.*$/g, "").trim() !== ""
+
+/**
+ * The furthest line a job is known to play: the line it reports, or, once it resumed from a
+ * program pause, the first line after the pause that does anything. The reported line moves
+ * only with feed moves (G1, G2, G3), so after a pause it stays on the line before it until the
+ * next one, while probing, rapids and tool changes run. Null before the job reports progress.
+ */
+export function playedLine(
+  job: JobState,
+  subject: Pick<JobSubject, "compiled"> | null
+): number | null {
+  const reported = job.progress?.line ?? null
+  const resumed = job.resumedLine
+  if (resumed === null || !subject) return reported
+  const lines = linesOf(subject.compiled)
+  let line = resumed
+  while (line < lines.length && !executes(lines[line - 1])) line += 1
+  return Math.max(reported ?? 0, Math.min(line, lines.length))
+}
+
 /** Where this window's job is, for the timeline to follow; null before it reports progress. */
 export type FollowTarget = {
   readonly jobId: string
@@ -261,7 +296,7 @@ export function followTarget(view: JobView): FollowTarget | null {
   if (view.kind === "idle" || !view.session || !view.job.progress) return null
   return {
     jobId: view.job.id,
-    line: view.job.progress.line,
+    line: playedLine(view.job, view.session) ?? view.job.progress.line,
     active: view.kind !== "ended",
   }
 }

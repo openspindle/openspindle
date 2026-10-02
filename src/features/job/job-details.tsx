@@ -4,7 +4,12 @@ import { FieldDescription } from "@/components/ui/field"
 import { Progress } from "@/components/ui/progress"
 import type { JobState } from "@/machine/contract"
 import { formatDuration } from "./format"
-import { partLabel, positionLabel, programPosition } from "./job-view"
+import {
+  partLabel,
+  playedLine,
+  positionLabel,
+  programPosition,
+} from "./job-view"
 import type { JobSubject, ProgramPosition } from "./job-view"
 
 /** The position's label, as the timeline names its markers; the operation only when asked. */
@@ -30,8 +35,9 @@ export function JobProgressDetails({
 }) {
   const progress = job.progress
   if (!progress) return null
+  const line = playedLine(job, subject) ?? progress.line
   const position = subject
-    ? positionText(programPosition(subject, progress.line), withOperation)
+    ? positionText(programPosition(subject, line), withOperation)
     : null
   const part = partLabel(job)
   return (
@@ -39,7 +45,7 @@ export function JobProgressDetails({
       <Progress value={progress.percent} aria-label="Program progress" />
       <FieldDescription className="flex justify-between gap-3 font-numeric">
         <span>
-          Line {progress.line.toLocaleString()} of{" "}
+          Line {line.toLocaleString()} of{" "}
           {job.program.lineCount.toLocaleString()}
           {part && ` · ${part.toLowerCase()}`}
         </span>

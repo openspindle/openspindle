@@ -31,6 +31,7 @@ const idleAndStopped = (telemetry: Telemetry) =>
 export class MakeraCompletion implements CompletionTracker {
   private phase: JobPhase = "starting"
   private progress: Telemetry["job"] = null
+  private resumedLine: number | null = null
   private wait: JobWait | null = null
   private readonly faults: JobFault[] = []
   private readonly measured = new MakeraMeasurements()
@@ -69,6 +70,7 @@ export class MakeraCompletion implements CompletionTracker {
     return {
       phase: this.phase,
       progress: this.progress,
+      resumedLine: this.resumedLine,
       wait: this.wait,
       faults: this.faults,
       measurements: this.measured.list,
@@ -179,6 +181,8 @@ export class MakeraCompletion implements CompletionTracker {
         // Suspending: the queue drains before the machine reports Pause.
         return
       default:
+        if (this.wait?.reason === "program-pause")
+          this.resumedLine = this.pauseLine(this.wait.line) + 1
         this.wait = null
         this.pauseRequestedAt = null
         this.phase = this.doneSeen ? "finishing" : "running"
@@ -192,6 +196,12 @@ export class MakeraCompletion implements CompletionTracker {
     if (this.pauseLines.has(line) || this.pauseLines.has(line + 1))
       return "program-pause"
     return "hold"
+  }
+
+  /** The program pause a wait reported at `line` is at: the line after it, else the line. */
+  private pauseLine(line: number | null): number {
+    if (line === null) return 0
+    return this.pauseLines.has(line + 1) ? line + 1 : line
   }
 
   private pause(

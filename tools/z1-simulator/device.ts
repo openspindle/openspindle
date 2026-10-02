@@ -80,8 +80,12 @@ type Player = {
   pausedAt: number | null
   pausedMs: number
   suspended: boolean
-  /** The line reported while an M600 holds the player: the one before it. */
-  suspendLine: number | null
+  /**
+   * The line the status reports (Player::on_get_public_data): the line of the feed move (G1,
+   * G2, G3) under way or last, never a rapid's, a probe's or a routine's; once the player
+   * suspends, the lines played so far, which an M600 is not among yet. It stays after a resume.
+   */
+  reported: number
   toolWait: boolean
   dwellUntil: number
   doneAt: number | null
@@ -367,7 +371,7 @@ export class SimulatedZ1 {
     if (player.doneAt !== null)
       return { line: player.lines.length, percent: 100, elapsed }
     return {
-      line: player.suspendLine ?? player.index,
+      line: player.reported,
       percent: Math.round((player.played * 100) / Math.max(player.bytes, 1)),
       elapsed,
     }
@@ -527,7 +531,7 @@ export class SimulatedZ1 {
           pausedAt: null,
           pausedMs: 0,
           suspended: false,
-          suspendLine: null,
+          reported: 0,
           toolWait: false,
           dwellUntil: 0,
           doneAt: null,
@@ -549,7 +553,6 @@ export class SimulatedZ1 {
           "Restoring saved XYZ positions and state..."
         )
         player.suspended = false
-        player.suspendLine = null
         if (player.pausedAt !== null)
           player.pausedMs += Date.now() - player.pausedAt
         player.pausedAt = null
@@ -834,6 +837,7 @@ export class SimulatedZ1 {
     if (!player) return
     this.lines(message)
     player.suspended = true
+    player.reported = player.index
     player.pausedAt = Date.now()
     this.lines("Suspended, resume to continue playing")
   }
@@ -886,7 +890,7 @@ export class SimulatedZ1 {
     if (/^M0*600\b/.test(code)) {
       this.suspend("Suspending , waiting for queue to empty...")
       // suspend_command saves the lines played before this one.
-      player.suspendLine = player.index - 1
+      player.reported = player.index - 1
       this.reply("ok")
       return
     }
@@ -934,7 +938,15 @@ export class SimulatedZ1 {
       this.reply("ok")
       return
     }
+    const moving = this.motionUntil
     if (!this.motion(code, (text) => this.reply(text))) return
+    // A feed move's block carries its line; rapids, probes and routines do not.
+    if (
+      this.motionUntil !== moving &&
+      (this.motionMode ?? 0) >= 1 &&
+      !/^G0*38\./.test(code)
+    )
+      player.reported = player.index
     if (/^M0*5\b/.test(code)) player.dwellUntil = Date.now() + 1500
     if (/^G0*4\b/.test(code))
       player.dwellUntil = Date.now() + (word(code, "P") ?? 0) * 1000

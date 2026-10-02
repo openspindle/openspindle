@@ -267,6 +267,12 @@ export const JobStateSchema = z.object({
     totalBytes: z.int().nonnegative(),
   }),
   progress: JobProgressSchema.nullable(),
+  /**
+   * The line after the last program pause the job resumed from, where the machine plays on.
+   * The reported line moves only with feed moves (G1, G2, G3), so after a pause it can stay on
+   * the line before it while probing, rapids and tool changes run. Null before any resume.
+   */
+  resumedLine: z.int().nonnegative().nullable().default(null),
   wait: JobWaitSchema.nullable(),
   faults: z.array(JobFaultSchema),
   /**
