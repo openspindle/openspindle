@@ -104,7 +104,7 @@ function VacuumPowerForm({
           return
         setConfiguration(result.configuration)
         form.reset({ percent: String(result.configuration.vacuumDefaultPower) })
-        setNotice("Saved. Restart the device to apply it.")
+        setNotice("Saved.")
       } catch {
         // Preserve the draft, but obtain a fresh revision before another save.
         if (mounted.current) setNeedsReload(true)

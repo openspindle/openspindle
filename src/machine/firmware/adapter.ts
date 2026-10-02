@@ -16,6 +16,7 @@ import type {
   MachineFeatures,
   MachineState,
   NetworkDevice,
+  PictureSize,
   PlateAssists,
   PrepareResult,
   PreparedProgram,
@@ -305,6 +306,10 @@ export interface FirmwareAdapter {
     createUpload: (bytes: Uint8Array, md5: string) => TransferProtocol
     vacuumDefaultPower: (content: string) => number | null
     withVacuumDefaultPower: (content: string, percent: number) => string
+    /** The size of the camera's stream the file sets; null when it sets none. */
+    cameraPicture: (content: string) => PictureSize | null
+    /** Throws for a size the camera has not. */
+    withCameraPicture: (content: string, picture: PictureSize) => string
     readonly afterRestart: boolean
   }
   /**

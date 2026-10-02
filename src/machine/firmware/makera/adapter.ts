@@ -27,7 +27,9 @@ import { MakeraCompletion } from "./completion.ts"
 import {
   MAKERA_CONFIGURATION_PATH,
   MakeraConfigurationDownload,
+  readMakeraCameraPicture,
   readMakeraVacuumDefaultPower,
+  withMakeraCameraPicture,
   withMakeraVacuumDefaultPower,
 } from "./configuration.ts"
 import { changesToolBeforeSpindle, prepareMakeraProgram } from "./dialect.ts"
@@ -191,7 +193,7 @@ function anchorValues(anchors: readonly AnchorPosition[]): number[] {
   return [x, y, ...offsets]
 }
 
-/** Passive discovery format from the Z1-supporting community controller: name,ip,port,busy[,version]. */
+/** The announcement a Z1 broadcasts for discovery (UDP 3333): name,ip,port,busy[,version]. */
 function parseAnnouncement(
   data: Uint8Array,
   sender: string
@@ -275,6 +277,8 @@ export const makeraAdapter: FirmwareAdapter = {
       new MakeraTransfer(bytes, md5, MAKERA_CONFIGURATION_PATH),
     vacuumDefaultPower: readMakeraVacuumDefaultPower,
     withVacuumDefaultPower: withMakeraVacuumDefaultPower,
+    cameraPicture: readMakeraCameraPicture,
+    withCameraPicture: withMakeraCameraPicture,
     afterRestart: true,
   },
   anchors: {

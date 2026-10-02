@@ -1,5 +1,5 @@
 import { useId } from "react"
-import { Fan, Lightbulb, Power, RotateCw, Volume2 } from "lucide-react"
+import { Camera, Fan, Lightbulb, Power, RotateCw, Volume2 } from "lucide-react"
 import type { ReactNode } from "react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import {
@@ -18,7 +18,9 @@ import type {
   MachineCommand,
   Telemetry,
 } from "@/machine/contract"
+import { useMachineSnapshot } from "@/platform/machine"
 import { ControlCard } from "./device-control-card"
+import { DeviceCameraVideoField } from "./device-camera-video-field"
 import { WorkLightBrightnessFields } from "./work-light-brightness-fields"
 import { DeviceVacuumPowerField } from "./device-vacuum-power-field"
 
@@ -60,7 +62,10 @@ function OutputControl({
   )
 }
 
-/** The machine's on/off accessories: the work light, beep, vacuum and following the spindle. */
+/**
+ * The machine's accessories: the work light, beep, vacuum and following the spindle, and its
+ * camera's video size.
+ */
 export function DeviceAccessoriesCard({
   telemetry,
   pending,
@@ -73,6 +78,7 @@ export function DeviceAccessoriesCard({
   execute: (action: MachineCommand) => void
 }) {
   const light = useWorkLightControl()
+  const { features } = useMachineSnapshot()
   const busy = pending || light.pending
   const lightAction = telemetry?.lightOn === true ? "light" : "lightBrightness"
   return (
@@ -132,6 +138,17 @@ export function DeviceAccessoriesCard({
           <DeviceVacuumPowerField pending={busy} />
         </FieldGroup>
       </FieldSet>
+      {features?.camera === true && features.configuration && (
+        <FieldSet>
+          <FieldLegend className="flex items-center gap-2">
+            <Camera size={16} />
+            Camera
+          </FieldLegend>
+          <FieldGroup>
+            <DeviceCameraVideoField pending={busy} />
+          </FieldGroup>
+        </FieldSet>
+      )}
     </ControlCard>
   )
 }

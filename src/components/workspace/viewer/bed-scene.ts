@@ -1,6 +1,7 @@
 import * as THREE from "three"
 import { OrbitControls } from "three/addons/controls/OrbitControls.js"
 import { kitForSetup } from "@/domain/fixtures/catalog"
+import { pictureFov } from "@/domain/fixtures/fixture-kit"
 import type { MachineCamera } from "@/domain/fixtures/fixture-kit"
 import type { Point3 } from "@/domain/nc/gcode"
 import type {
@@ -213,7 +214,8 @@ export class BedScene {
         this.camera.right = centerX + halfWidth
         this.camera.updateProjectionMatrix()
         this.lens.aspect = width / height
-        this.lens.updateProjectionMatrix()
+        // The machine camera's field of view follows the picture's shape.
+        this.placeLens()
       },
     })
     this.controls = new OrbitControls(this.camera, renderer.domElement)
@@ -385,7 +387,7 @@ export class BedScene {
       selectedPlateId === null ? 0 : (this.offsetOf(selectedPlateId) ?? 0)
     const onBed = ([px, py, pz]: Point3) =>
       new THREE.Vector3(px + x, py + y, pz)
-    this.lens.fov = camera.fov
+    this.lens.fov = pictureFov(camera, this.lens.aspect)
     this.lens.updateProjectionMatrix()
     this.lens.up.set(0, 0, 1)
     this.lens.position.copy(onBed(camera.position))

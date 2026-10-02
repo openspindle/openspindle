@@ -184,6 +184,26 @@ export function DevicePanel({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      {snapshot.connection.restartNeeded && (
+        <Alert variant="warning">
+          <RotateCcw />
+          <AlertDescription>
+            Saved settings take effect once the machine restarts.
+          </AlertDescription>
+          <AlertAction>
+            <ReasonButton
+              label="Reset now"
+              variant="secondary"
+              size="sm"
+              reason={reason("reset")}
+              disabled={pending}
+              onClick={() => setConfirmReset(true)}
+            >
+              Reset now
+            </ReasonButton>
+          </AlertAction>
+        </Alert>
+      )}
       {snapshot.connection.restarting && (
         <Alert role="status">
           <LoaderCircle className="animate-spin" />

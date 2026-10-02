@@ -122,6 +122,11 @@ export const MachineSnapshotSchema = z.object({
     error: z.string().nullable(),
     /** Reset rebooted the machine; the same device is connected again once it answers. */
     restarting: z.boolean(),
+    /**
+     * Settings were saved on the machine over this connection that it applies only once it
+     * restarts. A new connection, as after Reset, starts without them.
+     */
+    restartNeeded: z.boolean(),
   }),
   features: MachineFeaturesSchema.nullable(),
   telemetry: TelemetrySchema.nullable(),
@@ -162,6 +167,7 @@ export function disconnectedSnapshot(
       device: null,
       error,
       restarting: false,
+      restartNeeded: false,
     },
     features: null,
     telemetry: null,

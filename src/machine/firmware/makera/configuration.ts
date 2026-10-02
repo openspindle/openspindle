@@ -1,4 +1,5 @@
 import { CONFIGURATION_MAX_BYTES } from "../../contract/configuration.ts"
+import type { PictureSize } from "../../contract/configuration.ts"
 import { TransferError } from "../adapter.ts"
 import type {
   DownloadProtocol,
@@ -11,6 +12,7 @@ import { advertisedMd5 } from "./transfer.ts"
 export const MAKERA_CONFIGURATION_PATH = "/sd/config.txt"
 
 const VACUUM_DEFAULT_POWER_KEY = "switch.vacuum.default_on_value"
+const CAMERA_FRAME_SIZE_KEY = "*mainboard.video_stream_framesize"
 
 /** Match active keys and their first value token, allowing a preserved UTF-8 document marker. */
 function vacuumDefaultPowerSettings(content: string) {
@@ -19,6 +21,41 @@ function vacuumDefaultPowerSettings(content: string) {
       /^\uFEFF?[ \t]*switch\.vacuum\.default_on_value(?=[ \t\r\n]|$)[ \t]*([^ \t\r\n#]*)/gm
     )
   )
+}
+
+function cameraFrameSizeSettings(content: string) {
+  return Array.from(
+    content.matchAll(
+      /^\uFEFF?[ \t]*\*mainboard\.video_stream_framesize(?=[ \t\r\n]|$)[ \t]*([^ \t\r\n#]*)/gm
+    )
+  )
+}
+
+/**
+ * Change only the value token of the key's line, or add the line at the end when there is none;
+ * preserve the rest of the file, including its line endings.
+ */
+function withSetting(
+  content: string,
+  settings: readonly RegExpExecArray[],
+  key: string,
+  value: string
+): string {
+  const setting = settings.at(0)
+  if (setting) {
+    const old = setting[1]
+    const start = setting.index + setting[0].length - old.length
+    const separator = /[ \t]$/.test(content.slice(0, start)) ? "" : " "
+    return (
+      content.slice(0, start) +
+      (old ? "" : separator) +
+      value +
+      content.slice(start + old.length)
+    )
+  }
+  const newline = /\r\n|\n|\r/.exec(content)?.[0] ?? "\n"
+  const separator = /[\r\n]$/.test(content) ? "" : newline
+  return `${content}${separator}${key} ${value}${newline}`
 }
 
 export function readMakeraVacuumDefaultPower(content: string): number | null {
@@ -31,7 +68,6 @@ export function readMakeraVacuumDefaultPower(content: string): number | null {
   return Number.isFinite(percent) ? percent : null
 }
 
-/** Change only the value token; preserve the rest of the file, including its line endings. */
 export function withMakeraVacuumDefaultPower(
   content: string,
   percent: number
@@ -41,21 +77,77 @@ export function withMakeraVacuumDefaultPower(
     throw new Error(
       "The configuration contains duplicate vacuum default settings. Open Firmware configuration and remove the duplicate before saving vacuum power."
     )
-  const setting = settings.at(0)
-  if (setting) {
-    const value = setting[1]
-    const start = setting.index + setting[0].length - value.length
-    const separator = /[ \t]$/.test(content.slice(0, start)) ? "" : " "
-    return (
-      content.slice(0, start) +
-      (value ? "" : separator) +
-      String(percent) +
-      content.slice(start + value.length)
+  return withSetting(
+    content,
+    settings,
+    VACUUM_DEFAULT_POWER_KEY,
+    String(percent)
+  )
+}
+
+/**
+ * The ESP32 camera's frame sizes by number (`framesize_t`), as Espressif's camera driver lists
+ * them: https://github.com/espressif/esp32-camera/blob/2bba0d1d57219ddacd18d2c5701927e1884a51d1/driver/sensor.c#L26-L54
+ */
+const CAMERA_FRAME_SIZES: readonly (readonly [number, number])[] = [
+  [96, 96],
+  [160, 120],
+  [128, 128],
+  [176, 144],
+  [240, 176],
+  [240, 240],
+  [320, 240],
+  [320, 320],
+  [400, 296],
+  [480, 320],
+  [640, 480],
+  [800, 600],
+  [1024, 768],
+  [1280, 720],
+  [1280, 1024],
+  [1600, 1200],
+  [1920, 1080],
+  [720, 1280],
+  [864, 1536],
+  [2048, 1536],
+  [2560, 1440],
+  [2560, 1600],
+  [1088, 1920],
+  [2560, 1920],
+  [2592, 1944],
+]
+
+/** The camera's stream size the file sets, as the frame size's number (10 is 640 × 480). */
+export function readMakeraCameraPicture(content: string): PictureSize | null {
+  const settings = cameraFrameSizeSettings(content)
+  if (settings.length !== 1 || !/^\d{1,2}$/.test(settings[0][1])) return null
+  const size = CAMERA_FRAME_SIZES.at(Number(settings[0][1]))
+  return size ? { width: size[0], height: size[1] } : null
+}
+
+/** Sets the camera's stream size by its frame size's number. */
+export function withMakeraCameraPicture(
+  content: string,
+  picture: PictureSize
+): string {
+  const frameSize = CAMERA_FRAME_SIZES.findIndex(
+    ([width, height]) => width === picture.width && height === picture.height
+  )
+  if (frameSize < 0)
+    throw new Error(
+      `The camera has no ${picture.width} × ${picture.height} frame size.`
     )
-  }
-  const newline = /\r\n|\n|\r/.exec(content)?.[0] ?? "\n"
-  const separator = /[\r\n]$/.test(content) ? "" : newline
-  return `${content}${separator}${VACUUM_DEFAULT_POWER_KEY} ${percent}${newline}`
+  const settings = cameraFrameSizeSettings(content)
+  if (settings.length > 1)
+    throw new Error(
+      "The configuration contains duplicate camera video settings. Open Firmware configuration and remove the duplicate before saving the camera video."
+    )
+  return withSetting(
+    content,
+    settings,
+    CAMERA_FRAME_SIZE_KEY,
+    String(frameSize)
+  )
 }
 
 type Stage = "start" | "md5" | "view" | "data" | "end" | "done"

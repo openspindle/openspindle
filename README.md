@@ -97,4 +97,6 @@ The release pull request updates the version and CHANGELOG.md ([releasing](docs/
 
 ## Acknowledgements
 
-Framing, model identification and the probing sequences follow [Makera's Z1 firmware](https://github.com/MakeraInc/MakeraZ1Firmware/tree/b3a2e26a9eaa2b01358f74ccdef549b993a08175); discovery, the camera stream and the file transfer follow the [Carvera Community Controller](https://github.com/Carvera-Community/Carvera_Controller/tree/63da3c0a8ab6bca2563ff4c2aadb7ab5323335bf/carveracontroller). The About panel credits the open-source software OpenSpindle includes.
+Framing, model identification and the probing sequences are documented in [Makera's Z1 firmware](https://github.com/MakeraInc/MakeraZ1Firmware/tree/b3a2e26a9eaa2b01358f74ccdef549b993a08175), and discovery and the file transfer in [Makera's controller](https://github.com/MakeraInc/CarveraController/tree/3914c912452f83fbd5b5d90c730cb78795198438). The camera stream is the one the Z1's own web page shows, at the frame size its configuration sets, numbered as in [Espressif's camera driver](https://github.com/espressif/esp32-camera/blob/2bba0d1d57219ddacd18d2c5701927e1884a51d1/driver/sensor.c#L26-L54). OpenSpindle implements these protocols itself and includes none of that code.
+
+The About panel lists the open-source libraries OpenSpindle is built with, such as Electron, React and three.js, with their licenses.

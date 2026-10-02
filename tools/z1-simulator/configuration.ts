@@ -47,6 +47,9 @@ spindle.max_rpm                 18000
 
 # Default vacuum power for Follow spindle, loaded on reset
 switch.vacuum.default_on_value   80
+
+# The camera stream's frame size (ESP32 camera framesize; 10 is 640x480)
+*mainboard.video_stream_framesize 10
 `)
 }
 

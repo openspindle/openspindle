@@ -33,11 +33,20 @@ export const ConfigurationContentSchema = z
     "The configuration needs at least one setting."
   )
 
+/** A picture's size in pixels. */
+export const PictureSizeSchema = z.object({
+  width: z.int().positive(),
+  height: z.int().positive(),
+})
+export type PictureSize = z.infer<typeof PictureSizeSchema>
+
 export const FirmwareConfigurationSchema = z.object({
   path: z.string().min(1).max(256),
   content: ConfigurationContentSchema,
   /** The saved vacuum default, including values outside the editable range; null when unknown. */
   vacuumDefaultPower: z.number().nullable(),
+  /** The size of the camera's stream the configuration sets; null when it sets none. */
+  cameraPicture: PictureSizeSchema.nullable(),
   revision: z.string().regex(/^[a-f0-9]{32}$/),
   connectionId: z.string().uuid(),
   fetchedAt: z.number().nonnegative(),
@@ -53,6 +62,11 @@ export const WriteConfigurationRequestSchema = z.union([
   }),
   z.strictObject({
     vacuumDefaultPower: VacuumDefaultPowerSchema,
+    revision: FirmwareConfigurationSchema.shape.revision,
+    connectionId: FirmwareConfigurationSchema.shape.connectionId,
+  }),
+  z.strictObject({
+    cameraPicture: PictureSizeSchema,
     revision: FirmwareConfigurationSchema.shape.revision,
     connectionId: FirmwareConfigurationSchema.shape.connectionId,
   }),

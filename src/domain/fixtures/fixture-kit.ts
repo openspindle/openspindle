@@ -41,10 +41,21 @@ export type KitRecolor = {
 export type MachineCamera = {
   readonly position: Point3
   readonly target: Point3
-  /** Its picture's vertical field of view, in degrees. */
+  /** Its whole picture's vertical field of view, in degrees. */
   readonly fov: number
-  /** Its picture's width over its height. */
+  /** Its whole picture's width over its height. */
   readonly aspect: number
+}
+
+/**
+ * The vertical field of view of a picture of `aspect` (width over height), taken from the middle
+ * of the camera's whole picture as Espressif's camera driver crops its sensors': a wider one
+ * loses the top and bottom, a narrower one the sides.
+ */
+export function pictureFov(camera: MachineCamera, aspect: number): number {
+  if (aspect <= camera.aspect) return camera.fov
+  const tall = Math.tan((camera.fov * Math.PI) / 360) * (camera.aspect / aspect)
+  return (Math.atan(tall) * 360) / Math.PI
 }
 
 /**

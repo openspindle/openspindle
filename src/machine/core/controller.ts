@@ -191,6 +191,8 @@ export class MachineController {
   private disconnects = 0
   private transfer: Pick<TransferProtocol, "cancel"> | null = null
   private readonly connectionIds = new WeakMap<MachineSession, string>()
+  /** Connections over which settings were saved that the machine applies once it restarts. */
+  private readonly restartNeeded = new WeakSet<MachineSession>()
   private lockout: string | null = null
   /** A reset is waiting for the machine to come back; connecting or disconnecting ends it. */
   private restart: { cancelled: boolean } | null = null
@@ -747,12 +749,11 @@ export class MachineController {
           progress.sent = true
         })
         this.anchors = { value, reading: false, error: null }
-        return {
-          anchors: value,
-          afterRestart:
-            !!request.anchors &&
-            (this.adapter.anchors?.write?.afterRestart ?? false),
-        }
+        const afterRestart =
+          !!request.anchors &&
+          (this.adapter.anchors?.write?.afterRestart ?? false)
+        if (afterRestart) this.restartNeeded.add(context.session)
+        return { anchors: value, afterRestart }
       } catch (error) {
         if (progress.sent && request.anchors)
           this.anchors = {
@@ -832,10 +833,9 @@ export class MachineController {
             this.publish()
           }
         )
-        return {
-          configuration,
-          afterRestart: this.adapter.configuration?.afterRestart ?? false,
-        }
+        const afterRestart = this.adapter.configuration?.afterRestart ?? false
+        if (afterRestart) this.restartNeeded.add(context.session)
+        return { configuration, afterRestart }
       }
     )
   }
@@ -1281,6 +1281,7 @@ export class MachineController {
         // Failed attempts while the machine restarts are expected, not errors.
         error: this.restart ? null : this.lastError,
         restarting: this.restart !== null,
+        restartNeeded: ready !== null && this.restartNeeded.has(ready),
       },
       features: ready?.identity
         ? {

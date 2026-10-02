@@ -7,7 +7,11 @@ import type {
   PlayheadSource,
 } from "@/components/workspace/bed-viewer"
 import { kitForSetup } from "@/domain/fixtures/catalog"
-import { useFreshTelemetry } from "@/platform/machine"
+import {
+  useCachedConfiguration,
+  useFreshTelemetry,
+  useMachineSnapshot,
+} from "@/platform/machine"
 import { useWorkspaceViewerPlates } from "./workspace-viewer-plates"
 import type { ShownPlate } from "./workspace-viewer-plates"
 
@@ -18,7 +22,9 @@ const NO_SETUP = { deviceId: null, fixtures: [] }
  * What the machine's camera would see, on the simulator: the plate on its bed through the
  * camera's lens, the bed moved along Y under it as the machine moves it, with the tool the
  * machine reports where it reports it. Following a job, the playhead that follows the machine
- * shows the tool and the path cut so far instead. Only to look at.
+ * shows the tool and the path cut so far instead. Its picture has the shape the device's
+ * configuration sets for the camera's stream, once the configuration has been read. Only to
+ * look at.
  */
 export function SimulatedCamera({
   shown,
@@ -46,10 +52,14 @@ export function SimulatedCamera({
     const position = bedPositionOf(plate, [x, y, z - offset])
     return position && { plateId: plate.id, tool, position }
   }, [plate, x, y, z, offset, tool])
-  const aspect = kitForSetup(plate?.setup ?? NO_SETUP).camera?.aspect
+  const { connection } = useMachineSnapshot()
+  const picture = useCachedConfiguration(connection.id)?.cameraPicture
+  const camera = kitForSetup(plate?.setup ?? NO_SETUP).camera
+  let aspect = camera?.aspect
+  if (camera && picture) aspect = picture.width / picture.height
   return (
     <div className="pointer-events-none absolute inset-0 flex justify-center">
-      {/* The camera's whole picture, as its stream is shown: with bars at its sides. */}
+      {/* The camera's picture, as its stream is shown: with bars at its sides when narrower. */}
       <div
         className={cn("relative h-full max-w-full", !aspect && "w-full")}
         style={{ aspectRatio: aspect }}

@@ -130,6 +130,7 @@ async function downloadConfiguration(
     path: configuration.path,
     content,
     vacuumDefaultPower: configuration.vacuumDefaultPower(content),
+    cameraPicture: configuration.cameraPicture(content),
     revision,
     connectionId: hooks.connectionId,
     fetchedAt: context.clock.now(),
@@ -176,14 +177,20 @@ export async function writeFirmwareConfiguration(
   if ("content" in request) content = request.content
   else {
     try {
-      content = configuration.withVacuumDefaultPower(
-        current.content,
-        request.vacuumDefaultPower
-      )
+      content =
+        "vacuumDefaultPower" in request
+          ? configuration.withVacuumDefaultPower(
+              current.content,
+              request.vacuumDefaultPower
+            )
+          : configuration.withCameraPicture(
+              current.content,
+              request.cameraPicture
+            )
     } catch (error) {
       throw new MachineError(
         "refused",
-        error instanceof Error ? error.message : "Cannot save vacuum power."
+        error instanceof Error ? error.message : "Cannot save the setting."
       )
     }
   }
@@ -215,6 +222,7 @@ export async function writeFirmwareConfiguration(
     ...current,
     content,
     vacuumDefaultPower: configuration.vacuumDefaultPower(content),
+    cameraPicture: configuration.cameraPicture(content),
     revision,
     fetchedAt: context.clock.now(),
   }
