@@ -3,6 +3,7 @@ import type {
   ViewerToolRun,
 } from "@/components/workspace/viewer/viewer-input"
 import type { CompiledPlate } from "@/domain/compile/compile"
+import type { GCodeProgram } from "@/domain/nc/gcode"
 import { plateToolpathBounds } from "@/domain/compile/toolpath-bounds"
 import type { Plate } from "@/domain/plate/plate"
 import { toolShape } from "@/domain/tools/tool-shape"
@@ -72,18 +73,22 @@ function toolRuns(
 }
 
 /**
- * What the 3D viewer draws for a plate: its compiled program at its single work origin, and
- * the library's tools on its tool table. Cached per plate object, so an unchanged plate
- * keeps the same viewer plate.
+ * What the 3D viewer draws for a plate: its compiled program at its single work origin, as its
+ * machine moves through it (`machine`, such as a Run's plan from where the machine was, else the
+ * plate's own placement), and the library's tools on its tool table. Cached per plate object, so
+ * an unchanged plate keeps the same viewer plate.
  */
 export function toViewerPlate(
   plate: Plate,
   compiled: CompiledPlate,
-  library: readonly Tool[]
+  library: readonly Tool[],
+  machine: GCodeProgram | null = null
 ): ViewerPlate {
   const cached = viewerPlates.get(plate)
+  const machineProgramOf = machine ?? machineProgram(plate, compiled.program)
   if (
     cached?.viewerPlate.program === compiled.program &&
+    cached.viewerPlate.machineProgram === machineProgramOf &&
     cached.library === library
   )
     return cached.viewerPlate
@@ -93,7 +98,7 @@ export function toViewerPlate(
     id: plate.id,
     name: plate.name,
     program: compiled.program,
-    machineProgram: machineProgram(plate, compiled.program),
+    machineProgram: machineProgramOf,
     tools: toolRuns(plate, compiled, library),
     toolpathBounds: toolpath.ok ? toolpath.bounds : null,
     stock: plate.setup.stock,

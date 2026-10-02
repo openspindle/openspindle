@@ -1,7 +1,10 @@
 import { useMemo } from "react"
 import { toast } from "sonner"
 import { limitsFor, planFor } from "@/app/job/plan-store"
-import { simulatedBedOf } from "@/app/workspace/machine-program"
+import {
+  programPositionOf,
+  simulatedBedOf,
+} from "@/app/workspace/machine-program"
 import { usePlateDiagnostics } from "@/app/workspace/use-plate-diagnostics"
 import {
   plateIndex,
@@ -20,11 +23,12 @@ import {
   runRules,
   toDisplayName,
 } from "@/machine/contract"
-import type { Availability } from "@/machine/contract"
+import type { Availability, Telemetry } from "@/machine/contract"
 import type { Tool } from "@/domain/tools/tool"
 import {
   useCachedConfiguration,
   useDismissJob,
+  useFreshTelemetry,
   useMachineCommand,
   useMachineSnapshot,
   useRunProgram,
@@ -132,9 +136,25 @@ export function useJobActions(): JobActions {
  * limits of the machine's configuration as last read (its defaults when it was not), then sends
  * exactly that program.
  */
+/**
+ * Where the tool's tip is in a plate's program coordinates, as the machine's status reports it:
+ * where the machine is less the tool's offset. Null without a fresh machine position, or where
+ * the preview does not place the plate's machine.
+ */
+function tipInProgram(plate: Plate, telemetry: Telemetry | null) {
+  const machine = telemetry?.machine
+  if (!machine) return null
+  return programPositionOf(plate, [
+    machine.x,
+    machine.y,
+    machine.z - (telemetry.toolOffset ?? 0),
+  ])
+}
+
 export function useRunJob() {
   const workspace = useWorkspaceStore()
   const { connection } = useMachineSnapshot()
+  const telemetry = useFreshTelemetry()
   const { device } = connection
   const configuration = useCachedConfiguration(connection.id)
   const run = useRunProgram()
@@ -145,10 +165,12 @@ export function useRunJob() {
     library: readonly Tool[]
   ) => {
     const label = plateLabel(plate, plateIndex(workspace.state, plate.id))
+    // Planned from where the machine is, as it starts the program there.
     const plan = planFor(
       plate,
       compiled.program,
-      limitsFor(kitForPlate(plate), configuration)
+      limitsFor(kitForPlate(plate), configuration),
+      tipInProgram(plate, telemetry)
     )
     const runPlate = () => {
       const session = createJobSession(plate, label, compiled, library, plan)

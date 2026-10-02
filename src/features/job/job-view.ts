@@ -12,6 +12,7 @@ import type {
   JobWait,
   MachineSnapshot,
 } from "@/machine/contract"
+import type { MotionPlan } from "@/domain/motion/types"
 import type { Tool } from "@/domain/tools/tool"
 import type { JobSession } from "./job-session"
 
@@ -239,6 +240,8 @@ export type JobSubject = {
   readonly compiled: CompiledPlate
   /** A job's library tools as they were at Run; the selected plate uses the library's. */
   readonly tools?: readonly Tool[]
+  /** The plan a job's Run was sent with; the selected plate has none. */
+  readonly plan?: MotionPlan | null
 }
 
 export function jobSubject(

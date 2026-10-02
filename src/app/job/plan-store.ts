@@ -7,7 +7,7 @@ import { planMotion } from "@/domain/motion/plan"
 import { indexPlan } from "@/domain/motion/plan-index"
 import type { MotionPlan, PlanIndex } from "@/domain/motion/types"
 import { parseGCode } from "@/domain/nc/gcode"
-import type { GCodeProgram } from "@/domain/nc/gcode"
+import type { GCodeProgram, Point3 } from "@/domain/nc/gcode"
 import type { Plate, PlateSetup } from "@/domain/plate/plate"
 import { fingerprint } from "@/lib/fingerprint"
 import type { FirmwareConfiguration } from "@/machine/contract"
@@ -41,14 +41,21 @@ const pins = new Map<MotionPlan, number>()
 
 const indexes = new WeakMap<MotionPlan, PlanIndex>()
 
-/** Where a plate is on its machine (`firmwareSetup`), as JSON. */
-function setupOf(plate: Plate, kit: FixtureKit) {
+/** A start as the setup's key holds it: to a micrometre, which no report is finer than. */
+const startKey = (start: Point3) =>
+  start.map((value) => Number(value.toFixed(3)))
+
+/**
+ * Where a plate is on its machine (`firmwareSetup`), as JSON, with where its program starts when
+ * that is not its work origin.
+ */
+function setupOf(plate: Plate, kit: FixtureKit, start: Point3 | null) {
   let json = setupJson.get(plate.setup)
   if (json === undefined) {
     json = JSON.stringify(firmwareSetup(plate, kit))
     setupJson.set(plate.setup, json)
   }
-  return json
+  return start ? `${json}\n${JSON.stringify(startKey(start))}` : json
 }
 
 /** Whether any of a placement's plans is held (`pinPlan`). */
@@ -56,16 +63,18 @@ const pinned = ({ plans }: Placed) =>
   [...plans.values()].some((plan) => pins.has(plan))
 
 /**
- * A plate's program placed by its setup: parsed with the plate's firmware once, and kept while
- * the setup is among the program's last few (`SETUPS_PER_PROGRAM`) or holds a pinned plan.
+ * A plate's program placed by its setup, starting at `start` (its work origin when null): parsed
+ * with the plate's firmware once, and kept while the setup is among the program's last few
+ * (`SETUPS_PER_PROGRAM`) or holds a pinned plan.
  */
 function placedOf(
   plate: Plate,
   program: GCodeProgram,
   kit: FixtureKit,
-  firmware: FirmwareModel
+  firmware: FirmwareModel,
+  start: Point3 | null = null
 ): Placed {
-  const setup = setupOf(plate, kit)
+  const setup = setupOf(plate, kit, start)
   const key = `${kit.id}\n${setup}`
   const placed = placements.get(program) ?? new Map<string, Placed>()
   placements.set(program, placed)
@@ -79,7 +88,11 @@ function placedOf(
     program: parseGCode(
       program.source,
       program.name,
-      firmware.preview(firmwareSetup(plate, kit))
+      firmware.preview(
+        start
+          ? { ...firmwareSetup(plate, kit), start }
+          : firmwareSetup(plate, kit)
+      )
     ),
     setup: fingerprint(setup),
     plans: new Map(),
@@ -110,18 +123,21 @@ export function machineProgramOf(
 
 /**
  * The plan of the moves a plate's machine makes for its program, timed by `limits`; built once per
- * program, setup and limits, on the machine program the viewer draws (`machineProgramOf`). Null
- * without limits, or when the preview does not follow the plate's machine's firmware.
+ * program, setup, start and limits. From the work origin it is on the machine program the viewer
+ * draws (`machineProgramOf`); from `start`, where the machine was at Run, on a program of its own
+ * (`MotionPlan.program`), which the job's views draw. Null without limits, or when the preview
+ * does not follow the plate's machine's firmware.
  */
 export function planFor(
   plate: Plate,
   program: GCodeProgram,
-  limits: MachineLimits | null
+  limits: MachineLimits | null,
+  start: Point3 | null = null
 ): MotionPlan | null {
   const kit = kitForPlate(plate)
   const { firmware } = kit
   if (!limits || !firmware) return null
-  const placed = placedOf(plate, program, kit, firmware)
+  const placed = placedOf(plate, program, kit, firmware, start)
   const cached = placed.plans.get(limits.key)
   if (cached) return cached
   let source = sources.get(program)

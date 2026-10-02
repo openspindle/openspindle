@@ -147,6 +147,11 @@ export interface GCodeFirmware {
    * (`FirmwareEffect.status`); absent, the preview leaves what it reports out.
    */
   readonly initialStatus?: ToolStatus
+  /**
+   * Where the tool's tip is as the program starts, in its work coordinates, such as where the
+   * machine was at Run; absent, at the work origin.
+   */
+  readonly initialPosition?: Point3
 }
 
 /** The lines a program holds that cannot run as written: the first, and how many. */
@@ -340,7 +345,9 @@ export function parseGCode(
   const tools = new Set<number>()
   let firstUnreadable: Omit<UnreadableLines, "count"> | null = null
   let unreadableCount = 0
-  let position: Point3 = [0, 0, 0]
+  let position: Point3 = firmware?.initialPosition
+    ? [...firmware.initialPosition]
+    : [0, 0, 0]
   let offset: Point3 = [0, 0, 0]
   let absolute = true
   let incrementalArcCenters = true

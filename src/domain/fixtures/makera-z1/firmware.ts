@@ -225,11 +225,13 @@ class Z1Preview implements GCodeFirmware {
     tool: UNKNOWN_TOOL,
     target: UNKNOWN_TOOL,
   }
+  readonly initialPosition?: Point3
   private readonly frame: Z1Frame
   private active: number | null = null
 
   constructor(setup: FirmwareSetup) {
     this.frame = new Z1Frame(setup)
+    if (setup.start) this.initialPosition = setup.start
   }
 
   handles(letter: "G" | "M", code: number) {
@@ -741,6 +743,8 @@ class Z1Preview implements GCodeFirmware {
 /** The Z1's firmware (1.1.2), as the preview follows how it moves. */
 export class Z1Firmware implements FirmwareModel {
   readonly motion = Z1_MOTION
+  /** Homed to each axis's maximum, then back off it by `<axis>_homing_retract_mm` (1 mm). */
+  readonly home: Point3 = [-1, -1, -1]
 
   preview(setup: FirmwareSetup): GCodeFirmware {
     return new Z1Preview(setup)

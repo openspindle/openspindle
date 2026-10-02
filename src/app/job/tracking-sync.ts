@@ -13,7 +13,7 @@ import { devFlags } from "./dev-flags"
 import { indexOf } from "./plan-store"
 import { jobTrackingStore } from "./tracking-store"
 
-/** The tracker a job starts with: the one the developer flags choose, while there is one. */
+/** The tracker a job starts with: the HMM, unless the developer flag asks for the greedy one. */
 const chosenTracker = (): Tracker =>
   devFlags.tracker === "hmm" && hmmTracker ? hmmTracker : greedyTracker
 
