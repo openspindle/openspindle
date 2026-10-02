@@ -7,7 +7,7 @@ import type { ProgramTool } from "@/domain/nc/cam-markers"
 import { markedStock } from "@/domain/nc/stock-markers"
 import { programTools } from "@/domain/nc/tool-comments"
 import { fitsWorkArea } from "@/domain/plate/placement"
-import { deviceDefinitions } from "@/domain/fixtures/profiles"
+import { deviceBedSetup } from "@/domain/fixtures/profiles"
 import type { FixtureProfiles } from "@/domain/fixtures/profiles"
 import {
   createPlate,
@@ -177,7 +177,15 @@ export function importProgram(
       stockSource: stock ? "source" : "unspecified",
       ...context.placement,
     })
-    // Where the markers put the stock, with the fixtures they say hold it.
+    // Where the markers put the stock, with the fixtures they say hold it, as the plate's
+    // device's bed setup defines them.
+    const bed = context.fixtureProfiles
+      ? deviceBedSetup(
+          context.fixtureProfiles,
+          setup.deviceId,
+          setup.bedSetupId
+        )
+      : null
     const held = marked
       ? withProgramFixtures(
           withStockPlacement(setup, marked.placement, {
@@ -187,13 +195,8 @@ export function importProgram(
             anchors: kit.factoryAnchors(setup.deviceId),
           }),
           marked.fixtures,
-          context.fixtureProfiles
-            ? deviceDefinitions(
-                context.fixtureProfiles,
-                setup.deviceId,
-                setup.bedSetupId
-              )
-            : []
+          bed?.bedSetup.definitions ?? [],
+          bed && { device: bed.device, bedSetup: bed.bedSetup.name }
         )
       : { setup, notices: [] }
     const plate = filePlate(

@@ -375,7 +375,9 @@ const sizeText = (size: readonly number[]) =>
 export function withProgramFixtures(
   setup: PlateSetup,
   fixtures: readonly MarkedFixture[],
-  definitions: readonly FixtureDefinition[]
+  definitions: readonly FixtureDefinition[],
+  /** Where `definitions` come from, which the notices name; null without a profile. */
+  from: { readonly device: string; readonly bedSetup: string } | null = null
 ): { readonly setup: PlateSetup; readonly notices: readonly string[] } {
   const { stock } = setup
   if (!stock || !fixtures.length) return { setup, notices: [] }
@@ -396,9 +398,20 @@ export function withProgramFixtures(
   for (const marked of fixtures) {
     const key = fixtureKey(marked.name)
     const definition = definitions.find((item) => fixtureKey(item.name) === key)
-    if (!definition?.model) {
+    const where = from
+      ? `${from.device} › ${from.bedSetup}`
+      : "the plate's device"
+    if (!definition) {
       notices.push(
-        `${fixtureName(marked.name)} holds the program's stock, but it is not one of this device's fixtures, so the plate does not have it.`
+        from
+          ? `${fixtureName(marked.name)} holds the program's stock, but ${where} has no fixture of that name, so the plate does not have it.`
+          : `${fixtureName(marked.name)} holds the program's stock, but the plate's device has no fixtures set up, so the plate does not have it.`
+      )
+      continue
+    }
+    if (!definition.model) {
+      notices.push(
+        `${definition.name} holds the program's stock, but in ${where} it has no 3D model, so the plate does not have it.`
       )
       continue
     }
@@ -439,7 +452,7 @@ export function withProgramFixtures(
       )
     )
       notices.push(
-        `${definition.name} is ${sizeText(marked.size)} mm in the program but ${sizeText(size)} mm on this device: check where the plate has it.`
+        `${definition.name} is ${sizeText(marked.size)} mm in the program but ${sizeText(size)} mm in ${where}: check where the plate has it.`
       )
     const corner = [x + marked.corner[0], y + marked.corner[1]] as const
     const support = stockSupportHeight(

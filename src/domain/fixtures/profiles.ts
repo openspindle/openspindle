@@ -166,18 +166,18 @@ export const FixtureProfilesSchema = z
 export type FixtureProfiles = z.infer<typeof FixtureProfilesSchema>
 
 /**
- * The fixtures a device's bed setup defines (the workspace profile's without a device; its
- * default bed setup's without one), if any.
+ * A device's bed setup (the workspace profile's without a device; its default bed setup without
+ * one), with the name of the profile it is in; null where the library has no profile for it.
  */
-export function deviceDefinitions(
+export function deviceBedSetup(
   profiles: FixtureProfiles,
   deviceId: string | null,
   bedSetupId?: string | null
-): readonly FixtureDefinition[] {
+): { readonly device: string; readonly bedSetup: BedSetup } | null {
   const id = deviceId ?? WORKSPACE_PROFILE
-  return Object.hasOwn(profiles, id)
-    ? bedSetupOf(profiles[id], bedSetupId).definitions
-    : []
+  if (!Object.hasOwn(profiles, id)) return null
+  const profile = profiles[id]
+  return { device: profile.name, bedSetup: bedSetupOf(profile, bedSetupId) }
 }
 
 /**
