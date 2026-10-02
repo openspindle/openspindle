@@ -22,8 +22,11 @@ import { materialsOf } from "@/lib/three-assets"
  */
 export type VisualStyle = "smooth" | "edges"
 
-/** What "edges" draws: its line colour, and widths in CSS pixels of creases and of outlines. */
-const EDGES = { color: 0x23282e, crease: 1, outline: 1.25 } as const
+/**
+ * What "edges" draws: its line colour, and widths in CSS pixels of creases and of outlines. An
+ * outline is drawn past the silhouette, where a crease there reaches half its width.
+ */
+const EDGES = { color: 0x23282e, crease: 0.75, outline: 0.75 } as const
 
 /**
  * How far creases are drawn towards the eye, mm: off the faces they lie on, which would hide them
@@ -154,18 +157,19 @@ export class SolidStyle {
   private readonly lift = new THREE.Matrix4()
   private readonly outlineWidth: ReturnType<typeof pixels>
   private readonly outline: MeshBasicNodeMaterial
-  private readonly crease = new Line2NodeMaterial({
-    color: EDGES.color,
-    linewidth: EDGES.crease,
-    // Lines this thin, covered in part by multisampling, would break up into dots.
-    alphaToCoverage: false,
-  })
+  private readonly crease: Line2NodeMaterial
 
-  /** `pixelRatio`: physical pixels per CSS pixel, which outlines are measured in. */
+  /** `pixelRatio`: physical pixels per CSS pixel, which lines are drawn in. */
   constructor(pixelRatio: number) {
     this.group.name = "solid-style"
     this.outlineWidth = pixels(EDGES.outline * pixelRatio)
     this.outline = outlineMaterial(this.outlineWidth)
+    this.crease = new Line2NodeMaterial({
+      color: EDGES.color,
+      linewidth: EDGES.crease * pixelRatio,
+      // Lines this thin, covered in part by multisampling, would break up into dots.
+      alphaToCoverage: false,
+    })
   }
 
   set(style: VisualStyle) {
