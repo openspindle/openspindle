@@ -61,8 +61,8 @@ export const PROBING_STRATEGIES: readonly ProbingStrategy[] = [
   {
     id: "touch-off",
     task: "touch-off",
-    label: "Touch off",
-    description: "Touch the stock top with the probe and set work Z there.",
+    label: "Z surface",
+    description: "Probe the stock's top surface and set work Z there.",
   },
   {
     id: "height-map",

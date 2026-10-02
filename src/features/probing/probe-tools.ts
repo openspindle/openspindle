@@ -3,9 +3,10 @@ import type { Plate, PlateTool } from "@/domain/plate/plate"
 import {
   runsWith,
   strategyById,
+  strategyRefuses,
   strategyUnsupported,
 } from "@/domain/probing/strategies"
-import type { MachineProbing } from "@/domain/probing/strategy"
+import type { MachineProbing, ProbingStrategy } from "@/domain/probing/strategy"
 import { probeProfile } from "@/domain/tools/tool"
 import type { ProbeProfile, Tool } from "@/domain/tools/tool"
 import { isProbeSlot } from "@/domain/tools/tool-table"
@@ -16,14 +17,53 @@ export function profileText({ touch, pointer }: ProbeProfile): string {
   return pointer ? `${touches} · laser pointer` : touches
 }
 
-/** The numbered table entry of the plate that holds a tool, if any. */
-export function heldEntry(
+/**
+ * The library probes that can perform a strategy on a machine (`runsWith`), in the library's
+ * order, each with why it refuses it in the number it would go in (`strategyRefuses`), such as
+ * for its ball; null where it does not.
+ */
+export function strategyProbes(
+  strategy: ProbingStrategy,
+  library: readonly Tool[],
+  machine: MachineProbing
+): { tool: Tool; refused: string | null }[] {
+  return library.flatMap((tool) => {
+    const profile = probeProfile(tool)
+    if (!profile || !runsWith(strategy, profile, machine)) return []
+    const number = machine.slot(profile) ?? tool.postProcess.number
+    return [{ tool, refused: strategyRefuses(strategy, tool, number, machine) }]
+  })
+}
+
+/**
+ * The probe a new operation of a strategy takes on a plate, of the library probes that can
+ * perform it (`strategyProbes`, not refused): the one the plate's table already holds in the
+ * number the machine needs it in; else one whose number holds no other tool (`replacedEntry`),
+ * so other operations keep theirs; else the first. Undefined where none can.
+ */
+export function defaultProbe(
+  strategy: ProbingStrategy,
   plate: Plate,
-  tool: Tool
-): (PlateTool & { readonly number: number }) | undefined {
-  return plate.tools.find(
-    (entry): entry is PlateTool & { number: number } =>
-      entry.toolId === tool.id && entry.number !== null
+  library: readonly Tool[],
+  machine: MachineProbing
+): Tool | undefined {
+  const tools = strategyProbes(strategy, library, machine).flatMap(
+    ({ tool, refused }) => (refused === null ? [tool] : [])
+  )
+  const inSlot = (tool: Tool) => {
+    const profile = probeProfile(tool)
+    const slot = profile && machine.slot(profile)
+    return (
+      slot !== null &&
+      plate.tools.some(
+        (entry) => entry.number === slot && entry.toolId === tool.id
+      )
+    )
+  }
+  return (
+    tools.find(inSlot) ??
+    tools.find((tool) => !replacedEntry(plate, tool, machine)) ??
+    tools.at(0)
   )
 }
 

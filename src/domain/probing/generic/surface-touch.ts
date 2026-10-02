@@ -11,7 +11,7 @@ import type { ProbingMethod, ProbingNc } from "../strategy"
 import { hasSpecs, specsOf } from "./specs"
 
 const INTRODUCTION = [
-  "; Touch off",
+  "; Z surface",
   "; Touches the stock top and sets work Z0 there with G10 L20.",
   "; REQUIRE: homed machine, installed/calibrated probe, tested probe signal.",
 ]

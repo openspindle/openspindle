@@ -21,7 +21,7 @@ const LABELS: Readonly<Record<CurrentStrategy, string>> = {
   "inside-corner": "Inside corner",
   "pocket-center": "Pocket center",
   "boss-center": "Boss center",
-  "touch-off": "Touch off",
+  "touch-off": "Z surface",
   "height-map": "Height map",
   "outline-trace": "Outline trace",
 }

@@ -61,12 +61,15 @@ export function SourceItem({
   icon,
   title,
   description,
+  note = null,
   reason = null,
   onSelect,
 }: {
   icon: ReactNode
   title: string
   description: string
+  /** What choosing it changes besides adding, such as a tool it replaces, under the description. */
+  note?: string | null
   /** Why it is unavailable; null (the default) when it is available. */
   reason?: string | null
   onSelect?: () => void
@@ -92,6 +95,7 @@ export function SourceItem({
         <ItemContent>
           <ItemTitle>{title}</ItemTitle>
           <ItemDescription>{description}</ItemDescription>
+          {note !== null && <ItemDescription>{note}</ItemDescription>}
         </ItemContent>
       </Item>
     </Unavailable>
