@@ -4,6 +4,7 @@ import {
   createRootRouteWithContext,
 } from "@tanstack/react-router"
 import type { QueryClient } from "@tanstack/react-query"
+import { useJobTrackingSync } from "@/app/job/tracking-sync"
 import { AppearanceProvider } from "@/components/appearance-provider"
 import { Toaster } from "@/components/ui/sonner"
 import { WorkLightControlProvider } from "@/components/work-light-control"
@@ -30,6 +31,8 @@ export const Route = createRootRouteWithContext<RouterContext>()({
 
 function RootLayout() {
   useMachineSync()
+  // Where this window's Run is, followed whichever page is open.
+  useJobTrackingSync()
   useUnsavedChanges()
   // Menu commands and their dialogs work on every page.
   useWorkspaceMenu()

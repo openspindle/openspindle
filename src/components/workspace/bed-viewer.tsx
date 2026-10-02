@@ -7,10 +7,10 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { useEffect, useRef, useState } from "react"
+import type { FrameSource } from "@/app/job/frame"
 import { useHost } from "@/platform/host-context"
 import { plateLabel } from "@/domain/plate/plate"
 import type {
-  PlayheadSource,
   ViewerPlate,
   ViewerProblem,
   ViewerProblemRef,
@@ -23,7 +23,6 @@ import type { ArrangeEvents, ArrangeView } from "./viewer/setup-arranger"
 
 export type { Stock } from "@/domain/stock/stock"
 export type {
-  PlayheadSource,
   ViewerPlate,
   ViewerProblem,
   ViewerProblemRef,
@@ -47,14 +46,13 @@ type Props = {
   hiddenLineRanges?: Readonly<Record<string, readonly LineRange[]>>
   /** Fixtures each plate leaves out of the view (their ids), by plate id. */
   hiddenFixtures?: Readonly<Record<string, readonly string[]>>
-  previewLine?: number | null
-  previewProbePoint?: number | null
   /**
-   * Where simulated playback is along the selected plate's moves, which the scene follows every
-   * frame on its own; without one, it shows up to the line.
+   * The frames of playback the selected plate is drawn at, which the scene follows every frame on
+   * its own; without them, or while they have none, it shows its whole program.
    */
-  playhead?: PlayheadSource
-  progress: number
+  frames?: FrameSource
+  /** @deprecated Ignored: without `frames` the whole program shows. */
+  progress?: number
   showRapids: boolean
   showStock: boolean
   view: ViewMode
@@ -85,10 +83,7 @@ export function BedViewer({
   selectedLineRanges,
   hiddenLineRanges,
   hiddenFixtures,
-  previewLine,
-  previewProbePoint,
-  playhead,
-  progress,
+  frames,
   showRapids,
   showStock,
   view,
@@ -164,9 +159,6 @@ export function BedViewer({
       selectedLineRanges,
       hiddenLineRanges,
       hiddenFixtures,
-      previewLine,
-      previewProbePoint,
-      progress,
       showRapids,
       showStock,
       problems,
@@ -179,9 +171,6 @@ export function BedViewer({
     selectedLineRanges,
     hiddenLineRanges,
     hiddenFixtures,
-    previewLine,
-    previewProbePoint,
-    progress,
     showRapids,
     showStock,
     problems,
@@ -189,17 +178,17 @@ export function BedViewer({
     machineOrigin,
     liveTool,
   ])
-  // Playback moves the playhead every frame: the scene follows it without a render here.
+  // Playback sets a frame every frame: the scene follows it without a render here.
   useEffect(() => {
-    if (!playhead) return
-    const follow = () => sceneRef.current?.setPlayhead(playhead.get())
+    if (!frames) return
+    const follow = () => sceneRef.current?.setFrame(frames.get())
     follow()
-    const unsubscribe = playhead.subscribe(follow)
+    const unsubscribe = frames.subscribe(follow)
     return () => {
       unsubscribe()
-      sceneRef.current?.setPlayhead(null)
+      sceneRef.current?.setFrame(null)
     }
-  }, [playhead])
+  }, [frames])
   // Unchanged plates keep their objects; the scene renders only when something changed.
   useEffect(() => {
     sceneRef.current?.setPlates(plates)

@@ -1,3 +1,4 @@
+import type { FrameSource } from "@/app/job/frame"
 import { useDispatch } from "@/app/workspace/workspace-context"
 import { BedViewer } from "@/components/workspace/bed-viewer"
 import {
@@ -9,22 +10,19 @@ import type { JobSubject } from "./job-view"
 import { useFreshTelemetry } from "@/platform/machine"
 import { MachineOriginCard, useMachineOrigin } from "./machine-origin"
 import { MachineStatusCard } from "./machine-status"
-import type { PlayheadSource } from "@/components/workspace/bed-viewer"
-import type { TimelinePreview } from "./use-job-timeline"
+import { TrackerOverlay } from "./tracker-overlay"
 
 /**
- * The 3D bed with every plate; the shown plate is highlighted and drawn up to the preview, with
- * where the connected machine keeps work zero.
+ * The 3D bed with every plate; the shown plate is highlighted and drawn at the timeline's frames,
+ * with where the connected machine keeps work zero.
  */
 export function JobViewer({
   shown,
-  preview,
-  playhead,
+  frames,
 }: {
   shown: JobSubject | null
-  preview: TimelinePreview
-  /** Where simulated playback is, which the view follows every frame. */
-  playhead: PlayheadSource
+  /** The frames of the shown plate's plan the view follows every frame on its own. */
+  frames: FrameSource
 }) {
   const plates = useWorkspaceViewerPlates(shown)
   const dispatch = useDispatch()
@@ -37,10 +35,7 @@ export function JobViewer({
         plates={plates}
         selectedPlateId={shown?.plate.id ?? null}
         onSelectPlate={(plateId) => dispatch({ type: "plate.select", plateId })}
-        previewLine={preview.line}
-        previewProbePoint={preview.probePoint}
-        playhead={playhead}
-        progress={preview.segmentProgress}
+        frames={frames}
         showRapids={false}
         showStock
         view={camera.view}
@@ -50,6 +45,7 @@ export function JobViewer({
         machineOrigin={machineOrigin}
       />
       <ViewerToolbar camera={camera} />
+      <TrackerOverlay />
       <div className="absolute right-4 bottom-4 z-10 flex flex-col gap-2">
         <MachineStatusCard telemetry={telemetry} />
         <MachineOriginCard

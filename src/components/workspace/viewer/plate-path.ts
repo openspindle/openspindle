@@ -1,9 +1,7 @@
 import * as THREE from "three"
+import type { PlaybackFrame } from "@/app/job/frame"
 import type { Point3 } from "@/domain/nc/gcode"
-import type {
-  ShownPlayhead,
-  ViewerPlate,
-} from "@/components/workspace/viewer/viewer-input"
+import type { ViewerPlate } from "@/components/workspace/viewer/viewer-input"
 import {
   PATH_DISPLAY_LIFT,
   plateProbeGrids,
@@ -15,23 +13,45 @@ import type { ViewerPalette } from "./palette"
 import { samePlate } from "./plate-identity"
 import { ProbeGridView } from "./probe-grid-view"
 import type { ProbePresentation } from "./probe-grid-view"
-import { revealedSegments } from "./toolpath-buffers"
 import type { Collide } from "./touch-marker"
 import { ToolpathView } from "./toolpath-view"
 import type { ToolModels } from "./toolpath-view"
 import { WorkAreaView } from "./work-area-view"
 
 /** What one plate's drawing shows; inactive plates show their whole program. */
-export type PathPresentation = ProbePresentation & {
+export type PathPresentation = Omit<
+  ProbePresentation,
+  "progress" | "previewLine" | "previewProbePoint"
+> & {
   /**
    * The tool the machine reports in its spindle, with its tip on the bed, shown instead of the
-   * program's (the simulator's camera) unless playback has a playhead; null or absent for the
-   * program's.
+   * program's (the simulator's camera) while there is no frame; null or absent for the program's.
    */
   liveTool?: { readonly tool: number | null; readonly position: Point3 } | null
   showRapids: boolean
-  /** Where simulated playback is: the moves before it drawn, the one under way up to the tool. */
-  playhead?: ShownPlayhead | null
+  /**
+   * The frame of playback the plate is drawn at: the moves before it made, the one under way up
+   * to the tool. Null or absent shows the whole program.
+   */
+  frame?: PlaybackFrame | null
+}
+
+/**
+ * Where a frame has the probe grids: up to its step's line in the preview, else the line of the
+ * move under way, and on a grid's line, its sample. Without one, every grid is probed.
+ */
+function probeCursor(
+  frame: PlaybackFrame | null
+): Pick<ProbePresentation, "progress" | "previewLine" | "previewProbePoint"> {
+  if (!frame) return { progress: 100 }
+  const { plan } = frame.index
+  const probePoint = plan.probePoint[frame.move]
+  return {
+    progress: 100,
+    previewLine:
+      frame.source === "preview" ? frame.line : plan.line[frame.move],
+    previewProbePoint: probePoint < 0 ? null : probePoint,
+  }
 }
 
 /** Where outlines lie: the stock top, or the work origin's height without stock. */
@@ -152,44 +172,29 @@ export class PlatePath {
   }
 
   present(state: PathPresentation) {
-    const playhead = state.playhead ?? null
-    const count =
-      playhead?.segment ??
-      revealedSegments(
-        this.plate.machineProgram,
-        state.progress,
-        state.previewLine,
-        state.previewProbePoint
-      )
+    // Only the active plate follows playback, and only a frame of the plan of what it draws.
+    const frame =
+      state.active &&
+      state.frame?.index.plan.program === this.plate.machineProgram
+        ? state.frame
+        : null
     this.toolpath.hide(state.hidden)
     this.toolpath.select(state.ranges)
-    const selectionShown = this.toolpath.reveal(count, state.showRapids)
-    this.toolpath.showMove(playhead, state.showRapids)
+    const selectionShown = this.toolpath.apply(frame, state.showRapids)
     this.toolpath.emphasize(
       state.active,
       selectionShown || (state.active && this.probes.intersects(state.ranges))
     )
     this.workArea.emphasize(state.active)
-    this.probes.present(state)
-    if (state.liveTool && !playhead) {
+    this.probes.present({ ...state, ...probeCursor(frame) })
+    if (state.liveTool && !frame) {
       const [x, y, z] = state.liveTool.position
       const [ox, oy, oz] = this.plate.workOrigin
       this.toolpath.showLiveTool({
         tool: state.liveTool.tool,
         position: [x - ox, y - oy, z - oz],
       })
-      this.toolpath.showAhead(null)
-      this.toolpath.showTouch(null)
-      return
     }
-    // While playback simulates the moves the tool is on the move under way, even where the step
-    // on show ends the program, such as a firmware routine on the program's last line.
-    const toolShown =
-      state.active && (playhead !== null || state.progress < 100)
-    this.toolpath.showTool(toolShown ? count : null, playhead)
-    // From the tool as it was just drawn.
-    this.toolpath.showAhead(state.active ? playhead : null)
-    this.toolpath.showTouch(toolShown ? (playhead?.segment ?? count) : null)
   }
 
   dispose() {

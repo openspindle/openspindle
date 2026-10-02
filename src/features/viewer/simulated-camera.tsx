@@ -1,11 +1,9 @@
 import { useMemo } from "react"
 import { cn } from "cn"
+import type { FrameSource } from "@/app/job/frame"
 import { bedPositionOf } from "@/app/workspace/machine-program"
 import { BedViewer } from "@/components/workspace/bed-viewer"
-import type {
-  LiveTool,
-  PlayheadSource,
-} from "@/components/workspace/bed-viewer"
+import type { LiveTool } from "@/components/workspace/bed-viewer"
 import { kitForSetup } from "@/domain/fixtures/catalog"
 import {
   useCachedConfiguration,
@@ -21,18 +19,18 @@ const NO_SETUP = { deviceId: null, fixtures: [] }
 /**
  * What the machine's camera would see, on the simulator: the plate on its bed through the
  * camera's lens, the bed moved along Y under it as the machine moves it, with the tool the
- * machine reports where it reports it. Following a job, the playhead that follows the machine
- * shows the tool and the path cut so far instead. Its picture has the shape the device's
- * configuration sets for the camera's stream, once the configuration has been read. Only to
- * look at.
+ * machine reports where it reports it. Following a job, the frames that follow the machine show
+ * the tool and the path cut so far instead, as the 3D view does. Its picture has the shape the
+ * device's configuration sets for the camera's stream, once the configuration has been read.
+ * Only to look at.
  */
 export function SimulatedCamera({
   shown,
-  playhead,
+  frames,
 }: {
   shown: ShownPlate | null
-  /** Where the machine is along the shown plate's moves, while a job there is followed. */
-  playhead?: PlayheadSource
+  /** The frames of the shown plate's plan the 3D view draws, while a job there is followed. */
+  frames?: FrameSource
 }) {
   const drawn = useWorkspaceViewerPlates(shown)
   const plate = shown?.plate ?? null
@@ -68,8 +66,7 @@ export function SimulatedCamera({
           plates={plates}
           selectedPlateId={plate?.id ?? null}
           onSelectPlate={NO_SELECTION}
-          progress={100}
-          playhead={playhead}
+          frames={frames}
           showRapids={false}
           showStock
           view="camera"

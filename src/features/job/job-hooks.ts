@@ -35,7 +35,6 @@ import { createJobSession, jobSessionStore } from "./job-session"
 import type { ProgramCheck } from "./program-check"
 import { evaluateRunChecklist } from "./run-checklist"
 import type { RunChecklist } from "./run-checklist"
-import { forgetPlacedJobs } from "./use-job-timeline"
 
 /** The Run checklist of a plate, against the connected machine. */
 export function useRunChecklist(
@@ -121,7 +120,6 @@ export function useJobActions(): JobActions {
         dismiss.mutate(undefined, {
           onSuccess: () => {
             jobSessionStore.actions.clear()
-            forgetPlacedJobs()
           },
           onError: report,
         }),

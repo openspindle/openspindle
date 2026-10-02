@@ -216,11 +216,7 @@ export function JobPage({
           className="relative flex h-full min-h-0 min-w-0 flex-col"
           aria-label="Job preview"
         >
-          <JobViewer
-            shown={subject}
-            preview={timeline.preview}
-            playhead={timeline.playhead}
-          />
+          <JobViewer shown={subject} frames={timeline.frames} />
           <JobTimelineBar
             timeline={timeline}
             details={
@@ -228,13 +224,13 @@ export function JobPage({
                 subject={subject}
                 prediction={prediction}
                 line={timeline.line}
-                playhead={timeline.playhead}
+                tool={timeline.tool}
               />
             }
           />
           <JobCamera
             shown={subject}
-            playhead={timeline.live ? timeline.playhead : undefined}
+            frames={timeline.live ? timeline.frames : undefined}
           />
         </main>
       </ResizablePanel>
