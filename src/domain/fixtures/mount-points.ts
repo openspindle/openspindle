@@ -14,7 +14,16 @@ export const MountPointSchema = z.object({
   name: TextSchema,
   position: Point3Schema,
 })
-export type MountPoint = z.infer<typeof MountPointSchema>
+
+/**
+ * What a kit's mount point is, where a probe centres on it: a hole or a slot it centres in, or
+ * a pin it centres on. Absent for the rest (corners, datums), and for points a definition gives.
+ */
+export type MountFeature = "hole" | "slot" | "pin"
+
+export type MountPoint = z.infer<typeof MountPointSchema> & {
+  readonly feature?: MountFeature
+}
 
 export const MountPointsSchema = z
   .array(MountPointSchema)
@@ -82,18 +91,20 @@ export type HoleXY = readonly [number, number]
 
 /**
  * A pattern of holes on a face at `height`, numbered from 1 (`dowel-1`, `dowel-2`…); `shift`
- * moves them from the frame they were measured in.
+ * moves them from the frame they were measured in. They are holes, or the round ends of a slot.
  */
 export function holePoints(
   prefix: string,
   name: string,
   holes: readonly HoleXY[],
   height: number,
-  shift: HoleXY = [0, 0]
+  shift: HoleXY = [0, 0],
+  feature: Extract<MountFeature, "hole" | "slot"> = "hole"
 ): MountPoint[] {
   return holes.map(([x, y], index) => ({
     id: `${prefix}-${index + 1}`,
     name,
     position: [x + shift[0], y + shift[1], height],
+    feature,
   }))
 }

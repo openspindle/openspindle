@@ -21,6 +21,6 @@ export class Z1DowelPin extends Fixture {
     offset: [0, 0, -7],
   }
   readonly mountPoints: readonly MountPoint[] = [
-    { id: "center", name: "Center", position: [0, 0, 0] },
+    { id: "center", name: "Center", position: [0, 0, 0], feature: "pin" },
   ]
 }

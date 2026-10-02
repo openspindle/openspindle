@@ -189,7 +189,12 @@ function designMountPoints(
   ]
 }
 
-function ownMountPoints(
+/**
+ * A drawn item's own mount points on the bed: the machine bed's holes and corners where no bed
+ * fixture covers it, a fixture's where it stands, the stock's box, the design's work origin and
+ * toolpath corners.
+ */
+export function ownMountPoints(
   subject: SetupSubject,
   ref: SetupItemRef,
   design: DesignExtent | null

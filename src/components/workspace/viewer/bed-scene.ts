@@ -23,7 +23,7 @@ import { reconcilePlates } from "./plate-identity"
 import { PlateView, bedGrid } from "./plate-view"
 import type { PlatePresentation, PlateViewContext } from "./plate-view"
 import { CLICK_TOLERANCE, SetupArranger } from "./setup-arranger"
-import type { ArrangeEvents, ArrangeView } from "./setup-arranger"
+import type { ArrangeEvents, ArrangeLabel, ArrangeView } from "./setup-arranger"
 import { along } from "./toolpath-view"
 import { ViewerAssets } from "./viewer-assets"
 import type { ModelMeshes } from "./viewer-assets"
@@ -99,6 +99,9 @@ export class BedScene {
   private readonly labels: ReadonlyMap<string, HTMLElement>
   /** Problem markers, by `problemMarkerId`. */
   private readonly problemMarkers: ReadonlyMap<string, HTMLElement>
+  /** The element the arranger's label shows in, such as where a picked point is. */
+  private readonly arrangeLabelElement: { readonly current: HTMLElement | null }
+  private arrangeLabel: ArrangeLabel | null = null
   private readonly events: BedSceneEvents
   private readonly stage: ViewerStage
   private readonly camera = new THREE.OrthographicCamera(
@@ -154,6 +157,7 @@ export class BedScene {
     container: HTMLElement,
     labels: ReadonlyMap<string, HTMLElement>,
     problemMarkers: ReadonlyMap<string, HTMLElement>,
+    arrangeLabel: { readonly current: HTMLElement | null },
     events: BedSceneEvents,
     meshes: ModelMeshes
   ) {
@@ -168,6 +172,7 @@ export class BedScene {
       renderer,
       labels,
       problemMarkers,
+      arrangeLabel,
       events,
       meshes
     )
@@ -178,12 +183,14 @@ export class BedScene {
     renderer: THREE.WebGLRenderer,
     labels: ReadonlyMap<string, HTMLElement>,
     problemMarkers: ReadonlyMap<string, HTMLElement>,
+    arrangeLabel: { readonly current: HTMLElement | null },
     events: BedSceneEvents,
     meshes: ModelMeshes
   ) {
     this.container = container
     this.labels = labels
     this.problemMarkers = problemMarkers
+    this.arrangeLabelElement = arrangeLabel
     this.events = events
     // Until plates are laid out, the perspective view looks at the middle of the bed's top.
     const { min, max } = this.emptyBed.bounds
@@ -256,6 +263,7 @@ export class BedScene {
               this.layout.placements.find(({ id }) => id === plateId)
                 ?.offsetX ?? 0,
             plateAt: (event) => this.plateAt(event),
+            label: (label) => this.showArrangeLabel(label),
           },
           events.arrange
         )
@@ -543,6 +551,28 @@ export class BedScene {
       const [x, y, z] = problemAnchor(problem)
       this.pin(marker, [x + offset, y, z])
     }
+    this.pinArrangeLabel()
+  }
+
+  /** Shows the arranger's label beside its point, or hides it (null). */
+  private showArrangeLabel(label: ArrangeLabel | null) {
+    this.arrangeLabel = label
+    const element = this.arrangeLabelElement.current
+    if (element && label) element.textContent = label.text
+    this.pinArrangeLabel()
+  }
+
+  private pinArrangeLabel() {
+    const element = this.arrangeLabelElement.current
+    if (!element) return
+    const label = this.arrangeLabel
+    const offset = label ? this.offsetOf(label.plateId) : null
+    if (!label || offset === null) {
+      element.style.visibility = "hidden"
+      return
+    }
+    const [x, y, z] = label.position
+    this.pin(element, [x + offset, y, z])
   }
 
   /** Puts an overlay element where a point shows, hidden when the point is out of view. */

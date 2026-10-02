@@ -590,8 +590,8 @@ export class PlateView {
   }
 
   /**
-   * The plate's setup points, which moves snap to and picks find: a hidden fixture's are left
-   * out, unless it is the selected item.
+   * The plate's setup points, which moves snap to: a hidden fixture's are left out, unless it is
+   * the selected item.
    */
   setupPoints(): readonly SetupPoint[] {
     const points = plateSetupPoints(this.current)

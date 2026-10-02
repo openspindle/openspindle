@@ -35,8 +35,12 @@ import { DesignRuleResults } from "@/features/design-rules/design-rule-results"
 import { ArrangeHint } from "./arrange/arrange-hint"
 import { ArrangeMenu } from "./arrange/arrange-menu"
 import { useArrange, useArrangeTarget } from "./arrange/arrange-state"
+import type { OperationPicking } from "./arrange/arrange-state"
 import { outlineTarget } from "@/domain/probing/tasks/outline/params"
+import { strategyById } from "@/domain/probing/strategies"
 import type { ItemEdgeRef } from "@/domain/plate/item-edges"
+import { pickTargets } from "@/domain/plate/pick-targets"
+import type { PickTarget } from "@/domain/plate/pick-targets"
 import { useArrangeEvents } from "./arrange/use-arrange-events"
 import { useArrangeShortcuts } from "./arrange/use-arrange-shortcuts"
 import { usePrepareSelection } from "./plate-tree/use-prepare-selection"
@@ -51,6 +55,7 @@ import { useShowProblem } from "./show-problem"
 
 /** No edges: one array, so that what is drawn changes only when edges do. */
 const NO_EDGES: readonly ItemEdgeRef[] = []
+const NO_TARGETS: readonly PickTarget[] = []
 
 const NO_PICK: ArrangePick = { from: null, notice: null }
 
@@ -129,6 +134,37 @@ function useHiddenFixtureIds(): Readonly<Record<string, string[]>> {
 }
 
 /**
+ * What a point picked for an operation snaps to: the targets its strategy offers on its plate,
+ * but for those of fixtures hidden in the view, which offer none.
+ */
+function usePickTargets(
+  picking: OperationPicking | null
+): readonly PickTarget[] {
+  const hidden = useHiddenFixtures()
+  const point = picking?.kind === "point" ? picking : null
+  const plateId = point?.plateId ?? null
+  const setup = useWorkspace(
+    (state) => state.plates.find(({ id }) => id === plateId)?.setup ?? null
+  )
+  const strategy = useWorkspace((state) => {
+    const source =
+      point &&
+      state.plates
+        .find(({ id }) => id === point.plateId)
+        ?.operations.find(({ id }) => id === point.operationId)?.source
+    return source?.kind === "probing" ? source.strategy : null
+  })
+  return useMemo(() => {
+    const id = strategy && strategyById(strategy)?.id
+    if (!plateId || !setup || !id) return NO_TARGETS
+    return pickTargets(setup, id).filter(
+      ({ item }) =>
+        item?.kind !== "fixture" || !hidden.has(fixtureKey(plateId, item.id))
+    )
+  }, [plateId, setup, strategy, hidden])
+}
+
+/**
  * Every plate on the bed; the selected plate's operation or sections are highlighted. Its
  * setup items can be selected, and moved with the move tool. Problems with a place on a bed are
  * marked there: picking one selects what it is about and shows it.
@@ -180,21 +216,29 @@ export function PrepareViewer() {
     const traced = outlineTarget(source.params)
     return traced.kind === "edges" ? traced.edges : NO_EDGES
   })
-  const arrangement = useMemo<ArrangeView>(
-    () => ({
+  const pickedTargets = usePickTargets(arrange.picking)
+  const arrangement = useMemo<ArrangeView>(() => {
+    const { picking } = arrange
+    return {
       selection: target ? arrange.selection : null,
-      moving:
-        arrange.moving && !arrange.picking && !!target && !target.item.fixed,
+      moving: arrange.moving && !picking && !!target && !target.item.fixed,
       axes: arrange.axes,
       snap: arrange.snap,
-      picking: arrange.picking && {
-        kind: arrange.picking.kind,
-        plateId: arrange.picking.plateId,
-        edges: pickedEdges,
-      },
-    }),
-    [target, arrange, pickedEdges]
-  )
+      picking:
+        picking &&
+        (picking.kind === "point"
+          ? {
+              kind: "point",
+              plateId: picking.plateId,
+              targets: pickedTargets,
+            }
+          : {
+              kind: "edges",
+              plateId: picking.plateId,
+              edges: pickedEdges,
+            }),
+    }
+  }, [target, arrange, pickedEdges, pickedTargets])
   useArrangeShortcuts(target)
   return (
     <div className="relative h-full min-h-0 overflow-hidden bg-muted/20">

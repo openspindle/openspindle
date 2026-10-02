@@ -53,8 +53,13 @@ export class Z1TopClamp extends Fixture {
     offset: [STEP_ORIGIN[0], STEP_ORIGIN[1], 0],
   }
   readonly mountPoints: readonly MountPoint[] = [
-    { id: "slot-center", name: "Slot center", position: [0, 0, 0] },
-    ...holePoints("slot-end", "Slot end", SLOT_ENDS, 0, STEP_ORIGIN),
+    {
+      id: "slot-center",
+      name: "Slot center",
+      position: [0, 0, 0],
+      feature: "slot",
+    },
+    ...holePoints("slot-end", "Slot end", SLOT_ENDS, 0, STEP_ORIGIN, "slot"),
     { id: "step-1mm-end", name: "1 mm step, end", position: [30.5, 0, 1] },
     { id: "step-1mm-side", name: "1 mm step, side", position: [0, -8, 1] },
     {

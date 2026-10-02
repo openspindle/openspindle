@@ -112,13 +112,13 @@ export function useArrangeEvents(handlers: {
     menu: handlers.menu,
     pick: handlers.pick,
     drag: (drag) => dragAtom.set(() => drag),
-    pickPoint: (plateId, point) => {
+    pickPoint: (plateId, pick) => {
       const picked = pickedOperation(workspace, plateId, "point")
       if (!picked) return
       const { plate, operation } = picked
       const source =
         operation.source.kind === "probing"
-          ? withPickedStart(operation.source, plate, point.position)
+          ? withPickedStart(operation.source, plate, pick.position, pick.target)
           : null
       if (!source) {
         toast.error(
