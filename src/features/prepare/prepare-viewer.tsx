@@ -41,7 +41,11 @@ import { useArrangeEvents } from "./arrange/use-arrange-events"
 import { useArrangeShortcuts } from "./arrange/use-arrange-shortcuts"
 import { usePrepareSelection } from "./plate-tree/use-prepare-selection"
 import { selectedSections, useSectionSelection } from "./selection"
-import { useHiddenOperations } from "./visibility"
+import {
+  fixtureKey,
+  useHiddenFixtures,
+  useHiddenOperations,
+} from "./visibility"
 import { PrepareToolbar } from "./prepare-toolbar"
 import { useShowProblem } from "./show-problem"
 
@@ -106,6 +110,24 @@ function useHiddenLines(): Readonly<Record<string, LineRange[]>> {
   )
 }
 
+/** The hidden fixtures (their ids), by plate: what the Prepare view leaves out. */
+function useHiddenFixtureIds(): Readonly<Record<string, string[]>> {
+  const hidden = useHiddenFixtures()
+  const plates = useWorkspace((state) => state.plates)
+  return useMemo(
+    () =>
+      Object.fromEntries(
+        plates.map((plate) => [
+          plate.id,
+          plate.setup.fixtures
+            .filter((fixture) => hidden.has(fixtureKey(plate.id, fixture.id)))
+            .map((fixture) => fixture.id),
+        ])
+      ),
+    [hidden, plates]
+  )
+}
+
 /**
  * Every plate on the bed; the selected plate's operation or sections are highlighted. Its
  * setup items can be selected, and moved with the move tool. Problems with a place on a bed are
@@ -120,6 +142,7 @@ export function PrepareViewer() {
   const shown = useShownProblem()
   const highlighted = useHighlightedLines(shown?.diagnostic ?? null)
   const hidden = useHiddenLines()
+  const hiddenFixtures = useHiddenFixtureIds()
   const marked = useWorkspaceProblems()
   const results = useDesignRuleResults()
   const showProblem = useShowProblem()
@@ -181,6 +204,7 @@ export function PrepareViewer() {
         onSelectPlate={selection.selectPlate}
         selectedLineRanges={highlighted}
         hiddenLineRanges={hidden}
+        hiddenFixtures={hiddenFixtures}
         progress={100}
         showRapids={false}
         showStock

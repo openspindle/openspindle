@@ -41,6 +41,8 @@ export type ViewerPresentation = {
   selectedLineRanges?: readonly LineRange[]
   /** Program lines each plate leaves out of the view, by plate id. */
   hiddenLineRanges?: Readonly<Record<string, readonly LineRange[]>>
+  /** Fixtures each plate leaves out of the view (their ids), by plate id. */
+  hiddenFixtures?: Readonly<Record<string, readonly string[]>>
   previewLine?: number | null
   previewProbePoint?: number | null
   progress: number
@@ -77,6 +79,7 @@ export type BedSceneEvents = {
 }
 
 const NO_RANGES: readonly LineRange[] = []
+const NO_IDS: readonly string[] = []
 const NO_PROBLEMS: readonly ViewerProblem[] = []
 /** A shown problem whose marker is this far from the view's middle, or farther, is panned to. */
 const REVEAL_REACH = 0.8
@@ -324,10 +327,14 @@ export class BedScene {
 
   /** Only plates whose presentation changed update; playback touches the selected plate alone. */
   present(presentation: ViewerPresentation) {
+    const previous = this.presentation
     this.presentation = presentation
     let changed = false
     for (const [id, view] of this.views)
       if (view.present(this.platePresentation(id))) changed = true
+    // The points moves snap to follow the fixtures shown.
+    if (presentation.hiddenFixtures !== previous.hiddenFixtures)
+      this.arranger?.platesChanged()
     if (changed) this.stage.invalidate()
     this.placeLens()
   }
@@ -459,8 +466,10 @@ export class BedScene {
       this.presentation
     const { problems = NO_PROBLEMS, shownProblem } = this.presentation
     const hidden = this.presentation.hiddenLineRanges?.[id] ?? NO_RANGES
+    const hiddenFixtures = this.presentation.hiddenFixtures?.[id] ?? NO_IDS
     const { machineOrigin, liveTool } = this.presentation
     const marked = {
+      hiddenFixtures,
       problems: problems.filter((problem) => problem.plateId === id),
       shownProblem: shownProblem?.plateId === id ? shownProblem.key : null,
       machineOrigin:

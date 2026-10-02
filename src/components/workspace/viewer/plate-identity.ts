@@ -47,6 +47,8 @@ export const sameRanges = sameList<LineRange>(
   (a, b) => a.start === b.start && a.end === b.end
 )
 
+export const sameIds = sameList<string>(Object.is)
+
 /** A problem's places come from its plate's cached diagnostics: unchanged, they are the same. */
 export const sameProblems = sameList<ViewerProblem>(
   (a, b) =>

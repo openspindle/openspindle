@@ -5,7 +5,7 @@ import { LineMaterial } from "three/addons/lines/LineMaterial.js"
 import { fixtureModelFinish } from "@/domain/fixtures/catalog"
 import type { MachineBed } from "@/domain/fixtures/machine-bed"
 import { setupItemKey } from "@/domain/plate/setup-items"
-import type { SetupItemRef } from "@/domain/plate/setup-items"
+import type { SetupItemRef, SetupPoint } from "@/domain/plate/setup-items"
 import { isMatteKind } from "@/domain/fixtures/definitions"
 import type {
   FixtureInstance,
@@ -31,6 +31,7 @@ import {
   bedArea,
   plateAnchorPoints,
   plateBed,
+  plateSetupPoints,
   plateStockBounds,
 } from "../bed-viewer-layout"
 import type { PlatePlacement, ViewerBounds } from "../bed-viewer-layout"
@@ -39,6 +40,7 @@ import { PlatePath } from "./plate-path"
 import type { PathPresentation } from "./plate-path"
 import {
   sameFields,
+  sameIds,
   samePlate,
   sameProblems,
   sameRanges,
@@ -59,6 +61,8 @@ export type PlatePresentation = PathPresentation & {
   shownProblem: string | null
   /** Where the connected machine keeps work zero, on this plate's bed; null to leave it out. */
   machineOrigin: Point3 | null
+  /** Fixtures left out of the view (their ids): not drawn, picked or snapped to. */
+  hiddenFixtures: readonly string[]
 }
 
 /** A setup item under the pointer: which, how far along the ray, and where it was hit. */
@@ -145,6 +149,7 @@ const PRESENTATION_EQUALITY: FieldEquality<PlatePresentation> = {
   shownProblem: Object.is,
   machineOrigin: (a, b) =>
     a === b || (!!a && !!b && a.every((value, index) => value === b[index])),
+  hiddenFixtures: sameIds,
   liveTool: (a, b) =>
     a === b ||
     (!!a &&
@@ -569,10 +574,10 @@ export class PlateView {
     this.applyPreview()
   }
 
-  /** The nearest setup item the picking ray hits: the bed, a fixture or the stock. */
+  /** The nearest setup item the picking ray hits: the bed, a shown fixture or the stock. */
   itemHit(raycaster: THREE.Raycaster): ItemHit | null {
     const candidates: THREE.Object3D[] = [
-      ...this.fixtureGroups.values(),
+      ...[...this.fixtureGroups.values()].filter((group) => group.visible),
       this.bed,
     ]
     if (this.stock.visible && this.stock.children.length)
@@ -582,6 +587,23 @@ export class PlateView {
       if (item) return { item, distance: hit.distance, point: hit.point }
     }
     return null
+  }
+
+  /**
+   * The plate's setup points, which moves snap to and picks find: a hidden fixture's are left
+   * out, unless it is the selected item.
+   */
+  setupPoints(): readonly SetupPoint[] {
+    const points = plateSetupPoints(this.current)
+    const hidden = this.presentation.hiddenFixtures
+    if (!hidden.length) return points
+    const selected = this.selectedItem
+    return points.filter(
+      ({ item }) =>
+        item?.kind !== "fixture" ||
+        !hidden.includes(item.id) ||
+        (selected?.kind === "fixture" && selected.id === item.id)
+    )
   }
 
   /** Outlines the selected item's box; null clears it. */
@@ -728,6 +750,7 @@ export class PlateView {
       kind: "fixture",
       id: instance.id,
     } satisfies SetupItemRef
+    placed.visible = !this.presentation.hiddenFixtures.includes(instance.id)
     this.fixtureGroups.set(instance.id, placed)
     this.fixtures.add(placed)
     // A fixture that loads while it is dragged starts where the drag has it.
@@ -800,6 +823,8 @@ export class PlateView {
     const { presentation } = this
     this.selection.visible = presentation.active
     this.stock.visible = presentation.showStock
+    for (const [id, group] of this.fixtureGroups)
+      group.visible = !presentation.hiddenFixtures.includes(id)
     this.path.present(presentation)
     this.problems.show(presentation.problems, presentation.shownProblem)
     const { machineOrigin } = presentation

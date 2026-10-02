@@ -16,6 +16,7 @@ import {
   ProjectReportDialog,
 } from "@/features/project/project-dialogs"
 import { StockDialog } from "@/features/prepare/stock/stock-dialog"
+import { AddFixtureDialog } from "@/features/prepare/fixtures/add-fixture-dialog"
 import { SettingsDialog } from "@/features/settings/settings-dialog"
 import { WorkspaceToolLibrary } from "@/features/tool-library"
 import { WorkspaceSettingsDialog } from "@/features/workspace-settings/workspace-settings-dialog"
@@ -55,6 +56,8 @@ function OpenDialog({ dialog }: { dialog: WorkspaceDialog }) {
       return <HeightMapDialog onClose={closeDialog} />
     case "stock":
       return <StockDialog plateId={dialog.plateId} onClose={closeDialog} />
+    case "add-fixture":
+      return <AddFixtureDialog plateId={dialog.plateId} onClose={closeDialog} />
     case "tools":
       return (
         <WorkspaceToolLibrary assign={dialog.assign} onClose={closeDialog} />

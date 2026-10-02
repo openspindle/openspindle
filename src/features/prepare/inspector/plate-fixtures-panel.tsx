@@ -26,24 +26,17 @@ import { Toggle } from "@/components/ui/toggle"
 import { OptionSelect } from "@/components/option-select"
 import { PointFields } from "@/components/workspace/coordinate-input"
 import { FixtureOriginSelect } from "@/components/workspace/fixture-origin-select"
-import { useFixtureLibrary } from "@/app/fixtures/fixture-context"
 import { useWorkspaceStore } from "@/app/workspace/workspace-context"
 import type { ModelId } from "@/domain/models/model"
 import type { Plate, PlateSetup } from "@/domain/plate/plate"
 import type { FixturePatch } from "@/domain/plate/plate-fixtures"
 import { setupItemKey } from "@/domain/plate/setup-items"
 import type { SetupItemRef } from "@/domain/plate/setup-items"
-import {
-  WORKSPACE_PROFILE,
-  bedSetupOf,
-  defaultFixtureProfile,
-} from "@/domain/fixtures/profiles"
 import type { WorkspaceCommand } from "@/domain/workspace/workspace"
 import { useModelLibrary } from "@/features/models/model-queries"
 import { newId } from "@/domain/primitives"
 import {
   FIXTURE_LIMIT,
-  fixtureInstance,
   isBedKind,
   isLocked,
   libraryModelId,
@@ -55,6 +48,7 @@ import type {
 } from "@/domain/fixtures/definitions"
 import { selectSetupItem, useArrangeSelection } from "../arrange/arrange-state"
 import { lockToggleCopy, toggleLock } from "../arrange/use-arrange-events"
+import { addFixtureToPlate, usePlateBedSetup } from "../fixtures/plate-fixtures"
 import { AnchorPlacementFields } from "./anchor-placement-fields"
 
 const FIXTURE_ANCHOR_HINT =
@@ -216,13 +210,7 @@ function AddFixture({
 export function PlateFixturesPanel({ plate }: { plate: Plate }) {
   const workspace = useWorkspaceStore()
   const setup = plate.setup
-  // The plate's own device, not whichever one the Device tab currently shows.
-  const profiles = useFixtureLibrary((library) => library.profiles)
-  const profileId = setup.deviceId ?? WORKSPACE_PROFILE
-  const plateProfile = Object.hasOwn(profiles, profileId)
-    ? profiles[profileId]
-    : defaultFixtureProfile()
-  const { definitions } = bedSetupOf(plateProfile, setup.bedSetupId)
+  const { definitions } = usePlateBedSetup(plate)
   const models = useModelLibrary().data
   const library = useMemo(
     () => (models ? new Set(models.map((model) => model.id)) : null),
@@ -263,31 +251,7 @@ export function PlateFixturesPanel({ plate }: { plate: Plate }) {
   const full = setup.fixtures.length >= FIXTURE_LIMIT
   const add = (value: string) => {
     const definition = definitions.find((item) => item.id === value)
-    if (!definition) return
-    const added = fixtureInstance(definition)
-    const result = run({
-      type: "fixture.add",
-      plateId: plate.id,
-      fixture: added,
-    })
-    if (!result.ok) return
-    // The new fixture is selected, so it can be moved into place right away; a bed the plate
-    // had already stays its bed, and is selected instead.
-    const fixtures =
-      result.value.plates.find(({ id }) => id === plate.id)?.setup.fixtures ??
-      []
-    const selected =
-      fixtures.find((item) => item.id === added.id) ??
-      fixtures.find(
-        (item) =>
-          isBedKind(item.definition.kind) &&
-          item.definition.id === definition.id
-      )
-    if (selected)
-      selectSetupItem(
-        { plateId: plate.id, item: { kind: "fixture", id: selected.id } },
-        !isBedKind(definition.kind)
-      )
+    if (definition) addFixtureToPlate(workspace, plate.id, definition)
   }
   return (
     <FieldGroup className="min-w-0 p-4" role="tabpanel" aria-label="Fixtures">

@@ -4,6 +4,7 @@ import {
   ArrowDown,
   ArrowDownToLine,
   ArrowUp,
+  Boxes,
   ChevronDown,
   ChevronRight,
   Eye,
@@ -13,7 +14,10 @@ import {
   FolderOpen,
   LandPlot,
   Layers3,
+  ListOrdered,
   ListTree,
+  Lock,
+  LockOpen,
   Pause,
   PencilLine,
   Plus,
@@ -30,6 +34,7 @@ import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
   ContextMenu,
+  ContextMenuCheckboxItem,
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuSeparator,
@@ -47,6 +52,7 @@ import {
 import type { StepId } from "@/app/workspace/history"
 import type { WorkspaceStore } from "@/app/workspace/store"
 import type { SectionKind } from "@/domain/compile/sections"
+import { isBedKind, isLocked } from "@/domain/fixtures/definitions"
 import type { Operation } from "@/domain/operations/operation"
 import { plateLabel } from "@/domain/plate/plate"
 import type { Plate } from "@/domain/plate/plate"
@@ -56,12 +62,21 @@ import type { WorkspaceCommand } from "@/domain/workspace/workspace"
 import { useFusionUpdate } from "@/features/fusion360/use-fusion-update"
 import { useOperationIcon } from "@/features/prepare/operation-icon"
 import { openDialog } from "@/features/shell/dialogs"
+import { lockToggleCopy, toggleLock } from "../arrange/use-arrange-events"
+import { FIXTURE_ICONS } from "../fixtures/fixture-icon"
 import { selectSections } from "../selection"
-import { toggleOperationHidden, useHiddenOperations } from "../visibility"
+import {
+  fixtureKey,
+  setFixturesHidden,
+  setOperationsHidden,
+  toggleOperationHidden,
+  useHiddenFixtures,
+  useHiddenOperations,
+} from "../visibility"
 import type { TreeRow } from "./tree-rows"
 import type { TreeTableRow } from "./plate-tree"
 
-const INDENT = ["pl-1", "pl-5", "pl-9", "pl-12"] as const
+const INDENT = ["pl-1", "pl-4", "pl-7", "pl-10", "pl-13"] as const
 
 const SECTION_ICONS: Partial<Record<SectionKind, LucideIcon>> = {
   "tool-change": Wrench,
@@ -75,9 +90,14 @@ type RowProps = {
   row: TreeTableRow
   selectedPlateId: string | null
   selectedOperationId: string | null
+  /** The fixture selected in the viewer, on the selected plate. */
+  selectedFixtureId: string | null
   onToggle: () => void
   onSelectPlate: (plateId: string) => void
   onSelectOperation: (plateId: string, operationId: string) => void
+  onSelectFixture: (plateId: string, fixtureId: string) => void
+  /** Shows the plate's Fixtures panel. */
+  onShowFixtures: (plateId: string) => void
   onSelectSection: (event: MouseEvent) => void
 }
 
@@ -154,11 +174,17 @@ function RowButton({
 
 function IconAction({
   label,
+  title = label,
+  pressed,
   disabled,
   onClick,
   children,
 }: {
   label: string
+  /** What hovering it says; its label by default. */
+  title?: string
+  /** Whether a toggle is on. */
+  pressed?: boolean
   disabled?: boolean
   onClick: () => void
   children: ReactNode
@@ -168,7 +194,8 @@ function IconAction({
       variant="ghost"
       size="icon-sm"
       aria-label={label}
-      title={label}
+      aria-pressed={pressed}
+      title={title}
       disabled={disabled}
       onClick={onClick}
     >
@@ -227,9 +254,11 @@ function PlateRow(
 ) {
   const workspace = useWorkspaceStore()
   const { node, row } = props
+  // A fixture of the plate selected in the viewer is what is selected, not the plate.
   const active =
     props.selectedPlateId === node.plate.id &&
-    props.selectedOperationId === null
+    props.selectedOperationId === null &&
+    !node.plate.setup.fixtures.some(({ id }) => id === props.selectedFixtureId)
   const neighbor = (offset: number) =>
     workspace.state.plates.at(node.index + offset)
   const move = (offset: number) => {
@@ -259,15 +288,6 @@ function PlateRow(
       </RowButton>
       <ErrorCount count={node.errors} />
       <IconAction
-        label={`Add operation to ${node.label}`}
-        onClick={() => {
-          props.onSelectPlate(node.plate.id)
-          openDialog({ kind: "add-operation" })
-        }}
-      >
-        <Plus />
-      </IconAction>
-      <IconAction
         label={`Move ${node.label} up`}
         disabled={node.index === 0}
         onClick={() => move(-1)}
@@ -285,6 +305,266 @@ function PlateRow(
         <X />
       </IconAction>
     </RowFrame>
+  )
+}
+
+/** Hides or shows every item of a group row: all of them hidden shows them again. */
+function GroupEye({
+  label,
+  hidden,
+  count,
+  onChange,
+}: {
+  /** What the items are, such as "fixtures of Plate 1". */
+  label: string
+  /** How many of the items are hidden. */
+  hidden: number
+  count: number
+  onChange: (hidden: boolean) => void
+}) {
+  const shown = count === 0 || hidden < count
+  return (
+    <IconAction
+      label={`${shown ? "Hide" : "Show"} ${label} in the 3D view`}
+      disabled={count === 0}
+      onClick={() => onChange(shown)}
+    >
+      {shown ? <Eye /> : <EyeOff />}
+    </IconAction>
+  )
+}
+
+/** The plate's fixtures: hide them all, show the Fixtures panel, or add one. */
+function FixturesRow(
+  props: RowProps & { node: Extract<TreeRow, { kind: "fixtures" }> }
+) {
+  const { node, row } = props
+  const { plate } = node
+  const hidden = useHiddenFixtures()
+  // Those the 3D view draws: fixtures with a model.
+  const ids = node.subRows.flatMap((sub) =>
+    sub.kind === "fixture" && sub.instance.definition.model
+      ? [sub.instance.id]
+      : []
+  )
+  const hiddenCount = ids.filter((id) =>
+    hidden.has(fixtureKey(plate.id, id))
+  ).length
+  const allHidden = ids.length > 0 && hiddenCount === ids.length
+  const add = () => openDialog({ kind: "add-fixture", plateId: plate.id })
+  return (
+    <ContextMenu>
+      <ContextMenuTrigger
+        className="data-popup-open:bg-sidebar-accent"
+        render={<RowFrame row={row} selected={false} />}
+      >
+        <ExpandButton row={row} onToggle={props.onToggle} />
+        <GroupEye
+          label={`fixtures of ${node.owner}`}
+          hidden={hiddenCount}
+          count={ids.length}
+          onChange={(hide) => setFixturesHidden(plate.id, ids, hide)}
+        />
+        <RowButton
+          active={false}
+          title={`Fixtures of ${node.owner}`}
+          onClick={() => props.onShowFixtures(plate.id)}
+        >
+          <Boxes />
+          <span className="truncate">{node.label}</span>
+        </RowButton>
+        <Badge
+          variant="secondary"
+          className="font-numeric"
+          aria-label={`${node.count} fixtures`}
+        >
+          {node.count}
+        </Badge>
+        <IconAction label={`Add fixture to ${node.owner}`} onClick={add}>
+          <Plus />
+        </IconAction>
+      </ContextMenuTrigger>
+      <ContextMenuContent>
+        <ContextMenuItem onClick={add}>Add fixture…</ContextMenuItem>
+        <ContextMenuSeparator />
+        <ContextMenuItem
+          disabled={!ids.length}
+          onClick={() => setFixturesHidden(plate.id, ids, !allHidden)}
+        >
+          {allHidden ? "Show all" : "Hide all"}
+        </ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
+  )
+}
+
+/**
+ * A fixture on the plate's bed: hide it in the 3D view, select it there, lock it or remove it;
+ * a locked one refuses removal, and says why.
+ */
+function FixtureRow(
+  props: RowProps & { node: Extract<TreeRow, { kind: "fixture" }> }
+) {
+  const workspace = useWorkspaceStore()
+  const { node, row } = props
+  const { plate, instance } = node
+  const hidden = useHiddenFixtures().has(fixtureKey(plate.id, instance.id))
+  const active =
+    props.selectedPlateId === plate.id &&
+    props.selectedFixtureId === instance.id
+  const { kind, model } = instance.definition
+  const Icon = FIXTURE_ICONS[kind]
+  const bed = isBedKind(kind)
+  const locked = isLocked(instance)
+  const lock = lockToggleCopy(locked)
+  const toggleHidden = () => setFixturesHidden(plate.id, [instance.id], !hidden)
+  const toggleLocked = () =>
+    toggleLock(workspace, {
+      plate,
+      item: { ref: { kind: "fixture", id: instance.id }, locked },
+    })
+  const remove = () => {
+    const previous = workspace.history.latestStep
+    const removed = workspace.dispatch({
+      type: "fixture.remove",
+      plateId: plate.id,
+      fixtureId: instance.id,
+    })
+    if (removed.ok) toastUndoable(workspace, previous, `Removed ${node.label}.`)
+    else toast.error(removed.error)
+  }
+  return (
+    <ContextMenu>
+      <ContextMenuTrigger
+        className="data-popup-open:bg-sidebar-accent"
+        render={<RowFrame row={row} selected={active} />}
+      >
+        <span className="size-7 shrink-0" />
+        {/* A fixture without a model is not drawn, so there is nothing to hide. */}
+        {model ? (
+          <IconAction
+            label={`${hidden ? "Show" : "Hide"} ${node.label} in the 3D view`}
+            onClick={toggleHidden}
+          >
+            {hidden ? <EyeOff /> : <Eye />}
+          </IconAction>
+        ) : (
+          <span className="size-7 shrink-0" />
+        )}
+        <RowButton
+          active={active}
+          title={node.label}
+          onClick={() => props.onSelectFixture(plate.id, instance.id)}
+        >
+          <Icon />
+          <span className="truncate">{node.label}</span>
+        </RowButton>
+        {!bed && (
+          <IconAction
+            label={`${lock.label} ${node.label}`}
+            title={lock.description}
+            pressed={locked}
+            onClick={toggleLocked}
+          >
+            {locked ? <Lock /> : <LockOpen />}
+          </IconAction>
+        )}
+        <IconAction
+          label={`Remove ${node.label}`}
+          title={
+            locked
+              ? `${node.label} is locked. Unlock it to remove it.`
+              : undefined
+          }
+          onClick={remove}
+        >
+          <X />
+        </IconAction>
+      </ContextMenuTrigger>
+      <ContextMenuContent>
+        {model && (
+          <ContextMenuItem onClick={toggleHidden}>
+            {hidden ? "Show" : "Hide"}
+          </ContextMenuItem>
+        )}
+        {!bed && (
+          <ContextMenuCheckboxItem
+            checked={locked}
+            onCheckedChange={toggleLocked}
+          >
+            Locked
+          </ContextMenuCheckboxItem>
+        )}
+        {(model || !bed) && <ContextMenuSeparator />}
+        <ContextMenuItem
+          onClick={() => openDialog({ kind: "add-fixture", plateId: plate.id })}
+        >
+          Add fixture…
+        </ContextMenuItem>
+        <ContextMenuSeparator />
+        <ContextMenuItem onClick={remove}>Remove</ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
+  )
+}
+
+/** The plate's operations: hide them all, or add one. */
+function OperationsRow(
+  props: RowProps & { node: Extract<TreeRow, { kind: "operations" }> }
+) {
+  const { node, row } = props
+  const { plate } = node
+  const hidden = useHiddenOperations()
+  const ids = plate.operations.map(({ id }) => id)
+  const hiddenCount = ids.filter((id) => hidden.has(id)).length
+  const allHidden = ids.length > 0 && hiddenCount === ids.length
+  const add = () => {
+    props.onSelectPlate(plate.id)
+    openDialog({ kind: "add-operation" })
+  }
+  return (
+    <ContextMenu>
+      <ContextMenuTrigger
+        className="data-popup-open:bg-sidebar-accent"
+        render={<RowFrame row={row} selected={false} />}
+      >
+        <ExpandButton row={row} onToggle={props.onToggle} />
+        <GroupEye
+          label={`operations of ${node.owner}`}
+          hidden={hiddenCount}
+          count={ids.length}
+          onChange={(hide) => setOperationsHidden(ids, hide)}
+        />
+        <RowButton
+          active={false}
+          title={`Operations of ${node.owner}`}
+          onClick={() => props.onSelectPlate(plate.id)}
+        >
+          <ListOrdered />
+          <span className="truncate">{node.label}</span>
+        </RowButton>
+        <Badge
+          variant="secondary"
+          className="font-numeric"
+          aria-label={`${node.count} operations`}
+        >
+          {node.count}
+        </Badge>
+        <IconAction label={`Add operation to ${node.owner}`} onClick={add}>
+          <Plus />
+        </IconAction>
+      </ContextMenuTrigger>
+      <ContextMenuContent>
+        <ContextMenuItem onClick={add}>Add operation…</ContextMenuItem>
+        <ContextMenuSeparator />
+        <ContextMenuItem
+          disabled={!ids.length}
+          onClick={() => setOperationsHidden(ids, !allHidden)}
+        >
+          {allHidden ? "Show all" : "Hide all"}
+        </ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
   )
 }
 
@@ -620,6 +900,12 @@ export function TreeRowView(props: RowProps) {
   switch (node.kind) {
     case "plate":
       return <PlateRow {...props} node={node} />
+    case "fixtures":
+      return <FixturesRow {...props} node={node} />
+    case "fixture":
+      return <FixtureRow {...props} node={node} />
+    case "operations":
+      return <OperationsRow {...props} node={node} />
     case "operation":
       return <OperationRow {...props} node={node} />
     case "group":

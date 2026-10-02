@@ -44,6 +44,8 @@ type Props = {
   selectedLineRanges?: LineRange[]
   /** Program lines each plate leaves out of the view, such as hidden operations', by plate id. */
   hiddenLineRanges?: Readonly<Record<string, readonly LineRange[]>>
+  /** Fixtures each plate leaves out of the view (their ids), by plate id. */
+  hiddenFixtures?: Readonly<Record<string, readonly string[]>>
   previewLine?: number | null
   previewProbePoint?: number | null
   /**
@@ -81,6 +83,7 @@ export function BedViewer({
   onSelectPlate,
   selectedLineRanges,
   hiddenLineRanges,
+  hiddenFixtures,
   previewLine,
   previewProbePoint,
   playhead,
@@ -161,6 +164,7 @@ export function BedViewer({
       selectedPlateId,
       selectedLineRanges,
       hiddenLineRanges,
+      hiddenFixtures,
       previewLine,
       previewProbePoint,
       progress,
@@ -175,6 +179,7 @@ export function BedViewer({
     selectedPlateId,
     selectedLineRanges,
     hiddenLineRanges,
+    hiddenFixtures,
     previewLine,
     previewProbePoint,
     progress,

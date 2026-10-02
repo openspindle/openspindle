@@ -11,6 +11,7 @@ const hasPlate = (state: WorkspaceState, plateId: string) =>
 function subjectExists(dialog: WorkspaceDialog, state: WorkspaceState) {
   switch (dialog.kind) {
     case "stock":
+    case "add-fixture":
       return hasPlate(state, dialog.plateId)
     case "tools":
       return !dialog.assign || hasPlate(state, dialog.assign.plateId)

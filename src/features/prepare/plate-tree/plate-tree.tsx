@@ -26,6 +26,8 @@ import {
 import { useDiagnosticsOf } from "@/app/workspace/use-plate-diagnostics"
 import { useWorkspace } from "@/app/workspace/workspace-context"
 import { openDialog } from "@/features/shell/dialogs"
+import { useArrangeSelection } from "../arrange/arrange-state"
+import { useSelectSetupItem } from "../arrange/use-arrange-events"
 import { sectionSelectionAtom, selectSections } from "../selection"
 import { SelectionBar } from "./selection-bar"
 import { TreeRowView } from "./tree-row"
@@ -55,13 +57,22 @@ const columns = columnHelper.columns([
 
 const ROW_HEIGHT = 36
 
-/** Plates, their operations and program sections: select, reorder, group and search. */
+/**
+ * Plates with their fixtures and operations, and the operations' program sections: select,
+ * hide, add, reorder, group and search.
+ */
 export function PlateTree({ className }: { className?: string }) {
   const plates = useWorkspace((state) => state.plates)
   const tools = useWorkspace((state) => state.tools)
   const selectedPlateId = useWorkspace((state) => state.selectedPlateId)
   const diagnosticsOf = useDiagnosticsOf()
   const selection = usePrepareSelection()
+  const selectItem = useSelectSetupItem()
+  const arranged = useArrangeSelection()
+  const selectedFixtureId =
+    arranged?.item.kind === "fixture" && arranged.plateId === selectedPlateId
+      ? arranged.item.id
+      : null
   const addPlate = useAddPlate()
   const [query, setQuery] = useState("")
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
@@ -152,7 +163,7 @@ export function PlateTree({ className }: { className?: string }) {
             <Search />
           </InputGroupAddon>
           <InputGroupInput
-            aria-label="Search plates, operations and sections"
+            aria-label="Search plates, fixtures, operations and sections"
             placeholder="Search"
             value={query}
             onChange={(event) => {
@@ -182,7 +193,7 @@ export function PlateTree({ className }: { className?: string }) {
         ref={scroller}
         className="min-h-0 flex-1 overflow-y-auto px-2 pb-3"
         role="tree"
-        aria-label="Plates and operations"
+        aria-label="Plates, fixtures and operations"
       >
         <div
           className="relative w-full"
@@ -203,9 +214,17 @@ export function PlateTree({ className }: { className?: string }) {
                   row={row}
                   selectedPlateId={selectedPlateId}
                   selectedOperationId={selection.operationId}
+                  selectedFixtureId={selectedFixtureId}
                   onToggle={() => toggle(row)}
-                  onSelectPlate={selection.selectPlate}
+                  // As clicking beside the plate's setup in the viewer: the plate alone.
+                  onSelectPlate={(plateId) => selectItem(plateId, null)}
                   onSelectOperation={selection.selectOperation}
+                  onSelectFixture={(plateId, fixtureId) =>
+                    selectItem(plateId, { kind: "fixture", id: fixtureId })
+                  }
+                  onShowFixtures={(plateId) =>
+                    selection.showPlateSetup(plateId, "fixtures")
+                  }
                   onSelectSection={(event) => selectSection(row, event)}
                 />
               </div>

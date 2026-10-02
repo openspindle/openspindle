@@ -3,6 +3,8 @@ import { compilePlate } from "@/domain/compile/compile"
 import type { CompiledPlate, CompiledSection } from "@/domain/compile/compile"
 import { diagnosticOperation } from "@/domain/diagnostics"
 import type { Diagnostic } from "@/domain/diagnostics"
+import { namedFixtures } from "@/domain/fixtures/definitions"
+import type { FixtureInstance } from "@/domain/fixtures/definitions"
 import { operationPhase } from "@/domain/operations/kinds"
 import type { Operation, Phase } from "@/domain/operations/operation"
 import { numberedPlate, plateLabel } from "@/domain/plate/plate"
@@ -24,6 +26,22 @@ export type TreeRow =
       readonly kind: "plate"
       readonly index: number
       readonly errors: number
+    })
+  /** The plate's fixtures, those on its bed; `owner` is the plate's label. */
+  | (RowBase & {
+      readonly kind: "fixtures"
+      readonly owner: string
+      readonly count: number
+    })
+  | (RowBase & {
+      readonly kind: "fixture"
+      readonly instance: FixtureInstance
+    })
+  /** The plate's operations, in the order they run; `owner` is the plate's label. */
+  | (RowBase & {
+      readonly kind: "operations"
+      readonly owner: string
+      readonly count: number
     })
   | (RowBase & {
       readonly kind: "operation"
@@ -126,9 +144,40 @@ function operationChildren(
   return rows
 }
 
+/** The plate's fixtures on its bed, named as the Fixtures panel lists them. */
+function fixturesRow(
+  plate: Plate,
+  owner: string,
+  plateSearch: string
+): TreeRow {
+  const label = "Fixtures"
+  const search = `${plateSearch} ${label}`
+  const placed = namedFixtures(
+    plate.setup.fixtures.filter((instance) => instance.enabled)
+  )
+  return {
+    kind: "fixtures",
+    id: `fixtures:${plate.id}`,
+    plate,
+    owner,
+    count: placed.length,
+    label,
+    search,
+    subRows: placed.map(({ instance, name }) => ({
+      kind: "fixture",
+      id: `fixture:${plate.id}:${instance.id}`,
+      plate,
+      instance,
+      label: name,
+      search: `${search} ${name}`,
+      subRows: [],
+    })),
+  }
+}
+
 /**
- * Plates, their operations, groups and program sections, as rows of the plate tree; `tools` is
- * the library the plates' tables refer to.
+ * Plates with their fixtures and operations, the operations' groups and program sections, as
+ * rows of the plate tree; `tools` is the library the plates' tables refer to.
  */
 export function buildTreeRows(
   plates: readonly Plate[],
@@ -145,6 +194,33 @@ export function buildTreeRows(
     const label = plateLabel(plate, index)
     // A named plate is still found by its number.
     const plateSearch = `${numberedPlate(index)} ${plate.name}`
+    const operationsSearch = `${plateSearch} Operations`
+    const operations = plate.operations.map((operation, position): TreeRow => {
+      const phase = operationPhase(operation)
+      const operationLabel = treeLabel(operation.name)
+      const search = `${operationsSearch} ${operationLabel} ${PHASE_LABELS[phase]}`
+      return {
+        kind: "operation",
+        id: `operation:${operation.id}`,
+        plate,
+        operation,
+        index: position,
+        count: plate.operations.length,
+        phase,
+        errors: errorsOf(diagnostics, operation.id),
+        label: operationLabel,
+        search,
+        subRows: operationChildren(
+          plate,
+          compiled.sections.filter(
+            (section) => section.operationId === operation.id
+          ),
+          groups,
+          byId,
+          search
+        ),
+      }
+    })
     return {
       kind: "plate",
       id: `plate:${plate.id}`,
@@ -153,39 +229,29 @@ export function buildTreeRows(
       errors: errorsOf(diagnostics),
       label,
       search: plateSearch,
-      subRows: plate.operations.map((operation, position): TreeRow => {
-        const phase = operationPhase(operation)
-        const operationLabel = treeLabel(operation.name)
-        const search = `${plateSearch} ${operationLabel} ${PHASE_LABELS[phase]}`
-        return {
-          kind: "operation",
-          id: `operation:${operation.id}`,
+      subRows: [
+        fixturesRow(plate, label, plateSearch),
+        {
+          kind: "operations",
+          id: `operations:${plate.id}`,
           plate,
-          operation,
-          index: position,
+          owner: label,
           count: plate.operations.length,
-          phase,
-          errors: errorsOf(diagnostics, operation.id),
-          label: operationLabel,
-          search,
-          subRows: operationChildren(
-            plate,
-            compiled.sections.filter(
-              (section) => section.operationId === operation.id
-            ),
-            groups,
-            byId,
-            search
-          ),
-        }
-      }),
+          label: "Operations",
+          search: operationsSearch,
+          subRows: operations,
+        },
+      ],
     }
   })
 }
 
-/** Rows shown expanded until the user collapses them: plates and groups. */
+/** Rows shown expanded until the user collapses them: plates, their fixtures and operations, groups. */
 const expandedByDefault = (row: TreeRow) =>
-  row.kind === "plate" || row.kind === "group"
+  row.kind === "plate" ||
+  row.kind === "fixtures" ||
+  row.kind === "operations" ||
+  row.kind === "group"
 
 /** Every expanded row: the user's choices, and the defaults for rows they did not toggle. */
 export function expandedState(

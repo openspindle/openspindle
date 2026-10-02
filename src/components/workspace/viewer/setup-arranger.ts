@@ -13,11 +13,7 @@ import type {
 import type { Point3 } from "@/domain/nc/gcode"
 import { sameEdge } from "@/domain/plate/item-edges"
 import type { ItemEdge, ItemEdgeRef } from "@/domain/plate/item-edges"
-import {
-  WORK_AXIS_LENGTH,
-  plateItemEdges,
-  plateSetupPoints,
-} from "../bed-viewer-layout"
+import { WORK_AXIS_LENGTH, plateItemEdges } from "../bed-viewer-layout"
 import type { EdgeHighlight } from "./edge-highlights"
 import type { PlateView } from "./plate-view"
 import type { Marker, MarkerStyle } from "./setup-markers"
@@ -312,9 +308,10 @@ export class SetupArranger {
     const from = this.from
     const selection = this.state.selection
     if (from && selection) {
-      const plate = this.host.view(selection.plateId)?.plate
-      const current =
-        plate && plateSetupPoints(plate).find((point) => point.key === from.key)
+      const current = this.host
+        .view(selection.plateId)
+        ?.setupPoints()
+        .find((point) => point.key === from.key)
       if (
         !current ||
         current.position.some((value, axis) => value !== from.position[axis])
@@ -361,7 +358,7 @@ export class SetupArranger {
   ) {
     const view = this.host.view(selection.plateId)
     if (!view) return
-    const points = plateSetupPoints(view.plate)
+    const points = view.setupPoints()
     this.drag = {
       pointerId,
       plateId: selection.plateId,
@@ -540,7 +537,7 @@ export class SetupArranger {
       const view = this.host.view(plateId)
       if (picking.kind !== "point" || picking.plateId !== plateId || !view)
         return null
-      return plateSetupPoints(view.plate).flatMap((point) => {
+      return view.setupPoints().flatMap((point) => {
         const marker = {
           position: point.position,
           style: this.markerStyle(point, false),
@@ -562,7 +559,7 @@ export class SetupArranger {
         (point) => point?.key ?? []
       )
     )
-    return plateSetupPoints(view.plate).flatMap((point) => {
+    return view.setupPoints().flatMap((point) => {
       const own = this.isOwn(point)
       const position = own ? plus(point.position, delta) : point.position
       const style = this.markerStyle(point, own)
@@ -698,7 +695,7 @@ export class SetupArranger {
     const rect = this.host.canvas.getBoundingClientRect()
     const at = { x: event.clientX - rect.left, y: event.clientY - rect.top }
     let best: PointPick | null = null
-    for (const point of plateSetupPoints(view.plate)) {
+    for (const point of view.setupPoints()) {
       const shown = this.screen(plateId, point.position, rect)
       const distance = Math.hypot(shown.x - at.x, shown.y - at.y)
       if (distance > PICK_RADIUS) continue

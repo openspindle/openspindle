@@ -64,6 +64,30 @@ export function toggleLock(workspace: WorkspaceStore, target: LockTarget) {
 }
 
 /**
+ * Selects a plate's setup item as clicking it in the viewer does, and the inspector shows its
+ * settings; no item selects the plate alone.
+ */
+export function useSelectSetupItem() {
+  const workspace = useWorkspaceStore()
+  const selection = usePrepareSelection()
+  return (plateId: string | null, item: SetupItemRef | null) => {
+    const plate = workspace.state.plates.find(({ id }) => id === plateId)
+    if (!plate || !item) {
+      selectSetupItem(null)
+      if (plate) selection.selectPlate(plate.id)
+      return
+    }
+    const movable = !setupItem(plate.setup, item)?.fixed
+    selectSetupItem({ plateId: plate.id, item }, movable)
+    const panel = panelOf(item)
+    // The machine bed has no settings of its own: what the inspector shows stays.
+    if (panel) selection.showPlateSetup(plate.id, panel)
+    else if (workspace.state.selectedPlateId !== plate.id)
+      selection.selectPlate(plate.id)
+  }
+}
+
+/**
  * What the Prepare viewer does when setup items are clicked and moved: the inspector shows the
  * selected item's settings, and moves are workspace commands.
  */
@@ -72,23 +96,9 @@ export function useArrangeEvents(handlers: {
   pick: (pick: ArrangePick) => void
 }): ArrangeEvents {
   const workspace = useWorkspaceStore()
-  const selection = usePrepareSelection()
+  const select = useSelectSetupItem()
   return {
-    select: (plateId, item) => {
-      const plate = workspace.state.plates.find(({ id }) => id === plateId)
-      if (!plate || !item) {
-        selectSetupItem(null)
-        if (plate) selection.selectPlate(plate.id)
-        return
-      }
-      const movable = !setupItem(plate.setup, item)?.fixed
-      selectSetupItem({ plateId: plate.id, item }, movable)
-      const panel = panelOf(item)
-      // The machine bed has no settings of its own: what the inspector shows stays.
-      if (panel) selection.showPlateSetup(plate.id, panel)
-      else if (workspace.state.selectedPlateId !== plate.id)
-        selection.selectPlate(plate.id)
-    },
+    select,
     move: (plateId, item, delta) => {
       const result = workspace.dispatch({
         type: "plate.moveItem",
