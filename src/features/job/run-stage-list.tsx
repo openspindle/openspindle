@@ -18,7 +18,8 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { Spinner } from "@/components/ui/spinner"
-import { AxisLabel } from "@/components/workspace/axis-label"
+import { AxisLabel, AxisValue } from "@/components/workspace/axis-label"
+import { numberText } from "@/features/device/device-format"
 import { formatMillimetres } from "@/domain/geometry/millimetres"
 import type { Operation } from "@/domain/operations/operation"
 import {
@@ -54,8 +55,13 @@ import {
   HeightMapGrid,
 } from "@/components/workspace/height-map-grid"
 import { operationKindLabel } from "@/features/prepare/use-operation-kind-label"
+import type { OperationSettings } from "@/domain/compile/operation-settings"
 import { HeightMapReviewStep } from "./height-map-review-step"
 import { JobFaults, JobProgressDetails } from "./job-details"
+import {
+  OperationSettingsRow,
+  useOperationSettings,
+} from "./operation-settings"
 import type { JobActions } from "./job-hooks"
 import { EndedStage, FinishingStage, TransferStage } from "./job-stages"
 import type { JobSubject, JobView } from "./job-view"
@@ -125,22 +131,53 @@ function StageItem({
 
 const mm = (value: number) => formatMillimetres(Number(value.toFixed(3)))
 
+/** A coordinate as the Device page's coordinates show it: to three decimals, a micrometre. */
+const coordinate = (value: number) => numberText(value, 3)
+
+/** A stored anchor and the X and Y from it, each axis as `AxisValue` sets it. */
+function AnchorOffset({
+  name,
+  offset,
+}: {
+  name: string
+  offset: readonly number[]
+}) {
+  return (
+    <>
+      {name} + <AxisValue axis="X" value={coordinate(offset[0])} />{" "}
+      <AxisValue axis="Y" value={coordinate(offset[1])} />
+    </>
+  )
+}
+
 /** What an operation does, before it has run. */
 function operationSummary(
   operation: Operation,
   subject: JobSubject,
   tools: readonly Tool[]
-): string {
+): ReactNode {
   const { source } = operation
   const probing = source.kind === "probing" ? source : null
   switch (probing?.task) {
     case "touch-off": {
       const { placement } = probing.params
-      const where =
-        placement.kind === "anchor"
-          ? `at ${anchorName(subject, placement.anchorId)} + X${mm(placement.offset[0])} Y${mm(placement.offset[1])}`
-          : "below the probe"
-      return `Touches the stock top ${where} and sets work Z there.`
+      return (
+        <>
+          Touches the stock top{" "}
+          {placement.kind === "anchor" ? (
+            <>
+              at{" "}
+              <AnchorOffset
+                name={anchorName(subject, placement.anchorId)}
+                offset={placement.offset}
+              />
+            </>
+          ) : (
+            "below the probe"
+          )}{" "}
+          and sets work <AxisLabel axis="Z" /> there.
+        </>
+      )
     }
     case "grid": {
       const [columns, rows] = probing.params.points
@@ -162,12 +199,27 @@ function operationSummary(
     case "origin": {
       const { placement } = probing.params
       const height = placementHeight(placement)
-      const z = height === undefined ? "" : ` Z${mm(height)}`
-      const where =
-        placement.kind === "anchor"
-          ? `from ${anchorName(subject, placement.anchorId)} + X${mm(placement.offset[0])} Y${mm(placement.offset[1])}${z}`
-          : `from the probe position${z && ` at${z}`}`
-      return `Finds ${probe3dTarget(probing.params)} ${where} and sets the work origin there.`
+      const z = height !== undefined && (
+        <AxisValue axis="Z" value={coordinate(height)} />
+      )
+      return (
+        <>
+          Finds {probe3dTarget(probing.params)}{" "}
+          {placement.kind === "anchor" ? (
+            <>
+              from{" "}
+              <AnchorOffset
+                name={anchorName(subject, placement.anchorId)}
+                offset={placement.offset}
+              />
+              {z && <> {z}</>}
+            </>
+          ) : (
+            <>from the probe position{z && <> at {z}</>}</>
+          )}{" "}
+          and sets the work origin there.
+        </>
+      )
     }
     default: {
       const names = toolNames(operation, subject, tools)
@@ -271,11 +323,7 @@ type Fact = { label: string; value: ReactNode }
 
 /** A machine Z, its axis in its colour. */
 function Height({ z }: { z: number }) {
-  return (
-    <>
-      <AxisLabel axis="Z" /> {mm(z)}
-    </>
-  )
+  return <AxisValue axis="Z" value={coordinate(z)} />
 }
 
 /**
@@ -318,20 +366,20 @@ function probe3dFacts(
         Found the {feature} and set work{" "}
         {set.map(({ axis }) => (
           <Fragment key={axis}>
-            <AxisLabel axis={axis} />0{" "}
+            <AxisValue axis={axis} value="0" joined />{" "}
           </Fragment>
         ))}
         there, at machine
         {set.map(({ axis, value }) => (
           <Fragment key={axis}>
             {" "}
-            <AxisLabel axis={axis} /> {mm(value)}
+            <AxisValue axis={axis} value={coordinate(value)} />
           </Fragment>
         ))}
         {result.top !== null && (
           <>
             {" "}
-            and <AxisLabel axis="Z" />0 on the top it touched
+            and <AxisValue axis="Z" value="0" joined /> on the top it touched
           </>
         )}
         .
@@ -349,11 +397,12 @@ function sensorLabel(tool: number | null): string {
   return `T${tool} at sensor`
 }
 
-/** What the machine measured in an operation, or what it will do there. */
+/** What the machine measured in an operation, or what it will do there, and what it sets. */
 function operationResults(
   stage: OperationStage,
   subject: JobSubject,
-  tools: readonly Tool[]
+  tools: readonly Tool[],
+  settings: OperationSettings | undefined
 ): { description: ReactNode; details: ReactNode } {
   const { operation, surface, grid, contacts, status } = stage
   const facts: Fact[] = []
@@ -382,15 +431,16 @@ function operationResults(
     const { work } = surface
     description = (
       <>
-        Touched the stock top at machine <AxisLabel axis="X" /> {mm(x)}{" "}
-        <AxisLabel axis="Y" /> {mm(y)}
+        Touched the stock top at machine{" "}
+        <AxisValue axis="X" value={coordinate(x)} />{" "}
+        <AxisValue axis="Y" value={coordinate(y)} />
         {work && (
           <>
-            , work <AxisLabel axis="X" /> {mm(work[0])} <AxisLabel axis="Y" />{" "}
-            {mm(work[1])},
+            , work <AxisValue axis="X" value={coordinate(work[0])} />{" "}
+            <AxisValue axis="Y" value={coordinate(work[1])} />,
           </>
         )}{" "}
-        and set work <AxisLabel axis="Z" />0 there.
+        and set work <AxisValue axis="Z" value="0" joined /> there.
       </>
     )
     facts.push({ label: "Stock top", value: <Height z={z} /> })
@@ -431,6 +481,7 @@ function operationResults(
     description: description ?? operationSummary(operation, subject, tools),
     details: (
       <>
+        {settings && <OperationSettingsRow settings={settings} />}
         {facts.length > 0 && <HeightMapFacts facts={facts} />}
         {grid && <HeightMapGrid map={gridMap(grid)} compact />}
         {found && <SaveAsAnchor position={found} plate={subject.plate} />}
@@ -443,12 +494,19 @@ function OperationItem({
   stage,
   subject,
   tools,
+  settings,
 }: {
   stage: OperationStage
   subject: JobSubject
   tools: readonly Tool[]
+  settings: OperationSettings | undefined
 }) {
-  const { description, details } = operationResults(stage, subject, tools)
+  const { description, details } = operationResults(
+    stage,
+    subject,
+    tools,
+    settings
+  )
   return (
     <StageItem
       title={stage.operation.name}
@@ -466,14 +524,16 @@ function RunningOperation({
   stage,
   subject,
   tools,
+  settings,
 }: {
   view: Extract<JobView, { kind: "running" }>
   stage: OperationStage | null
   subject: JobSubject | null
   tools: readonly Tool[]
+  settings: OperationSettings | undefined
 }) {
   const results =
-    stage && subject ? operationResults(stage, subject, tools) : null
+    stage && subject ? operationResults(stage, subject, tools, settings) : null
   return (
     <StageCard
       title={stage?.operation.name ?? "Running"}
@@ -499,12 +559,14 @@ function CurrentStage({
   stage,
   subject,
   tools,
+  settings,
   actions,
 }: {
   view: JobView
   stage: OperationStage | null
   subject: JobSubject | null
   tools: readonly Tool[]
+  settings: OperationSettings | undefined
   actions: JobActions
 }) {
   switch (view.kind) {
@@ -515,6 +577,7 @@ function CurrentStage({
           stage={stage}
           subject={subject}
           tools={tools}
+          settings={settings}
         />
       )
     case "waiting-tool":
@@ -582,6 +645,7 @@ export function RunStageList({
   parts: number
 }) {
   const stages = runStages(view, subject)
+  const settings = useOperationSettings(subject)
   const readAnchors = useReadAnchorsFix(subject?.plate.id ?? null)
   const operations = stages.operations
   const current =
@@ -593,12 +657,16 @@ export function RunStageList({
     view.kind !== "transferring" &&
     view.kind !== "finishing" &&
     view.kind !== "ended"
+  const currentStage = current >= 0 ? operations![current] : null
   const prompt = inOperation ? (
     <CurrentStage
       view={view}
-      stage={current >= 0 ? operations![current] : null}
+      stage={currentStage}
       subject={subject}
       tools={tools}
+      settings={
+        currentStage ? settings?.get(currentStage.operation.id) : undefined
+      }
       actions={actions}
     />
   ) : null
@@ -642,7 +710,12 @@ export function RunStageList({
             {index === current && prompt ? (
               prompt
             ) : (
-              <OperationItem stage={stage} subject={subject} tools={tools} />
+              <OperationItem
+                stage={stage}
+                subject={subject}
+                tools={tools}
+                settings={settings?.get(stage.operation.id)}
+              />
             )}
           </li>
         ))}

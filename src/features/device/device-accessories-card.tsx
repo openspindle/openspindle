@@ -23,6 +23,7 @@ import { ControlCard } from "./device-control-card"
 import { DeviceCameraVideoField } from "./device-camera-video-field"
 import { WorkLightBrightnessFields } from "./work-light-brightness-fields"
 import { DeviceVacuumPowerField } from "./device-vacuum-power-field"
+import { MachineLightTimerField } from "./machine-light-timer-field"
 
 function OutputControl({
   label,
@@ -115,6 +116,7 @@ export function DeviceAccessoriesCard({
             }}
           />
           <WorkLightBrightnessFields />
+          <MachineLightTimerField pending={busy} />
         </FieldGroup>
         {light.error && (
           <Alert variant="destructive">

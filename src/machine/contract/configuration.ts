@@ -47,6 +47,8 @@ export const FirmwareConfigurationSchema = z.object({
   vacuumDefaultPower: z.number().nullable(),
   /** The size of the camera's stream the configuration sets; null when it sets none. */
   cameraPicture: PictureSizeSchema.nullable(),
+  /** The firmware's own light timer in minutes when it switches a dimmed light off; 0 when not. */
+  dimmingLightTimer: z.number().nonnegative(),
   revision: z.string().regex(/^[a-f0-9]{32}$/),
   connectionId: z.string().uuid(),
   fetchedAt: z.number().nonnegative(),
@@ -67,6 +69,12 @@ export const WriteConfigurationRequestSchema = z.union([
   }),
   z.strictObject({
     cameraPicture: PictureSizeSchema,
+    revision: FirmwareConfigurationSchema.shape.revision,
+    connectionId: FirmwareConfigurationSchema.shape.connectionId,
+  }),
+  /** Only off: any other value keeps switching a dimmed light off. */
+  z.strictObject({
+    lightTimerMinutes: z.literal(0),
     revision: FirmwareConfigurationSchema.shape.revision,
     connectionId: FirmwareConfigurationSchema.shape.connectionId,
   }),

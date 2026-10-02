@@ -1,5 +1,9 @@
 import { HEIGHT_MAP_LIMITS } from "../../contract/index.ts"
-import type { AnchorConfiguration, HeightMap } from "../../contract/index.ts"
+import type {
+  AnchorConfiguration,
+  HeightMap,
+  SwitchReport,
+} from "../../contract/index.ts"
 import { FAILURE_LINES, excerpt } from "../../firmware/adapter.ts"
 import type { AddedSlot } from "../../firmware/adapter.ts"
 import { MachineError } from "../errors.ts"
@@ -9,6 +13,7 @@ import type { OperationContext } from "./context.ts"
 
 const ANCHOR_KEY_MS = 8000
 const HEIGHT_MAP_MS = 8000
+const SWITCHES_MS = 5000
 /** Stray replies after a read are swallowed for this long. */
 const DRAIN_MS = 200
 /** A cancelled grid read may still be streaming rows. */
@@ -263,4 +268,52 @@ export async function readHeightMap(
       error instanceof Error ? error.message : "Invalid height map response."
     )
   }
+}
+
+/** The machine's switches as it reads them now (`FirmwareAdapter.switches`): it changes nothing. */
+export async function readSwitches(
+  context: OperationContext
+): Promise<SwitchReport> {
+  const { session, adapter, clock, signal } = context
+  const switches = adapter.switches
+  if (!switches)
+    throw new MachineError(
+      "refused",
+      "This machine does not report its switches."
+    )
+  const before = await freshStatus(
+    context,
+    "Timed out waiting for fresh device status. The switches were not read."
+  )
+  requireAdmission(context, { key: "readSwitches" }, before)
+  let report: Omit<SwitchReport, "at"> | null = null
+  const response = session.request<Omit<SwitchReport, "at">>(
+    [switches.query],
+    (event) => {
+      if (event.kind !== "line") return "ignored"
+      const { kind, text } = event.line
+      const parsed = switches.parse(text)
+      if (parsed) {
+        report = parsed
+        return "consumed"
+      }
+      if (kind === "ack" && report) return { done: report }
+      if (FAILURE_LINES.has(kind))
+        return {
+          fail: new MachineError(
+            "rejected",
+            `The device rejected the switch read: ${excerpt(text)}`
+          ),
+        }
+      return "ignored"
+    },
+    {
+      timeoutMs: SWITCHES_MS,
+      timeoutMessage: "Reading the switches timed out. It was not retried.",
+      signal,
+    }
+  )
+  const read = await response
+  session.drainFor(DRAIN_MS)
+  return { ...read, at: clock.now() }
 }

@@ -1,7 +1,7 @@
 import * as THREE from "three"
-import { Line2 } from "three/addons/lines/Line2.js"
+import { Line2 } from "three/addons/lines/webgpu/Line2.js"
 import { LineGeometry } from "three/addons/lines/LineGeometry.js"
-import { LineMaterial } from "three/addons/lines/LineMaterial.js"
+import { Line2NodeMaterial } from "three/webgpu"
 import type { Point3 } from "@/domain/primitives"
 import { disposeObjects } from "@/lib/three-assets"
 
@@ -34,7 +34,7 @@ export class EdgeHighlights {
     for (const { start, end, hovered } of edges ?? []) {
       const line = new Line2(
         new LineGeometry().setPositions([...start, ...end]),
-        new LineMaterial({
+        new Line2NodeMaterial({
           color: this.color,
           linewidth: hovered ? HOVERED_WIDTH : CHOSEN_WIDTH,
           opacity: hovered ? 1 : 0.8,

@@ -319,7 +319,7 @@ export function DeviceFixtures({
         <FieldGroup>
           {definitions.map((definition) => {
             const key = `${selectedId}:${definition.id}`
-            // Previews are drawn while open: each holds a WebGL context.
+            // Previews are drawn while open: each holds its own GPU renderer.
             const previewed = expanded.has(key)
               ? libraryModel(definition)
               : null

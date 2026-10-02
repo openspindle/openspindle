@@ -4,16 +4,18 @@ import {
   programPositionOf,
 } from "@/app/workspace/machine-program"
 import type { PlayheadSource } from "@/components/workspace/bed-viewer"
+import type { ShownPlayhead } from "@/components/workspace/viewer/viewer-input"
 import { revealedSegments } from "@/components/workspace/viewer/toolpath-buffers"
 import { kitForPlate } from "@/domain/fixtures/catalog"
 import type { GCodeProgram, Point3 } from "@/domain/nc/gcode"
 import {
   moveTimes,
   playheadAt,
+  positionAt,
   timeAfterMoves,
   timeAtPosition,
 } from "@/domain/nc/move-times"
-import type { Playhead } from "@/domain/nc/move-times"
+import type { MoveTimes } from "@/domain/nc/move-times"
 import type { Plate } from "@/domain/plate/plate"
 import type { Telemetry } from "@/machine/contract"
 import { useFreshTelemetry } from "@/platform/machine"
@@ -40,6 +42,27 @@ const STEP_INTERVAL_MS = 100
  */
 const REPLAY_MS = { least: 100, most: 2000 } as const
 
+/**
+ * How far (s of the program's moves) the playhead goes to where a report places the machine at
+ * once, rather than along the moves: the follow lost the machine for that long, or a report
+ * corrected where it was placed.
+ */
+const SNAP_SECONDS = 2
+
+/** How fast, at most, the playhead catches up along the moves, in seconds of them per second. */
+const CATCH_UP_RATE = 2
+
+/**
+ * How far (mm) a report may put the tool off the program's moves before it is drawn where the
+ * machine reported it, such as where a probe touched before the plate's model has it touch; and
+ * how near it then comes again (`NEAR_REPORTS`) to be drawn on them, so that a reading about as
+ * far off does not switch between both.
+ */
+const OFF_MOVES_MM = { enter: 1.5, leave: 0.5 } as const
+
+/** Reports in a row near the moves again (`OFF_MOVES_MM`) that put the tool back on them. */
+const NEAR_REPORTS = 2
+
 /** A followed job's latest report: the machine's line and positions. */
 type LiveReport = {
   readonly jobId: string
@@ -57,12 +80,61 @@ type Replay = {
   readonly span: number
   /** The report's time (`Telemetry.receivedAt`). */
   readonly receivedAt: number
+  /** Where the tool is drawn on its way to where the report put it off the moves; null on them. */
+  readonly tip: { readonly from: Point3; readonly to: Point3 } | null
 }
 
-const replayTime = ({ from, to, startedAt, span }: Replay, now: number) =>
-  span > 0
-    ? from + (to - from) * Math.min(1, Math.max(0, (now - startedAt) / span))
-    : to
+/** How far along its way a replay is at `now`, from 0 to 1. */
+const replayShare = ({ startedAt, span }: Replay, now: number) =>
+  span > 0 ? Math.min(1, Math.max(0, (now - startedAt) / span)) : 1
+
+const replayTime = (replay: Replay, now: number) =>
+  replay.from + (replay.to - replay.from) * replayShare(replay, now)
+
+function replayTip(replay: Replay, now: number): Point3 | undefined {
+  const { tip } = replay
+  if (!tip) return undefined
+  const share = replayShare(replay, now)
+  return [
+    tip.from[0] + (tip.to[0] - tip.from[0]) * share,
+    tip.from[1] + (tip.to[1] - tip.from[1]) * share,
+    tip.from[2] + (tip.to[2] - tip.from[2]) * share,
+  ]
+}
+
+const distance = (a: Point3, b: Point3) =>
+  Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2])
+
+/** Where a followed job's last report placed the machine, which the next report goes on from. */
+type Placed = {
+  /** When, in the program's moves (`timeAtPosition`). */
+  readonly time: number
+  /** The furthest line the job reported. */
+  readonly line: number
+  /** Off the moves (`OFF_MOVES_MM`), where the tool is drawn: where it was reported; else null. */
+  readonly tip: Point3 | null
+  /** Reports in a row that put it near the moves again while off them. */
+  readonly near: number
+  /** The report's time (`Telemetry.receivedAt`). */
+  readonly receivedAt: number
+}
+
+/**
+ * Where the last report placed each job this window follows, by job id: the Job tab mounted
+ * anew, such as after another tab, goes on from there rather than from the reported line, which
+ * may lag back to a place the job went through before. Dismissing the job forgets it.
+ */
+const placedJobs = new Map<string, Placed>()
+
+/** Forgets where reports placed this window's jobs, as Dismiss ends the job's Run session. */
+export const forgetPlacedJobs = () => placedJobs.clear()
+
+/** A followed job's plate, and the moves its machine makes (`machineProgram`), timed. */
+type FollowedMoves = {
+  readonly plate: Plate
+  readonly machine: GCodeProgram
+  readonly timed: MoveTimes
+}
 
 /**
  * Where a report puts the machine's tool in the plate's program: by its machine position, and
@@ -84,6 +156,103 @@ function reportedPositions(
   if (tip) positions.push(tip)
   if (work) positions.push([work.x, work.y, work.z])
   return positions
+}
+
+/** Where a report places the machine, going on from where the job's last report placed it. */
+function placeReport(
+  { plate, machine, timed }: FollowedMoves,
+  last: Placed | null,
+  { line, telemetry }: LiveReport
+): Placed {
+  const positions = reportedPositions(plate, telemetry)
+  const furthest = Math.max(line, last?.line ?? 0)
+  const time = timeAtPosition(
+    machine,
+    timed,
+    {
+      line: furthest,
+      positions,
+      tool: telemetry.tool,
+      requestedTool: telemetry.requestedTool,
+    },
+    last && {
+      time: last.time,
+      since: Math.max(0, (telemetry.receivedAt - last.receivedAt) / 1000),
+    }
+  )
+  // Off the moves by more than either reading allows, the tool is drawn where the report has it,
+  // until reports in a row put it near them again.
+  const onMoves = positionAt(machine, timed, time)
+  const reported = positions.at(0)
+  const away =
+    onMoves && reported
+      ? Math.min(...positions.map((at) => distance(at, onMoves)))
+      : 0
+  const near = last?.tip && away <= OFF_MOVES_MM.leave ? last.near + 1 : 0
+  const off = last?.tip ? near < NEAR_REPORTS : away > OFF_MOVES_MM.enter
+  return {
+    time,
+    line: furthest,
+    tip: off && reported ? reported : null,
+    near: off ? near : 0,
+    receivedAt: telemetry.receivedAt,
+  }
+}
+
+/** Whether the tool changes along the moves between two times of the program. */
+function toolChangesBetween(
+  { machine, timed }: FollowedMoves,
+  from: number,
+  to: number
+) {
+  const first = playheadAt(timed, Math.min(from, to)).segment
+  const last = playheadAt(timed, Math.max(from, to)).segment
+  const { segments } = machine
+  for (let index = first + 1; index <= last; index++)
+    if (segments[index].tool !== segments[first].tool) return true
+  return false
+}
+
+/**
+ * From where the playhead is, the way to where a report placed the machine: on to it, one report
+ * behind, over about the time until the next report and at most `CATCH_UP_RATE` times as fast
+ * as the moves; at once when it is far ahead (`SNAP_SECONDS`) or past a tool change, or far
+ * behind. A little behind where it is shown, and anywhere behind off the moves, which the report
+ * cannot place well, the playhead waits there for the machine.
+ */
+function replayTo(
+  moves: FollowedMoves,
+  previous: Replay | null,
+  placed: Placed,
+  now: number
+): Replay {
+  const { machine, timed } = moves
+  const { time, tip, receivedAt } = placed
+  const shown = previous ? replayTime(previous, now) : time
+  // Off the moves, the tool goes to where the report has it from where it is drawn.
+  const drawn =
+    (previous && replayTip(previous, now)) ??
+    positionAt(machine, timed, shown) ??
+    tip
+  const way = (from: number, to: number, span: number): Replay => ({
+    from,
+    to,
+    startedAt: now,
+    span,
+    receivedAt,
+    tip: tip && { from: drawn ?? tip, to: tip },
+  })
+  if (!previous) return way(time, time, 0)
+  const ahead = time - shown
+  const far = Math.abs(ahead) > SNAP_SECONDS
+  if (ahead > 0 ? far || toolChangesBetween(moves, shown, time) : far && !tip)
+    return way(time, time, 0)
+  const interval = Math.min(
+    REPLAY_MS.most,
+    Math.max(REPLAY_MS.least, receivedAt - previous.receivedAt)
+  )
+  if (ahead <= 0) return way(shown, shown, interval)
+  return way(shown, time, Math.max(interval, (ahead / CATCH_UP_RATE) * 1000))
 }
 
 type Playback = {
@@ -111,7 +280,7 @@ const clampStep = (step: number, count: number) =>
 
 /** Where simulated playback is, which the 3D view follows every frame (`PlayheadSource`). */
 class PlayheadStore implements PlayheadSource {
-  private playhead: Playhead | null = null
+  private playhead: ShownPlayhead | null = null
   private readonly listeners = new Set<() => void>()
   readonly get = () => this.playhead
   readonly subscribe = (listener: () => void) => {
@@ -121,7 +290,7 @@ class PlayheadStore implements PlayheadSource {
     }
   }
 
-  set(playhead: Playhead | null) {
+  set(playhead: ShownPlayhead | null) {
     this.playhead = playhead
     for (const listener of this.listeners) listener()
   }
@@ -164,8 +333,9 @@ export type JobTimeline = {
  * playback speed: the 3D view follows the moves every frame (`playhead`), while the step on show
  * follows a few times a second, so the tab does not render every frame. While this window's job
  * reports progress it follows the machine's line until the user scrubs; while the job is under
- * way the playhead goes along the line's moves to where each report puts the machine
- * (`timeAtPosition`), over about the time until the next, so it follows one report behind.
+ * way the playhead goes along the moves that line leaves in reach to where each report places the
+ * machine (`timeAtPosition`), over about the time until the next, so it follows one report
+ * behind (`replayTo`), and the line on show is the one it is on.
  */
 export function useJobTimeline(
   subject: Pick<JobSubject, "plate" | "compiled"> | null,
@@ -208,23 +378,23 @@ export function useJobTimeline(
     live && telemetry
       ? { jobId: target.jobId, line: target.line, telemetry }
       : null
-  // The step the playhead is on while it follows the machine, a few times a second.
+  // The step and line the playhead is on while it follows the machine, a few times a second.
   const [liveStep, setLiveStep] = useState<{
     jobId: string
     step: number
+    line: number
   } | null>(null)
+  const shownLive = liveStep && liveStep.jobId === liveJob ? liveStep : null
   let cursor = Math.floor(clampStep(playback.position ?? count, count))
   if (following)
-    cursor =
-      liveStep && liveStep.jobId === liveJob
-        ? liveStep.step
-        : stepForLine(timeline, target.line)
+    cursor = shownLive ? shownLive.step : stepForLine(timeline, target.line)
   const preview: TimelinePreview = program
     ? previewAt(timeline, cursor, program)
     : { line: 0, probePoint: undefined, segmentProgress: 0 }
   // The whole program on show has no line of its own until the user moves the cursor.
   let line = preview.line
-  if (following) line = target.line
+  // The reported line stays on the last feed move while the machine's rapids and routines run.
+  if (following) line = Math.max(target.line, shownLive?.line ?? 0)
   else if (playback.position === null && !simulating) line = 0
 
   // A simulation that ended, or of another program, shows no playhead.
@@ -242,37 +412,23 @@ export function useJobTimeline(
 
   useEffect(() => {
     if (!liveJob || !plate || !machine || !timed) return
-    /** From where the playhead is, the way to where a new report puts the machine. */
-    const replayTo = (
-      previous: Replay | null,
-      latest: LiveReport,
-      now: number
-    ): Replay => {
-      const shown = previous ? replayTime(previous, now) : null
-      const to = timeAtPosition(
-        machine,
-        timed,
-        latest.line,
-        reportedPositions(plate, latest.telemetry),
-        shown
-      )
-      const since = previous
-        ? latest.telemetry.receivedAt - previous.receivedAt
-        : 0
-      // It goes on to where the machine is, one report behind; ahead of it, it goes back at once.
-      return {
-        from: shown === null || shown > to ? to : shown,
-        to,
-        startedAt: now,
-        span: previous
-          ? Math.min(REPLAY_MS.most, Math.max(REPLAY_MS.least, since))
-          : 0,
-        receivedAt: latest.telemetry.receivedAt,
-      }
-    }
-    let replay: Replay | null = null
+    const moves: FollowedMoves = { plate, machine, timed }
+    // Followed before, it goes on from where the last report placed the job.
+    const placed = placedJobs.get(liveJob)
+    let replay: Replay | null = placed
+      ? {
+          from: placed.time,
+          to: placed.time,
+          startedAt: performance.now(),
+          span: 0,
+          receivedAt: placed.receivedAt,
+          tip: placed.tip && { from: placed.tip, to: placed.tip },
+        }
+      : null
     let shownTime: number | null = null
+    let shownTip: Point3 | undefined
     let shownStep: number | null = null
+    let shownLine: number | null = null
     let steppedAt = -Infinity
     let frame = 0
     const tick = (now: number) => {
@@ -280,20 +436,34 @@ export function useJobTimeline(
       if (
         latest?.jobId === liveJob &&
         latest.telemetry.receivedAt !== replay?.receivedAt
-      )
-        replay = replayTo(replay, latest, now)
+      ) {
+        const next = placeReport(moves, placedJobs.get(liveJob) ?? null, latest)
+        placedJobs.set(liveJob, next)
+        replay = replayTo(moves, replay, next, now)
+      }
       if (replay) {
         const seconds = replayTime(replay, now)
         const at = playheadAt(timed, seconds)
-        if (seconds !== shownTime || !playhead.get()) {
+        const tip = replayTip(replay, now)
+        if (
+          seconds !== shownTime ||
+          tip?.join() !== shownTip?.join() ||
+          !playhead.get()
+        ) {
           shownTime = seconds
-          playhead.set(at)
+          shownTip = tip
+          playhead.set(tip ? { ...at, tip } : at)
         }
-        const step = stepForMove(timeline, machine.segments[at.segment])
-        if (step !== shownStep && now - steppedAt >= STEP_INTERVAL_MS) {
+        const segment = machine.segments[at.segment]
+        const step = stepForMove(timeline, segment)
+        if (
+          (step !== shownStep || segment.line !== shownLine) &&
+          now - steppedAt >= STEP_INTERVAL_MS
+        ) {
           shownStep = step
+          shownLine = segment.line
           steppedAt = now
-          setLiveStep({ jobId: liveJob, step })
+          setLiveStep({ jobId: liveJob, step, line: segment.line })
         }
       }
       frame = requestAnimationFrame(tick)

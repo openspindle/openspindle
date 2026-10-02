@@ -13,77 +13,73 @@ export const MAKERA_CONFIGURATION_PATH = "/sd/config.txt"
 
 const VACUUM_DEFAULT_POWER_KEY = "switch.vacuum.default_on_value"
 const CAMERA_FRAME_SIZE_KEY = "*mainboard.video_stream_framesize"
+const LIGHT_TIMER_KEY = "light.turn_off_min"
 
-/** Match active keys and their first value token, allowing a preserved UTF-8 document marker. */
-function vacuumDefaultPowerSettings(content: string) {
+/** Match active lines of `key` and their first value token, allowing a preserved UTF-8 document marker. */
+function settings(content: string, key: string) {
+  const name = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
   return Array.from(
     content.matchAll(
-      /^\uFEFF?[ \t]*switch\.vacuum\.default_on_value(?=[ \t\r\n]|$)[ \t]*([^ \t\r\n#]*)/gm
+      new RegExp(
+        `^\\uFEFF?[ \\t]*${name}(?=[ \\t\\r\\n]|$)[ \\t]*([^ \\t\\r\\n#]*)`,
+        "gm"
+      )
     )
   )
 }
 
-function cameraFrameSizeSettings(content: string) {
-  return Array.from(
-    content.matchAll(
-      /^\uFEFF?[ \t]*\*mainboard\.video_stream_framesize(?=[ \t\r\n]|$)[ \t]*([^ \t\r\n#]*)/gm
-    )
-  )
+function numberValue(value: string): number | null {
+  if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/.test(value))
+    return null
+  const number = Number(value)
+  return Number.isFinite(number) ? number : null
 }
 
 /**
  * Change only the value token of the key's line, or add the line at the end when there is none;
- * preserve the rest of the file, including its line endings.
+ * preserve the rest of the file, including its line endings. A key on more than one line throws
+ * `duplicate`, as which of them the firmware keeps is not this writer's to decide.
  */
 function withSetting(
   content: string,
-  settings: readonly RegExpExecArray[],
   key: string,
-  value: string
+  replacement: string,
+  duplicate: string
 ): string {
-  const setting = settings.at(0)
+  const lines = settings(content, key)
+  if (lines.length > 1) throw new Error(duplicate)
+  const setting = lines.at(0)
   if (setting) {
-    const old = setting[1]
-    const start = setting.index + setting[0].length - old.length
+    const value = setting[1]
+    const start = setting.index + setting[0].length - value.length
     const separator = /[ \t]$/.test(content.slice(0, start)) ? "" : " "
     return (
       content.slice(0, start) +
-      (old ? "" : separator) +
-      value +
-      content.slice(start + old.length)
+      (value ? "" : separator) +
+      replacement +
+      content.slice(start + value.length)
     )
   }
   const newline = /\r\n|\n|\r/.exec(content)?.[0] ?? "\n"
   const separator = /[\r\n]$/.test(content) ? "" : newline
-  return `${content}${separator}${key} ${value}${newline}`
+  return `${content}${separator}${key} ${replacement}${newline}`
 }
 
 export function readMakeraVacuumDefaultPower(content: string): number | null {
-  const settings = vacuumDefaultPowerSettings(content)
-  if (settings.length !== 1) return null
-  const value = settings[0][1]
-  if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/.test(value))
-    return null
-  const percent = Number(value)
-  return Number.isFinite(percent) ? percent : null
+  const lines = settings(content, VACUUM_DEFAULT_POWER_KEY)
+  return lines.length === 1 ? numberValue(lines[0][1]) : null
 }
 
-export function withMakeraVacuumDefaultPower(
+export const withMakeraVacuumDefaultPower = (
   content: string,
   percent: number
-): string {
-  const settings = vacuumDefaultPowerSettings(content)
-  if (settings.length > 1)
-    throw new Error(
-      "The configuration contains duplicate vacuum default settings. Open Firmware configuration and remove the duplicate before saving vacuum power."
-    )
-  return withSetting(
+) =>
+  withSetting(
     content,
-    settings,
     VACUUM_DEFAULT_POWER_KEY,
-    String(percent)
+    String(percent),
+    "The configuration contains duplicate vacuum default settings. Open Firmware configuration and remove the duplicate before saving vacuum power."
   )
-}
 
 /**
  * The ESP32 camera's frame sizes by number (`framesize_t`), as Espressif's camera driver lists
@@ -119,9 +115,9 @@ const CAMERA_FRAME_SIZES: readonly (readonly [number, number])[] = [
 
 /** The camera's stream size the file sets, as the frame size's number (10 is 640 × 480). */
 export function readMakeraCameraPicture(content: string): PictureSize | null {
-  const settings = cameraFrameSizeSettings(content)
-  if (settings.length !== 1 || !/^\d{1,2}$/.test(settings[0][1])) return null
-  const size = CAMERA_FRAME_SIZES.at(Number(settings[0][1]))
+  const lines = settings(content, CAMERA_FRAME_SIZE_KEY)
+  if (lines.length !== 1 || !/^\d{1,2}$/.test(lines[0][1])) return null
+  const size = CAMERA_FRAME_SIZES.at(Number(lines[0][1]))
   return size ? { width: size[0], height: size[1] } : null
 }
 
@@ -137,18 +133,43 @@ export function withMakeraCameraPicture(
     throw new Error(
       `The camera has no ${picture.width} × ${picture.height} frame size.`
     )
-  const settings = cameraFrameSizeSettings(content)
-  if (settings.length > 1)
-    throw new Error(
-      "The configuration contains duplicate camera video settings. Open Firmware configuration and remove the duplicate before saving the camera video."
-    )
   return withSetting(
     content,
-    settings,
     CAMERA_FRAME_SIZE_KEY,
-    String(frameSize)
+    String(frameSize),
+    "The configuration contains duplicate camera video settings. Open Firmware configuration and remove the duplicate before saving the camera video."
   )
 }
+
+/**
+ * The firmware's light timer, in minutes, when it switches a dimmed light off; otherwise 0.
+ * While the timer is on, the firmware sets the light to the brightness it stores whenever the
+ * machine is not Idle. A PWM light stores none from `M821 S`, and switching it off stores 0, so
+ * it goes dark as a job, homing or jog starts. The firmware's built-in configuration, loaded
+ * before this file, leaves the timer off and starts with the light on; the last of duplicate
+ * lines wins.
+ */
+export function readMakeraDimmingLightTimer(content: string): number {
+  const last = (key: string) => settings(content, key).at(-1)?.[1]
+  const minutes = numberValue(last(LIGHT_TIMER_KEY) ?? "")
+  const startup = last("switch.light.startup_state")
+  if (
+    minutes === null ||
+    minutes <= 0 ||
+    last("switch.light.output_type") !== "pwm" ||
+    (startup !== undefined && !/[ty1]/.test(startup))
+  )
+    return 0
+  return minutes
+}
+
+export const withMakeraLightTimer = (content: string, minutes: number) =>
+  withSetting(
+    content,
+    LIGHT_TIMER_KEY,
+    String(minutes),
+    "The configuration contains duplicate light timer settings. Open Firmware configuration and remove the duplicate before changing the machine light timer."
+  )
 
 type Stage = "start" | "md5" | "view" | "data" | "end" | "done"
 

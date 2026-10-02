@@ -11,6 +11,7 @@ import {
   ConsoleEntrySchema,
   DisconnectRequestSchema,
   HeightMapSchema,
+  SwitchReportSchema,
   MachineCommandSchema,
   MachineSnapshotSchema,
   NetworkDeviceSchema,
@@ -122,6 +123,11 @@ export const machineMethods = {
     params: none,
     result: HeightMapSchema,
     timeoutMs: 0,
+  },
+  "machine.readSwitches": {
+    params: none,
+    result: SwitchReportSchema,
+    timeoutMs: 30_000,
   },
   // Each setting, then each read back, within the controller's own deadlines.
   "machine.writeAnchors": {

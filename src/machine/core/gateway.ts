@@ -2,6 +2,7 @@ import type {
   AnchorConfiguration,
   ConsoleEntry,
   HeightMap,
+  SwitchReport,
   MachineSnapshot,
   NetworkDevice,
   PrepareResult,
@@ -121,6 +122,10 @@ export class MachineGateway {
 
   readHeightMap(signal?: AbortSignal): Promise<HeightMap> {
     return this.controller.readHeightMap(signal)
+  }
+
+  readSwitches(): Promise<SwitchReport> {
+    return this.controller.readSwitches()
   }
 
   readConfiguration(signal?: AbortSignal): Promise<FirmwareConfiguration> {

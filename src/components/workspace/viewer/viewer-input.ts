@@ -79,10 +79,17 @@ export type ViewerProblem = {
 export type ViewerProblemRef = Pick<ViewerProblem, "plateId" | "key">
 
 /**
+ * Where playback is along a plate's moves. Following a machine whose report puts the tool off
+ * them, `tip` is where it reported the tool's tip, in the program's coordinates: the tool is
+ * drawn there, while the moves are drawn up to the playhead.
+ */
+export type ShownPlayhead = Playhead & { readonly tip?: Point3 }
+
+/**
  * Where simulated playback is along the selected plate's moves, which the view follows every
  * frame without its owner rendering again.
  */
 export type PlayheadSource = {
-  readonly get: () => Playhead | null
+  readonly get: () => ShownPlayhead | null
   readonly subscribe: (listener: () => void) => () => void
 }

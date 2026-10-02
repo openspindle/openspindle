@@ -30,6 +30,12 @@ export interface GCodeSegment {
   probing?: true
   /** The sample of a probe grid the move belongs to, from 0 in the order they are probed. */
   probePoint?: number
+  /**
+   * A move of a routine the machine's firmware runs for its block (`GCodeFirmware.run`): a tool
+   * change's, probing's or the firmware's automation's, rather than the block's own move, which
+   * a firmware may only place in machine coordinates (G53).
+   */
+  routine?: true
 }
 
 /** A move a machine's firmware makes for a block, in the program's work coordinates. */
@@ -293,12 +299,13 @@ export function parseGCode(
   /** Whether a move found the preview's segments full, which ends it. */
   const segmentLimit = { reached: false }
 
-  /** A programmed move, or a firmware's with its own feed and tool. */
+  /** A programmed move, or a firmware's with its own feed and tool, and whether a routine's. */
   const append = (
     end: Point3,
     rapid: boolean,
     line: number,
-    made?: FirmwareMove
+    made?: FirmwareMove,
+    routine = false
   ) => {
     if (segments.length >= MAX_SEGMENTS) {
       segmentLimit.reached = true
@@ -326,6 +333,7 @@ export function parseGCode(
       ...(made?.probePoint === undefined
         ? {}
         : { probePoint: made.probePoint }),
+      ...(routine ? { routine: true } : {}),
     })
     tools.add(movedBy)
     position = [...end]
@@ -438,7 +446,14 @@ export function parseGCode(
       })
       // A block the preview cannot follow is left out.
       if (!effect) continue
-      for (const made of effect.moves) append(made.end, made.rapid, line, made)
+      // In machine coordinates (G53) alone, its moves are its own; any other code runs a routine.
+      const routine = !(
+        claimed.length === 1 &&
+        gCodes.includes(53) &&
+        firmware.handles("G", 53)
+      )
+      for (const made of effect.moves)
+        append(made.end, made.rapid, line, made, routine)
       if (effect.offset) offset = [...effect.offset]
       if (effect.feed !== undefined) feed = effect.feed
       if (effect.tool !== undefined) {

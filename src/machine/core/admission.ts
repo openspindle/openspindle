@@ -136,6 +136,7 @@ function representative(
     case "readConfiguration":
     case "writeConfiguration":
     case "readHeightMap":
+    case "readSwitches":
     case "stop":
     case "reset":
     case "console":

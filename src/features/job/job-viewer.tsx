@@ -8,6 +8,7 @@ import { useWorkspaceViewerPlates } from "@/features/viewer/workspace-viewer-pla
 import type { JobSubject } from "./job-view"
 import { useFreshTelemetry } from "@/platform/machine"
 import { MachineOriginCard, useMachineOrigin } from "./machine-origin"
+import { MachineStatusCard } from "./machine-status"
 import type { PlayheadSource } from "@/components/workspace/bed-viewer"
 import type { TimelinePreview } from "./use-job-timeline"
 
@@ -49,11 +50,14 @@ export function JobViewer({
         machineOrigin={machineOrigin}
       />
       <ViewerToolbar camera={camera} />
-      <MachineOriginCard
-        telemetry={telemetry}
-        origin={machineOrigin}
-        workOrigin={shown?.plate.setup.workOrigin ?? null}
-      />
+      <div className="absolute right-4 bottom-4 z-10 flex flex-col gap-2">
+        <MachineStatusCard telemetry={telemetry} />
+        <MachineOriginCard
+          telemetry={telemetry}
+          origin={machineOrigin}
+          workOrigin={shown?.plate.setup.workOrigin ?? null}
+        />
+      </div>
     </div>
   )
 }

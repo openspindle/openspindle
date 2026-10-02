@@ -76,6 +76,9 @@ export const TelemetrySchema = z.object({
   /** The external extractor output; not the controller's power fan. */
   vacuumOn: flag,
   vacuumPower: reading,
+  /** The spindle air (the spindle fan, which blowing turns on with the spindle) and its power. */
+  spindleAirOn: flag,
+  spindleAirPower: reading,
   job: JobProgressSchema.nullable(),
   /** Halt reason while the controller is halted. */
   alarm: reading,

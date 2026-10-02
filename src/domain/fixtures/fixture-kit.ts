@@ -63,6 +63,16 @@ export function pictureFov(camera: MachineCamera, aspect: number): number {
  * it and its factory anchors. A device's fixture profile starts from its machine's kit and keeps
  * up with the kit's versions: each version adds fixtures or corrects them.
  */
+/**
+ * An alarm the machine halts with: what it is, what it means, and what clears it once its cause
+ * is fixed: unlocking, a reset of the controller, or switching the machine off and on.
+ */
+export type MachineAlarm = {
+  readonly name: string
+  readonly meaning: string
+  readonly clear: "unlock" | "reset" | "power"
+}
+
 export abstract class FixtureKit {
   /** Unique among kits, and never changes: rules name the machines they hold for by it (`Rule.machines`). */
   abstract readonly id: string
@@ -102,6 +112,8 @@ export abstract class FixtureKit {
   abstract readonly camMarkers: CamMarkers | null
   /** The codes of the machine's NC, as the G-code glossary lists them. */
   abstract readonly glossary: readonly NcGlossaryEntry[]
+  /** The alarms its firmware halts with, by the code its status reports. */
+  abstract readonly alarms: Readonly<Record<number, MachineAlarm>>
 
   /**
    * The NC that puts the machine's work X and Y on a work origin kept relative to one of its
@@ -125,6 +137,14 @@ export abstract class FixtureKit {
    * parks its program closes with. False for every block of a machine without one.
    */
   abstract isPark(words: readonly Pick<NcWord, "letter" | "value">[]): boolean
+
+  /**
+   * Whether a block switches the machine's vacuum on (true) or off (false) itself, as the CAM
+   * made for it does around the spindle's start and stop; null for a block that does neither.
+   */
+  abstract switchesVacuum(
+    words: readonly Pick<NcWord, "letter" | "value">[]
+  ): boolean | null
 
   /** The anchors a profile starts with, until they are read from its device. */
   abstract factoryAnchors(deviceId: string | null): StoredAnchorSetup

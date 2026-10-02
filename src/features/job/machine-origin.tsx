@@ -26,7 +26,7 @@ export function useMachineOrigin(
 /**
  * Where the machine keeps work zero, from the shown plate's work origin (0 when the machine is
  * set up as the plate plans), its axes in their colours, and the tool offset (T), over the 3D
- * view's lower right corner.
+ * view.
  */
 export function MachineOriginCard({
   telemetry,
@@ -47,7 +47,7 @@ export function MachineOriginCard({
       size="sm"
       role="region"
       aria-label="Work origin"
-      className="absolute right-4 bottom-4 z-10 w-28 shadow-lg"
+      className="w-28 shadow-lg"
     >
       <CardContent>
         <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 [&_dd]:text-right [&_dd]:font-numeric">

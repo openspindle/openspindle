@@ -25,6 +25,7 @@ const { values } = parseArgs({
     "fail-at-line": { type: "string" },
     "drop-acks": { type: "string" },
     "other-file": { type: "boolean", default: false },
+    estop: { type: "boolean", default: false },
     "md5-challenge": { type: "boolean", default: false },
     "placeholder-md5": { type: "boolean", default: false },
     "corrupt-upload": { type: "boolean", default: false },
@@ -50,11 +51,12 @@ if (values.help) {
   --fail-at-line <n>       halt with a probe failure at this program line
   --drop-acks <regexp>     never acknowledge matching commands
   --other-file             every play gets another file, one line longer (a name CRC clash)
+  --estop                  E-stop pressed at power-on: the boot homing fails (alarm 2)
   --md5-challenge          ask for the upload MD5 twice
   --placeholder-md5        advertise a placeholder MD5 on readback
   --corrupt-upload         corrupt the stored file (readback must fail)
   --stall-after <ms>       stop answering status this long after a connection
-Keyboard: s = stall/unstall status, h = halt, q = quit`)
+Keyboard: s = stall/unstall status, h = halt, e = press/release the E-stop, q = quit`)
   process.exit(0)
 }
 
@@ -88,6 +90,7 @@ const simulator = await serveSimulator({
     failAtLine: values["fail-at-line"] ? Number(values["fail-at-line"]) : null,
     dropAcks: values["drop-acks"] ? new RegExp(values["drop-acks"]) : null,
     otherFile: values["other-file"],
+    estop: values.estop,
     transfer: {
       md5Challenge: values["md5-challenge"],
       placeholderMd5: values["placeholder-md5"],
@@ -130,6 +133,9 @@ if (process.stdin.isTTY) {
         return
       case "h":
         device.halt(3, "ALARM: Hard limit")
+        return
+      case "e":
+        device.pressEstop(!device.estop)
         return
       case "q":
       case "\u0003":

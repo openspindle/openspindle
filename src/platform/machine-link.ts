@@ -41,6 +41,7 @@ function machineOver(peer: Peer<MachineContract>): MachineHost {
       peer.call("machine.writeConfiguration", request),
     readHeightMap: (signal) =>
       peer.call("machine.readHeightMap", undefined, signal ? { signal } : {}),
+    readSwitches: () => peer.call("machine.readSwitches", undefined),
     watchCamera: (listener) =>
       peer.subscribe("machine.camera", undefined, listener),
     watchConsole: (listener) =>
@@ -84,6 +85,7 @@ function unreachableMachine(error: string | null): MachineHost {
     readConfiguration: refuse,
     writeConfiguration: refuse,
     readHeightMap: refuse,
+    readSwitches: refuse,
     watchCamera: (listener) => {
       listener({ kind: "status", status: "error" })
       return () => {}

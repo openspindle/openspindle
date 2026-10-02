@@ -27,6 +27,8 @@ export type FixtureModelView = {
 export type FixtureModelSceneEvents = {
   /** The model was turned: onto a clicked face, or by a quarter turn. */
   orient: (orientation: Point3) => void
+  /** The 3D view could not start: neither WebGPU nor WebGL 2 is available. */
+  unavailable: () => void
 }
 
 /** A flat face of one of the model's meshes, drawn over in the primary colour. */
@@ -188,24 +190,15 @@ export class FixtureModelScene {
   } | null = null
   private pointerStart: { x: number; y: number; id: number } | null = null
 
-  /** Returns null when WebGL is unavailable. */
+  /** Reports `events.unavailable` when neither WebGPU nor WebGL 2 is available. */
   static create(container: HTMLElement, events: FixtureModelSceneEvents) {
-    let renderer: THREE.WebGLRenderer
-    try {
-      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
-    } catch {
-      return null
-    }
-    return new FixtureModelScene(container, renderer, events)
+    return new FixtureModelScene(container, events)
   }
 
-  private constructor(
-    container: HTMLElement,
-    renderer: THREE.WebGLRenderer,
-    events: FixtureModelSceneEvents
-  ) {
+  private constructor(container: HTMLElement, events: FixtureModelSceneEvents) {
     this.events = events
-    this.stage = new ViewerStage(container, renderer, this.frame, {
+    this.stage = new ViewerStage(container, this.frame, {
+      unavailable: () => events.unavailable(),
       resize: (width, height) => {
         this.camera.aspect = width / height
         this.camera.updateProjectionMatrix()
@@ -222,7 +215,8 @@ export class FixtureModelScene {
       polygonOffsetUnits: -2,
       toneMapped: false,
     })
-    this.markers = new SetupMarkers(palette.primary, renderer.getPixelRatio())
+    const { renderer } = this.stage
+    this.markers = new SetupMarkers(palette.primary)
     this.camera.up.set(0, 0, 1)
     this.controls = new OrbitControls(this.camera, renderer.domElement)
     this.controls.enableDamping = false

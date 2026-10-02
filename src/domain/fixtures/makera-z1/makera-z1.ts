@@ -8,6 +8,7 @@ import type { MachineProbing } from "../../probing/strategy"
 import { PROBE_3D_TOOL, PROBE_TOOL } from "../../tools/tool-table"
 import { FixtureKit } from "../fixture-kit"
 import type { KitFixture, KitRecolor, MachineCamera } from "../fixture-kit"
+import { Z1_ALARMS } from "./alarms"
 import { Z1DowelPin } from "./dowel-pin"
 import { Z1Firmware } from "./firmware"
 import { Z1FourthAxis } from "./fourth-axis"
@@ -16,7 +17,7 @@ import { MAKERA_CAM } from "./makera-cam"
 import { Z1MdfBed } from "./mdf-bed"
 import { Z1MdfWasteboard } from "./mdf-wasteboard"
 import { Z1_GLOSSARY } from "./nc-glossary"
-import { isZ1Park, readZ1Block } from "./nc-grammar"
+import { isZ1Park, readZ1Block, z1VacuumSwitch } from "./nc-grammar"
 import { Z1_GENERIC_SPECS, Z1_PROBING_NC } from "./probing-nc"
 import { HEIGHT_MAP } from "./strategies/height-map"
 import { ROUTINES } from "./strategies/routines"
@@ -114,6 +115,7 @@ export class MakeraZ1 extends FixtureKit {
   /** Makera CAM's toolpath and stock markers (`;@MKR|…`). */
   readonly camMarkers = MAKERA_CAM
   readonly glossary = Z1_GLOSSARY
+  readonly alarms = Z1_ALARMS
 
   /**
    * The firmware reads `G10 L2`'s X and Y in the current units, and its `P0` is the current work
@@ -145,6 +147,11 @@ export class MakeraZ1 extends FixtureKit {
   /** G28 alone in its block, as Makera's CAM ends its programs. */
   isPark(words: readonly Pick<NcWord, "letter" | "value">[]) {
     return isZ1Park(words)
+  }
+
+  /** M851 and M852, the extend-out port the external extractor runs on. */
+  switchesVacuum(words: readonly Pick<NcWord, "letter" | "value">[]) {
+    return z1VacuumSwitch(words)
   }
 
   /**

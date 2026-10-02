@@ -22,6 +22,7 @@ export const DEFAULT_SIMULATOR_OPTIONS: SimulatorOptions = {
   failAtLine: null,
   dropAcks: null,
   otherFile: false,
+  estop: false,
   transfer: { md5Challenge: false, placeholderMd5: false, corrupt: false },
 }
 

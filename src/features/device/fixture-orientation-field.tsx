@@ -55,11 +55,8 @@ export function FixtureOrientationField({
     if (!container.current) return
     const scene = FixtureModelScene.create(container.current, {
       orient: (orientation) => orient.current(orientation),
+      unavailable: () => setError("3D view unavailable."),
     })
-    if (!scene) {
-      setError("3D view unavailable.")
-      return
-    }
     sceneRef.current = scene
     return () => {
       scene.dispose()

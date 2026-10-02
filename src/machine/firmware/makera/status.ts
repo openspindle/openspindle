@@ -19,6 +19,8 @@ export type Diagnostics = {
   beepOn: boolean | null
   vacuumOn: boolean | null
   vacuumPower: number | null
+  spindleAirOn: boolean | null
+  spindleAirPower: number | null
   estop: boolean | null
 }
 
@@ -216,6 +218,8 @@ export function parseStatus(
       beepOn: diagnostic?.beepOn ?? null,
       vacuumOn: diagnostic?.vacuumOn ?? null,
       vacuumPower: diagnostic?.vacuumPower ?? null,
+      spindleAirOn: diagnostic?.spindleAirOn ?? null,
+      spindleAirPower: diagnostic?.spindleAirPower ?? null,
       job,
       alarm: integer(f.H?.[0]),
       estop: diagnostic?.estop ?? null,
@@ -224,7 +228,10 @@ export function parseStatus(
   }
 }
 
-/** SimpleShell diagnose (0x82); G carries light, beep, extend-in, vacuum and its power. */
+/**
+ * SimpleShell diagnose (0x82); G carries light, beep, extend-in, vacuum and its power, F the
+ * spindle fan (the spindle air) and its power.
+ */
 export function parseDiagnostics(
   payload: string,
   receivedAt: number
@@ -239,6 +246,8 @@ export function parseDiagnostics(
     beepOn: flag(f.G?.[1]),
     vacuumOn: flag(f.G?.[3]),
     vacuumPower: numeric(f.G?.[4]),
+    spindleAirOn: flag(f.F?.[0]),
+    spindleAirPower: numeric(f.F?.[1]),
     estop: flag(f.I?.[0]),
   }
 }

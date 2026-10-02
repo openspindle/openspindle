@@ -1,8 +1,8 @@
 import * as THREE from "three"
-import { Line2 } from "three/addons/lines/Line2.js"
+import { Line2 } from "three/addons/lines/webgpu/Line2.js"
 import { LineGeometry } from "three/addons/lines/LineGeometry.js"
-import { LineMaterial } from "three/addons/lines/LineMaterial.js"
-import { LineSegments2 } from "three/addons/lines/LineSegments2.js"
+import { Line2NodeMaterial } from "three/webgpu"
+import { LineSegments2 } from "three/addons/lines/webgpu/LineSegments2.js"
 import { LineSegmentsGeometry } from "three/addons/lines/LineSegmentsGeometry.js"
 import type { Area, Path, Place, Point } from "@/domain/diagnostics"
 import { disposeObjects } from "@/lib/three-assets"
@@ -36,7 +36,7 @@ const overlay = {
 function line(positions: number[], color: THREE.Color, width: number) {
   const object = new Line2(
     new LineGeometry().setPositions(positions),
-    new LineMaterial({ color, linewidth: width, ...overlay })
+    new Line2NodeMaterial({ color, linewidth: width, ...overlay })
   )
   object.renderOrder = RENDER_ORDER
   return object
@@ -101,7 +101,7 @@ function areaObjects(
   box.dispose()
   const object = new LineSegments2(
     new LineSegmentsGeometry().fromEdgesGeometry(edges),
-    new LineMaterial({ color, linewidth: width, ...overlay })
+    new Line2NodeMaterial({ color, linewidth: width, ...overlay })
   )
   edges.dispose()
   object.position.set(center[0], center[1], center[2])

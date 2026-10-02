@@ -34,6 +34,22 @@ const SWITCH_CODES: readonly number[] = [851, 852, 821, 822, 861, 862]
 
 /** The extend-out port's on code, which may set its PWM duty cycle in percent (S). */
 const EXTEND_OUT_ON = 851
+const EXTEND_OUT_OFF = 852
+
+/**
+ * Whether a block switches the extend-out port, which runs the external extractor, on (M851) or
+ * off (M852), as Makera's CAM does around the spindle's start and stop; null for any other.
+ */
+export function z1VacuumSwitch(
+  words: readonly Pick<NcWord, "letter" | "value">[]
+): boolean | null {
+  for (const word of words)
+    if (word.letter === "M") {
+      if (word.value === EXTEND_OUT_ON) return true
+      if (word.value === EXTEND_OUT_OFF) return false
+    }
+  return null
+}
 
 /** G28, which parks the Z1 rather than homing it. */
 const PARK = 28

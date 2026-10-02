@@ -1,7 +1,9 @@
 import { COMMAND_RULES } from "@/machine/contract"
 import { STOCK_DEPTH_RULES } from "../compile/stock-depth"
+import { ALARM_RULES, DIAGNOSIS_RULES } from "../diagnosis/rules"
 import { PROGRAM_RULES } from "../design-rules/common-rules"
 import { MOVE_RULES } from "../design-rules/move-rules"
+import { Z1_DIAGNOSIS_RULES } from "../fixtures/makera-z1/diagnosis"
 import { Z1_RULES } from "../fixtures/makera-z1/program-rules"
 import { PLATE_RUN_RULES } from "../plate/run-rules"
 import { WORK_ORIGIN_RULES } from "../plate/work-origin"
@@ -17,7 +19,8 @@ import type { AnyRule, StageName, StageRule } from "./stages"
 /**
  * Every rule the app checks, in an order that counts: each chain's gates in turn, move rules
  * before program rules in design results, and the settings' rows (the move rules, then the
- * program rules of every machine, then each machine's own).
+ * program rules of every machine, then each machine's own). In diagnosis's alarm chain, the
+ * machines' own alarm findings come before the generic alarm.
  */
 export const RULES: readonly AnyRule[] = [
   ...COMMAND_RULES,
@@ -34,6 +37,9 @@ export const RULES: readonly AnyRule[] = [
   ...PROGRAM_RULES,
   ...Z1_RULES,
   ...HEIGHT_MAP_RULES,
+  ...DIAGNOSIS_RULES,
+  ...Z1_DIAGNOSIS_RULES,
+  ...ALARM_RULES,
 ]
 
 const STAGE_RULES = new Map<StageName, readonly AnyRule[]>(

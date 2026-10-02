@@ -28,14 +28,16 @@ import {
   MAKERA_CONFIGURATION_PATH,
   MakeraConfigurationDownload,
   readMakeraCameraPicture,
+  readMakeraDimmingLightTimer,
   readMakeraVacuumDefaultPower,
   withMakeraCameraPicture,
+  withMakeraLightTimer,
   withMakeraVacuumDefaultPower,
 } from "./configuration.ts"
 import { changesToolBeforeSpindle, prepareMakeraProgram } from "./dialect.ts"
 import { parseMakeraHeightMap } from "./height-map.ts"
 import { MakeraInterpreter } from "./interpreter.ts"
-import { parseFileSize, parseHomedReport } from "./lines.ts"
+import { parseFileSize, parseHomedReport, parseSwitchReport } from "./lines.ts"
 import { MakeraTransfer } from "./transfer.ts"
 
 const command = (payload: string): OutboundFrame => ({
@@ -279,6 +281,8 @@ export const makeraAdapter: FirmwareAdapter = {
     withVacuumDefaultPower: withMakeraVacuumDefaultPower,
     cameraPicture: readMakeraCameraPicture,
     withCameraPicture: withMakeraCameraPicture,
+    dimmingLightTimer: readMakeraDimmingLightTimer,
+    withLightTimer: withMakeraLightTimer,
     afterRestart: true,
   },
   anchors: {
@@ -381,6 +385,16 @@ export const makeraAdapter: FirmwareAdapter = {
     // M375 without .1 would load the grid and enable compensation.
     query: command("M375.1"),
     parse: parseMakeraHeightMap,
+  },
+  switches: {
+    query: command("M119"),
+    // Endstops answers in any state; a program's moves would race the reading.
+    admit: (telemetry) =>
+      telemetry.job === null &&
+      (telemetry.state === "Idle" || telemetry.state === "Alarm")
+        ? null
+        : "The device must be idle or halted with no active program.",
+    parse: parseSwitchReport,
   },
   cameraUrl: (device) => `ws://${device.host}:82/ws_video`,
 }

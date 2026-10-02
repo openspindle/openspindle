@@ -1,3 +1,4 @@
+import type { HomeSwitch, SwitchReport } from "../../contract/index.ts"
 import type { Line, LineKind } from "../adapter.ts"
 
 /** Ordered: the first matching rule classifies the line. */
@@ -50,4 +51,29 @@ export function parseHomedReport(
   )
     return null
   return { homed: flags.every((match) => match[2] === "1"), acknowledged }
+}
+
+/**
+ * Endstops M119: each home switch by its axis and end, then the raw pins, then the probe input
+ * ("X_max:0 Y_max:0 Z_max:0 A_min:1 pins- (XL)P0.24:0 … Probe: 0"); 1 reads closed.
+ */
+export function parseSwitchReport(
+  text: string
+): Omit<SwitchReport, "at"> | null {
+  const parts = text.trim().split(/\s*pins-\s*/)
+  const [homesText, rest] = parts
+  if (
+    parts.length < 2 ||
+    !/^(?:[XYZABC]_(?:min|max):[01]\s*)+$/.test(homesText)
+  )
+    return null
+  const homes = [...homesText.matchAll(/([XYZABC])_(min|max):([01])/g)].map(
+    ([, axis, end, value]) => ({
+      axis: axis as HomeSwitch["axis"],
+      end: end as HomeSwitch["end"],
+      closed: value === "1",
+    })
+  )
+  const probe = /\bProbe:\s*([01])\b/.exec(rest)
+  return { homes, probe: probe ? probe[1] === "1" : null }
 }

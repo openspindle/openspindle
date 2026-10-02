@@ -5,6 +5,8 @@ import type {
   RuleResult,
 } from "@/machine/contract"
 import type { CompiledPlate } from "../compile/compile"
+import type { MachineEvidence } from "../diagnosis/evidence"
+import type { Resolution } from "../diagnosis/resolution"
 import { FRESH_START } from "../design-rules/program-rules"
 import type { ProgramStart } from "../design-rules/program-rules"
 import type { Place, QuickFix, Subject } from "../diagnostics"
@@ -123,6 +125,15 @@ export type RuleStages = {
     readonly subject: HeightMapSubject
     readonly fix: never
     readonly details: object
+  }
+  /**
+   * What is known about the connected machine. A failure is a finding, which its rule's label
+   * names unless its `title` names it otherwise, such as an alarm by its code.
+   */
+  readonly diagnosis: {
+    readonly subject: MachineEvidence
+    readonly fix: Resolution
+    readonly details: { readonly title?: string }
   }
 }
 export type StageName = keyof RuleStages

@@ -25,6 +25,7 @@ import type {
   ConnectTarget,
   ConsoleEntry,
   HeightMap,
+  SwitchReport,
   JobState,
   MachineSnapshot,
   NetworkDevice,
@@ -64,7 +65,11 @@ import {
   prepareAndStart,
 } from "./operations/job-runner.ts"
 import type { JobRunnerHooks } from "./operations/job-runner.ts"
-import { readAnchorConfiguration, readHeightMap } from "./operations/reads.ts"
+import {
+  readAnchorConfiguration,
+  readHeightMap,
+  readSwitches,
+} from "./operations/reads.ts"
 import {
   readFirmwareConfiguration,
   writeFirmwareConfiguration,
@@ -148,6 +153,7 @@ export type ControllerOptions = {
 
 const FAST_PHASES: ReadonlySet<JobState["phase"]> = new Set([
   "starting",
+  "running",
   "finishing",
   "cleaning",
 ])
@@ -729,6 +735,15 @@ export class MachineController {
     )
   }
 
+  /**
+   * Reads the machine's switches, as diagnosis inspects them: in the states the firmware takes
+   * it in, an alarm among them, never while a program runs.
+   */
+  async readSwitches(): Promise<SwitchReport> {
+    this.admitNow({ key: "readSwitches" })
+    return this.operate("inspection", "Reading switches", readSwitches)
+  }
+
   // ── Settings ───────────────────────────────────────────────────────────
 
   /**
@@ -1031,6 +1046,7 @@ export class MachineController {
         : null,
       readConfiguration: this.configurationAdmission("readAdmit"),
       writeConfiguration: this.configurationAdmission("writeAdmit"),
+      readSwitches: this.adapter.switches?.admit ?? null,
       limits: this.adapter.limits,
     }
   }

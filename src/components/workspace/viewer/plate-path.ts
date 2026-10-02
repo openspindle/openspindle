@@ -1,7 +1,9 @@
 import * as THREE from "three"
 import type { Point3 } from "@/domain/nc/gcode"
-import type { Playhead } from "@/domain/nc/move-times"
-import type { ViewerPlate } from "@/components/workspace/viewer/viewer-input"
+import type {
+  ShownPlayhead,
+  ViewerPlate,
+} from "@/components/workspace/viewer/viewer-input"
 import {
   PATH_DISPLAY_LIFT,
   plateProbeGrids,
@@ -14,6 +16,7 @@ import { samePlate } from "./plate-identity"
 import { ProbeGridView } from "./probe-grid-view"
 import type { ProbePresentation } from "./probe-grid-view"
 import { revealedSegments } from "./toolpath-buffers"
+import type { Collide } from "./touch-marker"
 import { ToolpathView } from "./toolpath-view"
 import type { ToolModels } from "./toolpath-view"
 import { WorkAreaView } from "./work-area-view"
@@ -28,7 +31,7 @@ export type PathPresentation = ProbePresentation & {
   liveTool?: { readonly tool: number | null; readonly position: Point3 } | null
   showRapids: boolean
   /** Where simulated playback is: the moves before it drawn, the one under way up to the tool. */
-  playhead?: Playhead | null
+  playhead?: ShownPlayhead | null
 }
 
 /** Where outlines lie: the stock top, or the work origin's height without stock. */
@@ -57,14 +60,22 @@ export class PlatePath {
   readonly group = new THREE.Group()
   private readonly palette: ViewerPalette
   private readonly models: ToolModels
+  private readonly collide: Collide
   private plate: ViewerPlate
   private toolpath: ToolpathView
   private workArea: WorkAreaView
   private probes: ProbeGridView
 
-  constructor(plate: ViewerPlate, palette: ViewerPalette, models: ToolModels) {
+  /** `collide` finds what the probe meets, for where it is going to touch. */
+  constructor(
+    plate: ViewerPlate,
+    palette: ViewerPalette,
+    models: ToolModels,
+    collide: Collide
+  ) {
     this.palette = palette
     this.models = models
+    this.collide = collide
     this.plate = plate
     // Only the drawing is lifted above surfaces; physical setup coordinates remain exact.
     this.group.position.z = PATH_DISPLAY_LIFT
@@ -73,7 +84,8 @@ export class PlatePath {
       plate.workOrigin,
       palette,
       plate.tools,
-      models
+      models,
+      collide
     )
     this.workArea = new WorkAreaView(plate.toolpathBounds, palette.workArea)
     this.workArea.place(plate.workOrigin, surfaceZ(plate))
@@ -96,7 +108,8 @@ export class PlatePath {
         workOrigin,
         this.palette,
         plate.tools,
-        this.models
+        this.models,
+        this.collide
       )
       this.group.add(this.toolpath.group)
     } else {
@@ -165,17 +178,18 @@ export class PlatePath {
         tool: state.liveTool.tool,
         position: [x - ox, y - oy, z - oz],
       })
+      this.toolpath.showAhead(null)
+      this.toolpath.showTouch(null)
       return
     }
     // While playback simulates the moves the tool is on the move under way, even where the step
     // on show ends the program, such as a firmware routine on the program's last line.
-    this.toolpath.showTool(
+    const toolShown =
       state.active && (playhead !== null || state.progress < 100)
-        ? count
-        : null,
-      playhead ? null : (state.previewLine ?? null),
-      playhead
-    )
+    this.toolpath.showTool(toolShown ? count : null, playhead)
+    // From the tool as it was just drawn.
+    this.toolpath.showAhead(state.active ? playhead : null)
+    this.toolpath.showTouch(toolShown ? (playhead?.segment ?? count) : null)
   }
 
   dispose() {

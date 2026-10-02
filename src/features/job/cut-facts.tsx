@@ -1,6 +1,14 @@
+import { useMemo, useSyncExternalStore } from "react"
 import { toViewerPlate } from "@/features/viewer/viewer-plate"
 import { useWorkspace } from "@/app/workspace/workspace-context"
-import type { ViewerToolRun } from "@/components/workspace/viewer/viewer-input"
+import { revealedSegments } from "@/components/workspace/viewer/toolpath-buffers"
+import {
+  moveTools,
+  toolOfMove,
+} from "@/components/workspace/viewer/toolpath-view"
+import type { MoveTools } from "@/components/workspace/viewer/toolpath-view"
+import type { PlayheadSource } from "@/components/workspace/viewer/viewer-input"
+import type { GCodeProgram } from "@/domain/nc/gcode"
 import { lineCut } from "@/domain/tools/cut-engagement"
 import type { LineCut, LineCutKind } from "@/domain/tools/cut-engagement"
 import type { Tool } from "@/domain/tools/tool"
@@ -19,34 +27,34 @@ const NOT_CUTTING: Record<Exclude<LineCutKind, "cut">, string> = {
   unknown: "Tool shape unknown",
 }
 
-/** The run of the tool in the spindle at `line`; runs are in program order. */
-function runOnLine(runs: readonly ViewerToolRun[], line: number) {
-  let low = 0
-  let high = runs.length
-  while (low < high) {
-    const middle = (low + high) >>> 1
-    if (runs[middle].lineEnd < line) low = middle + 1
-    else high = middle
-  }
-  const run = runs.at(low)
-  return run && run.lineStart <= line ? run : undefined
-}
-
-/** "T2 · name" for the tool in the spindle at `line`, as the plate's tool table names it. */
+/**
+ * "T2 · name" for the tool in the spindle, as the plate's tool table names it: the tool the 3D
+ * view draws, the one making the move the playhead is on, else the last move of the machine
+ * program up to `line`.
+ */
 function toolText(
   subject: JobSubject,
   tools: readonly Tool[],
-  runs: readonly ViewerToolRun[],
-  line: number
+  program: GCodeProgram,
+  moves: MoveTools,
+  line: number,
+  move: number | null
 ): string {
-  const run = line > 0 ? runOnLine(runs, line) : undefined
-  if (!run) return "—"
+  if (move === null && (line <= 0 || !program.segments.length)) return "—"
+  const number = toolOfMove(
+    program,
+    moves,
+    move ?? Math.max(0, revealedSegments(program, 100, line) - 1)
+  )
   const toolId = subject.plate.tools.find(
-    (entry) => entry.number === run.tool
+    (entry) => entry.number === number
   )?.toolId
   const name = tools.find((tool) => tool.id === toolId)?.name
-  const number = run.tool === null ? null : `T${run.tool}`
-  return [number, name].filter((part) => !!part).join(" · ") || "—"
+  return (
+    [number === null ? null : `T${number}`, name]
+      .filter((part) => !!part)
+      .join(" · ") || "—"
+  )
 }
 
 /** The facts' values for a line, or what stands in for them before they are known. */
@@ -76,19 +84,36 @@ export function CutFacts({
   subject,
   prediction,
   line,
+  playhead,
 }: {
   subject: JobSubject | null
   prediction: CutPrediction | null
   /** The line on show; 0 while the whole program shows. */
   line: number
+  /** Where playback or a followed job is along the moves; a change of move re-renders. */
+  playhead: PlayheadSource
 }) {
+  const move = useSyncExternalStore(
+    playhead.subscribe,
+    () => playhead.get()?.segment ?? null
+  )
   const library = useWorkspace((state) => state.tools)
   const tools = subject?.tools ?? library
-  const runs = subject
-    ? toViewerPlate(subject.plate, subject.compiled, tools).tools
-    : []
+  const plate = subject
+    ? toViewerPlate(subject.plate, subject.compiled, tools)
+    : null
+  // Both come from the cached viewer plate, which keeps them while its plate stays.
+  const program = plate?.machineProgram ?? null
+  const runs = plate?.tools ?? null
+  const moves = useMemo(
+    () => (program && runs ? moveTools(program, runs) : null),
+    [program, runs]
+  )
   const values = cutValues(prediction, line)
-  const tool = subject ? toolText(subject, tools, runs, line) : "—"
+  const tool =
+    subject && program && moves
+      ? toolText(subject, tools, program, moves, line, move)
+      : "—"
   return (
     <HeightMapFacts
       facts={[

@@ -1,4 +1,15 @@
 import * as THREE from "three"
+import {
+  float,
+  fwidth,
+  instancedDynamicBufferAttribute,
+  length,
+  mix,
+  smoothstep,
+  uv,
+  vec3,
+} from "three/tsl"
+import { PointsNodeMaterial } from "three/webgpu"
 import type { Point3 } from "@/domain/nc/gcode"
 
 /** How a point shows: on the item being moved, on something else, or a device anchor. */
@@ -15,65 +26,79 @@ export type Marker = {
 const DOT_SIZE: Record<MarkerStyle, number> = { own: 11, target: 8, anchor: 10 }
 const RING_SIZE = 22
 
-const vertexShader = /* glsl */ `
-  attribute vec3 markerColor;
-  attribute float markerSize;
-  attribute float markerRing;
-  uniform float pixelRatio;
-  varying vec3 vColor;
-  varying float vRing;
-  void main() {
-    vColor = markerColor;
-    vRing = markerRing;
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-    gl_PointSize = markerSize * pixelRatio;
-  }
-`
+/** One marker's attributes, a buffer of each, for `capacity` markers. */
+type Buffers = {
+  readonly capacity: number
+  readonly positions: THREE.InstancedBufferAttribute
+  readonly colors: THREE.InstancedBufferAttribute
+  readonly sizes: THREE.InstancedBufferAttribute
+  readonly rings: THREE.InstancedBufferAttribute
+}
 
-/** Dots have a white rim, so they read on the light metal bed and the dark MDF alike. */
-const fragmentShader = /* glsl */ `
-  varying vec3 vColor;
-  varying float vRing;
-  void main() {
-    float r = length(gl_PointCoord * 2.0 - 1.0);
-    float aa = fwidth(r);
-    float alpha = 1.0 - smoothstep(1.0 - aa, 1.0, r);
-    vec3 color;
-    if (vRing > 0.5) {
-      alpha *= smoothstep(0.6 - aa, 0.6, r);
-      float band = smoothstep(0.68 - aa, 0.68, r) * (1.0 - smoothstep(0.88 - aa, 0.88, r));
-      color = mix(vec3(1.0), vColor, band);
-    } else {
-      color = mix(vColor, vec3(1.0), smoothstep(0.6 - aa, 0.6, r));
-    }
-    if (alpha <= 0.0) discard;
-    gl_FragColor = vec4(color, alpha);
-    #include <colorspace_fragment>
+/**
+ * Markers drawn as sprites, one per marker, at their size on screen: dots with a white rim, so
+ * they read on the light metal bed and the dark MDF alike, and rings, white with a band of their
+ * colour.
+ */
+function markerMaterial({ positions, colors, sizes, rings }: Buffers) {
+  const material = new PointsNodeMaterial({
+    transparent: true,
+    depthTest: false,
+    depthWrite: false,
+    sizeAttenuation: false,
+  })
+  material.positionNode = instancedDynamicBufferAttribute<"vec3">(
+    positions,
+    "vec3"
+  )
+  material.sizeNode = instancedDynamicBufferAttribute<"float">(sizes, "float")
+  const color = instancedDynamicBufferAttribute<"vec3">(colors, "vec3")
+  const ring = instancedDynamicBufferAttribute<"float">(
+    rings,
+    "float"
+  ).greaterThan(0.5)
+  const r = length(uv().mul(2).sub(1))
+  const aa = fwidth(r)
+  const edge = (at: number) => smoothstep(float(at).sub(aa), at, r)
+  const disc = float(1).sub(edge(1))
+  const band = edge(0.68).mul(float(1).sub(edge(0.88)))
+  const white = vec3(1)
+  material.colorNode = ring.select(
+    mix(white, color, band),
+    mix(color, white, edge(0.6))
+  )
+  material.opacityNode = ring.select(disc.mul(edge(0.6)), disc)
+  return material
+}
+
+function buffers(capacity: number): Buffers {
+  const attribute = (size: number) =>
+    new THREE.InstancedBufferAttribute(
+      new Float32Array(capacity * size),
+      size
+    ).setUsage(THREE.DynamicDrawUsage)
+  return {
+    capacity,
+    positions: attribute(3),
+    colors: attribute(3),
+    sizes: attribute(1),
+    rings: attribute(1),
   }
-`
+}
 
 /** The mount points of a plate's setup items, drawn over everything while moving. */
 export class SetupMarkers {
-  readonly object: THREE.Points<THREE.BufferGeometry, THREE.ShaderMaterial>
+  readonly object: THREE.Sprite<THREE.Object3DEventMap>
   private readonly colors: Record<MarkerStyle, THREE.Color>
+  private buffers = buffers(8)
 
-  constructor(primary: THREE.Color, pixelRatio: number) {
+  constructor(primary: THREE.Color) {
     this.colors = {
       own: primary,
       target: new THREE.Color(0x3d444d),
       anchor: new THREE.Color(0xf58b24),
     }
-    this.object = new THREE.Points(
-      new THREE.BufferGeometry(),
-      new THREE.ShaderMaterial({
-        uniforms: { pixelRatio: { value: pixelRatio } },
-        vertexShader,
-        fragmentShader,
-        transparent: true,
-        depthTest: false,
-        depthWrite: false,
-      })
-    )
+    this.object = new THREE.Sprite(markerMaterial(this.buffers))
     this.object.renderOrder = 12
     this.object.frustumCulled = false
     this.object.visible = false
@@ -89,13 +114,7 @@ export class SetupMarkers {
       ...markers.filter((marker) => marker.ring),
       ...markers.filter((marker) => !marker.ring),
     ]
-    const geometry = this.geometryFor(ordered.length)
-    const attribute = (name: string) =>
-      geometry.getAttribute(name) as THREE.BufferAttribute
-    const positions = attribute("position")
-    const colors = attribute("markerColor")
-    const sizes = attribute("markerSize")
-    const rings = attribute("markerRing")
+    const { positions, colors, sizes, rings } = this.buffersFor(ordered.length)
     ordered.forEach((marker, index) => {
       const color = this.colors[marker.style]
       positions.setXYZ(index, ...marker.position)
@@ -105,42 +124,23 @@ export class SetupMarkers {
     })
     for (const changed of [positions, colors, sizes, rings])
       changed.needsUpdate = true
+    this.object.count = ordered.length
     this.object.visible = true
   }
 
+  /** Its material only: every sprite shares one geometry, which others still draw. */
   dispose() {
     this.object.removeFromParent()
-    this.object.geometry.dispose()
     this.object.material.dispose()
   }
 
-  /** Reuses the buffers while the count stays; a new count gets new ones. */
-  private geometryFor(count: number) {
-    const current = this.object.geometry
-    if (
-      current.hasAttribute("position") &&
-      current.getAttribute("position").count === count
-    )
-      return current
-    const geometry = new THREE.BufferGeometry()
-    geometry.setAttribute(
-      "position",
-      new THREE.BufferAttribute(new Float32Array(count * 3), 3)
-    )
-    geometry.setAttribute(
-      "markerColor",
-      new THREE.BufferAttribute(new Float32Array(count * 3), 3)
-    )
-    geometry.setAttribute(
-      "markerSize",
-      new THREE.BufferAttribute(new Float32Array(count), 1)
-    )
-    geometry.setAttribute(
-      "markerRing",
-      new THREE.BufferAttribute(new Float32Array(count), 1)
-    )
-    this.object.geometry = geometry
-    current.dispose()
-    return geometry
+  /** Keeps the buffers while the markers fit; more get buffers twice as large. */
+  private buffersFor(count: number) {
+    if (count <= this.buffers.capacity) return this.buffers
+    this.buffers = buffers(Math.max(count, this.buffers.capacity * 2))
+    const previous = this.object.material
+    this.object.material = markerMaterial(this.buffers)
+    previous.dispose()
+    return this.buffers
   }
 }

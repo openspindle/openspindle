@@ -35,6 +35,7 @@ export function createMachineHandlers(
         machine(() => gateway.writeConfiguration(request)),
       "machine.readHeightMap": (_params, { signal }) =>
         machine(() => gateway.readHeightMap(signal)),
+      "machine.readSwitches": () => machine(() => gateway.readSwitches()),
       "machine.protocolTrace": () => formatTrace(gateway.protocolTrace()),
     },
     events: {

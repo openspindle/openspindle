@@ -1,7 +1,7 @@
 import * as THREE from "three"
-import { Line2 } from "three/addons/lines/Line2.js"
+import { Line2 } from "three/addons/lines/webgpu/Line2.js"
 import { LineGeometry } from "three/addons/lines/LineGeometry.js"
-import { LineMaterial } from "three/addons/lines/LineMaterial.js"
+import { Line2NodeMaterial } from "three/webgpu"
 import { fixtureModelFinish } from "@/domain/fixtures/catalog"
 import type { MachineBed } from "@/domain/fixtures/machine-bed"
 import { setupItemKey } from "@/domain/plate/setup-items"
@@ -51,6 +51,7 @@ import type { EdgeHighlight } from "./edge-highlights"
 import { ProblemView } from "./problem-view"
 import { SetupMarkers } from "./setup-markers"
 import type { Marker } from "./setup-markers"
+import type { Collide } from "./touch-marker"
 import { GRID_COLORS } from "./viewer-stage"
 import type { ViewerAssets } from "./viewer-assets"
 
@@ -86,6 +87,17 @@ const BARE_ORIGIN: ViewerBounds = { min: [-2, -2, -2], max: [2, 2, 2] }
 const WORK_AXIS_LINE_WIDTH = 1.5
 /** A device anchor's solid dot; its border reaches out to STORED_ANCHOR_RADIUS. */
 const ANCHOR_DOT_RADIUS = 1.2
+
+/** How far, in millimetres, the probe's projection looks for what it meets. */
+const PROBE_REACH = 1000
+const caster = new THREE.Raycaster()
+
+/** Whether an object and every group it is in are drawn. */
+function drawn(object: THREE.Object3D) {
+  for (let item: THREE.Object3D | null = object; item; item = item.parent)
+    if (!item.visible) return false
+  return true
+}
 const MACHINE_ORIGIN_RADIUS = 2.2
 
 const plus = (point: Point3, delta: Point3): Point3 => [
@@ -144,7 +156,11 @@ const PRESENTATION_EQUALITY: FieldEquality<PlatePresentation> = {
   previewProbePoint: Object.is,
   playhead: (a, b) =>
     a === b ||
-    (!!a && !!b && a.segment === b.segment && a.fraction === b.fraction),
+    (!!a &&
+      !!b &&
+      a.segment === b.segment &&
+      a.fraction === b.fraction &&
+      a.tip === b.tip),
   problems: sameProblems,
   shownProblem: Object.is,
   machineOrigin: (a, b) =>
@@ -203,7 +219,7 @@ export function workOriginAxes() {
     end[axis] = WORK_AXIS_LENGTH
     const line = new Line2(
       new LineGeometry().setPositions([0, 0, 0, ...end]),
-      new LineMaterial({
+      new Line2NodeMaterial({
         color: colors[axis],
         linewidth: WORK_AXIS_LINE_WIDTH,
         // Drawn over everything, so transparent: the translucent stock drawn after an opaque
@@ -252,12 +268,14 @@ function selectionOutline(color: THREE.Color, { bounds }: MachineBed) {
   const [right, back, top] = bounds.max.map((value, axis) =>
     axis === 2 ? value + 0.3 : value + 3
   )
-  const outline = new THREE.LineLoop(
+  // Closed by returning to its first corner: the renderer draws no line loops.
+  const outline = new THREE.Line(
     new THREE.BufferGeometry().setFromPoints([
       new THREE.Vector3(left, front, top),
       new THREE.Vector3(right, front, top),
       new THREE.Vector3(right, back, top),
       new THREE.Vector3(left, back, top),
+      new THREE.Vector3(left, front, top),
     ]),
     new THREE.LineBasicMaterial({
       color,
@@ -479,7 +497,7 @@ export class PlateView {
   private readonly axes = workOriginAxes()
   private readonly anchors = new THREE.Group()
   private anchorDiscs: THREE.Mesh[] = []
-  private readonly selection: THREE.LineLoop<
+  private readonly selection: THREE.Line<
     THREE.BufferGeometry,
     THREE.LineBasicMaterial
   >
@@ -510,12 +528,17 @@ export class PlateView {
     this.bed.add(context.assets.bed(machineBed).clone(true))
     this.bed.userData.setupItem = { kind: "bed" } satisfies SetupItemRef
     this.stock.userData.setupItem = { kind: "stock" } satisfies SetupItemRef
-    this.path = new PlatePath(plate, context.palette, {
-      load: (url) => context.assets.toolModel(url),
-      invalidate: context.invalidate,
-    })
+    this.path = new PlatePath(
+      plate,
+      context.palette,
+      {
+        load: (url) => context.assets.toolModel(url),
+        invalidate: context.invalidate,
+      },
+      this.collide
+    )
     this.selection = selectionOutline(context.palette.primary, machineBed)
-    this.markers = new SetupMarkers(context.palette.primary, context.pixelRatio)
+    this.markers = new SetupMarkers(context.palette.primary)
     this.problems = new ProblemView(context.palette)
     this.edges = new EdgeHighlights(context.palette.primary)
     this.machineOrigin = machineOriginMarker(context.palette.primary)
@@ -641,6 +664,23 @@ export class PlateView {
     this.presentation = presentation
     this.applyPresentation()
     return true
+  }
+
+  /** What a probe meets first: the plate's bed, fixtures and stock as they are drawn. */
+  private readonly collide: Collide = (origin, direction) => {
+    caster.set(origin, direction)
+    caster.far = PROBE_REACH
+    const hits = caster.intersectObjects(
+      [this.bed, this.fixtures, this.stock],
+      true
+    )
+    for (const { object, face, point } of hits) {
+      if (!(object instanceof THREE.Mesh) || !face || !drawn(object)) continue
+      const normal = face.normal.clone().transformDirection(object.matrixWorld)
+      if (normal.dot(direction) > 0) normal.negate()
+      return { point, normal }
+    }
+    return null
   }
 
   /** Swaps in a loaded model of its bed; clones share the template's resources. */

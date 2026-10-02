@@ -45,6 +45,7 @@ export type AdmissionRequest =
         | "readConfiguration"
         | "writeConfiguration"
         | "readHeightMap"
+        | "readSwitches"
         | "stop"
         | "reset"
         | "console"
@@ -68,6 +69,8 @@ export type AdmissionContext = {
   readonly writeAnchors: ((telemetry: Telemetry) => string | null) | null
   readonly readConfiguration: ((telemetry: Telemetry) => string | null) | null
   readonly writeConfiguration: ((telemetry: Telemetry) => string | null) | null
+  /** Machine-state preconditions for reading its switches; null when it does not report them. */
+  readonly readSwitches: ((telemetry: Telemetry) => string | null) | null
   /** The ranges the machine's manual controls accept. */
   readonly limits: ControlLimits
 }
@@ -128,6 +131,8 @@ function stateReason({ request, context }: CommandSubject): string | null {
       return context.writeConfiguration?.(telemetry) ?? null
     case "readHeightMap":
       return context.rules.readHeightMap(telemetry, context.job)
+    case "readSwitches":
+      return context.readSwitches?.(telemetry) ?? null
     // Stop and Reset recover from any machine state; a typed line goes in any machine state,
     // and the firmware answers what it will not run.
     case "stop":
@@ -193,6 +198,18 @@ export const COMMAND_RULES: readonly CommandRule[] = [
     explain: () => ({
       problem: "This machine does not support a configuration editor.",
     }),
+  },
+  {
+    id: "machine/switches-reported",
+    stage: "command",
+    label: "Switches reported",
+    description: "Switches are read from a machine that reports them.",
+    severity: "error",
+    configurable: false,
+    chain: ADMISSION,
+    test: ({ request, context }) =>
+      request.key !== "readSwitches" || context.readSwitches !== null,
+    explain: () => ({ problem: "This machine does not report its switches." }),
   },
   {
     id: "machine/lockout",

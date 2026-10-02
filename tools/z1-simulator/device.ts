@@ -49,6 +49,11 @@ export type SimulatorOptions = {
    * the CRC-16 of the name `play` asks for: `File size` reports that file's size.
    */
   readonly otherFile: boolean
+  /**
+   * The E-stop is pressed at power-on: the motors stay off, so the homing the firmware runs as it
+   * starts fails, and it halts with homing failed (2), not E-stop (13).
+   */
+  readonly estop: boolean
   readonly transfer: TransferOptions
 }
 
@@ -101,6 +106,8 @@ const MAX_TEXT_FRAME = 512
 /** configZ1.default: G0's rate, G1's without an F, and the most each axis goes (mm/min). */
 const SEEK_RATE = 2000
 const FEED_RATE = 1000
+/** The spindle fan's power while blowing gives the spindle air, as `PlaySpindleFanValue`. */
+const SPINDLE_AIR_POWER = 80
 const AXIS_RATES: Xyz = [1200, 1200, 600]
 /** `coordinate.clearance_x` and `_y`: where G28 parks. */
 const PARK: [number, number] = [-11.6, -14.6]
@@ -177,6 +184,8 @@ export class SimulatedZ1 {
   homed: boolean
   halted = false
   haltReason = 0
+  /** Whether the E-stop is pressed (`pressEstop`). */
+  estop = false
   answeringStatus = true
   /** How many times faster than the machine it moves; a change applies from the next move. */
   speed: number
@@ -265,7 +274,32 @@ export class SimulatedZ1 {
       })
     )
     this.loadVacuumDefaultPower()
+    if (options.estop) {
+      this.estop = true
+      this.bootHoming()
+    }
     this.timer = setInterval(() => this.tick(), options.lineMs)
+  }
+
+  /**
+   * The homing the firmware runs as it starts (`home_on_boot`): with the E-stop pressed the
+   * motors stay off, no home switch closes, and it halts with homing failed.
+   */
+  private bootHoming() {
+    if (!this.estop) return
+    this.homed = false
+    this.halted = true
+    this.haltReason = 2
+  }
+
+  /**
+   * Presses or releases the E-stop. MainButton halts with E-stop (13) only when the machine is
+   * not in an alarm already, which keeps the reason it has.
+   */
+  pressEstop(pressed: boolean) {
+    this.estop = pressed
+    this.log(pressed ? "E-stop pressed" : "E-stop released")
+    if (pressed && !this.halted) this.halt(13, "ALARM: E-stop pressed")
   }
 
   private get configuration() {
@@ -415,9 +449,11 @@ export class SimulatedZ1 {
   }
 
   private diagnose() {
+    // Blowing turns the spindle fan, its air, on with the spindle (SpindleControl M3).
+    const air = this.spindleOn && this.blowing
     this.send(
       FRAME_TYPES.diagnostics,
-      `{S:${flag(this.spindleOn)},${this.targetRpm}|G:${flag(this.light)},${flag(this.beep)},0,${flag(this.vacuum)},${this.vacuumPower}|I:0}`
+      `{S:${flag(this.spindleOn)},${this.targetRpm}|F:${flag(air)},${air ? SPINDLE_AIR_POWER : 0}|G:${flag(this.light)},${flag(this.beep)},0,${flag(this.vacuum)},${this.vacuumPower}|I:${flag(this.estop)}}`
     )
   }
 
@@ -574,8 +610,22 @@ export class SimulatedZ1 {
 
   private gcode(text: string) {
     const code = text.toUpperCase()
+    // Endstops answers M119 in any state, an alarm too. Away from home every switch is open;
+    // A's reads closed without a rotary module.
+    if (/^M0*119\b/.test(code)) {
+      const home = this.homed && this.mpos.every((value) => value === 0)
+      this.lines(
+        `X_max:${flag(home)} Y_max:${flag(home)} Z_max:${flag(home)} A_min:1 pins- (XL)P0.24:${flag(home)} (YL)P0.25:${flag(home)} (ZL)P1.1:${flag(home)} (AL)P1.4:1  Probe: 0`
+      )
+      this.ok(text)
+      return
+    }
     if (this.halted && !/^\$H\b|^\$X\b/.test(code)) {
       this.lines("error:Alarm lock")
+      return
+    }
+    if (code === "$H" && this.estop) {
+      this.halt(2)
       return
     }
     if (code === "$H") {
@@ -1230,6 +1280,7 @@ export class SimulatedZ1 {
     }
     this.anchor1 = [anchor(0), anchor(1)]
     this.loadVacuumDefaultPower()
+    this.bootHoming()
     this.log("rebooted")
     this.onReboot()
   }

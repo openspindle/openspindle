@@ -2,12 +2,19 @@ import * as THREE from "three"
 import type { ToolShape } from "@/domain/tools/tool-shape"
 import type { GCodeProgram, GCodeSegment, Point3 } from "@/domain/nc/gcode"
 import type { Playhead } from "@/domain/nc/move-times"
-import type { ViewerToolRun } from "@/components/workspace/viewer/viewer-input"
+import { isProbeSlot } from "@/domain/tools/tool-table"
+import type {
+  ShownPlayhead,
+  ViewerToolRun,
+} from "@/components/workspace/viewer/viewer-input"
 import { disposeObjects } from "@/lib/three-assets"
 import { TOOL_MARKER_LENGTH } from "../bed-viewer-layout"
 import type { LineRange } from "../bed-viewer-layout"
 import type { ViewerPalette } from "./palette"
 import { sameRanges } from "./plate-identity"
+import { PathAhead } from "./path-ahead"
+import { TouchMarker } from "./touch-marker"
+import type { Collide } from "./touch-marker"
 import { disposeToolModel, toolMaterials, toolModel } from "./tool-model"
 import type { ToolMaterials } from "./tool-model"
 import {
@@ -65,6 +72,9 @@ export type ToolModels = {
   invalidate: () => void
 }
 
+/** How far behind the tool's tip, in millimetres, a projection of what it meets starts. */
+const PROJECTION_BACK_OFF = 1
+
 /** The point `fraction` of the way along a move. */
 export const along = (
   { start, end }: GCodeSegment,
@@ -75,20 +85,54 @@ export const along = (
   start[2] + (end[2] - start[2]) * fraction,
 ]
 
+/** How a tool is drawn: its 3D model once that has loaded, else its shape, else a marker. */
+type ToolLook = Pick<ViewerToolRun, "shape" | "model">
+
 /**
- * The run of the tool in the spindle at `line`: the run whose lines hold it, else the last before
- * it, as a tool stays in until the next change; -1 before the first. Runs are in program order.
+ * Which tool makes each move of a plate's machine program, and how each tool is drawn. A move's
+ * tool is its own, but for the moves before the program first changes tools: the parse gives
+ * those the number it starts with, while the spindle holds the implicit tool, or one the program
+ * does not know. On the change's line, they are the ones that take that tool to the change.
  */
-function runIndexAt(runs: readonly ViewerToolRun[], line: number) {
-  let low = 0
-  let high = runs.length
-  while (low < high) {
-    const middle = (low + high) >>> 1
-    if (runs[middle].lineEnd < line) low = middle + 1
-    else high = middle
-  }
-  return low < runs.length && runs[low].lineStart <= line ? low : low - 1
+export type MoveTools = {
+  /** How each tool the plate's runs name is drawn, by its number; null is the implicit tool's. */
+  readonly looks: ReadonlyMap<number | null, ToolLook>
+  /** How many of the program's first moves the implicit tool makes. */
+  readonly implicitMoves: number
 }
+
+/** The tools making a machine program's moves, by the plate's tool runs, whose lines it shares. */
+export function moveTools(
+  program: GCodeProgram,
+  runs: readonly ViewerToolRun[]
+): MoveTools {
+  const looks = new Map<number | null, ToolLook>()
+  for (const { tool, shape, model } of runs) looks.set(tool, { shape, model })
+  const change = runs.find((run) => run.tool !== null)
+  const parsed = program.segments.at(0)?.tool
+  let implicitMoves = 0
+  for (const { line, tool } of program.segments) {
+    // A change to the number the parse starts with leaves its moves alike: its line is the new
+    // tool's.
+    const changed =
+      !!change &&
+      (line > change.lineStart ||
+        (line === change.lineStart && change.tool === parsed))
+    if (tool !== parsed || changed) break
+    implicitMoves++
+  }
+  return { looks, implicitMoves }
+}
+
+/** The number on the plate of the tool making move `index`; null for the implicit tool. */
+export const toolOfMove = (
+  program: GCodeProgram,
+  tools: MoveTools,
+  index: number
+) =>
+  index < tools.implicitMoves
+    ? null
+    : (program.segments.at(index)?.tool ?? null)
 
 /**
  * One plate's toolpath, drawn from the plate's work origin. Each motion's vertices upload
@@ -108,7 +152,7 @@ export class ToolpathView {
     THREE.LineBasicMaterial
   >
   private readonly layers: MotionLayer[]
-  private tools: readonly ViewerToolRun[]
+  private tools: MoveTools
   private readonly toolMaterials: ToolMaterials
   /** Each tool shape's model, made when playback first shows it. */
   private readonly toolModels = new Map<ToolShape, THREE.Group>()
@@ -122,6 +166,21 @@ export class ToolpathView {
     THREE.BufferGeometry,
     THREE.LineBasicMaterial
   >
+  /** For each move, the first from it on that a probe makes into a touch; -1 for none. */
+  private readonly touches: Int32Array
+  /** Where the probe is going to touch, while the tool shows. */
+  private readonly touch: TouchMarker | null
+  /** The moves the tool makes next, while playback follows them. */
+  private readonly ahead: PathAhead
+  /** What the probe meets, projected from the tool's tip; without it, where the moves touch. */
+  private readonly collide: Collide | null
+  /**
+   * Where the tool's tip is on show, in the program's coordinates, and the tool making the move
+   * it is on; null while none is.
+   */
+  private tip: { readonly at: Point3; readonly tool: number } | null = null
+  /** The tip and probing move the marker was last projected for: it stays while they do. */
+  private projected = ""
   private shownTool: THREE.Object3D | null = null
   /** What `showTool` was last asked to show, to show again once a model arrives. */
   private shown: Parameters<ToolpathView["showTool"]> = [null]
@@ -137,12 +196,24 @@ export class ToolpathView {
     origin: Point3,
     palette: ViewerPalette,
     tools: readonly ViewerToolRun[],
-    models: ToolModels
+    models: ToolModels,
+    collide: Collide | null = null
   ) {
     this.program = program
-    this.tools = tools
+    this.tools = moveTools(program, tools)
     this.models = models
+    this.collide = collide
     this.buffers = toolpathBuffers(program)
+    this.touches = new Int32Array(program.segments.length)
+    let next = -1
+    for (let index = program.segments.length - 1; index >= 0; index--) {
+      const segment = program.segments[index]
+      if (segment.probing && isProbeSlot(segment.tool)) next = index
+      this.touches[index] = next
+    }
+    this.ahead = new PathAhead(palette.pathAhead)
+    // Only a program a probe touches in gets the marker, and with it its light.
+    this.touch = next < 0 ? null : new TouchMarker(palette.nextTouch)
     this.materials = {
       cut: pathMaterial(palette.primary),
       rapid: pathMaterial(palette.rapid),
@@ -190,14 +261,15 @@ export class ToolpathView {
     this.move.renderOrder = 3
     this.move.frustumCulled = false
     this.move.visible = false
-    this.path.add(this.marker, this.move)
+    this.path.add(this.marker, this.move, this.ahead.object)
+    if (this.touch) this.path.add(this.touch.object)
     this.group.add(this.path)
     this.place(origin)
   }
 
   /** New tools for the same program; models no run uses any more are released. */
   setTools(tools: readonly ViewerToolRun[]) {
-    this.tools = tools
+    this.tools = moveTools(this.program, tools)
     const used = new Set(tools.map((run) => run.shape))
     for (const [shape, model] of this.toolModels) {
       if (used.has(shape)) continue
@@ -364,38 +436,103 @@ export class ToolpathView {
   }
 
   /**
-   * Shows the tool in the spindle at `line` (without one, on the line of the last of the first
-   * `count` segments) with its tip at that segment's end, or, while playback simulates the
-   * moves, along the move under way; a null count hides it.
+   * Shows the tool making the last of the first `count` segments with its tip at that segment's
+   * end, or, while playback simulates the moves, the tool making the move under way along it,
+   * or where the machine reported it; a null count hides it.
    */
-  showTool(
-    count: number | null,
-    line: number | null = null,
-    playhead: Playhead | null = null
-  ) {
-    this.shown = [count, line, playhead]
+  showTool(count: number | null, playhead: ShownPlayhead | null = null) {
+    this.shown = [count, playhead]
     if (this.shownTool) this.shownTool.visible = false
     this.shownTool = null
+    this.tip = null
     if (count === null) return
-    const current = this.program.segments.at(
-      playhead?.segment ?? Math.max(0, count - 1)
-    )
+    const index = playhead?.segment ?? Math.max(0, count - 1)
+    const current = this.program.segments.at(index)
     if (!current) return
     let position = count > 0 ? current.end : current.start
-    if (playhead) position = along(current, playhead.fraction)
-    // Runs are in lines: the program's segments are not the ones drawn. Before the first line
-    // there is none, and the tool is the one that makes the first move.
-    let index = runIndexAt(
-      this.tools,
-      line !== null && line > 0 ? line : current.line
+    if (playhead) position = playhead.tip ?? along(current, playhead.fraction)
+    this.tip = { at: position, tool: current.tool }
+    const tool = toolOfMove(this.program, this.tools, index)
+    const look = this.tools.looks.get(tool)
+    // Before the first change, without an implicit tool, the spindle holds one the program does
+    // not know: none shows.
+    if (tool === null && !look?.shape && !look?.model) return
+    this.placeTool(look ?? null, position)
+  }
+
+  /**
+   * Marks what the probe is going to hit, for the first probing move a probe makes from move
+   * `from` on (the move under way, or the one after the tool on show). With a probe in the
+   * spindle it is projected from the tip along that move, onto what it meets, else onto the plane
+   * the move touches in; before, it is where that move touches. Null hides it.
+   */
+  showTouch(from: number | null) {
+    const { touch } = this
+    if (!touch) return
+    const index = from === null ? -1 : (this.touches[from] ?? -1)
+    const segment = index < 0 ? null : this.program.segments[index]
+    const { tip } = this
+    if (!segment || !tip) {
+      this.projected = ""
+      touch.show(null)
+      return
+    }
+    const key = `${index}:${tip.tool}:${tip.at.join()}`
+    if (key === this.projected) return
+    this.projected = key
+    const { start, end } = segment
+    const direction = new THREE.Vector3(
+      end[0] - start[0],
+      end[1] - start[1],
+      end[2] - start[2]
+    ).normalize()
+    const facing = direction.clone().negate().toArray()
+    if (!isProbeSlot(tip.tool)) {
+      touch.show(end, facing)
+      return
+    }
+    const hit = this.project(tip.at, direction)
+    if (hit) {
+      touch.show(hit.point, hit.normal)
+      return
+    }
+    // Where the tip meets the plane through the touch, facing back along the move.
+    const ahead = Math.max(
+      0,
+      direction.dot(new THREE.Vector3(...end).sub(new THREE.Vector3(...tip.at)))
     )
-    // A change's run starts on its line, where the firmware first moves the tool it changes.
-    const named = index >= 0 ? this.tools[index].tool : null
-    if (named !== null && named !== current.tool) index--
-    const run = index >= 0 ? this.tools[index] : null
-    // Before a tool change the spindle holds a tool the program does not know: none shows.
-    if (!run || (run.tool === null && !run.shape && !run.model)) return
-    this.placeTool(run, position)
+    touch.show(
+      new THREE.Vector3(...tip.at).addScaledVector(direction, ahead).toArray(),
+      facing
+    )
+  }
+
+  /** What a move from `tip` along `direction` meets, in the program's coordinates. */
+  private project(tip: Point3, direction: THREE.Vector3) {
+    if (!this.collide) return null
+    this.path.updateWorldMatrix(true, false)
+    // From a little behind the tip, so that a probe touching a surface still meets it.
+    const origin = this.path
+      .localToWorld(new THREE.Vector3(...tip))
+      .addScaledVector(direction, -PROJECTION_BACK_OFF)
+    const hit = this.collide(origin, direction)
+    if (!hit) return null
+    return {
+      point: this.path.worldToLocal(hit.point.clone()).toArray(),
+      normal: hit.normal.toArray(),
+    }
+  }
+
+  /**
+   * Shows the moves the tool makes next from where playback is, from the tool as `showTool`
+   * last drew it; null hides them.
+   */
+  showAhead(playhead: Playhead | null) {
+    this.ahead.show(
+      this.program.segments,
+      playhead,
+      playhead && this.tip ? this.tip.at : null
+    )
   }
 
   /**
@@ -406,17 +543,16 @@ export class ToolpathView {
   showLiveTool(live: { tool: number | null; position: Point3 } | null) {
     if (this.shownTool) this.shownTool.visible = false
     this.shownTool = null
+    this.tip = null
     if (!live) return
-    const run = [...this.tools]
-      .reverse()
-      .find((item) => item.tool === live.tool)
-    this.placeTool(run ?? null, live.position)
+    this.placeTool(this.tools.looks.get(live.tool) ?? null, live.position)
   }
 
-  /** A run's tool (its model, else its shape, else the marker) with its tip at `position`. */
-  private placeTool(run: ViewerToolRun | null, position: Point3) {
-    const model = run?.model ? this.meshModel(run.model) : null
-    const tool = model ?? (run?.shape ? this.toolModel(run.shape) : this.marker)
+  /** A tool (its model, else its shape, else the marker) with its tip at `position`. */
+  private placeTool(look: ToolLook | null, position: Point3) {
+    const model = look?.model ? this.meshModel(look.model) : null
+    const tool =
+      model ?? (look?.shape ? this.toolModel(look.shape) : this.marker)
     const [x, y, z] = position
     // The marker is a centred cylinder; a model's origin is its tip.
     tool.position.set(

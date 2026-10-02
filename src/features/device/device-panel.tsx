@@ -12,16 +12,6 @@ import type { ReactNode } from "react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Alert, AlertAction, AlertDescription } from "@/components/ui/alert"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
 import { FieldDescription } from "@/components/ui/field"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -44,6 +34,8 @@ import { DeviceOverridesCard } from "./device-overrides-card"
 import { DeviceSimulatorCard } from "./device-simulator-card"
 import { DeviceSpindleCard } from "./device-spindle-card"
 import { DeviceStatusCard } from "./device-status-card"
+import { MachineDiagnosis } from "./machine-diagnosis"
+import { ResetMachineDialog } from "./reset-machine-dialog"
 
 export function DevicePanel({
   openPicker,
@@ -57,7 +49,7 @@ export function DevicePanel({
   const stop = useStopMachine()
   const reset = useResetMachine()
   const [confirmReset, setConfirmReset] = useState(false)
-  const { availability, activity, features, limits, lockout } = snapshot
+  const { availability, activity, features, limits } = snapshot
   const device = snapshot.connection.device
   const telemetry = isFresh(snapshot.telemetry, Date.now())
     ? snapshot.telemetry
@@ -160,30 +152,11 @@ export function DevicePanel({
           </ReasonButton>
         </div>
       </header>
-      <AlertDialog open={confirmReset} onOpenChange={setConfirmReset}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Reset the machine?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Its controller restarts, which takes a few seconds and stops
-              anything it is doing. OpenSpindle connects to it again once it is
-              back.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              variant="destructive"
-              onClick={() => {
-                setConfirmReset(false)
-                reset.mutate()
-              }}
-            >
-              Reset
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ResetMachineDialog
+        open={confirmReset}
+        onOpenChange={setConfirmReset}
+        onReset={() => reset.mutate()}
+      />
       {snapshot.connection.restartNeeded && (
         <Alert variant="warning">
           <RotateCcw />
@@ -213,11 +186,6 @@ export function DevicePanel({
           </AlertDescription>
         </Alert>
       )}
-      {lockout && (
-        <Alert variant="destructive" role="alert">
-          <AlertDescription>{lockout.reason}</AlertDescription>
-        </Alert>
-      )}
       {failure && (
         <Alert variant="destructive" role="alert">
           <AlertDescription>{failure.message}</AlertDescription>
@@ -242,11 +210,7 @@ export function DevicePanel({
           <AlertDescription>{snapshot.connection.error}</AlertDescription>
         </Alert>
       )}
-      {telemetry?.state === "Alarm" && telemetry.alarm != null && (
-        <Alert variant="destructive" role="alert">
-          <AlertDescription>Machine alarm {telemetry.alarm}</AlertDescription>
-        </Alert>
-      )}
+      <MachineDiagnosis />
       <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(320px,1fr)]">
         <div className="flex min-w-0 flex-col gap-4">
           <DeviceStatusCard

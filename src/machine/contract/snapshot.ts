@@ -72,6 +72,8 @@ export const AVAILABILITY_KEYS = [
   "readConfiguration",
   "writeConfiguration",
   "readHeightMap",
+  /** The machine's switches, as diagnosis inspects them. */
+  "readSwitches",
   "stop",
   "reset",
   /** A line typed in the console. */
@@ -96,6 +98,7 @@ export const ActivityKindSchema = z.enum([
   "anchors",
   "heightMap",
   "configuration",
+  "inspection",
   "run",
 ])
 export const ActivitySchema = z.object({

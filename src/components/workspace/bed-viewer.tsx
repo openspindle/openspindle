@@ -150,10 +150,6 @@ export function BedViewer({
       },
       (id) => models.mesh(id)
     )
-    if (!scene) {
-      setError("3D view unavailable.")
-      return
-    }
     sceneRef.current = scene
     return () => {
       scene.dispose()

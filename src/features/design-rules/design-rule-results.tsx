@@ -1,11 +1,5 @@
 import { Fragment } from "react"
 import { CircleAlert, RefreshCw, TriangleAlert, X } from "lucide-react"
-import {
-  Alert,
-  AlertAction,
-  AlertDescription,
-  AlertTitle,
-} from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -16,6 +10,13 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import {
+  Item,
+  ItemActions,
+  ItemContent,
+  ItemMedia,
+  ItemTitle,
+} from "@/components/ui/item"
 import { Toggle } from "@/components/ui/toggle"
 import { ProblemText } from "@/components/workspace/problem-text"
 import {
@@ -132,11 +133,14 @@ export function DesignRuleResults() {
           const shown = isFocused(focus, plateId, key)
           const { fix } = violation
           return (
-            <Alert key={key} variant={error ? "warning" : "default"}>
-              <Icon />
-              <AlertTitle>{violation.label}</AlertTitle>
-              <AlertDescription>
+            <Item key={key} variant="muted" size="sm" className="items-start">
+              <ItemMedia variant="icon" className="translate-y-0.5 self-start">
+                <Icon className={error ? "text-destructive" : "text-warning"} />
+              </ItemMedia>
+              <ItemContent>
+                <ItemTitle>{violation.label}</ItemTitle>
                 <ProblemText
+                  className="text-muted-foreground"
                   problem={violation.message}
                   suggestion={violation.suggestion}
                   action={
@@ -156,8 +160,8 @@ export function DesignRuleResults() {
                     )
                   }
                 />
-              </AlertDescription>
-              <AlertAction>
+              </ItemContent>
+              <ItemActions className="self-start">
                 <Toggle
                   size="sm"
                   aria-label={`Show ${violation.label} in the 3D view`}
@@ -173,8 +177,8 @@ export function DesignRuleResults() {
                 >
                   Show
                 </Toggle>
-              </AlertAction>
-            </Alert>
+              </ItemActions>
+            </Item>
           )
         })}
         {notes.map((note) => (

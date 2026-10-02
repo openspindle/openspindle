@@ -7,6 +7,7 @@ import type {
   ControlLimits,
   FirmwareRules,
   HeightMap,
+  SwitchReport,
   Identity,
   JobFault,
   JobMeasurement,
@@ -84,6 +85,8 @@ export type FirmwareDiagnostics = Pick<
   | "beepOn"
   | "vacuumOn"
   | "vacuumPower"
+  | "spindleAirOn"
+  | "spindleAirPower"
   | "estop"
 >
 
@@ -310,6 +313,9 @@ export interface FirmwareAdapter {
     cameraPicture: (content: string) => PictureSize | null
     /** Throws for a size the camera has not. */
     withCameraPicture: (content: string, picture: PictureSize) => string
+    /** The firmware's own light timer in minutes when it switches a dimmed light off; 0 when not. */
+    dimmingLightTimer: (content: string) => number
+    withLightTimer: (content: string, minutes: number) => string
     readonly afterRestart: boolean
   }
   /**
@@ -375,6 +381,13 @@ export interface FirmwareAdapter {
   readonly heightMap: {
     readonly query: OutboundFrame
     parse: (raw: string, receivedAt: number, deviceId: string) => HeightMap
+  }
+  /** Reads the machine's switches, as diagnosis inspects them; absent when it does not report them. */
+  readonly switches?: {
+    readonly query: OutboundFrame
+    admit: (telemetry: Telemetry) => string | null
+    /** What a line reports of the switches; null for unrelated text. */
+    parse: (text: string) => Omit<SwitchReport, "at"> | null
   }
   cameraUrl: (device: ConnectedDevice) => string | null
 }

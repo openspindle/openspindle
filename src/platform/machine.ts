@@ -205,6 +205,10 @@ export const useReadHeightMap = () =>
   useMachineMutation("readHeightMap", (machine, _: void) =>
     machine.readHeightMap()
   )
+export const useReadSwitches = () =>
+  useMachineMutation("readSwitches", (machine, _: void) =>
+    machine.readSwitches()
+  )
 /** Share successful configuration reads and writes only with the connection they came from. */
 function storeConfiguration(client: QueryClient, next: FirmwareConfiguration) {
   client.setQueryData<FirmwareConfiguration>(

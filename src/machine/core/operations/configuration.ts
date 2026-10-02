@@ -131,6 +131,7 @@ async function downloadConfiguration(
     content,
     vacuumDefaultPower: configuration.vacuumDefaultPower(content),
     cameraPicture: configuration.cameraPicture(content),
+    dimmingLightTimer: configuration.dimmingLightTimer(content),
     revision,
     connectionId: hooks.connectionId,
     fetchedAt: context.clock.now(),
@@ -183,10 +184,15 @@ export async function writeFirmwareConfiguration(
               current.content,
               request.vacuumDefaultPower
             )
-          : configuration.withCameraPicture(
-              current.content,
-              request.cameraPicture
-            )
+          : "cameraPicture" in request
+            ? configuration.withCameraPicture(
+                current.content,
+                request.cameraPicture
+              )
+            : configuration.withLightTimer(
+                current.content,
+                request.lightTimerMinutes
+              )
     } catch (error) {
       throw new MachineError(
         "refused",
@@ -223,6 +229,7 @@ export async function writeFirmwareConfiguration(
     content,
     vacuumDefaultPower: configuration.vacuumDefaultPower(content),
     cameraPicture: configuration.cameraPicture(content),
+    dimmingLightTimer: configuration.dimmingLightTimer(content),
     revision,
     fetchedAt: context.clock.now(),
   }
