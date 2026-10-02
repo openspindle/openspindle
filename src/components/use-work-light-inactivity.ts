@@ -1,7 +1,11 @@
 import { useEffect, useEffectEvent, useRef, useState } from "react"
 import { toast } from "sonner"
 import { TELEMETRY_FRESH_MS, isFresh, isJobActive } from "@/machine/contract"
-import { useMachineSnapshot, useWorkLightIdleOff } from "@/platform/machine"
+import {
+  machineErrorCode,
+  useMachineSnapshot,
+  useWorkLightIdleOff,
+} from "@/platform/machine"
 import { useWorkLightPreferences } from "./work-light-preferences"
 
 type IdleCycle = {
@@ -123,6 +127,12 @@ export function useWorkLightInactivity() {
       {
         onError: (failure) => {
           if (controller.signal.aborted) return
+          // Refused while another operation ran: the light goes off once that has ended.
+          if (machineErrorCode(failure) === "busy") {
+            if (cycle.current.generation === generation)
+              cycle.current.attempted = false
+            return
+          }
           if (cycle.current.generation === generation) setError(failure)
           toast.error("Work light could not be turned off", {
             description: failure.message,

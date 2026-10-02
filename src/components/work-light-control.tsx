@@ -8,7 +8,11 @@ import {
 import type { ReactNode } from "react"
 import { toast } from "sonner"
 import { isFresh } from "@/machine/contract"
-import { useMachineCommand, useMachineSnapshot } from "@/platform/machine"
+import {
+  machineErrorCode,
+  useMachineCommand,
+  useMachineSnapshot,
+} from "@/platform/machine"
 import { useAppearance } from "./appearance-provider"
 import { useWorkLightInactivity } from "./use-work-light-inactivity"
 import { useWorkLightPreferences } from "./work-light-preferences"
@@ -21,7 +25,11 @@ type WorkLightControl = {
 
 const WorkLightContext = createContext<WorkLightControl | null>(null)
 
-/** Applies the latest preference once it is safe, without retrying failed commands. */
+/**
+ * Applies the latest preference once it is safe, without retrying failed commands; one the
+ * controller refused because another operation was running (such as reading the configuration
+ * on connecting) is applied again once that has ended.
+ */
 export function WorkLightControlProvider({
   children,
 }: {
@@ -60,10 +68,15 @@ export function WorkLightControlProvider({
       mutate(
         { type: "lightBrightness", connectionId, percent, onlyIfOn },
         {
-          onError: (failure) =>
+          onError: (failure) => {
+            if (machineErrorCode(failure) === "busy") {
+              attempted.current = null
+              return
+            }
             toast.error("Work light brightness could not be applied", {
               description: failure.message,
-            }),
+            })
+          },
           onSettled: () => {
             inFlight.current = false
           },
@@ -88,7 +101,8 @@ export function WorkLightControlProvider({
   const turnOn = useCallback(() => apply(false), [apply])
   const currentError =
     variables?.type === "lightBrightness" &&
-    variables.connectionId === connectionId
+    variables.connectionId === connectionId &&
+    machineErrorCode(error) !== "busy"
       ? error
       : null
 
