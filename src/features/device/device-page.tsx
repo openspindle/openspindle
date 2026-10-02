@@ -223,6 +223,7 @@ export function DevicePage() {
                 fixtures.setDefinitions(bedSetup.id, definitions)
               }
               selectedId={selectedId}
+              bedSetupId={bedSetup.id}
             />
           </>
         }

@@ -12,65 +12,22 @@ import {
   ItemGroup,
   ItemTitle,
 } from "@/components/ui/item"
-import { Skeleton } from "@/components/ui/skeleton"
 import {
   useWorkspace,
   useWorkspaceStore,
 } from "@/app/workspace/workspace-context"
 import { isBedKind } from "@/domain/fixtures/definitions"
-import type {
-  FixtureDefinition,
-  FixtureModel,
-} from "@/domain/fixtures/definitions"
+import type { FixtureDefinition } from "@/domain/fixtures/definitions"
 import { plateLabel } from "@/domain/plate/plate"
 import type { Plate } from "@/domain/plate/plate"
 import { AppDialog } from "@/features/shell/app-dialog"
 import { usePrepareSelection } from "../plate-tree/use-prepare-selection"
-import { FIXTURE_ICONS } from "./fixture-icon"
-import { useFixtureThumbnail } from "./fixture-thumbnails"
+import { FixturePicture, modelSize } from "./fixture-picture"
 import {
   FIXTURE_KIND_GROUPS,
   addFixtureToPlate,
   usePlateBedSetup,
 } from "./plate-fixtures"
-
-/** A model's box as width × depth × height, in millimetres. */
-function modelSize({ bounds: { min, max } }: FixtureModel) {
-  return max
-    .map((value, axis) =>
-      (value - min[axis]).toLocaleString("en-US", {
-        useGrouping: false,
-        maximumFractionDigits: 1,
-      })
-    )
-    .join(" × ")
-}
-
-/** The fixture's model as a picture, its kind's icon without one, a placeholder while drawn. */
-function FixturePicture({ definition }: { definition: FixtureDefinition }) {
-  return (
-    <div className="grid aspect-[4/3] w-full place-items-center overflow-hidden rounded-sm bg-muted/40">
-      <PictureContent definition={definition} />
-    </div>
-  )
-}
-
-function PictureContent({ definition }: { definition: FixtureDefinition }) {
-  const picture = useFixtureThumbnail(definition)
-  if (picture === undefined) return <Skeleton className="size-full" />
-  if (picture === null) {
-    const Icon = FIXTURE_ICONS[definition.kind]
-    return <Icon className="size-8 text-muted-foreground" aria-hidden />
-  }
-  return (
-    <img
-      className="size-full object-contain"
-      src={picture}
-      alt=""
-      draggable={false}
-    />
-  )
-}
 
 /** A fixture to add, as a card with its picture: its name, its size and how many the plate has. */
 function FixtureChoice({

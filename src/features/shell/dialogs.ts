@@ -7,7 +7,8 @@ import type { SettingsSection } from "@/features/settings/settings-dialog"
 export type WorkspaceDialog =
   | { readonly kind: "device" }
   | { readonly kind: "device-configuration" }
-  | { readonly kind: "models" }
+  /** The Models library; closing it goes back to the dialog it opened from. */
+  | { readonly kind: "models"; readonly back?: WorkspaceDialog }
   | { readonly kind: "height-map" }
   | { readonly kind: "fusion" }
   | {
@@ -16,6 +17,13 @@ export type WorkspaceDialog =
       readonly returnToFusion: boolean
     }
   | { readonly kind: "stock"; readonly plateId: string }
+  /** A fixture definition of a bed setup of the device profile the Device tab shows, edited. */
+  | {
+      readonly kind: "fixture-definition"
+      readonly profileId: string
+      readonly bedSetupId: string
+      readonly definitionId: string
+    }
   /** A fixture of the plate's bed setup to add to it, chosen by its picture. */
   | { readonly kind: "add-fixture"; readonly plateId: string }
   | {

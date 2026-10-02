@@ -4,6 +4,7 @@ import { FusionSource } from "@/features/fusion360/fusion-source"
 import { FusionPairingDialog } from "@/features/fusion360/fusion-pairing-dialog"
 import { useFusionPairing } from "@/features/fusion360/use-fusion-pairing"
 import { useFusionSync } from "@/platform/fusion"
+import { FixtureDefinitionDialog } from "@/features/device/fixture-definition-dialog"
 import { HeightMapDialog } from "@/features/device/height-map-dialog"
 import { GCodeGlossaryDialog } from "@/features/glossary/gcode-glossary-dialog"
 import { ModelsDialog } from "@/features/models/models-dialog"
@@ -48,8 +49,16 @@ function OpenDialog({ dialog }: { dialog: WorkspaceDialog }) {
           <DevicePicker close={closeDialog} />
         </AppDialog>
       )
-    case "models":
-      return <ModelsDialog onClose={closeDialog} />
+    case "models": {
+      const { back } = dialog
+      return (
+        <ModelsDialog
+          onClose={() => (back ? openDialog(back) : closeDialog())}
+        />
+      )
+    }
+    case "fixture-definition":
+      return <FixtureDefinitionDialog dialog={dialog} onClose={closeDialog} />
     case "device-configuration":
       return <DeviceConfigurationDialog onClose={closeDialog} />
     case "height-map":
