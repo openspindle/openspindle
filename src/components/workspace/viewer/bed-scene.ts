@@ -4,12 +4,12 @@ import { bloom } from "three/addons/tsl/display/BloomNode.js"
 import { max as largest, mrt, output, pass, vec4 } from "three/tsl"
 import { BlendMode, RenderPipeline } from "three/webgpu"
 import type { PassNode } from "three/webgpu"
+import type { PlaybackFrame } from "@/app/job/frame"
 import { kitForSetup } from "@/domain/fixtures/catalog"
 import { pictureFov } from "@/domain/fixtures/fixture-kit"
 import type { MachineCamera } from "@/domain/fixtures/fixture-kit"
 import type { Point3 } from "@/domain/nc/gcode"
 import type {
-  ShownPlayhead,
   ViewerPlate,
   ViewerProblem,
   ViewerProblemRef,
@@ -29,7 +29,6 @@ import { PlateView, bedGrid } from "./plate-view"
 import type { PlatePresentation, PlateViewContext } from "./plate-view"
 import { CLICK_TOLERANCE, SetupArranger } from "./setup-arranger"
 import type { ArrangeEvents, ArrangeLabel, ArrangeView } from "./setup-arranger"
-import { along } from "./toolpath-view"
 import { GLOW } from "./touch-marker"
 import { ViewerAssets } from "./viewer-assets"
 import type { ModelMeshes } from "./viewer-assets"
@@ -49,9 +48,6 @@ export type ViewerPresentation = {
   hiddenLineRanges?: Readonly<Record<string, readonly LineRange[]>>
   /** Fixtures each plate leaves out of the view (their ids), by plate id. */
   hiddenFixtures?: Readonly<Record<string, readonly string[]>>
-  previewLine?: number | null
-  previewProbePoint?: number | null
-  progress: number
   showRapids: boolean
   showStock: boolean
   /** Problems to mark where they are on their plates' beds, and the one shown. */
@@ -171,10 +167,10 @@ export class BedScene {
   private readonly views = new Map<string, PlateView>()
   private plates: readonly ViewerPlate[] = []
   private layout = layoutPlates([], this.emptyBed)
-  private playhead: ShownPlayhead | null = null
+  /** The frame of playback the selected plate is drawn at; null for its whole program. */
+  private playback: PlaybackFrame | null = null
   private presentation: ViewerPresentation = {
     selectedPlateId: null,
-    progress: 100,
     showRapids: false,
     showStock: true,
   }
@@ -360,11 +356,11 @@ export class BedScene {
   }
 
   /**
-   * Where simulated playback is along the selected plate's moves: it moves every frame, and only
-   * that plate's path follows.
+   * The frame of playback the selected plate is drawn at, which changes every frame while a plan
+   * plays or a job is followed: only that plate's path follows. Null shows its whole program.
    */
-  setPlayhead(playhead: ShownPlayhead | null) {
-    this.playhead = playhead
+  setFrame(frame: PlaybackFrame | null) {
+    this.playback = frame
     this.present(this.presentation)
   }
 
@@ -405,9 +401,9 @@ export class BedScene {
 
   /**
    * Puts the lens where the machine's camera is. Fixed to the frame, the camera sees the bed move
-   * along Y under the spindle, so it is level with the tool: where the playhead has it on the
-   * selected plate, else where the machine reports it, else where it last was (at first, over
-   * the middle of the plates' beds).
+   * along Y under the spindle, so it is level with the tool: where the frame of playback has it
+   * on the selected plate, else where the machine reports it, else where it last was (at first,
+   * over the middle of the plates' beds).
    */
   private placeLens() {
     const camera = this.machineCamera
@@ -428,16 +424,16 @@ export class BedScene {
     this.stage.invalidate()
   }
 
-  /** Where the tool is along a plate's bed's Y: at the playhead, else where the machine reports it. */
+  /**
+   * Where the tool is along a plate's bed's Y: where the frame of playback has its tip, else where
+   * the machine reports it.
+   */
   private toolY(plateId: string | null): number | null {
     const plate = this.plates.find(({ id }) => id === plateId)
     if (!plate) return null
-    const { playhead } = this
-    if (playhead?.tip) return playhead.tip[1] + plate.workOrigin[1]
-    const segment =
-      playhead && plate.machineProgram.segments.at(playhead.segment)
-    if (playhead && segment)
-      return along(segment, playhead.fraction)[1] + plate.workOrigin[1]
+    const frame = this.playback
+    if (frame?.index.plan.program === plate.machineProgram)
+      return frame.tip[1] + plate.workOrigin[1]
     const { liveTool } = this.presentation
     return liveTool?.plateId === plateId ? liveTool.position[1] : null
   }
@@ -531,21 +527,15 @@ export class BedScene {
         showStock,
         ranges: NO_RANGES,
         hidden,
-        progress: 100,
         ...marked,
       }
-    const { progress, previewLine, previewProbePoint } = this.presentation
-    const { playhead } = this
     return {
       active: true,
       showRapids,
       showStock,
       ranges: selectedLineRanges ?? NO_RANGES,
       hidden,
-      progress,
-      previewLine,
-      previewProbePoint,
-      playhead,
+      frame: this.playback,
       ...marked,
     }
   }

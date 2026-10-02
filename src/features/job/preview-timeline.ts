@@ -9,7 +9,6 @@ import { positionLabel } from "./job-view"
 
 export type PreviewStep = {
   line: number
-  segmentEnd: number
   probePoint?: number
 }
 export type PreviewTick = {
@@ -127,28 +126,22 @@ function timelineOf(
     if (point.reason === "stop-before") mark(point.line, STOP_BEFORE)
   const steps: PreviewStep[] = []
   const ticks: PreviewTick[] = []
-  let segmentEnd = 0
   for (let index = 0; index < program.lines.length; index++) {
     const line = index + 1
     const block = blocks[index]
     if (!executable(block)) continue
-    while (
-      segmentEnd < program.segments.length &&
-      program.segments[segmentEnd].line <= line
-    )
-      segmentEnd++
     const step = steps.length + 1
     const grid = grids.get(line)
     if (grid) {
       for (let point = 0; point < grid.samples.length; point++)
-        steps.push({ line, segmentEnd, probePoint: point })
+        steps.push({ line, probePoint: point })
       ticks.push({
         step,
         line,
         kind: "probe",
         label: `Probe grid · ${grid.samples.length} points`,
       })
-    } else steps.push({ line, segmentEnd })
+    } else steps.push({ line })
     for (const item of marks.get(line) ?? [])
       if (item.kind !== "probe" || !grid) ticks.push({ step, line, ...item })
     if (block.message !== null) continue
@@ -174,31 +167,10 @@ function timelineOf(
   return { steps, ticks, probePoints: probing.pointCount }
 }
 
-export function previewAt(
-  timeline: PreviewTimeline,
-  cursor: number,
-  program: GCodeProgram
+export function stepForLine(
+  timeline: Pick<PreviewTimeline, "steps">,
+  line: number
 ) {
-  const index = Math.max(
-    0,
-    Math.min(
-      timeline.steps.length,
-      Number.isNaN(cursor) ? 0 : Math.floor(cursor)
-    )
-  )
-  const step = index > 0 ? timeline.steps.at(index - 1) : undefined
-  // Programs without segments are either not started (0) or fully shown (100).
-  let segmentProgress = index > 0 ? 100 : 0
-  if (program.segments.length)
-    segmentProgress = (100 * (step?.segmentEnd ?? 0)) / program.segments.length
-  return {
-    line: step?.line ?? 0,
-    probePoint: step?.probePoint,
-    segmentProgress,
-  }
-}
-
-export function stepForLine(timeline: PreviewTimeline, line: number) {
   if (line <= 0 || Number.isNaN(line)) return 0
   let low = 0,
     high = timeline.steps.length
@@ -212,7 +184,7 @@ export function stepForLine(timeline: PreviewTimeline, line: number) {
 
 /** The step that shows a move: its line's, or on a probe grid's line, its sample's. */
 export function stepForMove(
-  timeline: PreviewTimeline,
+  timeline: Pick<PreviewTimeline, "steps">,
   { line, probePoint = 0 }: Pick<GCodeSegment, "line" | "probePoint">
 ) {
   let step = stepForLine(timeline, line)

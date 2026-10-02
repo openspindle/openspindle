@@ -107,60 +107,6 @@ function segmentsThroughLine(program: GCodeProgram, line: number) {
   return firstSegment(program, (value) => !(value <= line))
 }
 
-/**
- * Segments through the touch of a probe grid's sample on its line, so the probe shows where it
- * probes; null when no probing move belongs to that sample.
- */
-function segmentsThroughProbePoint(
-  program: GCodeProgram,
-  line: number,
-  probePoint: number
-) {
-  const { segments } = program
-  let end: number | null = null
-  for (
-    let index = firstSegment(program, (value) => value >= line);
-    index < segments.length && segments[index].line === line;
-    index++
-  ) {
-    // Moves before the grid's own, such as changing to the probe, come with its first sample.
-    const point = segments[index].probePoint ?? 0
-    if (point > probePoint) break
-    if (point === probePoint && segments[index].probing) end = index + 1
-  }
-  return end
-}
-
-/**
- * Revealed segment count; a preview line takes precedence over percentage progress, and on a
- * probe grid's line its sample does.
- */
-export function revealedSegments(
-  program: GCodeProgram,
-  progress: number,
-  previewLine?: number | null,
-  previewProbePoint?: number | null
-) {
-  if (previewLine !== undefined && previewLine !== null) {
-    if (
-      previewProbePoint !== undefined &&
-      previewProbePoint !== null &&
-      Number.isFinite(previewProbePoint)
-    ) {
-      const probed = segmentsThroughProbePoint(
-        program,
-        previewLine,
-        Math.floor(previewProbePoint)
-      )
-      if (probed !== null) return probed
-    }
-    return segmentsThroughLine(program, previewLine)
-  }
-  const total = program.segments.length
-  const percent = Number.isFinite(progress) ? progress : 0
-  return Math.min(total, Math.max(0, Math.ceil((total * percent) / 100)))
-}
-
 /** Inclusive source ranges as ascending, disjoint segment windows. */
 export function segmentWindows(
   program: GCodeProgram,

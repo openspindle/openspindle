@@ -151,16 +151,8 @@ const PRESENTATION_EQUALITY: FieldEquality<PlatePresentation> = {
   showRapids: Object.is,
   ranges: sameRanges,
   hidden: sameRanges,
-  progress: Object.is,
-  previewLine: Object.is,
-  previewProbePoint: Object.is,
-  playhead: (a, b) =>
-    a === b ||
-    (!!a &&
-      !!b &&
-      a.segment === b.segment &&
-      a.fraction === b.fraction &&
-      a.tip === b.tip),
+  // A frame is set once for each frame of playback, and only when it shows something new.
+  frame: Object.is,
   problems: sameProblems,
   shownProblem: Object.is,
   machineOrigin: (a, b) =>

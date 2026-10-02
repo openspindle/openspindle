@@ -1,12 +1,9 @@
 import * as THREE from "three"
 import type { ToolShape } from "@/domain/tools/tool-shape"
+import type { PlaybackFrame } from "@/app/job/frame"
 import type { GCodeProgram, GCodeSegment, Point3 } from "@/domain/nc/gcode"
-import type { Playhead } from "@/domain/nc/move-times"
 import { isProbeSlot } from "@/domain/tools/tool-table"
-import type {
-  ShownPlayhead,
-  ViewerToolRun,
-} from "@/components/workspace/viewer/viewer-input"
+import type { ViewerToolRun } from "@/components/workspace/viewer/viewer-input"
 import { disposeObjects } from "@/lib/three-assets"
 import { TOOL_MARKER_LENGTH } from "../bed-viewer-layout"
 import type { LineRange } from "../bed-viewer-layout"
@@ -124,22 +121,12 @@ export function moveTools(
   return { looks, implicitMoves }
 }
 
-/** The number on the plate of the tool making move `index`; null for the implicit tool. */
-export const toolOfMove = (
-  program: GCodeProgram,
-  tools: MoveTools,
-  index: number
-) =>
-  index < tools.implicitMoves
-    ? null
-    : (program.segments.at(index)?.tool ?? null)
-
 /**
- * One plate's toolpath, drawn from the plate's work origin. Each motion's vertices upload
- * once and stay on the GPU: playback and hidden ranges only regroup what is drawn, a
- * selection change only regroups the overlay, and a new work origin only moves the group. Playback shows the
- * tool that makes the revealed segment: its 3D model once that has loaded, else as its
- * shape describes it.
+ * One plate's toolpath, drawn from the plate's work origin at a frame of playback. Each motion's
+ * vertices upload once and stay on the GPU: playback and hidden ranges only regroup what is
+ * drawn, a selection change only regroups the overlay, and a new work origin only moves the
+ * group. A frame shows the tool it names, making the move under way: its 3D model once that has
+ * loaded, else as its shape describes it.
  */
 export class ToolpathView {
   readonly group = new THREE.Group()
@@ -166,8 +153,6 @@ export class ToolpathView {
     THREE.BufferGeometry,
     THREE.LineBasicMaterial
   >
-  /** For each move, the first from it on that a probe makes into a touch; -1 for none. */
-  private readonly touches: Int32Array
   /** Where the probe is going to touch, while the tool shows. */
   private readonly touch: TouchMarker | null
   /** The moves the tool makes next, while playback follows them. */
@@ -182,8 +167,17 @@ export class ToolpathView {
   /** The tip and probing move the marker was last projected for: it stays while they do. */
   private projected = ""
   private shownTool: THREE.Object3D | null = null
-  /** What `showTool` was last asked to show, to show again once a model arrives. */
-  private shown: Parameters<ToolpathView["showTool"]> = [null]
+  /** The frame the tool was last shown at, to show again once a model arrives. */
+  private shown: PlaybackFrame | null = null
+  /**
+   * How many segments were last revealed, with which motions drawn, and whether a selected one
+   * showed: revealing again regroups every motion's buffers, so it waits for these to change.
+   */
+  private revealed: {
+    readonly count: number
+    readonly showRapids: boolean
+    readonly selectionShown: boolean
+  } | null = null
   private disposed = false
   private ranges: readonly LineRange[] = []
   /** The selected windows that no hidden range covers. */
@@ -204,16 +198,12 @@ export class ToolpathView {
     this.models = models
     this.collide = collide
     this.buffers = toolpathBuffers(program)
-    this.touches = new Int32Array(program.segments.length)
-    let next = -1
-    for (let index = program.segments.length - 1; index >= 0; index--) {
-      const segment = program.segments[index]
-      if (segment.probing && isProbeSlot(segment.tool)) next = index
-      this.touches[index] = next
-    }
     this.ahead = new PathAhead(palette.pathAhead)
     // Only a program a probe touches in gets the marker, and with it its light.
-    this.touch = next < 0 ? null : new TouchMarker(palette.nextTouch)
+    const touches = program.segments.some(
+      (segment) => segment.probing && isProbeSlot(segment.tool)
+    )
+    this.touch = touches ? new TouchMarker(palette.nextTouch) : null
     this.materials = {
       cut: pathMaterial(palette.primary),
       rapid: pathMaterial(palette.rapid),
@@ -298,8 +288,8 @@ export class ToolpathView {
       this.path.add(model)
       this.meshModels.set(url, model)
       // The tool on show may be the one that arrived.
-      if (this.shown[0] === null) return
-      this.showTool(...this.shown)
+      if (!this.shown) return
+      this.showTool(this.shown)
       this.models.invalidate()
     })
     return null
@@ -351,6 +341,7 @@ export class ToolpathView {
     this.hiddenRanges = ranges
     this.hidden = segmentWindows(this.program, ranges)
     this.regroupSelection()
+    this.revealed = null
   }
 
   /** Regroups the selection overlay when the selected source ranges change. */
@@ -358,6 +349,30 @@ export class ToolpathView {
     if (sameRanges(ranges, this.ranges)) return
     this.ranges = ranges
     this.regroupSelection()
+    this.revealed = null
+  }
+
+  /**
+   * Draws a frame of a plan of this program: the segments before it made, the move under way up
+   * to the tool, the tool, where the probe touches next and the moves ahead. Null, or a frame of
+   * another program's plan, shows the whole program and no tool. Rapids show only with
+   * `showRapids`. Returns whether a selected segment shows.
+   */
+  apply(frame: PlaybackFrame | null, showRapids: boolean) {
+    const own = frame?.index.plan.program === this.program ? frame : null
+    const count = own ? own.revealed : this.program.segments.length
+    const { revealed } = this
+    const selectionShown =
+      revealed?.count === count && revealed.showRapids === showRapids
+        ? revealed.selectionShown
+        : this.reveal(count, showRapids)
+    this.revealed = { count, showRapids, selectionShown }
+    this.showMove(own, showRapids)
+    // The moves ahead and the next touch go from the tool as it is drawn.
+    this.showTool(own)
+    this.showAhead(own)
+    this.showTouch(own)
+    return selectionShown
   }
 
   private regroupSelection() {
@@ -382,7 +397,7 @@ export class ToolpathView {
    * Shows the first `count` program segments, the rapids only with `showRapids`; reports
    * whether a selected one shows.
    */
-  reveal(count: number, showRapids: boolean) {
+  private reveal(count: number, showRapids: boolean) {
     const drawn = (motion: Motion) => motion !== "rapid" || showRapids
     const shown = this.shownWindows(0, count)
     for (const { motion, base, selected } of this.layers) {
@@ -419,58 +434,58 @@ export class ToolpathView {
     this.materials.rapid.opacity = dimmed ? 0.12 : 0.55
   }
 
-  /** Draws the move under way up to where simulated playback has the tool; null hides it. */
-  showMove(playhead: Playhead | null, showRapids: boolean) {
-    const segment = playhead && this.program.segments.at(playhead.segment)
+  /**
+   * Draws the move under way, while the frame has one it does not draw made, up to where it has
+   * the tool along it; else hides it.
+   */
+  private showMove(frame: PlaybackFrame | null, showRapids: boolean) {
+    const segment =
+      frame && frame.move >= frame.revealed
+        ? this.program.segments.at(frame.move)
+        : undefined
     const motion = segment ? motionOf(segment) : null
-    if (!playhead || !segment || (motion === "rapid" && !showRapids)) {
+    if (!frame || !segment || (motion === "rapid" && !showRapids)) {
       this.move.visible = false
       return
     }
     const position = this.move.geometry.getAttribute("position")
     position.setXYZ(0, ...segment.start)
-    position.setXYZ(1, ...along(segment, playhead.fraction))
+    position.setXYZ(1, ...along(segment, frame.fraction))
     position.needsUpdate = true
     this.move.material = this.materials[motion ?? "cut"]
     this.move.visible = true
   }
 
   /**
-   * Shows the tool making the last of the first `count` segments with its tip at that segment's
-   * end, or, while playback simulates the moves, the tool making the move under way along it,
-   * or where the machine reported it; a null count hides it.
+   * Shows the tool the frame names with its tip where the frame has it: along the move under way,
+   * or where the machine reported it off the moves. Null hides it.
    */
-  showTool(count: number | null, playhead: ShownPlayhead | null = null) {
-    this.shown = [count, playhead]
+  private showTool(frame: PlaybackFrame | null) {
+    this.shown = frame
     if (this.shownTool) this.shownTool.visible = false
     this.shownTool = null
     this.tip = null
-    if (count === null) return
-    const index = playhead?.segment ?? Math.max(0, count - 1)
-    const current = this.program.segments.at(index)
-    if (!current) return
-    let position = count > 0 ? current.end : current.start
-    if (playhead) position = playhead.tip ?? along(current, playhead.fraction)
-    this.tip = { at: position, tool: current.tool }
-    const tool = toolOfMove(this.program, this.tools, index)
-    const look = this.tools.looks.get(tool)
+    const current = frame && this.program.segments.at(frame.move)
+    if (!frame || !current) return
+    this.tip = { at: frame.tip, tool: current.tool }
+    const look = this.tools.looks.get(frame.tool)
     // Before the first change, without an implicit tool, the spindle holds one the program does
     // not know: none shows.
-    if (tool === null && !look?.shape && !look?.model) return
-    this.placeTool(look ?? null, position)
+    if (frame.tool === null && !look?.shape && !look?.model) return
+    this.placeTool(look ?? null, frame.tip)
   }
 
   /**
-   * Marks what the probe is going to hit, for the first probing move a probe makes from move
-   * `from` on (the move under way, or the one after the tool on show). With a probe in the
-   * spindle it is projected from the tip along that move, onto what it meets, else onto the plane
-   * the move touches in; before, it is where that move touches. Null hides it.
+   * Marks what the probe is going to hit, for the frame's next touch: the first probing move a
+   * probe makes from the move under way on, or from the one after the tool on show. With a probe
+   * in the spindle it is projected from the tip along that move, onto what it meets, else onto
+   * the plane the move touches in; before, it is where that move touches. Null hides it.
    */
-  showTouch(from: number | null) {
+  private showTouch(frame: PlaybackFrame | null) {
     const { touch } = this
     if (!touch) return
-    const index = from === null ? -1 : (this.touches[from] ?? -1)
-    const segment = index < 0 ? null : this.program.segments[index]
+    const index = frame ? frame.nextTouch : -1
+    const segment = index < 0 ? null : this.program.segments.at(index)
     const { tip } = this
     if (!segment || !tip) {
       this.projected = ""
@@ -523,16 +538,14 @@ export class ToolpathView {
     }
   }
 
-  /**
-   * Shows the moves the tool makes next from where playback is, from the tool as `showTool`
-   * last drew it; null hides them.
-   */
-  showAhead(playhead: Playhead | null) {
-    this.ahead.show(
-      this.program.segments,
-      playhead,
-      playhead && this.tip ? this.tip.at : null
-    )
+  /** Shows the moves the frame has ahead of the tool, from the tool as it was just drawn. */
+  private showAhead(frame: PlaybackFrame | null) {
+    const { tip } = this
+    if (!frame || !tip || frame.aheadEnd <= frame.move) {
+      this.ahead.hide()
+      return
+    }
+    this.ahead.show(frame.index.plan, frame.move, frame.aheadEnd, tip.at)
   }
 
   /**
