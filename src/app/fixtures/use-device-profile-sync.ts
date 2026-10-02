@@ -2,17 +2,21 @@ import { useEffect, useEffectEvent } from "react"
 import { machineId } from "@/machine/contract"
 import { useDocumentState, usePersistence } from "@/persistence/persistence"
 import { useMachineSnapshot } from "@/platform/machine"
-import { followDeviceAnchors } from "../workspace/project-session"
+import {
+  followDeviceAnchors,
+  followDeviceBed,
+} from "../workspace/project-session"
 import { useWorkspace, useWorkspaceStore } from "../workspace/workspace-context"
 import { plateAnchors } from "@/domain/plate/bed-setup"
 import { useFixtureLibrary, useFixtureLibraryStore } from "./fixture-context"
-import { profileAnchors } from "./fixture-library-store"
+import { profileAnchors, profilePlacement } from "./fixture-library-store"
 
 /**
- * Follows the connected device: its fixture profile is created and selected, anchors read
- * from its configuration are recorded there (with the bed setups' anchors it stores, once its
- * profile has it store them), and every plate moves to it and follows them, as soon as they are
- * read and whenever a plate is opened or added while it is connected.
+ * Follows the connected device: its fixture profile is created and selected, and the empty plate
+ * a project starts with is set up on its bed at once (`followDeviceBed`). Anchors read from its
+ * configuration are recorded there (with the bed setups' anchors it stores, once its profile has
+ * it store them), and every plate moves to it and follows them, as soon as they are read and
+ * whenever a plate is opened or added while it is connected.
  * Runs once the fixture library is loaded, so nothing it records is replaced by hydration.
  */
 export function useDeviceProfileSync() {
@@ -51,6 +55,7 @@ export function useDeviceProfileSync() {
   const synchronize = useEffectEvent(() => {
     if (!device) return
     fixtures.adoptDevice(device)
+    followDeviceBed(workspace, profilePlacement(fixtures.state))
     if (!configuration) return
     fixtures.recordDeviceAnchors(device, configuration)
     const id = machineId(device)

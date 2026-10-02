@@ -3,7 +3,7 @@ import { libraryOf } from "@/domain/workspace/library"
 import type { WorkspaceState } from "@/domain/workspace/workspace"
 import type { Result } from "@/domain/primitives"
 import type { ProfileAnchors } from "@/app/fixtures/fixture-library-store"
-import { emptyPlate, newProject } from "./defaults"
+import { emptyPlate, isEmptyPlaceholder, newProject } from "./defaults"
 import type { PlatePlacement } from "./import-program"
 import type { WorkspaceStore } from "./store"
 
@@ -101,6 +101,49 @@ export function followDeviceAnchors(
     anchors,
     bedSetups,
     connected,
+  })
+  if (unchanged) markProjectSaved(workspace.state)
+}
+
+/**
+ * Sets the empty plate a project starts with up on a device's bed (`placement`: its default bed
+ * setup's fixtures and anchors) while it is still empty, without stock: the plate a program
+ * imported then replaces it with looks for the program's fixtures there. A plate with stock
+ * keeps its setup, as programs that replace it keep it.
+ */
+export function followDeviceBed(
+  workspace: WorkspaceStore,
+  placement: PlatePlacement
+) {
+  const behind = workspace.state.plates.filter(
+    (plate) =>
+      isEmptyPlaceholder(plate) &&
+      !plate.setup.stock &&
+      (plate.setup.deviceId !== placement.deviceId ||
+        plate.setup.bedSetupId !== placement.bedSetupId)
+  )
+  if (!behind.length) return
+  const unchanged = !hasUnsavedChanges(workspace.state)
+  workspace.dispatch({
+    type: "batch",
+    commands: behind.flatMap((plate) => [
+      // The device with its anchors at once: a plate's anchors are its device's.
+      {
+        type: "plate.setup" as const,
+        plateId: plate.id,
+        patch: {
+          deviceId: placement.deviceId ?? null,
+          anchors: placement.anchors ?? null,
+        },
+      },
+      {
+        type: "fixtures.useDefaults" as const,
+        plateId: plate.id,
+        fixtures: placement.fixtures,
+        anchors: placement.anchors ?? null,
+        bedSetupId: placement.bedSetupId ?? null,
+      },
+    ]),
   })
   if (unchanged) markProjectSaved(workspace.state)
 }
