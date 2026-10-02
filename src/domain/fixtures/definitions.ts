@@ -310,6 +310,25 @@ export function withBoxSize(model: FixtureModel, size: Point3): FixtureModel {
   return { ...model, bounds: { min, max } }
 }
 
+/** A box's eight corners. */
+export const boxCorners = ({ min, max }: FixtureBounds): Point3[] =>
+  [0, 1, 2, 3, 4, 5, 6, 7].map(
+    (corner) =>
+      [0, 1, 2].map((axis) =>
+        corner & (1 << axis) ? max[axis] : min[axis]
+      ) as Point3
+  )
+
+/** The box that holds the points, of which there is at least one. */
+export const pointsBounds = (points: readonly Point3[]): FixtureBounds => ({
+  min: [0, 1, 2].map((axis) =>
+    Math.min(...points.map((point) => point[axis]))
+  ) as Point3,
+  max: [0, 1, 2].map((axis) =>
+    Math.max(...points.map((point) => point[axis]))
+  ) as Point3,
+})
+
 /** The model's box where the fixture stands, enabled or not; null without a model. */
 function placedBounds(instance: FixtureInstance): FixtureBounds | null {
   if (!instance.definition.model) return null

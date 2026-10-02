@@ -1,4 +1,4 @@
-import type { FixtureModel } from "@/domain/fixtures/definitions"
+import type { FixtureBounds, FixtureModel } from "@/domain/fixtures/definitions"
 import type { Point3 } from "@/domain/nc/gcode"
 import { holePoints } from "@/domain/fixtures/mount-points"
 import type { HoleXY, MountPoint } from "@/domain/fixtures/mount-points"
@@ -12,6 +12,22 @@ const STEP_ORIGIN: HoleXY = [-32.5, -10]
 const SLOT_ENDS: readonly HoleXY[] = [
   [9.5, 10],
   [55.5, 10],
+]
+
+/**
+ * The plate as solid boxes in its frame, from its model: the pad 2 mm in from each edge, with
+ * the 6.5 mm slot through it from X −26.25 to 26.25, and the steps around it, from 1 mm up at
+ * the +X end and front and from 3.5 mm up at the −X end and back.
+ */
+const SOLIDS: readonly FixtureBounds[] = [
+  { min: [-30.5, -8, 0], max: [30.5, -3.25, 5] },
+  { min: [-30.5, 3.25, 0], max: [30.5, 8, 5] },
+  { min: [-30.5, -3.25, 0], max: [-26.25, 3.25, 5] },
+  { min: [26.25, -3.25, 0], max: [30.5, 3.25, 5] },
+  { min: [-32.5, -10, 1], max: [32.5, -8, 5] },
+  { min: [30.5, -8, 1], max: [32.5, 8, 5] },
+  { min: [-32.5, 8, 3.5], max: [32.5, 10, 5] },
+  { min: [-32.5, -8, 3.5], max: [-30.5, 8, 5] },
 ]
 
 /**
@@ -52,4 +68,8 @@ export class Z1TopClamp extends Fixture {
       position: [0, 8, 3.5],
     },
   ]
+
+  override get solids() {
+    return SOLIDS
+  }
 }

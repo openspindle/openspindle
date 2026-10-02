@@ -1,4 +1,5 @@
 import type {
+  FixtureBounds,
   FixtureDefinition,
   FixtureKind,
   FixtureModel,
@@ -36,6 +37,15 @@ export abstract class Fixture {
    * model, like its points. Null: as fixtures of its kind are drawn.
    */
   readonly finish: Omit<Finish, "color"> | null = null
+
+  /**
+   * The boxes it is solid in, in its model's frame, where its model's box also holds open space
+   * a probe reaches into, such as an L-bracket's open corner or a clamp's slot. Plates find them
+   * by the model, like its points. Null: its model's box.
+   */
+  get solids(): readonly FixtureBounds[] | null {
+    return null
+  }
 
   /** The definition a profile holds for it. */
   definition(): FixtureDefinition {

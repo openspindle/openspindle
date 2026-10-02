@@ -9,7 +9,14 @@ import type {
   FirmwareModel,
   FirmwareSetup,
 } from "../../firmware/firmware-model"
+import { standsUnder } from "../solids"
+import type { Solid } from "../solids"
 import { PROBE_TOOL } from "../../tools/tool-table"
+import { originStartOffset } from "../../probing/tasks/origin/plan"
+import type {
+  Probe3dCorner,
+  Probe3dRoutine,
+} from "../../probing/tasks/origin/params"
 import { ORIGIN_ROUTINE, distanceSigns, routineOf } from "./3d-probe/blocks"
 import { gridSamples } from "./wired-probe/grid"
 import { CLEARANCE_Z } from "./wired-probe/travel"
@@ -104,23 +111,65 @@ class Z1Frame {
     return tipMachineZ(z + this.setup.workOrigin[2])
   }
 
-  /** What a tool going straight down at `at` meets: the tool setter, the stock or its support. */
-  surface([x, y]: readonly number[]) {
+  /** The boxes a probe meets on the bed: the stock's, and where the fixtures are solid. */
+  private get boxes(): readonly Pick<Solid, "min" | "max">[] {
+    const { stock, solids } = this.setup
+    return stock ? [stock, ...solids] : solids
+  }
+
+  /** A point in the preview's coordinates on the bed. */
+  private onBed(point: readonly number[]): Point3 {
     const [ox, oy, oz] = this.setup.workOrigin
-    const [bedX, bedY] = [x + ox, y + oy]
+    return [point[0] + ox, point[1] + oy, (point[2] ?? Infinity) + oz]
+  }
+
+  /**
+   * What a tool going straight down at `at` meets: the tool setter, else the highest top under it
+   * of the stock, the fixtures and what carries the stock, but for boxes wholly above the tool. A
+   * tool already in a box meets its top, above the tool. Without a height, the highest top.
+   */
+  surface(at: readonly number[]) {
+    const [x, y] = at
+    const oz = this.setup.workOrigin[2]
     const [setterX, setterY] = this.fromAnchor(Z1.setter)
     if (Math.hypot(x - setterX, y - setterY) <= SETTER_RADIUS)
       return SETTER_TOP - oz
-    const { stock } = this.setup
-    if (
-      stock &&
-      bedX >= stock.min[0] &&
-      bedX <= stock.max[0] &&
-      bedY >= stock.min[1] &&
-      bedY <= stock.max[1]
-    )
-      return stock.max[2] - oz
-    return this.setup.supportZ - oz
+    const bed = this.onBed(at)
+    const tops = this.boxes
+      .filter((box) => standsUnder(box, bed) && box.min[2] < bed[2])
+      .map((box) => box.max[2])
+    return Math.max(this.setup.supportZ, ...tops) - oz
+  }
+
+  /**
+   * Where a ball of `radius` searching along X or Y by `distance` from `at` first comes to a side
+   * of the stock or a fixture beside it at its height: its centre the radius short of that side;
+   * null when it comes to none.
+   */
+  sideContact(
+    at: Point3,
+    axis: 0 | 1,
+    distance: number,
+    radius: number
+  ): number | null {
+    const bed = this.onBed(at)
+    const across = axis === 0 ? 1 : 0
+    const direction = Math.sign(distance)
+    const contacts = this.boxes.flatMap((box) => {
+      const beside =
+        bed[across] >= box.min[across] &&
+        bed[across] <= box.max[across] &&
+        bed[2] > box.min[2] &&
+        bed[2] < box.max[2]
+      const contact =
+        (direction > 0 ? box.min[axis] : box.max[axis]) - direction * radius
+      const travel = (contact - bed[axis]) * direction
+      return beside && travel >= 0 && travel <= Math.abs(distance)
+        ? [travel]
+        : []
+    })
+    if (!contacts.length) return null
+    return at[axis] + direction * Math.min(...contacts)
   }
 }
 
@@ -173,7 +222,7 @@ class Z1Preview implements GCodeFirmware {
     const g = (code: number) => block.gCodes.includes(code)
     if (block.mCodes.includes(6)) return this.change(block, moves)
     if (block.mCodes.includes(495)) return this.automation(block, moves)
-    if (block.mCodes.some(runsOrigin)) return this.originProbing(block, moves)
+    if (block.mCodes.some(runsOrigin)) return this.originProbing(block)
     if (g(53)) return this.machineMove(block, moves)
     if (g(32)) return this.grid(block, moves) ? { moves: moves.list } : null
     if (block.gCodes.some((code) => code > 38 && code < 39))
@@ -211,18 +260,19 @@ class Z1Preview implements GCodeFirmware {
 
   /**
    * A G38 search from where the tool is: X, Y and Z are distances, in millimetres whatever the
-   * units (ZProbe::probe_XYZ). Straight down it stops where it touches.
+   * units (ZProbe::probe_XYZ). Straight down it stops where it touches. Whether it searched: in
+   * what it would touch already, the firmware halts instead.
    */
-  private search(moves: Moves, delta: Point3, style: Style) {
+  private search(moves: Moves, delta: Point3, style: Style): boolean {
     const [x, y, z] = moves.at
     const end: Point3 = [x + delta[0], y + delta[1], z + delta[2]]
     if (!delta[0] && !delta[1] && delta[2] < 0) {
       const surface = this.frame.surface(moves.at)
-      // Already down on it, the firmware refuses to move.
-      if (surface > z) return
+      if (surface > z) return false
       end[2] = Math.max(end[2], surface)
     }
     moves.to(end, { ...style, probing: true })
+    return true
   }
 
   private probe(block: FirmwareBlock, moves: Moves) {
@@ -241,9 +291,10 @@ class Z1Preview implements GCodeFirmware {
   }
 
   /**
-   * A search along X or Y, at the probe's height: it stops where the ball meets `side`, its
-   * radius short of it, when the side is ahead within the search; otherwise it searches its
-   * whole distance.
+   * A search along X or Y, at the probe's height: it stops where the ball first meets a side of
+   * the stock or a fixture (`Z1Frame.sideContact`), or `side`, its radius short of it, when the
+   * side is ahead within the search; otherwise it searches its whole distance. Whether it touched
+   * a side.
    */
   private sideSearch(
     moves: Moves,
@@ -252,38 +303,66 @@ class Z1Preview implements GCodeFirmware {
     side: number | null,
     radius: number,
     style: Style
-  ) {
+  ): boolean {
     const from = moves.at[axis]
     const direction = Math.sign(distance)
-    let reach = from + distance
-    if (side !== null) {
-      const contact = side - direction * radius
-      if (
-        (contact - from) * direction >= 0 &&
-        (reach - contact) * direction >= 0
-      )
-        reach = contact
-    }
+    const ahead = (contact: number) =>
+      (contact - from) * direction >= 0 &&
+      (from + distance - contact) * direction >= 0
+    const contacts = [
+      this.frame.sideContact(moves.at, axis, distance, radius),
+      side === null ? null : side - direction * radius,
+    ].filter((contact): contact is number => contact !== null && ahead(contact))
     const end: Point3 = [...moves.at]
-    end[axis] = reach
+    end[axis] = contacts.length
+      ? from +
+        direction * Math.min(...contacts.map((at) => (at - from) * direction))
+      : from + distance
     moves.to(end, { ...style, probing: true })
+    return contacts.length > 0
   }
 
   /**
    * M480 (ATCHandler's fill_OutCorner_scripts, fill_InCorner_scripts, fill_InPocket_scripts and
    * fill_OutPocket_scripts): the 3D probe finds a corner or centre from where it is and sets the
-   * work origin there. The preview does not have what it probes: it touches a top where
-   * `surface` is, and finds the feature where the plate's work origin puts it, as the work
-   * origin belongs on it: a corner's sides through the work origin in effect, a pocket's walls
-   * and a boss's sides half the distances either side of it. A side out of reach is searched
-   * for the whole distance.
+   * work origin there. It touches the tops and sides of the stock and the fixtures as the plate
+   * places them (`Z1Frame.surface` and `sideContact`). What the plate does not have, such as a
+   * pocket, it takes to be where the work origin in effect is, as the plate's work origin belongs
+   * on it, when the routine reaches it from where it starts; otherwise where the routine is
+   * started for it (`originStartOffset`): half the distances from the start for a corner, under
+   * it for a centre.
    */
-  private originProbing(
-    block: FirmwareBlock,
-    moves: Moves
-  ): FirmwareEffect | null {
+  private originProbing(block: FirmwareBlock): FirmwareEffect | null {
     const found = routineOf(block.text)
     if (!found) return null
+    const { routine, corner } = found
+    const { words, position, offset } = block
+    const { distance } = Z1.origin
+    const reach: [number, number] = [
+      words.get("X") ?? distance,
+      words.get("Y") ?? distance,
+    ]
+    const atOrigin = this.originRoutine(block, found, [offset[0], offset[1]])
+    if (atOrigin.reached) return atOrigin.effect
+    const [x, y] = corner
+      ? originStartOffset({ routine, corner, distance: reach })
+      : [0, 0]
+    return this.originRoutine(block, found, [position[0] - x, position[1] - y])
+      .effect
+  }
+
+  /**
+   * The routine's moves from where the probe is, with what the plate does not have taken at
+   * `feature`: a corner's sides through it, a pocket's walls and a boss's sides half the
+   * distances either side of it. A side out of reach is searched for the whole distance;
+   * `reached` says whether every search touched a side. A probe already in what its first top
+   * search would touch halts the machine, and the routine stops there.
+   */
+  private originRoutine(
+    block: FirmwareBlock,
+    found: { routine: Probe3dRoutine; corner?: Probe3dCorner },
+    feature: XY
+  ): { effect: FirmwareEffect; reached: boolean } {
     const { words, tool } = block
     const { ball, distance, depth, descent } = Z1.origin
     const [signX, signY] = distanceSigns(found)
@@ -291,10 +370,10 @@ class Z1Preview implements GCodeFirmware {
     const dx = signX * (words.get("X") ?? distance)
     const dy = signY * (words.get("Y") ?? distance)
     const dz = words.get("Z") ?? depth
-    // The work origin in effect, which what the routine finds is taken to be on.
-    const origin = block.offset
+    const moves = new Moves(block.position)
     const offset: Point3 = [...block.offset]
     const start: Point3 = [...moves.at]
+    let reached = true
     const { slow, retract } = Z1.touch
     const rapid = { ...RAPID, tool }
     const down = { rapid: true, feed: Z1.rapid * descent, tool }
@@ -306,11 +385,21 @@ class Z1Preview implements GCodeFirmware {
       return point
     }
     const topTouches = () => {
-      this.search(moves, [0, 0, Z1.search], touch)
+      if (!this.search(moves, [0, 0, Z1.search], touch)) return false
       moves.z(moves.at[2] + retract, rapid)
       this.search(moves, [0, 0, Z1.search], touch)
       offset[2] = moves.at[2]
       moves.z(start[2], rapid)
+      return true
+    }
+    const sideSearch = (
+      index: 0 | 1,
+      reach: number,
+      side: number | null,
+      style: Style
+    ) => {
+      const touched = this.sideSearch(moves, index, reach, side, radius, style)
+      reached &&= touched
     }
     // Two touches on a side, the retract between and after them, from where the probe is.
     const sideTouches = (
@@ -319,40 +408,40 @@ class Z1Preview implements GCodeFirmware {
       second: number,
       side: (direction: number) => number | null
     ) => {
-      this.sideSearch(moves, index, first, side(first), radius, touch)
+      sideSearch(index, first, side(first), touch)
       const back = -Math.sign(first) * retract
       moves.to(axis(index, moves.at[index] + back), rapid)
-      this.sideSearch(moves, index, second, side(second), radius, again)
+      sideSearch(index, second, side(second), again)
       const contact = moves.at[index]
       moves.to(axis(index, moves.at[index] + back), rapid)
       return contact
     }
     switch (found.routine) {
       case "outside-corner": {
-        topTouches()
+        if (!topTouches()) break
         moves.to(axis(0, start[0] - dx), rapid)
         moves.z(offset[2] - dz, down)
-        const x = sideTouches(0, dx, dx, () => origin[0])
+        const x = sideTouches(0, dx, dx, () => feature[0])
         offset[0] = x + Math.sign(dx) * radius
         moves.z(start[2], rapid)
         moves.to(axis(0, start[0]), rapid)
         moves.to(axis(1, start[1] + dy), rapid)
         moves.z(offset[2] - dz, down)
-        const y = sideTouches(1, -dy, -dy, () => origin[1])
+        const y = sideTouches(1, -dy, -dy, () => feature[1])
         offset[1] = y - Math.sign(dy) * radius
         moves.z(start[2], rapid)
         moves.xy([offset[0], offset[1]], rapid)
         break
       }
       case "inside-corner": {
-        topTouches()
+        if (!topTouches()) break
         moves.xy([start[0] + dx, start[1] - dy], rapid)
         moves.z(offset[2] - dz, down)
         const inside = moves.at[0]
-        const x = sideTouches(0, -dx, -dx, () => origin[0])
+        const x = sideTouches(0, -dx, -dx, () => feature[0])
         offset[0] = x - Math.sign(dx) * radius
         moves.to(axis(0, inside), rapid)
-        const y = sideTouches(1, dy, dy, () => origin[1])
+        const y = sideTouches(1, dy, dy, () => feature[1])
         offset[1] = y + Math.sign(dy) * radius
         moves.z(start[2], rapid)
         moves.xy([offset[0], offset[1]], rapid)
@@ -365,7 +454,7 @@ class Z1Preview implements GCodeFirmware {
         ] as const) {
           if (!reach) continue
           const wall = (direction: number) =>
-            origin[index] + (Math.sign(direction) * Math.abs(reach)) / 2
+            feature[index] + (Math.sign(direction) * Math.abs(reach)) / 2
           const minus = sideTouches(index, -reach, -reach, wall)
           const plus = sideTouches(index, 2 * reach, reach, wall)
           const middle = (minus + plus) / 2
@@ -375,14 +464,14 @@ class Z1Preview implements GCodeFirmware {
         break
       }
       case "boss-center": {
-        topTouches()
+        if (!topTouches()) break
         for (const [index, reach] of [
           [0, dx],
           [1, dy],
         ] as const) {
           if (!reach) continue
           const side = (direction: number) =>
-            origin[index] - (Math.sign(direction) * Math.abs(reach)) / 2
+            feature[index] - (Math.sign(direction) * Math.abs(reach)) / 2
           moves.to(axis(index, moves.at[index] - reach), rapid)
           moves.z(offset[2] - dz, down)
           const minus = sideTouches(index, reach, reach, side)
@@ -398,7 +487,7 @@ class Z1Preview implements GCodeFirmware {
         break
       }
     }
-    return { moves: moves.list, offset }
+    return { effect: { moves: moves.list, offset }, reached }
   }
 
   /** G10 L20: the current position becomes the given work coordinates. */
@@ -572,28 +661,30 @@ class Z1Preview implements GCodeFirmware {
       probePoint,
     })
     moves.xy(start, style(0))
-    const first = frame.surface(start)
+    const first = frame.surface(moves.at)
     // Already down on the surface, the firmware stops.
     if (first > from) return true
     moves.z(first, { ...style(0), probing: true })
     moves.z(from, { ...style(0), feed: back })
     const height = first + (words.get("H") ?? Z1.grid.height)
     moves.z(height, style(0))
+    // Whether it probed: a sample in a fixture taller than the grid's height halts the machine.
     const probeAt = (probePoint: number) => {
-      moves.z(frame.surface(moves.at), {
-        ...style(probePoint),
-        feed: slow,
-        probing: true,
-      })
+      const surface = frame.surface(moves.at)
+      if (surface > moves.at[2]) return false
+      moves.z(surface, { ...style(probePoint), feed: slow, probing: true })
       moves.z(height, { ...style(probePoint), feed: back })
+      return true
     }
-    probeAt(0)
-    gridSamples(start, [width, depth], [columns, rows]).forEach(
-      (sample, index) => {
-        moves.xy(sample, { ...style(index), feed: travel })
-        probeAt(index)
-      }
-    )
+    if (!probeAt(0)) return true
+    for (const [index, sample] of gridSamples(
+      start,
+      [width, depth],
+      [columns, rows]
+    ).entries()) {
+      moves.xy(sample, { ...style(index), feed: travel })
+      if (!probeAt(index)) break
+    }
     return true
   }
 }

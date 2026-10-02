@@ -1,6 +1,11 @@
 import { machineId } from "@/machine/contract"
-import { inModelFrame } from "@/domain/fixtures/definitions"
+import {
+  boxCorners,
+  inModelFrame,
+  pointsBounds,
+} from "@/domain/fixtures/definitions"
 import type {
+  FixtureBounds,
   FixtureDefinition,
   FixtureInstance,
   FixtureModel,
@@ -89,6 +94,32 @@ export function fixtureModelMountPoints(
     model.source.kind === "bundled" ? BY_MODEL.get(model.source.url) : null
   if (!fixture) return boxMountPoints(model.bounds)
   return inModelFrame(fixture.mountPoints, fixture.model, model)
+}
+
+/**
+ * The boxes a fixture model is solid in, in its frame: those of the fixture whose bundled model
+ * it draws (moved with the model when a definition gave it another origin or turned its mesh),
+ * else its box.
+ */
+export function fixtureModelSolids(
+  model: FixtureModel
+): readonly FixtureBounds[] {
+  const fixture =
+    model.source.kind === "bundled" ? BY_MODEL.get(model.source.url) : null
+  const solids = fixture?.solids
+  if (!fixture || !solids) return [model.bounds]
+  return solids.map((solid) => {
+    const corners = boxCorners(solid).map((position, index): MountPoint => ({
+      id: `corner-${index}`,
+      name: "Corner",
+      position,
+    }))
+    return pointsBounds(
+      inModelFrame(corners, fixture.model, model).map(
+        (corner) => corner.position
+      )
+    )
+  })
 }
 
 /**

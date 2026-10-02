@@ -1,5 +1,6 @@
 import type { GCodeFirmware, Point3 } from "@/domain/nc/gcode"
 import type { StoredAnchorSetup } from "@/domain/anchors/stored-anchors"
+import type { Solid } from "@/domain/fixtures/solids"
 
 /**
  * Where a plate is on its machine, as its firmware's moves are placed in the plate's work
@@ -14,6 +15,11 @@ export type FirmwareSetup = {
   readonly stock: { readonly min: Point3; readonly max: Point3 } | null
   /** Bed Z of what carries the stock, the plate's bed or wasteboard: where probing off the stock touches. */
   readonly supportZ: number
+  /**
+   * Where the plate's enabled fixtures but its bed are solid on the bed (`fixtureSolids`), which
+   * probing meets besides the stock and what carries it.
+   */
+  readonly solids: readonly Solid[]
 }
 
 /**

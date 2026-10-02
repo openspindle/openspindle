@@ -3,6 +3,7 @@ import type { FixtureKit } from "@/domain/fixtures/fixture-kit"
 import type { FirmwareSetup } from "@/domain/firmware/firmware-model"
 import type { Plate } from "@/domain/plate/plate"
 import { fixtureSupportHeight } from "@/domain/fixtures/definitions"
+import { fixtureSolids } from "@/domain/fixtures/solids"
 import { parseGCode } from "@/domain/nc/gcode"
 import type { GCodeProgram, Point3 } from "@/domain/nc/gcode"
 import type { SimulatedBed } from "@/machine/contract"
@@ -25,6 +26,7 @@ function firmwareSetup(plate: Plate, kit: FixtureKit): FirmwareSetup {
         }
       : null,
     supportZ: fixtureSupportHeight(fixtures, kit.tableTop),
+    solids: fixtureSolids(fixtures),
   }
 }
 

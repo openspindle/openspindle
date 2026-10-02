@@ -1,4 +1,4 @@
-import type { FixtureModel } from "@/domain/fixtures/definitions"
+import type { FixtureBounds, FixtureModel } from "@/domain/fixtures/definitions"
 import type { Point3 } from "@/domain/nc/gcode"
 import { holePoints } from "@/domain/fixtures/mount-points"
 import type { HoleXY, MountPoint } from "@/domain/fixtures/mount-points"
@@ -20,6 +20,9 @@ const SCREW_HOLES: readonly HoleXY[] = [
   [-73, -95.5],
   [-18, -95.5],
 ]
+
+/** How long and how wide each arm is. */
+const ARM = { length: 100, width: 15 } as const
 
 /**
  * The Z1's L-bracket, which stock is pushed into the inner corner of. Its frame starts at its
@@ -45,9 +48,17 @@ abstract class Z1LBracket extends Fixture {
   get model(): FixtureModel {
     return {
       source: { kind: "bundled", url: this.modelUrl },
-      bounds: { min: [0, 0, 0], max: [100, 100, this.height] },
+      bounds: { min: [0, 0, 0], max: [ARM.length, ARM.length, this.height] },
       offset: [STEP_ORIGIN[0], STEP_ORIGIN[1], 0],
     }
+  }
+
+  /** Its two arms, along X at the front and along Y at the left, without its screw holes. */
+  override get solids(): readonly FixtureBounds[] {
+    return [
+      { min: [0, 0, 0], max: [ARM.length, ARM.width, this.height] },
+      { min: [0, ARM.width, 0], max: [ARM.width, ARM.length, this.height] },
+    ]
   }
 }
 
