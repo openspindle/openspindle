@@ -16,10 +16,15 @@ export type WorkAreaXY = {
   readonly workAreaOrigin: readonly [number, number]
 }
 
+/** A coordinate within `[low, high]`. */
+const within = (value: number, low: number, high: number) =>
+  Math.min(Math.max(value, low), high)
+
 /**
  * Default placement: the stock centred in the machine's work area on its support, the work
- * origin at the stock's top front-left corner; without stock, both at the work area's front-left
- * corner. Physical coordinates, without the viewer's drawing offsets.
+ * origin at the stock's top front-left corner; without stock, both at the bed's origin (the
+ * machine's first anchor, Anchor 1 on the Z1), or the work area's point nearest it. Physical
+ * coordinates, without the viewer's drawing offsets.
  */
 export function defaultPlateCoordinates(
   stock: Pick<Stock, "width" | "depth" | "height"> | null,
@@ -32,7 +37,7 @@ export function defaultPlateCoordinates(
         y + depth / 2 - stock.depth / 2,
         supportHeight,
       ]
-    : [x, y, supportHeight]
+    : [within(0, x, x + width), within(0, y, y + depth), supportHeight]
   return {
     stockAnchor,
     workOrigin: [

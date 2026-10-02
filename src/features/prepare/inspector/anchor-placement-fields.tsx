@@ -1,5 +1,6 @@
 import type { ReactNode } from "react"
 import { FieldLegend, FieldSet } from "@/components/ui/field"
+import { Hint } from "@/components/workspace/hint"
 import { ReferencePointFields } from "@/components/workspace/reference-point-fields"
 import {
   anchorReference,
@@ -86,7 +87,9 @@ export function RelativePointFields({
 type AnchorPlacementFieldsProps = Omit<RelativePointFieldsProps, "label"> & {
   /** What is placed, as accessible names say it: "{name} placement", "{name} anchor X". */
   name: string
-  /** Which of its points the anchor is, beside the legend: the front-left bottom corner by default. */
+  /** Which of its points the anchor is, as the legend's hint says it. */
+  hint: string
+  /** A control beside the legend that chooses that point, if it can be chosen. */
   point?: ReactNode
 }
 
@@ -96,13 +99,14 @@ type AnchorPlacementFieldsProps = Omit<RelativePointFieldsProps, "label"> & {
  */
 export function AnchorPlacementFields({
   name,
-  point = "Front-left bottom",
+  hint,
+  point,
   ...placement
 }: AnchorPlacementFieldsProps) {
   return (
     <FieldSet aria-label={`${name} placement`}>
       <FieldLegend className="flex w-full items-center justify-between gap-3">
-        <span>Anchor</span>
+        <Hint text={hint}>Anchor</Hint>
         {point}
       </FieldLegend>
       <RelativePointFields label={`${name} anchor`} {...placement} />

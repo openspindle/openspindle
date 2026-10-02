@@ -8,6 +8,7 @@ import {
   FieldSet,
 } from "@/components/ui/field"
 import { OptionSelect } from "@/components/option-select"
+import { Hint } from "@/components/workspace/hint"
 import { ASSIST_KEYS, ASSIST_LABELS } from "@/machine/contract"
 import type { AssistMode } from "@/machine/contract"
 import type { PlateSetup } from "@/domain/plate/plate"
@@ -50,6 +51,12 @@ const isPoint = (value: readonly number[]): value is Point3 =>
       Number.isFinite(coordinate) && Math.abs(coordinate) <= COORDINATE_LIMIT
   )
 
+const STOCK_ANCHOR_HINT =
+  "Where the stock sits: its front-left bottom corner, in bed coordinates from Anchor 1 or relative to another stored anchor."
+
+const WORK_ORIGIN_HINT =
+  "The plate's NC zero, which every operation machines from. Run sets its X and Y once the plate's anchors are read from its device; until then, set the physical work zero on Device."
+
 /** Where the stock sits on the bed, by its anchor, like each fixture. */
 export function StockPlacementFields({
   setup,
@@ -59,6 +66,7 @@ export function StockPlacementFields({
   return (
     <AnchorPlacementFields
       name="Stock"
+      hint={STOCK_ANCHOR_HINT}
       value={setup.stockAnchor}
       relativeTo={setup.stockRelativeTo}
       anchorSetup={setup.anchors}
@@ -114,11 +122,8 @@ export function WorkOriginFields({
   })
   return (
     <FieldSet aria-label="Work origin">
-      <FieldLegend className="flex w-full items-baseline justify-between">
-        <span>Work origin</span>
-        <span title="The plate's NC zero. Run sets its X and Y once the plate's anchors are read from its device; until then, set the physical work zero on Device.">
-          NC zero
-        </span>
+      <FieldLegend>
+        <Hint text={WORK_ORIGIN_HINT}>Work origin</Hint>
       </FieldLegend>
       <RelativePointFields
         label="Work origin"

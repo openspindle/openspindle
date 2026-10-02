@@ -57,6 +57,9 @@ import { selectSetupItem, useArrangeSelection } from "../arrange/arrange-state"
 import { lockToggleCopy, toggleLock } from "../arrange/use-arrange-events"
 import { AnchorPlacementFields } from "./anchor-placement-fields"
 
+const FIXTURE_ANCHOR_HINT =
+  "Where the fixture sits: its origin, the point of its model chosen beside this, in bed coordinates from Anchor 1 or relative to another stored anchor."
+
 /** What the panel says about a fixture's model, if anything (nothing while the library loads). */
 function modelNote(
   definition: FixtureDefinition,
@@ -104,6 +107,7 @@ function FixturePlacementFields({
   return (
     <AnchorPlacementFields
       name={name}
+      hint={FIXTURE_ANCHOR_HINT}
       point={
         model && (
           <FixtureOriginSelect
