@@ -19,7 +19,6 @@ import {
   Field,
   FieldDescription,
   FieldGroup,
-  FieldLabel,
   FieldLegend,
   FieldSet,
 } from "@/components/ui/field"
@@ -27,13 +26,7 @@ import { Toggle } from "@/components/ui/toggle"
 import { OptionSelect } from "@/components/option-select"
 import { PointFields } from "@/components/workspace/coordinate-input"
 import { FixtureOriginSelect } from "@/components/workspace/fixture-origin-select"
-import {
-  useFixtureLibrary,
-  useFixtureLibraryStore,
-} from "@/app/fixtures/fixture-context"
-import { bedSetupPlacement } from "@/app/fixtures/fixture-library-store"
-import { Hint } from "@/components/workspace/hint"
-import { bedSetupAnchorsOf } from "@/domain/anchors/stored-anchors"
+import { useFixtureLibrary } from "@/app/fixtures/fixture-context"
 import { useWorkspaceStore } from "@/app/workspace/workspace-context"
 import type { ModelId } from "@/domain/models/model"
 import type { Plate, PlateSetup } from "@/domain/plate/plate"
@@ -215,13 +208,9 @@ function AddFixture({
   )
 }
 
-const BED_SETUP_HINT =
-  "One of its device's bed setups: its fixtures, and its anchors, which the plate follows. Choosing one sets the plate up on it; Apply bed setup does again after its fixtures changed."
-
 /** The fixtures on the plate's bed, a wasteboard among them: each added and removed. */
 export function PlateFixturesPanel({ plate }: { plate: Plate }) {
   const workspace = useWorkspaceStore()
-  const fixtureLibrary = useFixtureLibraryStore()
   const setup = plate.setup
   // The plate's own device, not whichever one the Device tab currently shows.
   const profiles = useFixtureLibrary((library) => library.profiles)
@@ -229,21 +218,7 @@ export function PlateFixturesPanel({ plate }: { plate: Plate }) {
   const plateProfile = Object.hasOwn(profiles, profileId)
     ? profiles[profileId]
     : defaultFixtureProfile()
-  const known = plateProfile.bedSetups.some(
-    (item) => item.id === setup.bedSetupId
-  )
-  const bedSetup = bedSetupOf(plateProfile, setup.bedSetupId)
-  const definitions = bedSetup.definitions
-  const applyBedSetup = (id: string) => {
-    const placement = bedSetupPlacement(profileId, plateProfile, id)
-    run({
-      type: "fixtures.useDefaults",
-      plateId: plate.id,
-      fixtures: placement.fixtures,
-      anchors: placement.anchors,
-      bedSetupId: placement.bedSetupId ?? null,
-    })
-  }
+  const { definitions } = bedSetupOf(plateProfile, setup.bedSetupId)
   const models = useModelLibrary().data
   const library = useMemo(
     () => (models ? new Set(models.map((model) => model.id)) : null),
@@ -418,64 +393,6 @@ export function PlateFixturesPanel({ plate }: { plate: Plate }) {
         <FieldDescription>Nothing on this plate's bed yet.</FieldDescription>
       )}
       <AddFixture definitions={definitions} disabled={full} onAdd={add} />
-      <Field orientation="horizontal">
-        <FieldLabel htmlFor={`${plate.id}-bed-setup`} className="shrink-0">
-          <Hint text={BED_SETUP_HINT}>Bed setup</Hint>
-        </FieldLabel>
-        <OptionSelect
-          id={`${plate.id}-bed-setup`}
-          aria-description={BED_SETUP_HINT}
-          className="min-w-0 flex-1"
-          options={[
-            ...plateProfile.bedSetups.map((item) => ({
-              value: item.id,
-              label: item.name,
-            })),
-            ...(known || !setup.bedSetupId
-              ? []
-              : [
-                  {
-                    value: setup.bedSetupId,
-                    label: "Not on this computer",
-                    disabled: true,
-                  },
-                ]),
-          ]}
-          value={known || !setup.bedSetupId ? bedSetup.id : setup.bedSetupId}
-          onValueChange={(id) => applyBedSetup(id)}
-        />
-      </Field>
-      {known || !setup.bedSetupId ? (
-        <Button
-          variant="ghost"
-          size="sm"
-          className="self-start"
-          onClick={() => applyBedSetup(bedSetup.id)}
-        >
-          Apply bed setup
-        </Button>
-      ) : (
-        <Button
-          variant="ghost"
-          size="sm"
-          className="self-start"
-          onClick={() =>
-            fixtureLibrary.keepBedSetup(profileId, {
-              id: setup.bedSetupId ?? newId(),
-              name: plate.name || "Plate's bed setup",
-              definitions: setup.fixtures.map((item) => ({
-                ...item.definition,
-                defaultEnabled: item.enabled,
-                defaultPosition: item.position,
-                defaultRotation: item.rotation,
-              })),
-              anchors: setup.anchors ? bedSetupAnchorsOf(setup.anchors) : [],
-            })
-          }
-        >
-          Add bed setup
-        </Button>
-      )}
     </FieldGroup>
   )
 }

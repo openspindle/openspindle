@@ -7,7 +7,7 @@ import {
 import { PrepareInspector } from "./inspector/prepare-inspector"
 import { PlateTree } from "./plate-tree/plate-tree"
 import { PrepareViewer } from "./prepare-viewer"
-import { BedTypeField, DeviceCard } from "./sidebar-header"
+import { BedSetupField, DeviceCard } from "./sidebar-header"
 
 /** Plates and their operations: set up stock, tools and fixtures, and preview them on the bed. */
 export function PreparePage() {
@@ -33,7 +33,7 @@ export function PreparePage() {
         <aside className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
           <div className="flex shrink-0 flex-col gap-3 p-3">
             <DeviceCard />
-            <BedTypeField />
+            <BedSetupField />
           </div>
           <PlateTree className="max-h-[45%] shrink-0" />
           <PrepareInspector />
