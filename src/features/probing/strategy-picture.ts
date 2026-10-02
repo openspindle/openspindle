@@ -14,24 +14,31 @@ import type { SceneMove, ScenePart, StrategyScene } from "./strategy-scene"
 export const PICTURE = { width: 240, height: 160 } as const
 const SCALE = 2
 
-/** What the pictures are drawn in: the 3D view's probe green and next-touch magenta. */
+/**
+ * What the pictures are drawn in: on the muted background (`oklch(0.97 0 0)`), the 3D view's
+ * probe green and next-touch magenta, and a probe like Makera's 3D probe: a metal stylus with a
+ * magenta ball.
+ */
 const LOOK = {
+  background: 0xf5f5f5,
   part: 0xc4cad2,
   edge: 0x5b6470,
   path: 0x22c55e,
   touch: 0xd946ef,
-  probe: 0x2b3038,
+  stylus: 0xb9c0c8,
   /** Line widths in CSS pixels, of a search and of travel. */
   probing: 2,
   travel: 1.25,
-  /** A touch's dot and the stylus over the tip, mm. */
-  dot: 0.8,
-  stylus: { radius: 0.45, length: 16 },
+  /** A touch's disc, how far off its surface it lies, and the stylus over the ball, mm. */
+  dot: { radius: 0.9, lift: 0.05 },
+  shaft: { radius: 0.45, length: 16 },
 } as const
 
-/** Where the camera looks from, towards what is probed: front right, from above. */
-const VIEW = new THREE.Vector3(0.9, -1.3, 1.05).normalize()
-const FOV = 32
+/** Where the camera looks from, towards what is probed: isometric, from the front right. */
+const VIEW = new THREE.Vector3(1, -1, 1).normalize()
+
+/** How much room the picture leaves around what it frames, as a share of it. */
+const MARGIN = 0.18
 
 const material = () =>
   new MeshStandardNodeMaterial({
@@ -135,7 +142,7 @@ function sceneOf({ parts, moves, touches, tip, ball }: StrategyScene) {
   scene.add(new THREE.AmbientLight(0xffffff, 2.2))
   const light = new THREE.DirectionalLight(0xffffff, 2.6)
   light.position.set(60, -120, 200)
-  const fill = new THREE.DirectionalLight(0xd4e5ff, 1.2)
+  const fill = new THREE.DirectionalLight(0xffffff, 1.2)
   fill.position.set(-120, 80, 60)
   scene.add(light, fill)
   for (const part of parts) scene.add(partMesh(part))
@@ -143,52 +150,76 @@ function sceneOf({ parts, moves, touches, tip, ball }: StrategyScene) {
   const travel = moves.filter((move) => !move.probing)
   if (travel.length) scene.add(lines(travel, LOOK.travel, 0.55))
   if (probing.length) scene.add(lines(probing, LOOK.probing, 1))
-  const dot = new THREE.SphereGeometry(LOOK.dot, 16, 12)
-  const magenta = new MeshBasicNodeMaterial({ color: LOOK.touch })
-  for (const touch of touches) {
+  // Each touch a disc lying on the surface it touches, facing out of it.
+  const dot = new THREE.CircleGeometry(LOOK.dot.radius, 32)
+  const magenta = new MeshBasicNodeMaterial({
+    color: LOOK.touch,
+    side: THREE.DoubleSide,
+  })
+  const face = new THREE.Vector3(0, 0, 1)
+  for (const { point, normal } of touches) {
+    const facing = new THREE.Vector3(...normal).normalize()
     const mesh = new THREE.Mesh(dot, magenta)
-    mesh.position.set(...touch)
+    mesh.quaternion.setFromUnitVectors(face, facing)
+    mesh.position.set(...point).addScaledVector(facing, LOOK.dot.lift)
     mesh.renderOrder = 3
     scene.add(mesh)
   }
-  const probe = new MeshStandardNodeMaterial({
-    color: LOOK.probe,
-    roughness: 0.4,
-    metalness: 0.3,
+  const ruby = new MeshStandardNodeMaterial({
+    color: LOOK.touch,
+    roughness: 0.35,
+    metalness: 0,
   })
-  const head = new THREE.Mesh(new THREE.SphereGeometry(ball, 24, 16), probe)
+  const steel = new MeshStandardNodeMaterial({
+    color: LOOK.stylus,
+    roughness: 0.3,
+    metalness: 0.6,
+  })
+  const head = new THREE.Mesh(new THREE.SphereGeometry(ball, 32, 24), ruby)
   head.position.set(tip[0], tip[1], tip[2] + ball)
-  const { radius, length } = LOOK.stylus
-  const stylus = new THREE.Mesh(
-    new THREE.CylinderGeometry(radius, radius, length, 16).rotateX(Math.PI / 2),
-    probe
+  const { radius, length } = LOOK.shaft
+  const shaft = new THREE.Mesh(
+    new THREE.CylinderGeometry(radius, radius, length, 24).rotateX(Math.PI / 2),
+    steel
   )
-  stylus.position.set(tip[0], tip[1], tip[2] + ball + length / 2)
-  scene.add(head, stylus)
+  shaft.position.set(tip[0], tip[1], tip[2] + ball + length / 2)
+  scene.add(head, shaft)
   return scene
 }
 
-/** A camera from `VIEW` that frames where the probe moves and touches. */
-function cameraFor({ moves, touches, tip }: StrategyScene) {
-  const box = new THREE.Box3()
-  for (const { start, end } of moves)
-    box
-      .expandByPoint(new THREE.Vector3(...start))
-      .expandByPoint(new THREE.Vector3(...end))
-  for (const touch of touches) box.expandByPoint(new THREE.Vector3(...touch))
-  box.expandByPoint(new THREE.Vector3(...tip))
-  const sphere = box.getBoundingSphere(new THREE.Sphere())
-  const radius = Math.max(sphere.radius, 8) * 1.08
-  const camera = new THREE.PerspectiveCamera(
-    FOV,
-    PICTURE.width / PICTURE.height,
-    1,
-    2000
-  )
-  const distance = radius / Math.sin(THREE.MathUtils.degToRad(FOV) / 2)
+/**
+ * An orthographic camera from `VIEW`, Z up so that what stands upright stands upright in the
+ * picture, centred on and framing where the probe moves and touches, with `MARGIN` around.
+ */
+function cameraFor({ moves, touches, tip, ball }: StrategyScene) {
+  const points = [
+    ...moves.flatMap(({ start, end }) => [start, end]),
+    ...touches.map(({ point }) => point),
+    tip,
+    [tip[0], tip[1], tip[2] + 2 * ball] as const,
+  ].map((point) => new THREE.Vector3(...point))
+  const camera = new THREE.OrthographicCamera()
   camera.up.set(0, 0, 1)
-  camera.position.copy(sphere.center).addScaledVector(VIEW, distance)
-  camera.lookAt(sphere.center)
+  camera.position.copy(VIEW)
+  camera.lookAt(0, 0, 0)
+  camera.updateMatrixWorld()
+  // Where the points are across and up the picture, and along the view.
+  const view = camera.matrixWorldInverse
+  const box = new THREE.Box3()
+  for (const point of points) box.expandByPoint(point.applyMatrix4(view))
+  const size = box.getSize(new THREE.Vector3())
+  const aspect = PICTURE.width / PICTURE.height
+  const height = Math.max(size.y, size.x / aspect, 10) * (1 + MARGIN)
+  const width = height * aspect
+  const centre = box.getCenter(new THREE.Vector3())
+  camera.left = centre.x - width / 2
+  camera.right = centre.x + width / 2
+  camera.bottom = centre.y - height / 2
+  camera.top = centre.y + height / 2
+  // From in front of everything drawn, whatever its depth.
+  camera.near = -1000 - box.max.z
+  camera.far = 1000 - box.min.z
+  camera.updateProjectionMatrix()
   return camera
 }
 
@@ -199,7 +230,7 @@ function pictureRenderer() {
     const made = new WebGPURenderer({ antialias: true, alpha: true })
     made.setPixelRatio(SCALE)
     made.setSize(PICTURE.width, PICTURE.height, false)
-    made.setClearColor(0x000000, 0)
+    made.setClearColor(LOOK.background, 1)
     made.outputColorSpace = THREE.SRGBColorSpace
     try {
       await made.init()

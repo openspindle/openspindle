@@ -30,6 +30,9 @@ export type ScenePart =
       readonly top: number
     }
 
+/** Where the probe touches a surface, and the way that surface faces, towards the probe. */
+export type SceneTouch = { readonly point: Point3; readonly normal: Point3 }
+
 /** One move of the probe, and whether it searches for a touch or travels fast. */
 export type SceneMove = {
   readonly start: Point3
@@ -45,7 +48,7 @@ export type SceneMove = {
  */
 export type StrategyScene = {
   readonly moves: readonly SceneMove[]
-  readonly touches: readonly Point3[]
+  readonly touches: readonly SceneTouch[]
   /** Where the probe's tip is as it starts. */
   readonly tip: Point3
   /** The probe's tip radius, mm. */
@@ -262,22 +265,37 @@ export function strategyScene(
   }
   const ceiling = stock.max[2] + SHOWN_ABOVE
   const ball = (tool.diameter ?? 2) / 2
-  const touches: Point3[] = []
+  const touches: SceneTouch[] = []
   const sides: { contact: Point3; direction: readonly [number, number] }[] = []
+  const touched = (point: Point3, normal: Point3) => {
+    const again = touches.some(
+      (touch) =>
+        distance(touch.point, point) < 0.05 &&
+        Math.abs(touch.point[2] - point[2]) < 0.05
+    )
+    if (!again) touches.push({ point, normal })
+  }
   for (const { start, end, probing } of moves) {
     if (!probing) continue
-    if (
-      !touches.some(
-        (touch) =>
-          distance(touch, end) < 0.05 && Math.abs(touch[2] - end[2]) < 0.05
-      )
-    )
-      touches.push(end)
     const dx = end[0] - start[0]
     const dy = end[1] - start[1]
     const length = Math.hypot(dx, dy)
-    if (length > 0.01)
-      sides.push({ contact: end, direction: [dx / length, dy / length] })
+    if (length <= 0.01) {
+      // Down onto a top: where the tip meets it.
+      touched(end, [0, 0, 1])
+      continue
+    }
+    const direction = [dx / length, dy / length] as const
+    sides.push({ contact: end, direction })
+    // Against a side: where the ball meets it, level with the ball's centre.
+    touched(
+      [
+        end[0] + direction[0] * ball,
+        end[1] + direction[1] * ball,
+        end[2] + ball,
+      ],
+      [-direction[0], -direction[1], 0]
+    )
   }
   const start = shown(first, ceiling).start
   return {
