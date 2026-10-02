@@ -21,6 +21,7 @@ import { ORIGIN_ROUTINE, distanceSigns, routineOf } from "./3d-probe/blocks"
 import { gridSamples } from "./wired-probe/grid"
 import { CLEARANCE_Z } from "./wired-probe/travel"
 import { SETTER_RADIUS, SETTER_TOP, tipBedZ, tipMachineZ } from "./tool-setter"
+import { Z1_MOTION } from "./motion"
 
 /**
  * The Z1's settings as its firmware (1.1.2) moves by them: `src/configZ1.default` and the
@@ -691,6 +692,8 @@ class Z1Preview implements GCodeFirmware {
 
 /** The Z1's firmware (1.1.2), as the preview follows how it moves. */
 export class Z1Firmware implements FirmwareModel {
+  readonly motion = Z1_MOTION
+
   preview(setup: FirmwareSetup): GCodeFirmware {
     return new Z1Preview(setup)
   }

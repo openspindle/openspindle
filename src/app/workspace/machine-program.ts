@@ -9,7 +9,7 @@ import type { GCodeProgram, Point3 } from "@/domain/nc/gcode"
 import type { SimulatedBed } from "@/machine/contract"
 
 /** Where the plate is on its machine, as its firmware's moves are placed. */
-function firmwareSetup(plate: Plate, kit: FixtureKit): FirmwareSetup {
+export function firmwareSetup(plate: Plate, kit: FixtureKit): FirmwareSetup {
   const { anchors, deviceId, stock, stockAnchor, workOrigin, fixtures } =
     plate.setup
   return {

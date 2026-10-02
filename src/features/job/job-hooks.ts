@@ -1,5 +1,6 @@
 import { useMemo } from "react"
 import { toast } from "sonner"
+import { limitsFor, planFor } from "@/app/job/plan-store"
 import { simulatedBedOf } from "@/app/workspace/machine-program"
 import { usePlateDiagnostics } from "@/app/workspace/use-plate-diagnostics"
 import {
@@ -7,6 +8,7 @@ import {
   useWorkspaceStore,
 } from "@/app/workspace/workspace-context"
 import type { CompiledPlate } from "@/domain/compile/compile"
+import { kitForPlate } from "@/domain/fixtures/catalog"
 import { plateLabel } from "@/domain/plate/plate"
 import type { Plate } from "@/domain/plate/plate"
 import { rulesOf } from "@/domain/rules/rules"
@@ -21,6 +23,7 @@ import {
 import type { Availability } from "@/machine/contract"
 import type { Tool } from "@/domain/tools/tool"
 import {
+  useCachedConfiguration,
   useDismissJob,
   useMachineCommand,
   useMachineSnapshot,
@@ -126,10 +129,16 @@ export function useJobActions(): JobActions {
   }
 }
 
-/** Run: snapshots the plate into a new session, then sends exactly that program. */
+/**
+ * Run: snapshots the plate into a new session, with the plan of its machine's moves timed by the
+ * limits of the machine's configuration as last read (its defaults when it was not), then sends
+ * exactly that program.
+ */
 export function useRunJob() {
   const workspace = useWorkspaceStore()
-  const { device } = useMachineSnapshot().connection
+  const { connection } = useMachineSnapshot()
+  const { device } = connection
+  const configuration = useCachedConfiguration(connection.id)
   const run = useRunProgram()
   const simulateBed = useSimulateBed()
   const start = (
@@ -138,8 +147,13 @@ export function useRunJob() {
     library: readonly Tool[]
   ) => {
     const label = plateLabel(plate, plateIndex(workspace.state, plate.id))
+    const plan = planFor(
+      plate,
+      compiled.program,
+      limitsFor(kitForPlate(plate), configuration)
+    )
     const runPlate = () => {
-      const session = createJobSession(plate, label, compiled, library)
+      const session = createJobSession(plate, label, compiled, library, plan)
       jobSessionStore.actions.begin(session)
       run.mutate(
         {

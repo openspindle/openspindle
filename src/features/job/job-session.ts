@@ -1,5 +1,7 @@
 import { Store, useSelector } from "@tanstack/react-store"
+import { pinPlan } from "@/app/job/plan-store"
 import type { CompiledPlate } from "@/domain/compile/compile"
+import type { MotionPlan } from "@/domain/motion/types"
 import type { Plate } from "@/domain/plate/plate"
 import type { Tool } from "@/domain/tools/tool"
 
@@ -16,6 +18,11 @@ export type JobSession = {
   /** How the plate showed at Run: its name, or its number then. */
   readonly label: string
   readonly compiled: CompiledPlate
+  /**
+   * The moves its machine makes, timed by the machine's limits at Run; null when the preview does
+   * not follow the machine's firmware.
+   */
+  readonly plan: MotionPlan | null
   readonly tools: readonly Tool[]
   /** Pauses (by `pauseKey`) whose one automatic height-map read has started. */
   readonly reviewedPauses: readonly string[]
@@ -25,7 +32,8 @@ export function createJobSession(
   plate: Plate,
   label: string,
   compiled: CompiledPlate,
-  library: readonly Tool[]
+  library: readonly Tool[],
+  plan: MotionPlan | null
 ): JobSession {
   const referenced = new Set(plate.tools.map((entry) => entry.toolId))
   return {
@@ -33,13 +41,17 @@ export function createJobSession(
     plate,
     label,
     compiled,
+    plan,
     tools: library.filter((tool) => referenced.has(tool.id)),
     reviewedPauses: [],
   }
 }
 
 type JobSessionActions = {
-  /** A new Run supersedes any earlier session. */
+  /**
+   * A new Run supersedes any earlier session. A session holds its plan (`pinPlan`) until it is
+   * superseded or cleared.
+   */
   begin: (session: JobSession) => void
   /** Dismiss: the Job tab returns to the selected plate. */
   clear: () => void
@@ -50,20 +62,32 @@ type JobSessionActions = {
 /** The Run this window started. It outlives route changes and ends only on Dismiss. */
 export const jobSessionStore = new Store<JobSession | null, JobSessionActions>(
   null,
-  ({ get, setState }) => ({
-    begin: (session) => setState(() => session),
-    clear: () => setState(() => null),
-    claimReview: (runId, pauseKey) => {
-      const session = get()
-      if (session?.runId !== runId || session.reviewedPauses.includes(pauseKey))
-        return false
-      setState(() => ({
-        ...session,
-        reviewedPauses: [...session.reviewedPauses, pauseKey],
-      }))
-      return true
-    },
-  })
+  ({ get, setState }) => {
+    /** Lets go of the plan the session holds. */
+    let release = () => {}
+    const hold = (session: JobSession | null) => {
+      release()
+      release = session?.plan ? pinPlan(session.plan) : () => {}
+      setState(() => session)
+    }
+    return {
+      begin: hold,
+      clear: () => hold(null),
+      claimReview: (runId, pauseKey) => {
+        const session = get()
+        if (
+          session?.runId !== runId ||
+          session.reviewedPauses.includes(pauseKey)
+        )
+          return false
+        setState(() => ({
+          ...session,
+          reviewedPauses: [...session.reviewedPauses, pauseKey],
+        }))
+        return true
+      },
+    }
+  }
 )
 
 export const useJobSession = () => useSelector(jobSessionStore)

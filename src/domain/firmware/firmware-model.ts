@@ -1,4 +1,5 @@
 import type { GCodeFirmware, Point3 } from "@/domain/nc/gcode"
+import type { MotionModel } from "@/domain/motion/limits"
 import type { StoredAnchorSetup } from "@/domain/anchors/stored-anchors"
 import type { Solid } from "@/domain/fixtures/solids"
 
@@ -36,4 +37,6 @@ export interface FirmwareModel {
   bedPosition: (setup: FirmwareSetup, machine: Point3) => Point3
   /** The machine position at which that tool's tip is at a point on the bed. */
   machinePosition: (setup: FirmwareSetup, bed: Point3) => Point3
+  /** How fast it moves and where it stops between moves, as its planner has it. */
+  readonly motion: MotionModel
 }
