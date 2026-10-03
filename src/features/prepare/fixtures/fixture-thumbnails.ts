@@ -4,8 +4,7 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js"
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js"
 import { log } from "@/app/errors/log"
 import type { ModelMeshes } from "@/components/workspace/viewer/viewer-assets"
-import { fixtureModelFinish } from "@/domain/fixtures/catalog"
-import { isMatteKind } from "@/domain/fixtures/definitions"
+import { definitionFinish } from "@/domain/fixtures/catalog"
 import type {
   FixtureDefinition,
   FixtureMeshSource,
@@ -41,6 +40,7 @@ function thumbnailKey(definition: FixtureDefinition): string | null {
     model.offset,
     model.orientation ?? null,
     definition.color,
+    definition.material ?? null,
     definition.kind,
     window.devicePixelRatio,
   ])
@@ -69,11 +69,7 @@ function fixtureContent(
   model: FixtureModel,
   mesh: THREE.Object3D | null
 ): THREE.Object3D {
-  const matte = isMatteKind(definition.kind)
-  const { metalness, roughness } = fixtureModelFinish(model) ?? {
-    metalness: matte ? 0 : 0.5,
-    roughness: matte ? 0.95 : 0.55,
-  }
+  const { metalness, roughness } = definitionFinish(definition)
   const material = new THREE.MeshStandardMaterial({
     color: definition.color,
     metalness,

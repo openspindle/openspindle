@@ -2,8 +2,11 @@ import { machineId } from "@/machine/contract"
 import {
   boxCorners,
   inModelFrame,
+  isMatteKind,
   pointsBounds,
 } from "@/domain/fixtures/definitions"
+import { SURFACE_FINISHES } from "@/domain/materials/surface-material"
+import type { SurfaceFinish } from "@/domain/materials/surface-material"
 import type {
   FixtureBounds,
   FixtureDefinition,
@@ -131,3 +134,17 @@ export function fixtureModelFinish(model: FixtureModel) {
     model.source.kind === "bundled" ? BY_MODEL.get(model.source.url) : null
   return fixture?.finish ?? null
 }
+
+/**
+ * How shiny a fixture is drawn: as the material it is made of, else as its bundled model's
+ * fixture is, else as its kind is (beds and wasteboards matte, the rest metal).
+ */
+export function definitionFinish(definition: FixtureDefinition): SurfaceFinish {
+  if (definition.material) return SURFACE_FINISHES[definition.material]
+  const bundled = definition.model && fixtureModelFinish(definition.model)
+  if (bundled) return bundled
+  return isMatteKind(definition.kind) ? SURFACE_FINISHES.matte : FIXTURE_METAL
+}
+
+/** How a fixture of a metal kind is drawn without a finish or material of its own. */
+const FIXTURE_METAL: SurfaceFinish = { metalness: 0.5, roughness: 0.55 }

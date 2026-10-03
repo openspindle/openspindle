@@ -13,6 +13,11 @@ import {
   ContextMenuShortcut,
 } from "@/components/ui/context-menu"
 import { useWorkspaceStore } from "@/app/workspace/workspace-context"
+import { useFixtureLibrary } from "@/app/fixtures/fixture-context"
+import { WORKSPACE_PROFILE, bedSetupOf } from "@/domain/fixtures/profiles"
+import type { FixtureLibrary } from "@/persistence/fixture-document"
+import { openDialog } from "@/features/shell/dialogs"
+import type { WorkspaceDialog } from "@/features/shell/dialogs"
 import type { ArrangeMenuRequest } from "@/components/workspace/bed-viewer"
 import {
   MOVE_AXES,
@@ -26,6 +31,36 @@ import { toggleLock } from "./use-arrange-events"
 
 const isMoveAxes = (value: unknown): value is MoveAxes =>
   MOVE_AXES.some((axes) => axes === value)
+
+/**
+ * The dialog that edits a fixture's definition, as its plate's device's bed setup defines it;
+ * null for other items, and for a fixture that bed setup does not define.
+ */
+function fixtureDialog(
+  { plate, item }: ArrangeTarget,
+  library: FixtureLibrary
+): WorkspaceDialog | null {
+  if (item.ref.kind !== "fixture") return null
+  const { id } = item.ref
+  const instance = plate.setup.fixtures.find((fixture) => fixture.id === id)
+  const profileId = plate.setup.deviceId ?? WORKSPACE_PROFILE
+  if (!instance || !Object.hasOwn(library.profiles, profileId)) return null
+  const bedSetup = bedSetupOf(
+    library.profiles[profileId],
+    plate.setup.bedSetupId
+  )
+  const definitionId = instance.definition.id
+  if (
+    !bedSetup.definitions.some((definition) => definition.id === definitionId)
+  )
+    return null
+  return {
+    kind: "fixture-definition",
+    profileId,
+    bedSetupId: bedSetup.id,
+    definitionId,
+  }
+}
 
 const AXIS_SHORTCUTS: Partial<Record<MoveAxes, string>> = {
   x: "X",
@@ -48,6 +83,8 @@ export function ArrangeMenu({
 }) {
   const workspace = useWorkspaceStore()
   const { moving, axes, snap } = useArrange()
+  const library = useFixtureLibrary((state) => state)
+  const editing = target && fixtureDialog(target, library)
   const anchor = useMemo(
     () =>
       request && {
@@ -95,6 +132,11 @@ export function ArrangeMenu({
                   Locked
                   <ContextMenuShortcut>L</ContextMenuShortcut>
                 </ContextMenuCheckboxItem>
+              )}
+              {editing && (
+                <ContextMenuItem onClick={() => openDialog(editing)}>
+                  Edit fixture…
+                </ContextMenuItem>
               )}
             </ContextMenuGroup>
             <ContextMenuSeparator />

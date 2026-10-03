@@ -9,6 +9,12 @@ import {
   FieldSet,
 } from "@/components/ui/field"
 import { Switch } from "@/components/ui/switch"
+import { ColorField } from "@/components/color-field"
+import { Hint } from "@/components/workspace/hint"
+import {
+  SURFACE_FINISHES,
+  SURFACE_MATERIALS,
+} from "@/domain/materials/surface-material"
 import { OptionSelect } from "@/components/option-select"
 import { NameField } from "@/components/name-field"
 import {
@@ -22,7 +28,9 @@ import {
   useFixtureLibrary,
   useFixtureLibraryStore,
 } from "@/app/fixtures/fixture-context"
-import { selectedProfile } from "@/app/fixtures/fixture-library-store"
+import { useWorkspaceStore } from "@/app/workspace/workspace-context"
+import { definitionFinish } from "@/domain/fixtures/catalog"
+import { profileDeviceId } from "@/domain/fixtures/profiles"
 import { fail, normalizeText, ok } from "@/domain/primitives"
 import {
   FIXTURE_NAME_LIMIT,
@@ -46,6 +54,20 @@ import { openDialog } from "@/features/shell/dialogs"
 import type { WorkspaceDialog } from "@/features/shell/dialogs"
 import { FixtureOrientationField } from "./fixture-orientation-field"
 import { MountPointsField } from "./mount-points-field"
+
+/** A fixture without a material of its own is drawn as its model or its type is. */
+const AUTOMATIC = "automatic"
+
+const MATERIAL_HINT =
+  "What it is made of, as it is drawn. Automatic draws a kit fixture as its model is, others as their type is: beds and wasteboards matte, the rest metal."
+
+const MATERIAL_OPTIONS = [
+  { value: AUTOMATIC, label: "Automatic" },
+  ...SURFACE_MATERIALS.map((material) => ({
+    value: material,
+    label: SURFACE_FINISHES[material].label,
+  })),
+] as const
 
 /** Fixture kinds, as they are named. */
 export const FIXTURE_KINDS: Array<[FixtureKind, string]> = [
@@ -231,8 +253,8 @@ function DefaultPositionFields({
 }
 
 /**
- * A fixture definition of a bed setup of the device profile the Device tab shows, edited as it
- * changes. It closes once the definition is gone, or another profile is shown.
+ * A fixture definition of a bed setup of a device's profile, edited as it changes: the plates
+ * set up on that bed setup show it as it is edited. It closes once the definition is gone.
  */
 export function FixtureDefinitionDialog({
   dialog,
@@ -242,13 +264,15 @@ export function FixtureDefinitionDialog({
   onClose: () => void
 }) {
   const fixtures = useFixtureLibraryStore()
-  const definitions = useFixtureLibrary((library) =>
-    library.selectedId === dialog.profileId
-      ? (selectedProfile(library).bedSetups.find(
-          (setup) => setup.id === dialog.bedSetupId
-        )?.definitions ?? null)
+  const workspace = useWorkspaceStore()
+  const profile = useFixtureLibrary((library) =>
+    Object.hasOwn(library.profiles, dialog.profileId)
+      ? library.profiles[dialog.profileId]
       : null
   )
+  const definitions =
+    profile?.bedSetups.find((setup) => setup.id === dialog.bedSetupId)
+      ?.definitions ?? null
   const definition =
     definitions?.find((item) => item.id === dialog.definitionId) ?? null
   useEffect(() => {
@@ -257,16 +281,25 @@ export function FixtureDefinitionDialog({
   const library = useModelLibrary().data
   if (!definitions || !definition) return null
   const { id } = definition
-  const update = (change: Partial<FixtureDefinition>) =>
-    fixtures.setDefinitions(
-      dialog.bedSetupId,
-      withSingleDefaultBed(
-        definitions.map((item) =>
-          item.id === id ? { ...item, ...change } : item
-        ),
-        change.defaultEnabled || change.kind ? id : undefined
-      )
+  // The profile's definition, and the plates set up on its bed setup that have the fixture.
+  const update = (change: Partial<FixtureDefinition>) => {
+    const next = withSingleDefaultBed(
+      definitions.map((item) =>
+        item.id === id ? { ...item, ...change } : item
+      ),
+      change.defaultEnabled || change.kind ? id : undefined
     )
+    fixtures.setDefinitions(dialog.bedSetupId, next, dialog.profileId)
+    const changed = next.find((item) => item.id === id)
+    if (changed)
+      workspace.dispatch({
+        type: "fixtures.redefine",
+        deviceId: profileDeviceId(dialog.profileId),
+        bedSetupId: dialog.bedSetupId,
+        isDefault: profile?.defaultBedSetupId === dialog.bedSetupId,
+        definition: changed,
+      })
+  }
   // The Models library model it draws, when the library has it: its preview turns it.
   const modelId = libraryModelId(definition)
   const previewed =
@@ -301,6 +334,28 @@ export function FixtureDefinitionDialog({
               className="w-full"
             />
           </Field>
+          <Field>
+            <FieldLabel htmlFor={`fixture-material-${definition.id}`}>
+              <Hint text={MATERIAL_HINT}>Material</Hint>
+            </FieldLabel>
+            <OptionSelect
+              options={MATERIAL_OPTIONS}
+              value={definition.material ?? AUTOMATIC}
+              onValueChange={(value) =>
+                update({ material: value === AUTOMATIC ? undefined : value })
+              }
+              id={`fixture-material-${definition.id}`}
+              aria-label="Fixture material"
+              aria-description={MATERIAL_HINT}
+              className="w-full"
+            />
+          </Field>
+          <ColorField
+            id={`fixture-color-${definition.id}`}
+            label="Colour"
+            value={definition.color}
+            onChange={(color) => update({ color })}
+          />
         </FieldGroup>
         <Field orientation="horizontal">
           <Switch
@@ -334,8 +389,8 @@ export function FixtureDefinitionDialog({
         {previewed && definition.model && (
           <FixtureOrientationField
             name={definition.name}
-            kind={definition.kind}
             color={definition.color}
+            finish={definitionFinish(definition)}
             model={definition.model}
             modelId={previewed}
             onChange={(model) =>

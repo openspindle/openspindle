@@ -1,12 +1,16 @@
 import * as THREE from "three"
 import { Line2 } from "three/addons/lines/webgpu/Line2.js"
 import { LineGeometry } from "three/addons/lines/LineGeometry.js"
-import { Line2NodeMaterial } from "three/webgpu"
-import { fixtureModelFinish } from "@/domain/fixtures/catalog"
+import { SeeThroughLineMaterial } from "./see-through-line"
+import { definitionFinish } from "@/domain/fixtures/catalog"
+import {
+  SURFACE_FINISHES,
+  surfaceMaterialOf,
+} from "@/domain/materials/surface-material"
+import type { SurfaceFinish } from "@/domain/materials/surface-material"
 import type { MachineBed } from "@/domain/fixtures/machine-bed"
 import { setupItemKey } from "@/domain/plate/setup-items"
 import type { SetupItemRef, SetupPoint } from "@/domain/plate/setup-items"
-import { isMatteKind } from "@/domain/fixtures/definitions"
 import type {
   FixtureInstance,
   FixtureModel,
@@ -211,7 +215,7 @@ export function workOriginAxes() {
     end[axis] = WORK_AXIS_LENGTH
     const line = new Line2(
       new LineGeometry().setPositions([0, 0, 0, ...end]),
-      new Line2NodeMaterial({
+      new SeeThroughLineMaterial({
         color: colors[axis],
         linewidth: WORK_AXIS_LINE_WIDTH,
         // Drawn over everything, so transparent: the translucent stock drawn after an opaque
@@ -286,13 +290,29 @@ function selectionOutline(color: THREE.Color, { bounds }: MachineBed) {
  */
 const PCB_LAMINATE = "#cfc68f"
 
-/** The colour of a stock's top face, and of the rest of its block. */
-function stockColors({ material, color }: Stock) {
+/** How a stock's face is drawn: its colour and finish. */
+type StockFace = SurfaceFinish & { readonly color: THREE.Color }
+
+/**
+ * How a stock's top face is drawn, and the rest of its block: in its colour, with the finish of
+ * what its material says it is made of (matte where it says nothing known). A PCB blank's top is
+ * its copper, its sides the laminate.
+ */
+function stockFaces({ material, color }: Stock): {
+  top: StockFace
+  body: StockFace
+} {
   const top = new THREE.Color(color)
-  return {
-    top,
-    body: material === "PCB" ? new THREE.Color(PCB_LAMINATE) : top,
-  }
+  if (material === "PCB" || /\bpcb\b|fr-?4/i.test(material))
+    return {
+      top: { color: top, ...SURFACE_FINISHES.metal },
+      body: {
+        color: new THREE.Color(PCB_LAMINATE),
+        ...SURFACE_FINISHES.plastic,
+      },
+    }
+  const finish = SURFACE_FINISHES[surfaceMaterialOf(material) ?? "matte"]
+  return { top: { color: top, ...finish }, body: { color: top, ...finish } }
 }
 
 /** The block's edges, darker than its faces: those around the top face in its colour. */
@@ -324,11 +344,12 @@ function stockObjects(plate: ViewerPlate): THREE.Object3D[] {
   const { stock } = plate
   const bounds = plateStockBounds(plate)
   if (!stock || !bounds) return []
-  const { top, body } = stockColors(stock)
-  const surface = (color: THREE.Color) =>
+  const { top, body } = stockFaces(stock)
+  const surface = ({ color, metalness, roughness }: StockFace) =>
     new THREE.MeshStandardMaterial({
       color,
-      roughness: 0.82,
+      metalness,
+      roughness,
       transparent: true,
       opacity: 0.76,
       depthWrite: false,
@@ -346,7 +367,7 @@ function stockObjects(plate: ViewerPlate): THREE.Object3D[] {
   ])
   block.position.set(...boundsCenter(bounds))
   const edges = new THREE.LineSegments(
-    stockEdges(geometry, top, body),
+    stockEdges(geometry, top.color, body.color),
     new THREE.LineBasicMaterial({
       vertexColors: true,
       transparent: true,
@@ -755,12 +776,7 @@ export class PlateView {
     template: THREE.Object3D | null
   ) {
     const missing = !template && model.source.kind === "library"
-    const matte = isMatteKind(instance.definition.kind)
-    // A kit fixture's bundled model has its own finish; others are drawn as their kind is.
-    const { metalness, roughness } = fixtureModelFinish(model) ?? {
-      metalness: matte ? 0 : 0.5,
-      roughness: matte ? 0.95 : 0.55,
-    }
+    const { metalness, roughness } = definitionFinish(instance.definition)
     const material = new THREE.MeshStandardMaterial({
       color: instance.definition.color,
       metalness,

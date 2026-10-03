@@ -4,6 +4,7 @@ import { ModelIdSchema } from "@/domain/models/model"
 import type { ModelRecord } from "@/domain/models/model"
 import { EntityIdSchema, Point3Schema, toMicrometre } from "@/domain/primitives"
 import type { Point3 } from "../nc/gcode"
+import { SurfaceMaterialSchema } from "@/domain/materials/surface-material"
 import { MountPointsSchema } from "./mount-points"
 import type { MountPoint } from "./mount-points"
 
@@ -95,6 +96,8 @@ export const FixtureDefinitionSchema = z.object({
     .refine((name) => !hasControlCharacter(name), "Remove control characters."),
   kind: FixtureKindSchema,
   color: z.string().regex(/^#[\da-f]{6}$/i),
+  /** What it is made of, as it is drawn; without one, as its model or its kind is. */
+  material: SurfaceMaterialSchema.optional(),
   defaultEnabled: z.boolean(),
   defaultPosition: Point3Schema,
   defaultRotation: Point3Schema,

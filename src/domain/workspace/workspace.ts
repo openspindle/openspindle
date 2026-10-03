@@ -1,6 +1,9 @@
 import type { HeightMap, RuleSettings } from "@/machine/contract"
 import type { StoredAnchorSetup } from "@/domain/anchors/stored-anchors"
-import type { FixtureInstance } from "@/domain/fixtures/definitions"
+import type {
+  FixtureDefinition,
+  FixtureInstance,
+} from "@/domain/fixtures/definitions"
 import type { Tool } from "@/domain/tools/tool"
 import type { Stock } from "@/domain/stock/stock"
 import { kitForPlate } from "../fixtures/catalog"
@@ -132,6 +135,18 @@ export type WorkspaceCommand =
       readonly anchors: StoredAnchorSetup | null
       readonly bedSetupId: string | null
     } & PlateTarget)
+  /**
+   * The fixtures defined as `definition` on the plates set up on `deviceId`'s bed setup
+   * `bedSetupId` (and on the plates set up on none of its bed setups, where it is the default)
+   * take it as it now is, where they are.
+   */
+  | {
+      readonly type: "fixtures.redefine"
+      readonly deviceId: string | null
+      readonly bedSetupId: string
+      readonly isDefault: boolean
+      readonly definition: FixtureDefinition
+    }
   /**
    * Moves a setup item by `delta` millimetres: a fixture, the stock with the design on it, or
    * the design (its work origin). Beds and locked fixtures stay in place.
@@ -513,6 +528,27 @@ function commandResult(
           patchedSetup(setup, { anchors, bedSetupId, fixtures: fixtures.value })
         )
       })
+    case "fixtures.redefine": {
+      const { deviceId, bedSetupId, isDefault, definition } = command
+      const plates = state.plates.map((plate) => {
+        const { setup } = plate
+        const onBedSetup =
+          setup.bedSetupId === bedSetupId || (!setup.bedSetupId && isDefault)
+        if (
+          setup.deviceId !== deviceId ||
+          !onBedSetup ||
+          !setup.fixtures.some((item) => item.definition.id === definition.id)
+        )
+          return plate
+        const fixtures = setup.fixtures.map((item) =>
+          item.definition.id === definition.id ? { ...item, definition } : item
+        )
+        return { ...plate, setup: patchedSetup(setup, { fixtures }) }
+      })
+      return plates.every((plate, index) => plate === state.plates[index])
+        ? ok(state)
+        : ok({ ...state, plates })
+    }
     case "anchors.sync": {
       const plates = state.plates.map((plate) =>
         command.connected

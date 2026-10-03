@@ -17,7 +17,7 @@ export type WorkspaceDialog =
       readonly returnToFusion: boolean
     }
   | { readonly kind: "stock"; readonly plateId: string }
-  /** A fixture definition of a bed setup of the device profile the Device tab shows, edited. */
+  /** A fixture definition of a bed setup of a device's profile, edited. */
   | {
       readonly kind: "fixture-definition"
       readonly profileId: string

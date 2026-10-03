@@ -13,6 +13,7 @@ import { toMicrometre } from "@/domain/primitives"
 import type { FixtureBounds, FixtureModel } from "@/domain/fixtures/definitions"
 import type { Point3 } from "@/domain/nc/gcode"
 import type { MountPoint } from "@/domain/fixtures/mount-points"
+import type { SurfaceFinish } from "@/domain/materials/surface-material"
 import { disposeObjects, inFixtureFrame } from "@/lib/three-assets"
 
 /** What the preview shows: a fixture's model in its frame, in the fixture's finish, with its points. */
@@ -20,8 +21,8 @@ export type FixtureModelView = {
   readonly model: FixtureModel
   readonly points: readonly MountPoint[]
   readonly color: string
-  /** Beds and wasteboards are drawn matte, the rest metallic, as on the plate. */
-  readonly matte: boolean
+  /** How shiny it is, as on the plate (`definitionFinish`). */
+  readonly finish: SurfaceFinish
 }
 
 export type FixtureModelSceneEvents = {
@@ -303,8 +304,8 @@ export class FixtureModelScene {
     }
     const { model } = view
     this.material.color.set(view.color)
-    this.material.metalness = view.matte ? 0 : 0.5
-    this.material.roughness = view.matte ? 0.95 : 0.55
+    this.material.metalness = view.finish.metalness
+    this.material.roughness = view.finish.roughness
     if (this.template) {
       const clone = this.template.clone(true)
       clone.traverse((child) => {

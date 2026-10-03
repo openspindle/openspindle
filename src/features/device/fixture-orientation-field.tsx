@@ -5,11 +5,9 @@ import { Button } from "@/components/ui/button"
 import { Field, FieldDescription, FieldTitle } from "@/components/ui/field"
 import { fixtureModelMountPoints } from "@/domain/fixtures/catalog"
 import type { ModelId } from "@/domain/models/model"
-import {
-  isMatteKind,
-  orientedFixtureModel,
-} from "@/domain/fixtures/definitions"
-import type { FixtureKind, FixtureModel } from "@/domain/fixtures/definitions"
+import { orientedFixtureModel } from "@/domain/fixtures/definitions"
+import type { FixtureModel } from "@/domain/fixtures/definitions"
+import type { SurfaceFinish } from "@/domain/materials/surface-material"
 import type { Point3 } from "@/domain/nc/gcode"
 import { disposeObjects, glbInBedSpace } from "@/lib/three-assets"
 import { useHost } from "@/platform/host-context"
@@ -24,15 +22,16 @@ const AS_AUTHORED: Point3 = [0, 0, 0]
  */
 export function FixtureOrientationField({
   name,
-  kind,
   color,
+  finish,
   model,
   modelId,
   onChange,
 }: {
   name: string
-  kind: FixtureKind
   color: string
+  /** How shiny it is drawn, as on the plate. */
+  finish: SurfaceFinish
   model: FixtureModel
   modelId: ModelId
   onChange: (model: FixtureModel) => void
@@ -97,9 +96,9 @@ export function FixtureOrientationField({
       model,
       points: fixtureModelMountPoints(model),
       color,
-      matte: isMatteKind(kind),
+      finish,
     })
-  }, [model, color, kind])
+  }, [model, color, finish])
 
   return (
     <Field>

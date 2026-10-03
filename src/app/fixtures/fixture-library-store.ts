@@ -284,17 +284,25 @@ export class FixtureLibraryStore implements DocumentTarget<FixtureLibrary> {
     }, null)
   }
 
-  /** Replaces the fixture definitions of one of the selected profile's bed setups. */
-  setDefinitions(bedSetupId: string, definitions: FixtureDefinition[]) {
-    const { selectedId } = this.state
-    const setup = selectedProfile(this.state).bedSetups.find(
+  /**
+   * Replaces the fixture definitions of one of a profile's bed setups: the selected profile's
+   * unless `profileId` names another.
+   */
+  setDefinitions(
+    bedSetupId: string,
+    definitions: FixtureDefinition[],
+    profileId: string = this.state.selectedId
+  ) {
+    if (!Object.hasOwn(this.state.profiles, profileId)) return
+    const setup = this.state.profiles[profileId].bedSetups.find(
       (item) => item.id === bedSetupId
     )
     if (!setup) return
     const key = definitionsKey(setup.definitions, definitions)
     this.edit(
-      (library) => this.withBedSetup(library, bedSetupId, { definitions }),
-      key === null ? null : `definitions:${selectedId}:${bedSetupId}:${key}`
+      (library) =>
+        this.withBedSetup(library, bedSetupId, { definitions }, profileId),
+      key === null ? null : `definitions:${profileId}:${bedSetupId}:${key}`
     )
   }
 
@@ -426,12 +434,13 @@ export class FixtureLibraryStore implements DocumentTarget<FixtureLibrary> {
   private withBedSetup(
     library: FixtureLibrary,
     bedSetupId: string,
-    patch: Partial<BedSetup>
+    patch: Partial<BedSetup>,
+    profileId: string = library.selectedId
   ): FixtureLibrary {
-    if (!Object.hasOwn(library.profiles, library.selectedId)) return library
-    const { bedSetups } = library.profiles[library.selectedId]
+    if (!Object.hasOwn(library.profiles, profileId)) return library
+    const { bedSetups } = library.profiles[profileId]
     if (!bedSetups.some((setup) => setup.id === bedSetupId)) return library
-    return this.withSelected(library, {
+    return this.withProfile(library, profileId, {
       bedSetups: bedSetups.map((setup) =>
         setup.id === bedSetupId ? { ...setup, ...patch } : setup
       ),
@@ -442,12 +451,17 @@ export class FixtureLibraryStore implements DocumentTarget<FixtureLibrary> {
     library: FixtureLibrary,
     patch: Partial<FixtureProfile>
   ): FixtureLibrary {
+    return this.withProfile(library, library.selectedId, patch)
+  }
+
+  private withProfile(
+    library: FixtureLibrary,
+    profileId: string,
+    patch: Partial<FixtureProfile>
+  ): FixtureLibrary {
     const profiles: FixtureProfiles = {
       ...library.profiles,
-      [library.selectedId]: {
-        ...library.profiles[library.selectedId],
-        ...patch,
-      },
+      [profileId]: { ...library.profiles[profileId], ...patch },
     }
     return { ...library, profiles }
   }
