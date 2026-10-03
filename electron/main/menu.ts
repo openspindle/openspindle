@@ -73,13 +73,15 @@ function editMenu(bus: MenuBus, isMac: boolean): MenuItemConstructorOptions {
  * Machine › Stop and Help › Export Protocol Trace are the exceptions: they go straight to
  * the machine in main, so they work even when the renderer is unresponsive, as does Help ›
  * Export Log. The update items (electron/main/updates.ts) are main's too; in builds that
- * cannot update, Check for Updates… says so.
+ * cannot update, Check for Updates… says so. Windows has no application menu: the About panel
+ * and the open-source licenses (electron/main/about.ts) are at the end of Help there.
  */
 export function buildApplicationMenu(
   bus: MenuBus,
   machine: { stop: () => void; exportTrace: () => void },
   updates: { enabled: boolean; check: () => void; install: () => void },
-  diagnostics: { exportLog: () => void }
+  diagnostics: { exportLog: () => void },
+  about: { openCredits: () => void }
 ): Menu {
   const isMac = process.platform === "darwin"
   const updateItems: MenuItemConstructorOptions[] = [
@@ -209,7 +211,18 @@ export function buildApplicationMenu(
           label: "Export Log…",
           click: () => diagnostics.exportLog(),
         },
-        ...(isMac ? [] : [{ type: "separator" } as const, ...updateItems]),
+        ...(isMac
+          ? []
+          : [
+              { type: "separator" } as const,
+              ...updateItems,
+              { type: "separator" } as const,
+              {
+                label: "Open-Source Licenses",
+                click: () => about.openCredits(),
+              },
+              { role: "about" } as const,
+            ]),
       ],
     },
   ])

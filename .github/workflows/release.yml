@@ -1,8 +1,9 @@
 # Every push to main runs release-please, which keeps a release pull request open with the next
 # version and its release notes, worked out from the titles of the pull requests merged since the
-# last release. Merging it tags the release and creates it as a draft; the build job then builds,
-# signs and notarizes the universal app, attaches it to the draft and publishes it, and installed
-# apps update to it. See docs/releasing.md.
+# last release. Merging it tags the release and creates it as a draft; the build jobs then build,
+# sign and notarize the universal Mac app and build the Windows installer, attaching both to the
+# draft, and the publish job publishes it once both are there. Installed apps update to it. See
+# docs/releasing.md.
 name: Release
 
 on:
@@ -53,19 +54,18 @@ jobs:
         with:
           token: ${{ steps.token.outputs.token }}
 
-  build:
+  build-mac:
     needs: release-please
     if: needs.release-please.outputs.created == 'true'
     runs-on: macos-15
     timeout-minutes: 60
     # The signing and notarization secrets belong to this environment, which only main deploys to.
     environment: release
-    # Attaches the app to the draft release and publishes it.
+    # Attaches the app to the draft release.
     permissions:
       contents: write
     env:
       TAG: ${{ needs.release-please.outputs.tag }}
-      VERSION: ${{ needs.release-please.outputs.version }}
       BUILD_NUMBER: ${{ github.run_number }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -118,12 +118,80 @@ jobs:
             exit 1
           fi
 
-      # The DMG installs; installed apps update from latest-mac.yml, the zip and its blockmap. The
-      # draft is published only once everything is attached: published releases are immutable.
-      - name: Attach the app to the draft release and publish it
+      # The DMG installs; installed apps update from latest-mac.yml, the zip and its blockmap.
+      - name: Attach the app to the draft release
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
+        run: gh release upload "$TAG" release/*.dmg release/*.zip release/*.blockmap release/latest-mac.yml --clobber
+
+  build-windows:
+    needs: release-please
+    if: needs.release-please.outputs.created == 'true'
+    runs-on: windows-2025
+    timeout-minutes: 60
+    # Sentry's token belongs to this environment, which only main deploys to.
+    environment: release
+    # Attaches the installer to the draft release.
+    permissions:
+      contents: write
+    env:
+      TAG: ${{ needs.release-please.outputs.tag }}
+      # The installer's file version is the release's version and this build number.
+      BUILD_NUMBER: ${{ github.run_number }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.release-please.outputs.sha }}
+          persist-credentials: false
+
+      # No dependency cache: a release installs everything from the registry.
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+
+      - run: npm ci
+
+      # Not signed yet: Windows warns before it runs an installer from the internet that no
+      # certificate vouches for (docs/releasing.md).
+      - name: Build
+        env:
+          SENTRY_DSN: ${{ vars.SENTRY_DSN }}
+          SENTRY_ORG: ${{ vars.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+        run: npm run dist:win -- --publish never
+
+      - name: Check that the app can update
         run: |
-          gh release upload "$TAG" release/*.dmg release/*.zip release/*.blockmap release/latest-mac.yml --clobber
-          gh release edit "$TAG" --title "OpenSpindle $VERSION" --draft=false --latest
+          if [ ! -f release/latest.yml ] || [ ! -f release/win-unpacked/resources/app-update.yml ]; then
+            echo "::error::No update feed: electron-builder found no repository in package.json"
+            exit 1
+          fi
+
+      # The installer installs, and installed apps update from latest.yml, the installer and its
+      # blockmap.
+      - name: Attach the installer to the draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: gh release upload "$TAG" release/OpenSpindle-Setup-*.exe release/OpenSpindle-Setup-*.exe.blockmap release/latest.yml --clobber
+
+  # The draft is published only once both apps are attached: published releases are immutable.
+  publish:
+    needs: [release-please, build-mac, build-windows]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ needs.release-please.outputs.tag }}
+          VERSION: ${{ needs.release-please.outputs.version }}
+        run: gh release edit "$TAG" --title "OpenSpindle $VERSION" --draft=false --latest

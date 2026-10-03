@@ -76,7 +76,11 @@ async function unusable(executable, info) {
 
 /** The first pcb2gcode where it is usually installed that passes the checks and runs. */
 async function foundRuntime(installed, signal) {
-  let problem = `Install pcb2gcode, with Homebrew for example (brew install pcb2gcode), or choose it in ${SETTINGS}.`
+  // Windows has no Homebrew, and automatic detection nowhere to look: the user chooses it.
+  let problem =
+    process.platform === "win32"
+      ? `Install pcb2gcode and choose pcb2gcode.exe in ${SETTINGS}.`
+      : `Install pcb2gcode, with Homebrew for example (brew install pcb2gcode), or choose it in ${SETTINGS}.`
   for (const executable of installed) {
     // Follows a link, such as Homebrew's, to the program itself.
     const info = await stat(executable).catch(() => null)

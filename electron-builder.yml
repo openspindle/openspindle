@@ -21,11 +21,6 @@ extraResources:
 # Writes LICENSES.chromium.txt: Electron's LICENSES.chromium.html (20 MB) with each text it repeats
 # printed once, about 1.5 MB.
 afterPack: ./tools/packaging/chromium-licenses.ts
-# Signed with the Developer ID Application certificate named by CSC_NAME in .env or, in CI,
-# imported from CSC_LINK (docs/releasing.md), with hardened runtime and electron-builder's default
-# entitlements. Fail rather than produce an unsigned app when it is missing; npm run package:mac
-# signs ad-hoc instead.
-forceCodeSigning: true
 # Electron's fuses, flipped before signing so that the signature covers them. The app loads only
 # its own app.asar, checked against the hash in Info.plist, and runs no code handed to it through
 # ELECTRON_RUN_AS_NODE, NODE_OPTIONS, --inspect or SIGUSR1. The renderer comes from app://, so file:// pages get no
@@ -40,25 +35,31 @@ electronFuses:
   grantFileProtocolExtraPrivileges: false
   enableCookieEncryption: false
 # Installed apps update from this repository's GitHub releases (electron/main/updates.ts): builds
-# write latest-mac.yml beside the artifacts and app-update.yml into the app. Owner and repo come
+# write latest-mac.yml or latest.yml beside the artifacts and app-update.yml into the app. Owner and repo come
 # from the git remote; without one, a build leaves both out and cannot update.
 publish:
   provider: github
-# The files OpenSpindle opens (FILE_KINDS in src/platform/contract/files.ts), which macOS then
-# offers it for: Finder lists it under Open With for NC programs without taking them from the
-# CAM or editor that opens them now, and opens its own projects with it. The app imports what it
-# is handed as it imports dropped files (electron/main/services/opened-files.ts).
+# The files OpenSpindle opens (FILE_KINDS in src/platform/contract/files.ts): the system opens
+# its own projects with it, and lists it under Open With for NC programs without taking them
+# from the CAM or editor that opens them now (mac below; build/installer.nsh on Windows). The app
+# imports what it is handed as it imports dropped files (electron/main/services/opened-files.ts).
 fileAssociations:
-  - ext: [nc, cnc, gcode, tap, ngc]
-    name: NC program
-    role: Viewer
-    rank: Alternate
   - ext: stpnc
     name: STEP-NC project
     role: Editor
     rank: Owner
 mac:
   category: public.app-category.productivity
+  # Signed with the Developer ID Application certificate named by CSC_NAME in .env or, in CI,
+  # imported from CSC_LINK (docs/releasing.md), with hardened runtime and electron-builder's
+  # default entitlements. Fail rather than produce an unsigned app when it is missing; npm run
+  # package:mac signs ad-hoc instead.
+  forceCodeSigning: true
+  fileAssociations:
+    - ext: [nc, cnc, gcode, tap, ngc]
+      name: NC program
+      role: Viewer
+      rank: Alternate
   # The interface is English, so only Chromium's English resources ship: 50 MB less than its 220
   # translations. Chromium's locale is then en-US on every Mac, as are macOS's own dialogs.
   electronLanguages: [en]
@@ -72,3 +73,15 @@ mac:
   extendInfo:
     NSLocalNetworkUsageDescription: OpenSpindle finds and controls CNC machines on your local network.
     LSAppNapIsDisabled: true
+win:
+  # English only, as on macOS: Windows names Chromium's resources by region.
+  electronLanguages: [en-US]
+  # Most Windows PCs are x64, and Windows on Arm runs x64 apps too.
+  target:
+    - target: nsis
+      arch: x64
+nsis:
+  # Without spaces: GitHub stores an uploaded file's spaces as dots, and latest.yml names the
+  # installer with dashes.
+  artifactName: ${productName}-Setup-${version}.${ext}
+  include: build/installer.nsh

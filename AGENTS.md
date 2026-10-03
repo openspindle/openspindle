@@ -44,5 +44,5 @@ See docs/architecture.md. In short:
 - `src/formats` holds file formats, `src/persistence` the versioned repositories, `src/platform` the Host abstraction and RPC clients, `src/app` application state (TanStack stores and diagnostics).
 - `src/features/<feature>` holds UI; `src/routes` stays thin. Dialogs are opened through the typed dialog atom in `src/features/shell/dialogs.ts` and rendered by the dialog host.
 - Problems the user must see are `Diagnostic`s with quick fixes, not exceptions. Machine disabled reasons come only from `snapshot.availability`.
-- Log through `log` (`src/app/errors/log.ts` in the renderer, `electron/main/diagnostics/log.ts` in main), not `console`. Unexpected errors reach the user in the error dialog with their Sentry ID, and leave the Mac only as the user allows (docs/architecture.md, Errors and logs).
+- Log through `log` (`src/app/errors/log.ts` in the renderer, `electron/main/diagnostics/log.ts` in main), not `console`. Unexpected errors reach the user in the error dialog with their Sentry ID, and leave the computer only as the user allows (docs/architecture.md, Errors and logs).
 - Validate untrusted data with Zod schemas; derive types with `z.infer`. Use TanStack Form for forms, TanStack Table/Virtual for long lists, TanStack Query mutations for async workspace work.

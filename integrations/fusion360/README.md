@@ -8,11 +8,13 @@ OpenSpindle imports the resulting G-code into the workspace.
 
 ## Install
 
-1. In Finder, open **Applications**, right-click **OpenSpindle.app**, and choose
-   **Show Package Contents**. Open **Contents → Resources → fusion360** to find
-   the **OpenSpindleBridge** folder. In Fusion, open **Utilities → Scripts and
-   Add-Ins**, choose **+ → Script or add-in from device**, and select that folder. In older
-   Fusion versions, use the **Add-Ins** tab and its **+** button.
+1. Find the **OpenSpindleBridge** folder that comes with OpenSpindle. On macOS,
+   in Finder, open **Applications**, right-click **OpenSpindle.app**, choose
+   **Show Package Contents** and open **Contents → Resources → fusion360**. On
+   Windows, it is in `%LOCALAPPDATA%\Programs\openspindle\resources\fusion360`.
+   In Fusion, open **Utilities → Scripts and Add-Ins**, choose **+ → Script or
+   add-in from device**, and select that folder. In older Fusion versions, use
+   the **Add-Ins** tab and its **+** button.
 2. Find **OpenSpindleBridge** and click **Run**. Keep **Run on Startup** on (the
    manifest's default) so the bridge starts with Fusion; for an add-in added
    before, turn it on there.

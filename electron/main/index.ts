@@ -2,7 +2,7 @@ import { Menu, app, dialog } from "electron"
 import type { BrowserWindow } from "electron"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
-import { configureAboutPanel } from "./about"
+import { configureAboutPanel, openCredits } from "./about"
 import { Diagnostics, appInfo } from "./diagnostics/diagnostics"
 import { ErrorReports } from "./diagnostics/error-reports"
 import { log } from "./diagnostics/log"
@@ -40,6 +40,10 @@ const DEV_ICON = app.isPackaged
 
 registerAppScheme()
 app.setName("OpenSpindle")
+// Windows shows a notification only for an app whose ID its Start menu shortcut carries: the
+// installer gives the shortcut electron-builder.yml's appId.
+if (process.platform === "win32")
+  app.setAppUserModelId("com.openspindle.desktop")
 // Dev runs keep their data, and their log, apart from the installed app's.
 if (!app.isPackaged) {
   app.setPath("userData", `${app.getPath("userData")}-dev`)
@@ -50,12 +54,26 @@ let mainWindow: BrowserWindow | null = null
 const currentWindow = () =>
   mainWindow && !mainWindow.isDestroyed() ? mainWindow : null
 
+/**
+ * Files Windows asks the app to open (Explorer's Open with, a double-click) arrive on the
+ * command line: the app's own when they launch it, a second instance's when it runs. Chromium
+ * may add switches to a second instance's, and dev runs start Electron with the app's folder.
+ */
+function filesInArgs(argv: readonly string[]): string[] {
+  if (process.platform === "darwin") return []
+  return argv
+    .slice(process.defaultApp ? 2 : 1)
+    .filter((arg) => !arg.startsWith("-") && path.isAbsolute(arg))
+}
+
 // One instance owns the discovery port and the machine connection.
 if (!app.requestSingleInstanceLock()) app.quit()
 else {
   const diagnostics = startDiagnostics()
   const openedFiles = new OpenedFileBus()
-  app.on("second-instance", () => {
+  for (const filePath of filesInArgs(process.argv)) openedFiles.open(filePath)
+  app.on("second-instance", (_event, argv) => {
+    for (const filePath of filesInArgs(argv)) openedFiles.open(filePath)
     const window = currentWindow()
     if (!window) return
     if (window.isMinimized()) window.restore()
@@ -177,7 +195,8 @@ function start(diagnostics: Diagnostics, openedFiles: OpenedFileBus) {
         check: () => void updates.check(),
         install: () => updates.install(),
       },
-      { exportLog: () => void diagnostics.exportLogFromMenu(files) }
+      { exportLog: () => void diagnostics.exportLogFromMenu(files) },
+      { openCredits: () => void openCredits() }
     )
   )
   updates.start()

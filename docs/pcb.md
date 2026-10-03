@@ -6,9 +6,9 @@ Use **PCB** in the Prepare toolbar or **Add operation** to import exports. Selec
 
 ## pcb2gcode
 
-OpenSpindle does not include pcb2gcode: install it, with [Homebrew](https://brew.sh) for example (`brew install pcb2gcode`). The converter supports pcb2gcode 3.0.4.
+OpenSpindle does not include pcb2gcode: install it, with [Homebrew](https://brew.sh) for example (`brew install pcb2gcode`). The converter supports pcb2gcode 3.0.4. On Windows, pcb2gcode's [releases](https://github.com/pcb2gcode/pcb2gcode/releases) carry a Windows build only now and then; its README describes building one with MSYS2.
 
-In **Settings › PCB**, choose the pcb2gcode executable or use automatic detection. With no chosen path, OpenSpindle checks `/opt/homebrew/bin/pcb2gcode`, then `/usr/local/bin/pcb2gcode`. It accepts an executable owned by you or root that other users cannot modify and that reports a version with `--version`. It does not search `PATH`.
+In **Settings › PCB**, choose the pcb2gcode executable or use automatic detection. With no chosen path, OpenSpindle checks `/opt/homebrew/bin/pcb2gcode`, then `/usr/local/bin/pcb2gcode`: on Windows, choose `pcb2gcode.exe`. It accepts an executable owned by you or root that other users cannot modify and that reports a version with `--version`. It does not search `PATH`.
 
 A chosen executable takes precedence, including when it cannot run. Use automatic detection to clear that choice. The PCB settings and operation editor report whether conversion is ready; **Check again** checks the installation after installing or upgrading pcb2gcode. Operations keep their source files and settings while waiting for a working executable.
 

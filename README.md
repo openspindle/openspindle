@@ -12,7 +12,7 @@ OpenSpindle is a desktop app for preparing, checking and running jobs on a Maker
 - Plates on a 3D model of the Z1's bed, each with its stock, fixtures, work origin and tool table, drawn as Smooth Shades or as Shaded Edges with fine edge lines
 - Fixtures: the MDF bed, L-brackets, top clamps, dowel pins and 4th axis, or your own STEP and GLB models, each drawn as what it is made of
 - Placement relative to the machine's stored anchors, with move, snap and lock in the 3D view
-- Import of `.nc`, `.cnc`, `.gcode`, `.tap` and `.ngc` programs from your CAM or from Finder, split into operations by tool or toolpath
+- Import of `.nc`, `.cnc`, `.gcode`, `.tap` and `.ngc` programs from your CAM, Finder or Explorer, split into operations by tool or toolpath
 - Discover NC programs in Fusion 360, import them directly through the installable Python add-in, and update imported operations from them
 - Probing chosen by what it does, each strategy pictured as it probes, with a probe from your tool library that can do it: Z surface sets work Z on the stock top, Height map compensates later cuts for an uneven surface, and Outline trace traces where the plate cuts, or the edges you choose, with the probe's laser
 - The work origin found with the Makera 3D Probe: Outside corner, Inside corner, Pocket center or Boss center, on the stock or on a bracket or anything else on the bed, from a start picked in the 3D view that snaps to the corners, holes and centres there
@@ -29,21 +29,23 @@ OpenSpindle is a desktop app for preparing, checking and running jobs on a Maker
 - STEP-NC project files, and NC export with the plate's setup
 - Built-in PCB preparation from KiCad Gerber and Excellon files, using your local pcb2gcode installation
 - Error reports and logs under your control; no account or cloud service
-- A signed and notarized app for Apple silicon and Intel Macs that updates itself
+- An app for Windows, and a signed and notarized app for Apple silicon and Intel Macs, that update themselves
 
 ![The Prepare tab with three plates for a double-sided PCB, each on the Z1's MDF bed with L-brackets, and the selected plate's stock placed relative to Anchor 1](docs/images/prepare.webp)
 
 ## Install
 
-Download `OpenSpindle-<version>-universal.dmg` from the [latest release](../../releases/latest) and drag OpenSpindle to **Applications**. OpenSpindle is released for macOS only. Allow local network access when macOS asks, or OpenSpindle cannot reach the machine; you can turn it on later in **System Settings › Privacy & Security › Local Network**.
+**macOS:** download `OpenSpindle-<version>-universal.dmg` from the [latest release](../../releases/latest) and drag OpenSpindle to **Applications**. Allow local network access when macOS asks, or OpenSpindle cannot reach the machine; you can turn it on later in **System Settings › Privacy & Security › Local Network**.
+
+**Windows:** download `OpenSpindle-Setup-<version>.exe` from the [latest release](../../releases/latest) and run it: it installs OpenSpindle for your user, without administrator rights, and starts it. The installer is for x64 PCs and runs on Windows on Arm too. It is not signed yet, so Windows warns before running it: choose **More info**, then **Run anyway**. Allow OpenSpindle through the firewall when Windows asks, or it does not find machines on the network; entering a machine's IP address works either way.
 
 ## Quick start
 
 1. **Connect:** click the device card in **Prepare** and choose your Z1, or enter its IP address.
-2. **Import:** drop your CAM's NC files on the window, open them with OpenSpindle from Finder, or choose **File › Import…** or **File › Import from Fusion 360**. When a program splits into operations, or holds what the Z1 would not run as written, OpenSpindle asks first: which plate it goes to, how to split it and how to fix it.
+2. **Import:** drop your CAM's NC files on the window, open them with OpenSpindle from Finder or Explorer, or choose **File › Import…** or **File › Import from Fusion 360**. When a program splits into operations, or holds what the Z1 would not run as written, OpenSpindle asks first: which plate it goes to, how to split it and how to fix it.
 3. **Set up:** place the stock, set the work origin and assign the tools that were not matched from your library.
 4. **Check:** play the program back on the **Job** tab.
-5. **Run:** once the run checklist passes. **Machine › Stop** (⌘.) stops at any time.
+5. **Run:** once the run checklist passes. **Machine › Stop** (⌘. on macOS, Ctrl+. on Windows) stops at any time.
 
 ## Status and safety
 
@@ -75,7 +77,7 @@ Contributions are welcome, from people and their coding agents: testing on a rea
 
 ### Development
 
-You need Node.js 22.18 or later and, to build releases, macOS.
+You need Node.js 22.18 or later and, to build the Mac app, macOS. `npm run package:win` builds the Windows installer on macOS or Windows.
 
 ```sh
 npm ci
