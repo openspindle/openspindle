@@ -126,7 +126,9 @@ function CustomStockForm({ onAdd }: { onAdd: (stock: Stock) => void }) {
 
 /**
  * Chooses the plate's stock from the library: a stock is selected here, and Use selected stock
- * assigns it to the plate and makes it the default for new plates.
+ * assigns it to the plate and makes it the default for new plates. Where the plate has stock,
+ * Replace stock does so, and Apply material gives the plate's stock the selected one's name,
+ * material and colour, keeping its size.
  */
 export function StockDialog({
   plateId,
@@ -162,14 +164,55 @@ export function StockDialog({
     }
     onClose()
   }
+  // The plate's own stock, made of the chosen one's material: its size stays.
+  const material = chosen &&
+    current && {
+      ...current,
+      name: chosen.name,
+      material: chosen.material,
+      color: chosen.color,
+    }
+  const applyMaterial = () => {
+    if (!material) return
+    const result = workspace.dispatch({
+      type: "plate.setup",
+      plateId,
+      patch: { stock: material, stockSource: "assigned" },
+    })
+    if (!result.ok) {
+      toast.error(result.error)
+      return
+    }
+    onClose()
+  }
+  const sameMaterial =
+    !!chosen &&
+    chosen.name === current?.name &&
+    chosen.material === current.material &&
+    chosen.color === current.color
   return (
     <AppDialog
       title="Stock"
       onClose={onClose}
       footer={
-        <Button disabled={!chosen} onClick={use}>
-          Use selected stock
-        </Button>
+        current ? (
+          <>
+            <Button
+              variant="outline"
+              disabled={!chosen || sameMaterial}
+              onClick={applyMaterial}
+            >
+              Apply material
+            </Button>
+            <Button disabled={!chosen} onClick={use}>
+              Replace stock
+            </Button>
+          </>
+        ) : (
+          <Button disabled={!chosen} onClick={use}>
+            Use selected stock
+          </Button>
+        )
       }
     >
       <FieldGroup>
