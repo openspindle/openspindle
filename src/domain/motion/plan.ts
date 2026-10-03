@@ -75,17 +75,37 @@ const sameRoutine = (segment: GCodeSegment, other: GCodeSegment | undefined) =>
   !!segment.routine && !!other?.routine && other.line === segment.line
 
 /**
- * Where the work offset changes along a program's moves (`GCodeProgram.offsets`), from the first
- * on: a work move's point less its shift is where it is in the machine's work coordinates.
+ * Where the work offset changes along a program's moves, from the first on: the program's
+ * (`GCodeProgram.offsets`), but a routine's move made in work coordinates it set itself is made in
+ * its own (`GCodeSegment.workOffset`). A work move's point less its shift is where it is in the
+ * machine's work coordinates.
  */
-function shiftsOf({ offsets }: GCodeProgram): MotionPlan["shifts"] {
+function shiftsOf({ offsets, segments }: GCodeProgram): MotionPlan["shifts"] {
   const shifts: { from: MoveIndex; shift: Vec3 }[] = []
-  for (const { segment, offset } of offsets) {
+  let next = 0
+  let program: Vec3 = [0, 0, 0]
+  for (let index = 0; index < segments.length; index++) {
+    while (next < offsets.length && offsets[next].segment <= index)
+      program = [...offsets[next++].offset]
+    const shift = segments[index].workOffset ?? program
     const last = shifts.at(-1)
-    if (last?.shift.every((value, axis) => value === offset[axis])) continue
-    shifts.push({ from: moveIndex(segment), shift: [...offset] })
+    if (last?.shift.every((value, axis) => value === shift[axis])) continue
+    shifts.push({ from: moveIndex(index), shift: [...shift] })
   }
   return shifts.length ? shifts : [{ from: moveIndex(0), shift: [0, 0, 0] }]
+}
+
+/**
+ * The first move after the program sets work Z, or a routine of its sets it and moves in it
+ * (`GCodeSegment.workOffset`); the first move when neither does.
+ */
+function workZFromOf({ offsets, segments }: GCodeProgram): MoveIndex {
+  const set = offsets.find(({ setsWorkZ }) => setsWorkZ)?.segment
+  const moved = segments.findIndex((segment) => !!segment.workOffset)
+  const first = [set, moved >= 0 ? moved : undefined].filter(
+    (at): at is number => at !== undefined
+  )
+  return moveIndex(first.length ? Math.min(...first) : 0)
 }
 
 /**
@@ -93,8 +113,10 @@ function shiftsOf({ offsets }: GCodeProgram): MotionPlan["shifts"] {
  * reports during each and when each runs by the machine's limits.
  *
  * - Routines' moves and a G53 block's own are placed by machine position, the program's others
- *   by work position, less the program's work offset at the move (`shifts`). Work Z is the
- *   machine's from the first move after the program first sets it (`workZFrom`).
+ *   by work position, less the program's work offset at the move (`shifts`); a routine's move
+ *   made in work coordinates it set itself (`GCodeSegment.workOffset`) by work position too, less
+ *   that offset. Work Z is the machine's from the first move after the program first sets it, or
+ *   a routine moves in work Z it set (`workZFrom`).
  * - The line the firmware reports (`P:`) is the last feed move's of the program's own, G53's
  *   included, or a pause's after it (`reportLine`). The tools it reports come from the firmware's
  *   status (`GCodeSegment.statusTool`, `statusTarget`).
@@ -169,7 +191,9 @@ export function planMotion(
     kind[index] = kindOf(segment)
     routine[index] = segment.routine ? 1 : 0
     frame[index] =
-      segment.routine || segment.machine ? MOVE_FRAME.machine : MOVE_FRAME.work
+      (segment.routine || segment.machine) && !segment.workOffset
+        ? MOVE_FRAME.machine
+        : MOVE_FRAME.work
     overridable[index] = segment.probing ? 0 : 1
     line[index] = segment.line
     const { defaultRate } = segment
@@ -241,9 +265,7 @@ export function planMotion(
     timing,
     checkpoints,
     shifts: shiftsOf(program),
-    workZFrom: moveIndex(
-      program.offsets.find(({ setsWorkZ }) => setsWorkZ)?.segment ?? 0
-    ),
+    workZFrom: workZFromOf(program),
     limits,
   }
 }

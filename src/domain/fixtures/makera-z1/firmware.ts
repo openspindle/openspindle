@@ -410,12 +410,21 @@ class Z1Preview implements GCodeFirmware {
       point[index] = value
       return point
     }
+    /**
+     * A move's style once the routine has set work Z: the firmware makes it in the work
+     * coordinates set so far, from where the probe touched rather than from the plate's model.
+     */
+    const inWork = (style: Style): Style =>
+      top.touched ? { ...style, workOffset: [...offset] } : style
+    // Each touch of the top sets work Z there (G10 L20 P0 Z0): the probe lifts from it and
+    // touches again.
     const topTouches = () => {
       if (!this.search(moves, [0, 0, Z1.search], touch)) return false
-      moves.z(moves.at[2] + retract, rapid)
-      this.search(moves, [0, 0, Z1.search], touch)
       offset[2] = moves.at[2]
       top.touched = true
+      moves.z(moves.at[2] + retract, inWork(rapid))
+      this.search(moves, [0, 0, Z1.search], inWork(touch))
+      offset[2] = moves.at[2]
       moves.z(start[2], rapid)
       return true
     }
@@ -428,19 +437,22 @@ class Z1Preview implements GCodeFirmware {
       const touched = this.sideSearch(moves, index, reach, side, radius, style)
       reached &&= touched
     }
-    // Two touches on a side, the retract between and after them, from where the probe is.
+    // Two touches on a side, the retract between and after them, from where the probe is; a
+    // corner's side sets its origin (`origin`, from the contact) before the last retract.
     const sideTouches = (
       index: 0 | 1,
       first: number,
       second: number,
-      side: (direction: number) => number | null
+      side: (direction: number) => number | null,
+      origin?: (contact: number) => number
     ) => {
-      sideSearch(index, first, side(first), touch)
+      sideSearch(index, first, side(first), inWork(touch))
       const back = -Math.sign(first) * retract
-      moves.to(axis(index, moves.at[index] + back), rapid)
-      sideSearch(index, second, side(second), again)
+      moves.to(axis(index, moves.at[index] + back), inWork(rapid))
+      sideSearch(index, second, side(second), inWork(again))
       const contact = moves.at[index]
-      moves.to(axis(index, moves.at[index] + back), rapid)
+      if (origin) offset[index] = origin(contact)
+      moves.to(axis(index, moves.at[index] + back), inWork(rapid))
       return contact
     }
     switch (found.routine) {
@@ -448,14 +460,24 @@ class Z1Preview implements GCodeFirmware {
         if (!topTouches()) break
         moves.to(axis(0, start[0] - dx), rapid)
         moves.z(offset[2] - dz, down)
-        const x = sideTouches(0, dx, dx, () => feature[0])
-        offset[0] = x + Math.sign(dx) * radius
+        sideTouches(
+          0,
+          dx,
+          dx,
+          () => feature[0],
+          (x) => x + Math.sign(dx) * radius
+        )
         moves.z(start[2], rapid)
         moves.to(axis(0, start[0]), rapid)
         moves.to(axis(1, start[1] + dy), rapid)
         moves.z(offset[2] - dz, down)
-        const y = sideTouches(1, -dy, -dy, () => feature[1])
-        offset[1] = y - Math.sign(dy) * radius
+        sideTouches(
+          1,
+          -dy,
+          -dy,
+          () => feature[1],
+          (y) => y - Math.sign(dy) * radius
+        )
         moves.z(start[2], rapid)
         moves.xy([offset[0], offset[1]], rapid)
         break
@@ -465,11 +487,21 @@ class Z1Preview implements GCodeFirmware {
         moves.xy([start[0] + dx, start[1] - dy], rapid)
         moves.z(offset[2] - dz, down)
         const inside = moves.at[0]
-        const x = sideTouches(0, -dx, -dx, () => feature[0])
-        offset[0] = x - Math.sign(dx) * radius
-        moves.to(axis(0, inside), rapid)
-        const y = sideTouches(1, dy, dy, () => feature[1])
-        offset[1] = y + Math.sign(dy) * radius
+        sideTouches(
+          0,
+          -dx,
+          -dx,
+          () => feature[0],
+          (x) => x - Math.sign(dx) * radius
+        )
+        moves.to(axis(0, inside), inWork(rapid))
+        sideTouches(
+          1,
+          dy,
+          dy,
+          () => feature[1],
+          (y) => y + Math.sign(dy) * radius
+        )
         moves.z(start[2], rapid)
         moves.xy([offset[0], offset[1]], rapid)
         break

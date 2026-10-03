@@ -61,6 +61,12 @@ export interface GCodeSegment {
   statusTarget?: number
   /** The machine waits for the user after it: for a tool change, at the position it waits at. */
   wait?: "tool"
+  /**
+   * For a routine's move made in work coordinates the routine set itself (a 3D probe's descent
+   * and searches beside the stock after it touched the top), the work offset it is made in
+   * (`FirmwareMove.workOffset`).
+   */
+  workOffset?: Point3
 }
 
 /** A move a machine's firmware makes for a block, in the program's work coordinates. */
@@ -82,6 +88,13 @@ export type FirmwareMove = {
   readonly status?: ToolStatus
   /** The machine waits for the user after it. */
   readonly wait?: "tool"
+  /**
+   * The work offset it is made in, for a move the firmware makes in work coordinates its routine
+   * set during the block (a touch of the stock's top sets work Z, which the probe then goes below
+   * by a distance): the machine reports where such a move takes the tool from where the touch
+   * was, not from the plate's model. Absent, it is placed by machine position.
+   */
+  readonly workOffset?: Point3
 }
 
 /** What a machine's firmware does for a block: its moves, and what it leaves set. */
@@ -426,6 +439,7 @@ export function parseGCode(
       segment.statusTarget = reported.target
     }
     if (made?.wait) segment.wait = made.wait
+    if (made?.workOffset) segment.workOffset = [...made.workOffset]
     segments.push(segment)
     tools.add(movedBy)
     position = [...end]
