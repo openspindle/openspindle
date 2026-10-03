@@ -34,6 +34,12 @@ const parameterGroups = {
   millFeed: "isolation",
   millVertfeed: "isolation",
   millSpeed: "isolation",
+  maskDepth: "mask",
+  maskDiameter: "mask",
+  maskFeed: "mask",
+  maskVertfeed: "mask",
+  maskSpeed: "mask",
+  maskStepover: "mask",
   drillMethod: "drilling",
   zdrill: "drilling",
   milldrillDiameter: "drilling",
@@ -78,6 +84,36 @@ export const inputs = [
     detect: {
       suffixes: ["b_cu.gbr", "b.cu.gbr", "b_cu.ger", "b.cu.ger", ".gbl"],
       contentIncludesAll: ["TF.FileFunction,Copper", ",Bot"],
+    },
+  },
+  {
+    id: "front-mask",
+    label: "Front mask",
+    accept: ".gbr,.ger,.gts",
+    detect: {
+      suffixes: [
+        "f_mask.gbr",
+        "f.mask.gbr",
+        "f_mask.ger",
+        "f.mask.ger",
+        ".gts",
+      ],
+      contentIncludesAll: ["TF.FileFunction,Soldermask", ",Top"],
+    },
+  },
+  {
+    id: "back-mask",
+    label: "Back mask",
+    accept: ".gbr,.ger,.gbs",
+    detect: {
+      suffixes: [
+        "b_mask.gbr",
+        "b.mask.gbr",
+        "b_mask.ger",
+        "b.mask.ger",
+        ".gbs",
+      ],
+      contentIncludesAll: ["TF.FileFunction,Soldermask", ",Bot"],
     },
   },
   {
@@ -146,6 +182,20 @@ export const parameters = [
   number("millFeed", "Feed rate", 120, 1, 10000, 1, "mm/min"),
   number("millVertfeed", "Plunge feed", 60, 1, 10000, 1, "mm/min"),
   number("millSpeed", "Spindle speed", 12000, 1, 100000, 1, "rpm"),
+  number("maskDepth", "Depth", -0.02, -2, -0.001, 0.001, "mm"),
+  number(
+    "maskDiameter",
+    "Effective tool diameter",
+    0.2,
+    0.01,
+    10,
+    0.000001,
+    "mm"
+  ),
+  number("maskFeed", "Feed rate", 120, 1, 10000, 1, "mm/min"),
+  number("maskVertfeed", "Plunge feed", 60, 1, 10000, 1, "mm/min"),
+  number("maskSpeed", "Spindle speed", 12000, 1, 100000, 1, "rpm"),
+  number("maskStepover", "Stepover", 50, 1, 50, 1, "%"),
   {
     // Drill plunges one drill per hole size; Mill makes every hole with one end mill,
     // circling those wider than it (pcb2gcode's milldrill).

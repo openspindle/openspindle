@@ -121,7 +121,7 @@ export function ImporterView({
         }
         if (!operations.length)
           throw new Error(
-            "No supported PCB files found. Choose front, back, outline or drill files."
+            "No supported PCB files found. Choose copper, solder mask, outline or drill files."
           )
         if (operations.length > MAX_FILES)
           throw new Error(`Import at most ${MAX_FILES} PCB files at once.`)

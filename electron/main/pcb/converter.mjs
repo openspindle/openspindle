@@ -34,6 +34,13 @@ const fail = (message) => {
 const bytes = (text) => Buffer.byteLength(text, "utf8")
 const roles = new Set(inputs.map(({ id }) => id))
 const names = Object.fromEntries(inputs.map(({ id, label }) => [id, label]))
+const isMask = (role) => role === "front-mask" || role === "back-mask"
+
+/**
+ * Clears the openings completely. pcb2gcode stops offsetting once no opening remains;
+ * keep this finite because it converts the theoretical pass count to an integer.
+ */
+const MASK_CLEARANCE = 10_000
 
 export function validateRequest(input) {
   if (
@@ -129,6 +136,14 @@ export function validateRequest(input) {
   if (values.zchange < values.zsafe)
     fail("Tool change height must be at least travel clearance.")
   if (
+    values.zeroStart &&
+    files.some((file) => isMask(file.role)) &&
+    files.some((file) => !isMask(file.role))
+  )
+    fail(
+      "Mask and other PCB layers convert separately. Disable Shift project to zero to preserve their shared origin."
+    )
+  if (
     seen.has("outline") &&
     values.bridges > 0 &&
     (values.bridgesnum < 1 || values.zbridges <= values.zcut)
@@ -141,14 +156,19 @@ export function validateRequest(input) {
 
 /**
  * Only fixed flags and validated values: no shell, arbitrary flags, config or preamble files.
- * A job converts every Gerber and the drill file at `drillIndex`; null converts only Gerbers.
+ * A job converts copper/outline and the drill at `drillIndex`, or the mask layers alone:
+ * pcb2gcode's polarity inversion applies to every Gerber in an invocation.
  */
-export function buildArguments(request, { drillIndex = 0 } = {}) {
+export function buildArguments(
+  request,
+  {
+    drillIndex = 0,
+    mask = request.files.every((file) => isMask(file.role)),
+  } = {}
+) {
   const p = request.parameters
   const drills = request.files.filter((file) => file.role === "drill")
-  const files = request.files.filter(
-    (file) => file.role !== "drill" || file === drills[drillIndex]
-  )
+  const files = filesForJob(request.files, drills[drillIndex], mask)
   const suppliedRoles = new Set(files.map((file) => file.role))
   const millingHoles = suppliedRoles.has("drill") && p.drillMethod === "mill"
   const args = [
@@ -166,15 +186,18 @@ export function buildArguments(request, { drillIndex = 0 } = {}) {
   if (suppliedRoles.has("drill")) args.push("--nog81")
   if (
     suppliedRoles.has("back") ||
+    suppliedRoles.has("back-mask") ||
     (suppliedRoles.has("drill") && p.drillSide === "back") ||
     (suppliedRoles.has("outline") && p.cutSide === "back")
   )
     args.push(`--mirror-axis=${p.mirrorAxis}`)
-  for (const file of files)
+  for (const file of files) {
+    const inputRole = isMask(file.role) ? file.role.slice(0, -5) : file.role
     args.push(
-      `--${file.role}=${inputFilename(file.role, drills.length, drillIndex)}`,
-      `--${file.role}-output=${file.role}.nc`
+      `--${inputRole}=${inputFilename(file.role, drills.length, drillIndex)}`,
+      `--${inputRole}-output=${file.role}.nc`
     )
+  }
   if (millingHoles) args.push("--milldrill-output=milldrill.nc")
   const fields = {}
   if (suppliedRoles.has("front") || suppliedRoles.has("back"))
@@ -186,6 +209,20 @@ export function buildArguments(request, { drillIndex = 0 } = {}) {
       millVertfeed: "mill-vertfeed",
       millSpeed: "mill-speed",
     })
+  if (mask) {
+    args.push(
+      "--invert-gerbers",
+      `--isolation-width=${MASK_CLEARANCE}`,
+      `--milling-overlap=${100 - p.maskStepover}%`
+    )
+    Object.assign(fields, {
+      maskDepth: "zwork",
+      maskDiameter: "mill-diameters",
+      maskFeed: "mill-feed",
+      maskVertfeed: "mill-vertfeed",
+      maskSpeed: "mill-speed",
+    })
+  }
   // Milling holes takes pcb2gcode's outline cutter: an outline in the same job is then only
   // the board reference, and generate() takes its program from a job of its own.
   if (suppliedRoles.has("outline") && !millingHoles)
@@ -226,6 +263,13 @@ export function buildArguments(request, { drillIndex = 0 } = {}) {
     )
   return args
 }
+
+/** Mask clearing never shares polarity or cutting parameters with copper or outlines. */
+const filesForJob = (files, drill, mask) =>
+  files.filter(
+    (file) =>
+      isMask(file.role) === mask && (file.role !== "drill" || file === drill)
+  )
 
 const inputFilename = (role, drillCount, drillIndex) =>
   role === "drill"
@@ -341,14 +385,21 @@ export async function generate(
     const millingHoles = drills.length > 0 && parameters.drillMethod === "mill"
     // One job per drill file, or one without; the first keeps the Gerbers' programs. With
     // an outline, milled holes take its cutter, so the Gerbers convert in a job of their own.
-    const drillJobs = drills.length
-      ? drills.map((_file, index) => index)
-      : [null]
+    let drillJobs = []
+    if (drills.length) drillJobs = drills.map((_file, index) => index)
+    else if (files.some((file) => !isMask(file.role))) drillJobs = [null]
     const jobIndexes =
       millingHoles && files.some((file) => file.role === "outline")
         ? [null, ...drillJobs]
         : drillJobs
-    for (const [job, drillIndex] of jobIndexes.entries()) {
+    const conversions = jobIndexes.map((drillIndex, index) => ({
+      drillIndex,
+      mask: false,
+      keepGerbers: index === 0,
+    }))
+    if (files.some((file) => isMask(file.role)))
+      conversions.push({ drillIndex: null, mask: true, keepGerbers: true })
+    for (const { drillIndex, mask, keepGerbers } of conversions) {
       const remaining = deadline - Date.now()
       if (remaining <= 0)
         throw new Error("pcb2gcode exceeded its generation time limit.")
@@ -356,10 +407,8 @@ export async function generate(
       await mkdir(output)
       // Every drill file sees the same Gerbers, so bounds, zero-start, and back
       // mirroring use exactly the same reference. Excellon tool tables stay separate.
-      const args = buildArguments(request, { drillIndex })
-      const jobFiles = files.filter(
-        (file) => file.role !== "drill" || file === drills[drillIndex]
-      )
+      const args = buildArguments(request, { drillIndex, mask })
+      const jobFiles = filesForJob(files, drills[drillIndex], mask)
       // Milled holes come out of pcb2gcode's milldrill program.
       const expected = new Map(
         jobFiles.map((file) => [
@@ -371,6 +420,7 @@ export async function generate(
       )
       jobs.push({
         ...(drills[drillIndex] ? { drill: drills[drillIndex].name } : {}),
+        ...(mask ? { mask: true } : {}),
         arguments: args,
       })
       const jobLog = await runner(executable, args, {
@@ -382,9 +432,10 @@ export async function generate(
       if (Date.now() > deadline)
         throw new Error("pcb2gcode exceeded its generation time limit.")
       if (signal?.aborted) throw new Error("Generation cancelled.")
+      const jobName = mask ? "Mask layers" : "Gerber files"
       const heading =
-        jobIndexes.length > 1
-          ? `[${drills[drillIndex]?.name ?? "Gerber files"}]\n`
+        conversions.length > 1
+          ? `[${drills[drillIndex]?.name ?? jobName}]\n`
           : ""
       logTotal +=
         bytes(heading) * 2 + bytes(jobLog.stdout) + bytes(jobLog.stderr)
@@ -421,7 +472,7 @@ export async function generate(
         if (role) producedRoles.add(role)
         const drillPreview =
           name === "original_drill.svg" || name === "original_milldrill.svg"
-        if (job > 0 && role !== "drill" && !drillPreview) continue
+        if (!keepGerbers && role !== "drill" && !drillPreview) continue
         const content = new TextDecoder("utf-8", { fatal: true }).decode(
           await readFile(path)
         )
@@ -447,13 +498,12 @@ export async function generate(
           })
         } else if (/<svg(?:\s|>)/.test(content)) {
           returnedTotal += bytes(content)
-          const previewName =
-            drillPreview && drills.length > 1
-              ? name.replace(
-                  "drill.svg",
-                  `${drillNames[drillIndex].slice(0, -3)}.svg`
-                )
-              : name
+          let previewName = mask ? `mask-${name}` : name
+          if (drillPreview && drills.length > 1)
+            previewName = name.replace(
+              "drill.svg",
+              `${drillNames[drillIndex].slice(0, -3)}.svg`
+            )
           previews.push({ name: previewName, svg: content })
         }
         if (returnedTotal > LIMITS.outputTotal)
@@ -470,14 +520,21 @@ export async function generate(
       await rm(output, { recursive: true, force: true })
     }
     // Keep outline last; separate sides remain separate programs and physical setups.
-    const order = ["front.nc", "back.nc", ...drillNames, "outline.nc"]
+    const order = [
+      "front.nc",
+      "back.nc",
+      "front-mask.nc",
+      "back-mask.nc",
+      ...drillNames,
+      "outline.nc",
+    ]
     programs.sort((a, b) => order.indexOf(a.name) - order.indexOf(b.name))
     const warnings = [
       "Machining values are examples, not a verified tool/material recipe. Confirm work zero, tooling, clearances and depth before Run.",
       "SVGs show pcb2gcode geometry before back-side mirroring. OpenSpindle previews the actual generated CNC coordinates.",
     ]
     if (
-      files.some((file) => file.role === "back") ||
+      files.some((file) => file.role === "back" || file.role === "back-mask") ||
       (drills.length > 0 && parameters.drillSide === "back") ||
       (files.some((file) => file.role === "outline") &&
         parameters.cutSide === "back")

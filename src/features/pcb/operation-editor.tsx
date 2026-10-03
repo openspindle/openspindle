@@ -222,13 +222,24 @@ function effectiveValues(
   return values
 }
 
-const recipeKey = (data: PCBOperationData, values: Values) =>
-  stableJson({
+/** Only settings this operation generates with belong to its saved recipe. */
+function recipeKey(data: PCBOperationData, values: Values): string {
+  const group = operationGroup(operationRole(data.file))
+  const method = drillMethod({ ...data, values })
+  const relevant: Values = {}
+  for (const parameter of parameters) {
+    if (parameter.group !== group && parameter.group !== "board") continue
+    if ((parameter.method ?? method) !== method) continue
+    const value = values[parameter.id] as Values[string] | undefined
+    if (value !== undefined) relevant[parameter.id] = value
+  }
+  return stableJson({
     file: data.file,
-    values,
+    values: relevant,
     toolId: data.toolId,
     presetId: data.presetId,
   })
+}
 
 /** The recipe of the saved program; null while the operation is pending. */
 function generatedRecipe(operation: Operation): string | null {
@@ -555,6 +566,8 @@ export function OperationEditor({
       if (
         role !== "front" &&
         role !== "back" &&
+        role !== "front-mask" &&
+        role !== "back-mask" &&
         role !== "outline" &&
         role !== "drill"
       )
@@ -680,6 +693,8 @@ export function OperationEditor({
     }
     const overrides: Values = { ...data.values }
     for (const key of cuttingFields) {
+      // Mask depth belongs to this operation, independently of its tool or preset.
+      if (key === "maskDepth") continue
       delete overrides[key]
       // Declining the preset keeps the current cutting values; a new tool brings its size.
       const geometry = geometryFields.includes(key)
@@ -830,6 +845,7 @@ export function OperationEditor({
   )
   const mirrored =
     role === "back" ||
+    role === "back-mask" ||
     (role === "drill" && values.drillSide === "back") ||
     (role === "outline" && values.cutSide === "back")
   const mirrorAxis = parameters.find(

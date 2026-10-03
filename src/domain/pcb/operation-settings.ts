@@ -6,7 +6,7 @@ import { roleLabel } from "./inputs"
 import type { PCBOperationData, Values } from "./operation-data"
 
 type Role = string | null
-type OperationGroup = "isolation" | "drilling" | "outline"
+type OperationGroup = "isolation" | "mask" | "drilling" | "outline"
 /** How an operation cuts: its group, with holes milled by an end mill apart from drilled ones. */
 type Machining = OperationGroup | "milldrilling"
 
@@ -16,6 +16,7 @@ const tapered = (tool: Tool) => /chamfer|engraving/.test(normalized(tool.kind))
 
 export function operationGroup(role: Role): OperationGroup | null {
   if (role === "front" || role === "back") return "isolation"
+  if (role === "front-mask" || role === "back-mask") return "mask"
   if (role === "drill") return "drilling"
   if (role === "outline") return "outline"
   return null
@@ -40,7 +41,9 @@ export const MILL_DRILL = "mill-drill"
 export const operationKinds = (
   file: PCBOperationData["file"]
 ): readonly string[] =>
-  isDrillFile(file) ? ["drill", MILL_DRILL] : ["front", "back", "outline"]
+  isDrillFile(file)
+    ? ["drill", MILL_DRILL]
+    : ["front", "back", "front-mask", "back-mask", "outline"]
 
 /**
  * The file's role, or none when the file cannot make it (a Gerber set to Drill, which
@@ -77,6 +80,7 @@ const RECOMMENDED_KINDS: Readonly<Record<Machining, readonly string[]>> = {
     "chamfer mill",
     "engraving",
   ],
+  mask: ["flat end mill", "chamfer mill", "engraving"],
   outline: ["flat end mill"],
   drilling: ["drill"],
   milldrilling: ["flat end mill"],
@@ -117,24 +121,25 @@ function taperHalfAngle(tool: Tool): number | null {
 }
 
 /**
- * The width a tool isolates copper with at the depth `zwork` (negative, in mm). A tapered
+ * The width a tool cuts at the given depth (negative, in mm). A tapered
  * tip widens with depth, tip + 2 × depth × tan(half angle), to the micrometre; without a
  * depth or an angle it is the tip itself.
  */
-function isolationWidth(
+function cuttingDiameter(
   tool: Tool,
-  zwork: Values[string] | undefined
+  cutDepth: Values[string] | undefined
 ): number | null {
   if (!tapered(tool)) return tool.diameter
   const tip = tool.geometry.tipDiameter
   const half = taperHalfAngle(tool)
-  const depth = typeof zwork === "string" ? -Number(zwork) : Number.NaN
+  const depth = typeof cutDepth === "string" ? -Number(cutDepth) : Number.NaN
   if (tip === null || half === null || !(depth > 0)) return tip
   return Number((tip + 2 * depth * Math.tan(half * DEGREES)).toFixed(3))
 }
 
 const inheritedFields = {
   isolation: ["zwork", "millDiameter", "millFeed", "millVertfeed", "millSpeed"],
+  mask: ["maskDepth", "maskDiameter", "maskFeed", "maskVertfeed", "maskSpeed"],
   drilling: ["drillFeed", "drillSpeed"],
   milldrilling: [
     "milldrillDiameter",
@@ -155,11 +160,12 @@ const inheritedFields = {
 /** The cutting values a tool's geometry supplies: they follow the tool, never a preset. */
 export const geometryFields: readonly string[] = [
   "millDiameter",
+  "maskDiameter",
   "cutterDiameter",
   "milldrillDiameter",
 ]
 
-/** The cutting values an operation takes from its tool and preset. */
+/** Required cutting values, supplied by the tool and preset or entered explicitly. */
 export function toolFields(role: Role, method: DrillMethod): string[] {
   const kind = machining(role, method)
   return kind ? [...inheritedFields[kind]] : []
@@ -172,7 +178,7 @@ function precision(value: number): number {
 
 /**
  * The values a tool and preset supply; `edits` are the operation's own values, whose depth
- * the isolation width follows. Values outside a parameter's range stay visible for
+ * the effective cutting diameter follows. Values outside a parameter's range stay visible for
  * validation; never clamp them.
  */
 export function toolValues(
@@ -213,7 +219,13 @@ export function toolValues(
       put("zwork", -preset.stepdown)
     // A tapered tip cuts wider the deeper it goes; an entered width still wins.
     const depth = edits.zwork as string | boolean | undefined
-    put("millDiameter", isolationWidth(tool, depth ?? values.zwork))
+    put("millDiameter", cuttingDiameter(tool, depth ?? values.zwork))
+  } else if (kind === "mask") {
+    put("maskFeed", preset?.feedRate)
+    put("maskVertfeed", preset?.plungeFeed)
+    put("maskSpeed", preset?.rpm)
+    // Mask depth is entered independently; a copper preset's stepdown never supplies it.
+    put("maskDiameter", cuttingDiameter(tool, edits.maskDepth))
   } else if (kind === "outline") {
     put("cutterDiameter", tool.diameter)
     put("cutFeed", preset?.feedRate)

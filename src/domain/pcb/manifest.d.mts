@@ -1,7 +1,8 @@
 /** Types for manifest.mjs, which the TypeScript views import. */
 
-export type GroupId = "board" | "isolation" | "drilling" | "outline"
-export type InputId = "front" | "back" | "outline" | "drill"
+export type GroupId = "board" | "isolation" | "mask" | "drilling" | "outline"
+export type InputId =
+  "front" | "back" | "front-mask" | "back-mask" | "outline" | "drill"
 /** How a drill operation makes its holes: one drill per size, or one end mill for all. */
 export type DrillMethod = "drill" | "mill"
 

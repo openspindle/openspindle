@@ -14,7 +14,14 @@ export const PcbGenerationRequestSchema = z.strictObject({
   files: z
     .array(
       z.strictObject({
-        role: z.enum(["front", "back", "outline", "drill"]),
+        role: z.enum([
+          "front",
+          "back",
+          "front-mask",
+          "back-mask",
+          "outline",
+          "drill",
+        ]),
         name: z.string().min(1).max(180),
         content: z.string().min(1).max(LIMITS.inputFile),
       })
