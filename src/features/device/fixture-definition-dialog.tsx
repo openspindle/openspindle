@@ -1,5 +1,7 @@
 import { useEffect } from "react"
+import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
   Field,
   FieldDescription,
@@ -30,7 +32,7 @@ import {
 } from "@/app/fixtures/fixture-context"
 import { useWorkspaceStore } from "@/app/workspace/workspace-context"
 import { definitionFinish } from "@/domain/fixtures/catalog"
-import { profileDeviceId } from "@/domain/fixtures/profiles"
+import { FIXTURE_MACHINE_TYPES } from "@/domain/fixtures/compatibility"
 import { fail, normalizeText, ok } from "@/domain/primitives"
 import {
   FIXTURE_NAME_LIMIT,
@@ -39,7 +41,6 @@ import {
   libraryModelId,
   withBoxSize,
   withDefinitionOrigin,
-  withSingleDefaultBed,
 } from "@/domain/fixtures/definitions"
 import type {
   FixtureDefinition,
@@ -221,7 +222,7 @@ function DefaultPositionFields({
   onChange,
 }: {
   definition: FixtureDefinition
-  onChange: (change: Partial<FixtureDefinition>) => void
+  onChange: (change: Partial<FixtureDefinition>, origin?: Point3) => void
 }) {
   const { model } = definition
   return (
@@ -234,10 +235,7 @@ function DefaultPositionFields({
             model={model}
             onChoose={(point) => {
               const framed = withDefinitionOrigin(definition, point)
-              onChange({
-                model: framed.model,
-                defaultPosition: framed.defaultPosition,
-              })
+              onChange({ model: framed.model }, point)
             }}
           />
         )}
@@ -253,8 +251,8 @@ function DefaultPositionFields({
 }
 
 /**
- * A fixture definition of a bed setup of a device's profile, edited as it changes: the plates
- * set up on that bed setup show it as it is edited. It closes once the definition is gone.
+ * A shared fixture's appearance and compatibility, with default placement kept for the selected
+ * bed setup. Plates holding the shared fixture follow its intrinsic edits.
  */
 export function FixtureDefinitionDialog({
   dialog,
@@ -270,36 +268,71 @@ export function FixtureDefinitionDialog({
       ? library.profiles[dialog.profileId]
       : null
   )
-  const definitions =
-    profile?.bedSetups.find((setup) => setup.id === dialog.bedSetupId)
-      ?.definitions ?? null
-  const definition =
-    definitions?.find((item) => item.id === dialog.definitionId) ?? null
-  useEffect(() => {
-    if (!definition) onClose()
-  }, [definition, onClose])
-  const library = useModelLibrary().data
-  if (!definitions || !definition) return null
-  const { id } = definition
-  // The profile's definition, and the plates set up on its bed setup that have the fixture.
-  const update = (change: Partial<FixtureDefinition>) => {
-    const next = withSingleDefaultBed(
-      definitions.map((item) =>
-        item.id === id ? { ...item, ...change } : item
-      ),
-      change.defaultEnabled || change.kind ? id : undefined
-    )
-    fixtures.setDefinitions(dialog.bedSetupId, next, dialog.profileId)
-    const changed = next.find((item) => item.id === id)
-    if (changed)
-      workspace.dispatch({
-        type: "fixtures.redefine",
-        deviceId: profileDeviceId(dialog.profileId),
-        bedSetupId: dialog.bedSetupId,
-        isDefault: profile?.defaultBedSetupId === dialog.bedSetupId,
-        definition: changed,
-      })
+  const definitions = useFixtureLibrary((library) => library.definitions)
+  const bedSetup = profile?.bedSetups.find(
+    (setup) => setup.id === dialog.bedSetupId
+  )
+  const shared =
+    definitions.find((item) => item.id === dialog.definitionId) ?? null
+  const defaults = bedSetup?.fixtures.find(
+    (item) => item.definitionId === dialog.definitionId
+  )
+  const definition = shared && {
+    ...shared,
+    defaultEnabled: defaults?.enabled ?? false,
+    defaultPosition: defaults?.position ?? shared.defaultPosition,
+    defaultRotation: defaults?.rotation ?? shared.defaultRotation,
   }
+  useEffect(() => {
+    if (!shared) onClose()
+  }, [shared, onClose])
+  const library = useModelLibrary().data
+  if (!shared || !definition) return null
+  const { id } = definition
+  // Intrinsic edits reach every instance; defaults belong only to this bed setup.
+  const update = (change: Partial<FixtureDefinition>, origin?: Point3) => {
+    const { defaultEnabled, defaultPosition, defaultRotation, ...intrinsic } =
+      change
+    if (Object.keys(intrinsic).length) {
+      const changed = { ...shared, ...intrinsic }
+      const result = workspace.dispatch(
+        {
+          type: "fixtures.redefine",
+          definition: changed,
+          previous: shared,
+          origin,
+        },
+        { record: false }
+      )
+      if (!result.ok) {
+        toast.error(result.error)
+        return
+      }
+      fixtures.setDefinition(changed, origin)
+    }
+    if (
+      bedSetup &&
+      (defaultEnabled !== undefined ||
+        (!origin && defaultPosition !== undefined) ||
+        defaultRotation !== undefined)
+    )
+      fixtures.setBedFixture(
+        dialog.bedSetupId,
+        id,
+        {
+          ...(defaultEnabled !== undefined ? { defaultEnabled } : {}),
+          ...(!origin && defaultPosition !== undefined
+            ? { defaultPosition }
+            : {}),
+          ...(defaultRotation !== undefined ? { defaultRotation } : {}),
+        },
+        dialog.profileId
+      )
+  }
+  const machines = Array.isArray(definition.compatibility)
+    ? definition.compatibility
+    : []
+  const allMachines = !Array.isArray(definition.compatibility)
   // The Models library model it draws, when the library has it: its preview turns it.
   const modelId = libraryModelId(definition)
   const previewed =
@@ -357,30 +390,65 @@ export function FixtureDefinitionDialog({
             onChange={(color) => update({ color })}
           />
         </FieldGroup>
-        <Field orientation="horizontal">
-          <Switch
-            id={`fixture-default-enabled-${definition.id}`}
-            checked={definition.defaultEnabled}
-            onCheckedChange={(checked) =>
-              update({
-                defaultEnabled: checked,
-              })
-            }
-          />
-          <FieldLabel htmlFor={`fixture-default-enabled-${definition.id}`}>
-            Enabled on new plates
-          </FieldLabel>
-        </Field>
-        <DefaultPositionFields
-          definition={definition}
-          onChange={(change) => update(change)}
-        />
-        <PointFieldSet
-          label="Default rotation"
-          unit="°"
-          value={definition.defaultRotation}
-          onChange={(defaultRotation) => update({ defaultRotation })}
-        />
+        <FieldSet>
+          <FieldLegend>Compatible machines</FieldLegend>
+          <FieldGroup className="gap-3">
+            <Field orientation="horizontal">
+              <Checkbox
+                id={`fixture-compatible-all-${id}`}
+                checked={allMachines}
+                onCheckedChange={(checked) => {
+                  if (checked) update({ compatibility: "all" })
+                }}
+              />
+              <FieldLabel htmlFor={`fixture-compatible-all-${id}`}>
+                All
+              </FieldLabel>
+            </Field>
+            {FIXTURE_MACHINE_TYPES.map((machine) => (
+              <Field key={machine.id} orientation="horizontal">
+                <Checkbox
+                  id={`fixture-compatible-${machine.id}-${id}`}
+                  checked={machines.includes(machine.id)}
+                  onCheckedChange={(checked) => {
+                    const next = checked
+                      ? [...machines, machine.id]
+                      : machines.filter((item) => item !== machine.id)
+                    update({ compatibility: next.length ? next : "all" })
+                  }}
+                />
+                <FieldLabel htmlFor={`fixture-compatible-${machine.id}-${id}`}>
+                  {machine.label}
+                </FieldLabel>
+              </Field>
+            ))}
+          </FieldGroup>
+        </FieldSet>
+        {bedSetup && (
+          <>
+            <Field orientation="horizontal">
+              <Switch
+                id={`fixture-default-enabled-${definition.id}`}
+                checked={definition.defaultEnabled}
+                onCheckedChange={(checked) =>
+                  update({
+                    defaultEnabled: checked,
+                  })
+                }
+              />
+              <FieldLabel htmlFor={`fixture-default-enabled-${definition.id}`}>
+                Enabled on new plates
+              </FieldLabel>
+            </Field>
+            <DefaultPositionFields definition={definition} onChange={update} />
+            <PointFieldSet
+              label="Default rotation"
+              unit="°"
+              value={definition.defaultRotation}
+              onChange={(defaultRotation) => update({ defaultRotation })}
+            />
+          </>
+        )}
         <FixtureModelField
           definition={definition}
           onChange={(model) => update({ model })}

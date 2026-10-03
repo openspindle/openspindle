@@ -51,7 +51,7 @@ function nextAnchorName(
 }
 
 /**
- * Which device's profile the Device tab shows, and the bed setup of it whose fixtures it edits:
+ * The project's device, and the bed setup of it whose fixture defaults it edits:
  * adding one (a copy of the shown one), naming, removing and making it the default for new
  * plates, and the anchors it keeps, each typed as X and Y from the device's first anchor or
  * taken from where the machine is.
@@ -90,6 +90,7 @@ export function DeviceBedSetup({
   onMakeDefault: () => void
   onAnchorsChange: (anchors: BedSetupAnchor[]) => void
 }) {
+  const available = Object.hasOwn(profiles, selectedId)
   const device = deviceAnchors ? deviceAnchorsOf(deviceAnchors) : []
   const first = device.at(0)
   const { anchors } = bedSetup
@@ -114,28 +115,30 @@ export function DeviceBedSetup({
           <LayoutTemplate className="size-4" />
           <Hint text={BED_SETUP_HINT}>Bed setup</Hint>
         </CardTitle>
-        <CardAction className="flex gap-1">
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            aria-label="Add bed setup"
-            title="Add bed setup"
-            disabled={bedSetups.length >= BED_SETUP_LIMIT}
-            onClick={onAdd}
-          >
-            <Plus />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            aria-label={`Remove ${bedSetup.name}`}
-            title={`Remove ${bedSetup.name}`}
-            disabled={bedSetups.length <= 1}
-            onClick={onRemove}
-          >
-            <Trash2 />
-          </Button>
-        </CardAction>
+        {available && (
+          <CardAction className="flex gap-1">
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label="Add bed setup"
+              title="Add bed setup"
+              disabled={bedSetups.length >= BED_SETUP_LIMIT}
+              onClick={onAdd}
+            >
+              <Plus />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label={`Remove ${bedSetup.name}`}
+              title={`Remove ${bedSetup.name}`}
+              disabled={bedSetups.length <= 1}
+              onClick={onRemove}
+            >
+              <Trash2 />
+            </Button>
+          </CardAction>
+        )}
       </CardHeader>
       <CardContent>
         <FieldGroup>
@@ -143,142 +146,161 @@ export function DeviceBedSetup({
             <FieldLabel htmlFor="fixture-library-device">Device</FieldLabel>
             <OptionSelect
               id="fixture-library-device"
-              aria-label="Fixture library device"
+              aria-label="Project device"
               className="w-full"
-              options={Object.entries(profiles).map(([id, profile]) => ({
-                value: id,
-                label: profile.name,
-              }))}
+              options={[
+                ...(!available
+                  ? [
+                      {
+                        value: selectedId,
+                        label: `${selectedId} · Not on this computer`,
+                        disabled: true,
+                      },
+                    ]
+                  : []),
+                ...Object.entries(profiles).map(([id, profile]) => ({
+                  value: id,
+                  label: profile.name,
+                })),
+              ]}
               value={selectedId}
               onValueChange={onProfileChange}
             />
           </Field>
-          <Field>
-            <FieldLabel htmlFor="device-bed-setup">Bed setup</FieldLabel>
-            <OptionSelect
-              id="device-bed-setup"
-              className="w-full"
-              options={bedSetups.map((setup) => ({
-                value: setup.id,
-                label: setup.name,
-              }))}
-              value={bedSetup.id}
-              onValueChange={onBedSetupChange}
-            />
-          </Field>
-          <NameField
-            name={bedSetup.name}
-            onRename={(typed) => {
-              const next = normalizeText(typed)
-              if (!next) return fail("Enter a name.")
-              onRename(next)
-              return ok(next)
-            }}
-          />
-          <Field orientation="horizontal">
-            <Checkbox
-              id="device-bed-setup-default"
-              checked={bedSetup.id === defaultBedSetupId}
-              disabled={bedSetup.id === defaultBedSetupId}
-              aria-description={DEFAULT_HINT}
-              onCheckedChange={(checked) => {
-                if (checked) onMakeDefault()
-              }}
-            />
-            <FieldLabel htmlFor="device-bed-setup-default">
-              <Hint text={DEFAULT_HINT}>Default for new plates</Hint>
-            </FieldLabel>
-          </Field>
-          {first && (
-            <FieldSet>
-              <FieldLegend className="flex w-full items-center justify-between">
-                <Hint text={ANCHORS_HINT}>Anchors from {first.name}</Hint>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label="Add anchor"
-                  title="Add anchor"
-                  disabled={anchors.length >= BED_SETUP_ANCHOR_LIMIT}
-                  onClick={() =>
-                    onAnchorsChange([
-                      ...anchors,
-                      {
-                        id: crypto.randomUUID(),
-                        name: nextAnchorName(device.length + 1, [
-                          ...device,
+          {available && (
+            <>
+              <Field>
+                <FieldLabel htmlFor="device-bed-setup">Bed setup</FieldLabel>
+                <OptionSelect
+                  id="device-bed-setup"
+                  className="w-full"
+                  options={bedSetups.map((setup) => ({
+                    value: setup.id,
+                    label: setup.name,
+                  }))}
+                  value={bedSetup.id}
+                  onValueChange={onBedSetupChange}
+                />
+              </Field>
+              <NameField
+                name={bedSetup.name}
+                onRename={(typed) => {
+                  const next = normalizeText(typed)
+                  if (!next) return fail("Enter a name.")
+                  onRename(next)
+                  return ok(next)
+                }}
+              />
+              <Field orientation="horizontal">
+                <Checkbox
+                  id="device-bed-setup-default"
+                  checked={bedSetup.id === defaultBedSetupId}
+                  disabled={bedSetup.id === defaultBedSetupId}
+                  aria-description={DEFAULT_HINT}
+                  onCheckedChange={(checked) => {
+                    if (checked) onMakeDefault()
+                  }}
+                />
+                <FieldLabel htmlFor="device-bed-setup-default">
+                  <Hint text={DEFAULT_HINT}>Default for new plates</Hint>
+                </FieldLabel>
+              </Field>
+              {first && (
+                <FieldSet>
+                  <FieldLegend className="flex w-full items-center justify-between">
+                    <Hint text={ANCHORS_HINT}>Anchors from {first.name}</Hint>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label="Add anchor"
+                      title="Add anchor"
+                      disabled={anchors.length >= BED_SETUP_ANCHOR_LIMIT}
+                      onClick={() =>
+                        onAnchorsChange([
                           ...anchors,
-                        ]),
-                        offset: here ?? [0, 0],
-                      },
-                    ])
-                  }
-                >
-                  <Plus />
-                </Button>
-              </FieldLegend>
-              {anchors.map((anchor) => (
-                <FieldGroup
-                  key={anchor.id}
-                  className="grid grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)_auto_auto] items-end gap-2"
-                >
-                  <NameField
-                    name={anchor.name}
-                    label="Anchor name"
-                    hideLabel
-                    onRename={(typed) => {
-                      const next = normalizeText(typed)
-                      if (!next) return fail("Enter a name.")
-                      place(anchor.id, { name: next })
-                      return ok(next)
-                    }}
-                  />
-                  <CoordinateInput
-                    axis="X"
-                    unit="mm"
-                    label={`${anchor.name} X from ${first.name}`}
-                    value={anchor.offset[0]}
-                    onCommit={(value) =>
-                      place(anchor.id, { offset: [value, anchor.offset[1]] })
-                    }
-                  />
-                  <CoordinateInput
-                    axis="Y"
-                    unit="mm"
-                    label={`${anchor.name} Y from ${first.name}`}
-                    value={anchor.offset[1]}
-                    onCommit={(value) =>
-                      place(anchor.id, { offset: [anchor.offset[0], value] })
-                    }
-                  />
-                  <ReasonButton
-                    label={`Use the current position for ${anchor.name}`}
-                    variant="outline"
-                    size="icon"
-                    aria-label={`Use the current position for ${anchor.name}`}
-                    title={`Use the current position for ${anchor.name}`}
-                    reason={reason}
-                    onClick={() => {
-                      if (here) place(anchor.id, { offset: here })
-                    }}
-                  >
-                    <LocateFixed />
-                  </ReasonButton>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    aria-label={`Remove ${anchor.name}`}
-                    title={`Remove ${anchor.name}`}
-                    onClick={() =>
-                      onAnchorsChange(
-                        anchors.filter((item) => item.id !== anchor.id)
-                      )
-                    }
-                  >
-                    <X />
-                  </Button>
-                </FieldGroup>
-              ))}
-            </FieldSet>
+                          {
+                            id: crypto.randomUUID(),
+                            name: nextAnchorName(device.length + 1, [
+                              ...device,
+                              ...anchors,
+                            ]),
+                            offset: here ?? [0, 0],
+                          },
+                        ])
+                      }
+                    >
+                      <Plus />
+                    </Button>
+                  </FieldLegend>
+                  {anchors.map((anchor) => (
+                    <FieldGroup
+                      key={anchor.id}
+                      className="grid grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)_auto_auto] items-end gap-2"
+                    >
+                      <NameField
+                        name={anchor.name}
+                        label="Anchor name"
+                        hideLabel
+                        onRename={(typed) => {
+                          const next = normalizeText(typed)
+                          if (!next) return fail("Enter a name.")
+                          place(anchor.id, { name: next })
+                          return ok(next)
+                        }}
+                      />
+                      <CoordinateInput
+                        axis="X"
+                        unit="mm"
+                        label={`${anchor.name} X from ${first.name}`}
+                        value={anchor.offset[0]}
+                        onCommit={(value) =>
+                          place(anchor.id, {
+                            offset: [value, anchor.offset[1]],
+                          })
+                        }
+                      />
+                      <CoordinateInput
+                        axis="Y"
+                        unit="mm"
+                        label={`${anchor.name} Y from ${first.name}`}
+                        value={anchor.offset[1]}
+                        onCommit={(value) =>
+                          place(anchor.id, {
+                            offset: [anchor.offset[0], value],
+                          })
+                        }
+                      />
+                      <ReasonButton
+                        label={`Use the current position for ${anchor.name}`}
+                        variant="outline"
+                        size="icon"
+                        aria-label={`Use the current position for ${anchor.name}`}
+                        title={`Use the current position for ${anchor.name}`}
+                        reason={reason}
+                        onClick={() => {
+                          if (here) place(anchor.id, { offset: here })
+                        }}
+                      >
+                        <LocateFixed />
+                      </ReasonButton>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label={`Remove ${anchor.name}`}
+                        title={`Remove ${anchor.name}`}
+                        onClick={() =>
+                          onAnchorsChange(
+                            anchors.filter((item) => item.id !== anchor.id)
+                          )
+                        }
+                      >
+                        <X />
+                      </Button>
+                    </FieldGroup>
+                  ))}
+                </FieldSet>
+              )}
+            </>
           )}
         </FieldGroup>
       </CardContent>

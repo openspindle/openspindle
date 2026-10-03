@@ -7,7 +7,9 @@ import type { ProgramTool } from "@/domain/nc/cam-markers"
 import { markedStock } from "@/domain/nc/stock-markers"
 import { programTools } from "@/domain/nc/tool-comments"
 import { fitsWorkArea } from "@/domain/plate/placement"
-import { deviceBedSetup } from "@/domain/fixtures/profiles"
+import { bedSetupDefinitions, deviceBedSetup } from "@/domain/fixtures/profiles"
+import type { FixtureDefinition } from "@/domain/fixtures/definitions"
+import { fixtureCompatible } from "@/domain/fixtures/compatibility"
 import type { FixtureProfiles } from "@/domain/fixtures/profiles"
 import {
   createPlate,
@@ -65,10 +67,10 @@ export type ImportContext = {
   readonly stock: Stock
   readonly placement?: PlatePlacement
   /**
-   * The fixture library's profiles: a new plate finds the fixtures its program's markers name
-   * among those its device's profile defines. Absent: it has none of them.
+   * Bed setups provide placement overrides for compatible shared fixture definitions.
    */
   readonly fixtureProfiles?: FixtureProfiles
+  readonly fixtureDefinitions?: readonly FixtureDefinition[]
   /** The setup plain programs keep of the empty plate they replace (see `keptSetup`). */
   readonly setup?: PlateSetup
 }
@@ -195,7 +197,15 @@ export function importProgram(
             anchors: kit.factoryAnchors(setup.deviceId),
           }),
           marked.fixtures,
-          bed?.bedSetup.definitions ?? [],
+          bed
+            ? bedSetupDefinitions(
+                context.fixtureDefinitions ?? [],
+                bed.bedSetup,
+                setup.deviceId
+              )
+            : (context.fixtureDefinitions ?? []).filter((definition) =>
+                fixtureCompatible(definition, setup.deviceId)
+              ),
           bed && { device: bed.device, bedSetup: bed.bedSetup.name }
         )
       : { setup, notices: [] }

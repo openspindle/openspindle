@@ -9,11 +9,22 @@ import type { StoredAnchorSetup } from "../anchors/stored-anchors"
 import type { BedSetupAnchors } from "../plate/bed-setup"
 import { AddedAnchorSchema, machineId } from "@/machine/contract"
 import type { ConnectedDevice } from "@/machine/contract"
-import { DEFAULT_KIT, kitForDevice, kitOf } from "@/domain/fixtures/catalog"
+import {
+  DEFAULT_KIT,
+  FIXTURE_KITS,
+  kitForDevice,
+  kitForDeviceId,
+  kitOf,
+} from "@/domain/fixtures/catalog"
 import type { FixtureKit } from "@/domain/fixtures/fixture-kit"
-import { EntityIdSchema, TextSchema } from "@/domain/primitives"
-import { FIXTURE_LIMIT, FixtureDefinitionSchema } from "./definitions"
+import { EntityIdSchema, Point3Schema, TextSchema } from "@/domain/primitives"
+import { FIXTURE_LIMIT } from "./definitions"
 import type { FixtureDefinition } from "./definitions"
+import {
+  defaultFixtureCompatibility,
+  fixtureCompatible,
+  FIXTURE_CATALOG_LIMIT,
+} from "./compatibility"
 
 /** The profile used when no device is selected. */
 export const WORKSPACE_PROFILE = "workspace"
@@ -34,18 +45,31 @@ export const DEFAULT_BED_SETUP = "default"
 const uniqueIds = (items: readonly { readonly id: string }[]) =>
   new Set(items.map((item) => item.id)).size === items.length
 
-/**
- * One way a device's bed is set up: the fixtures new plates on it start from (each definition
- * with whether it is on them and where), and anchors of its own, kept as X and Y from the
- * device's first anchor, such as a jig's corner.
- */
+/** A global fixture's placement on one bed setup. */
+export const BedFixtureSchema = z.object({
+  definitionId: EntityIdSchema,
+  enabled: z.boolean(),
+  position: Point3Schema,
+  rotation: Point3Schema,
+})
+export type BedFixture = z.infer<typeof BedFixtureSchema>
+
+/** A device's bed arrangement: global fixture placements and anchors of its own. */
 export const BedSetupSchema = z.object({
   id: EntityIdSchema,
   name: TextSchema,
-  definitions: z
-    .array(FixtureDefinitionSchema)
-    .max(FIXTURE_LIMIT)
-    .refine(uniqueIds, "Fixture definition ids repeat."),
+  fixtures: z
+    .array(BedFixtureSchema)
+    .max(FIXTURE_CATALOG_LIMIT)
+    .refine(
+      (items) =>
+        new Set(items.map((item) => item.definitionId)).size === items.length,
+      "Fixture definition ids repeat."
+    )
+    .refine(
+      (items) => items.filter((item) => item.enabled).length <= FIXTURE_LIMIT,
+      `A bed setup enables at most ${FIXTURE_LIMIT} fixtures.`
+    ),
   anchors: z
     .array(BedSetupAnchorSchema)
     .max(BED_SETUP_ANCHOR_LIMIT)
@@ -117,6 +141,36 @@ export function bedSetupOf(
   )
 }
 
+/** All compatible catalog fixtures, with this bed setup's defaults where it places them. */
+export function bedSetupDefinitions(
+  definitions: readonly FixtureDefinition[],
+  setup: BedSetup,
+  deviceId: string | null
+): FixtureDefinition[] {
+  const placements = new Map(
+    setup.fixtures.map((item) => [item.definitionId, item])
+  )
+  return definitions
+    .filter((definition) => fixtureCompatible(definition, deviceId))
+    .map((definition) => {
+      const placement = placements.get(definition.id)
+      return {
+        ...definition,
+        defaultEnabled: placement?.enabled ?? false,
+        defaultPosition: placement?.position ?? definition.defaultPosition,
+        defaultRotation: placement?.rotation ?? definition.defaultRotation,
+      }
+    })
+}
+
+/** The placement a definition supplies when first added to a bed setup. */
+export const bedFixture = (definition: FixtureDefinition): BedFixture => ({
+  definitionId: definition.id,
+  enabled: definition.defaultEnabled,
+  position: [...definition.defaultPosition],
+  rotation: [...definition.defaultRotation],
+})
+
 /**
  * The anchors a plate on one of a profile's bed setups keeps: the device's, then the bed setup's
  * at the first plus their offsets; null without the device's.
@@ -138,10 +192,12 @@ export const profileBedSetupAnchors = (
   )
 
 /** A bed setup holding the given fixture definitions and no anchors of its own. */
-const firstBedSetup = (definitions: BedSetup["definitions"]): BedSetup => ({
+const firstBedSetup = (
+  definitions: readonly FixtureDefinition[]
+): BedSetup => ({
   id: DEFAULT_BED_SETUP,
   name: "Default",
-  definitions,
+  fixtures: definitions.map(bedFixture),
   anchors: [],
 })
 
@@ -218,20 +274,33 @@ function refreshed(
 const kitProfile = (
   kit: FixtureKit,
   name: string,
-  deviceId: string | null
+  deviceId: string | null,
+  definitions?: readonly FixtureDefinition[]
 ): FixtureProfile => ({
   name,
   anchors: kit.factoryAnchors(deviceId),
-  bedSetups: [firstBedSetup(kit.definitions())],
+  bedSetups: [
+    firstBedSetup(
+      kit
+        .definitions()
+        .filter(
+          (definition) =>
+            !definitions ||
+            definitions.some((item) => item.id === definition.id)
+        )
+    ),
+  ],
   defaultBedSetupId: DEFAULT_BED_SETUP,
   bundle: kit.version,
 })
 
 /** A device's first profile: its machine's kit, or no fixtures when OpenSpindle has none. */
 export function defaultFixtureProfile(
-  device?: ConnectedDevice | null
+  device?: ConnectedDevice | null,
+  definitions?: readonly FixtureDefinition[]
 ): FixtureProfile {
-  if (!device) return kitProfile(DEFAULT_KIT, "Workspace defaults", null)
+  if (!device)
+    return kitProfile(DEFAULT_KIT, "Workspace defaults", null, definitions)
   const kit = kitForDevice(device.model)
   if (!kit)
     return {
@@ -239,48 +308,120 @@ export function defaultFixtureProfile(
       bedSetups: [firstBedSetup([])],
       defaultBedSetupId: DEFAULT_BED_SETUP,
     }
-  return kitProfile(kit, device.name, machineId(device))
+  return kitProfile(kit, device.name, machineId(device), definitions)
 }
 
 /**
- * A profile made from an earlier version of its kit gains the fixtures added since and the
- * corrections made since in each of its bed setups, once: a fixture deleted afterwards stays
- * deleted. It catches up as far as every bed setup has room for the fixtures added: the versions
- * whose fixtures would take one past `FIXTURE_LIMIT` wait, with their corrections, until it has
- * room for them.
+ * Bundled catalog definitions catch up once, retaining global deletions. Each older profile
+ * gains placements for additions still in the catalog and corrections to its bed placements.
+ * A full catalog or bed setup waits at the last kit version it can hold.
  */
-export function withCurrentBundle(profile: FixtureProfile): FixtureProfile {
-  const kit = kitOf(profile.bedSetups.flatMap((setup) => setup.definitions))
-  const from = profile.bundle ?? 1
-  if (!kit || from >= kit.version) return profile
-  const addedUpTo = (setup: BedSetup, to: number) =>
-    kit.fixtures.filter(
-      ({ fixture, addedIn }) =>
-        addedIn > from &&
-        addedIn <= to &&
-        !setup.definitions.some((definition) => definition.id === fixture.id)
+export function withCurrentBundle<
+  TLibrary extends {
+    definitions: FixtureDefinition[]
+    profiles: FixtureProfiles
+    bundles: Record<string, number>
+  },
+>(library: TLibrary): TLibrary {
+  let definitions = library.definitions
+  const bundles = { ...library.bundles }
+  for (const kit of FIXTURE_KITS) {
+    const from = bundles[kit.id] ?? 0
+    if (from >= kit.version) continue
+    const additions = (to: number) =>
+      kit.fixtures.filter(
+        ({ fixture, addedIn }) =>
+          addedIn > from &&
+          addedIn <= to &&
+          !definitions.some((item) => item.id === fixture.id)
+      )
+    let to = kit.version
+    while (
+      to > from &&
+      additions(to).length >
+        Math.max(0, FIXTURE_CATALOG_LIMIT - definitions.length)
     )
-  let to = kit.version
-  while (
-    to > from &&
-    profile.bedSetups.some(
-      (setup) =>
-        setup.definitions.length + addedUpTo(setup, to).length > FIXTURE_LIMIT
-    )
-  )
-    to -= 1
-  if (to === from) return profile
-  return {
-    ...profile,
-    bundle: to,
-    bedSetups: profile.bedSetups.map((setup) => ({
-      ...setup,
-      definitions: [
-        ...setup.definitions.map((definition) =>
-          refreshed(kit, definition, from, to)
-        ),
-        ...addedUpTo(setup, to).map(({ fixture }) => fixture.definition()),
-      ],
-    })),
+      to--
+    if (to === from) continue
+    definitions = [
+      ...definitions.map((definition) => refreshed(kit, definition, from, to)),
+      ...additions(to).map(({ fixture }) => {
+        const definition = fixture.definition()
+        return {
+          ...definition,
+          compatibility: defaultFixtureCompatibility(definition),
+        }
+      }),
+    ]
+    bundles[kit.id] = to
   }
+  const byId = new Map(
+    definitions.map((definition) => [definition.id, definition])
+  )
+  const profiles = Object.fromEntries(
+    Object.entries(library.profiles).map(([id, profile]) => {
+      const held = profile.bedSetups.flatMap((setup) =>
+        setup.fixtures.flatMap((item) => byId.get(item.definitionId) ?? [])
+      )
+      const kit = kitForDeviceId(profileDeviceId(id)) ?? kitOf(held)
+      if (!kit) return [id, profile]
+      const from = profile.bundle ?? 1
+      let to = bundles[kit.id] ?? from
+      if (from >= to) return [id, profile]
+      const additions = (setup: BedSetup, version: number) =>
+        kit.fixtures
+          .filter(
+            ({ fixture, addedIn }) =>
+              addedIn > from &&
+              addedIn <= version &&
+              byId.has(fixture.id) &&
+              !setup.fixtures.some((item) => item.definitionId === fixture.id)
+          )
+          .map(({ fixture }) => bedFixture(fixture.definition()))
+      while (
+        to > from &&
+        profile.bedSetups.some((setup) => {
+          const added = additions(setup, to)
+          return (
+            setup.fixtures.length + added.length > FIXTURE_CATALOG_LIMIT ||
+            [...setup.fixtures, ...added].filter((item) => item.enabled)
+              .length > FIXTURE_LIMIT
+          )
+        })
+      )
+        to--
+      if (to === from) return [id, profile]
+      return [
+        id,
+        {
+          ...profile,
+          bundle: to,
+          bedSetups: profile.bedSetups.map((setup) => ({
+            ...setup,
+            fixtures: [
+              ...setup.fixtures.map((placement) => {
+                const entry = kit.fixtures.find(
+                  ({ fixture }) => fixture.id === placement.definitionId
+                )
+                if (
+                  !entry?.changedIn ||
+                  entry.changedIn <= from ||
+                  entry.changedIn > to
+                )
+                  return placement
+                const current = entry.fixture.definition()
+                return {
+                  ...placement,
+                  position: current.defaultPosition,
+                  rotation: current.defaultRotation,
+                }
+              }),
+              ...additions(setup, to),
+            ],
+          })),
+        },
+      ]
+    })
+  )
+  return { ...library, definitions, profiles, bundles }
 }

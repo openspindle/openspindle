@@ -17,9 +17,18 @@ import {
   ItemTitle,
 } from "@/components/ui/item"
 import { kitForSetup } from "@/domain/fixtures/catalog"
-import { profileDeviceId } from "@/domain/fixtures/profiles"
 import {
-  FIXTURE_LIMIT,
+  bedSetupDefinitions,
+  bedSetupOf,
+  defaultFixtureProfile,
+  profileDeviceId,
+} from "@/domain/fixtures/profiles"
+import { FIXTURE_CATALOG_LIMIT } from "@/domain/fixtures/compatibility"
+import {
+  useFixtureLibrary,
+  useFixtureLibraryStore,
+} from "@/app/fixtures/fixture-context"
+import {
   defaultFixtureInstances,
   fixtureSupportHeight,
 } from "@/domain/fixtures/definitions"
@@ -85,22 +94,21 @@ function FixtureItem({
 }
 
 /**
- * The fixtures of a bed setup of the device profile shown (`selectedId`), each edited in a
- * dialog. Adding one opens it there.
+ * The shared fixture library, with the selected bed setup as the context for default placement.
+ * Every fixture remains available to edit, including ones for another kind of machine.
  */
 export function DeviceFixtures({
-  definitions,
-  onChange,
   selectedId,
   bedSetupId,
 }: {
-  definitions: FixtureDefinition[]
-  onChange: (definitions: FixtureDefinition[]) => void
-  /** The profile they belong to. */
+  /** The profile whose bed defaults are edited. */
   selectedId: string
-  /** The bed setup of it they belong to. */
+  /** The bed setup whose fixture defaults are edited. */
   bedSetupId: string
 }) {
+  const fixtures = useFixtureLibraryStore()
+  const definitions = useFixtureLibrary((library) => library.definitions)
+  const profiles = useFixtureLibrary((library) => library.profiles)
   const edit = (definitionId: string) =>
     openDialog({
       kind: "fixture-definition",
@@ -109,7 +117,7 @@ export function DeviceFixtures({
       definitionId,
     })
   return (
-    <Card size="sm" role="region" aria-label="Device fixtures">
+    <Card size="sm" role="region" aria-label="Fixture library">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Box className="size-4" />
@@ -120,33 +128,39 @@ export function DeviceFixtures({
             variant="ghost"
             size="icon-sm"
             aria-label="Add fixture definition"
-            disabled={definitions.length >= FIXTURE_LIMIT}
+            disabled={definitions.length >= FIXTURE_CATALOG_LIMIT}
             onClick={() => {
               const id = crypto.randomUUID()
+              const deviceId = profileDeviceId(selectedId)
+              const profile = Object.hasOwn(profiles, selectedId)
+                ? profiles[selectedId]
+                : defaultFixtureProfile()
+              const defaults = bedSetupDefinitions(
+                definitions,
+                bedSetupOf(profile, bedSetupId),
+                deviceId
+              )
               // New fixtures start in the middle of the machine's bed, on the top of the bed
               // new plates have, where the anchors are drawn too.
               const kit = kitForSetup({
-                deviceId: profileDeviceId(selectedId),
-                fixtures: definitions.map((definition) => ({ definition })),
+                deviceId,
+                fixtures: defaults.map((definition) => ({ definition })),
               })
               const [x, y] = kit.bed.topCenter
               const top = fixtureSupportHeight(
-                defaultFixtureInstances(definitions),
+                defaultFixtureInstances(defaults),
                 kit.tableTop
               )
-              onChange([
-                ...definitions,
-                {
-                  id,
-                  name: "New fixture",
-                  kind: "clamp",
-                  model: null,
-                  color: "#a2aab3",
-                  defaultEnabled: false,
-                  defaultPosition: [x, y, top],
-                  defaultRotation: [0, 0, 0],
-                },
-              ])
+              fixtures.addDefinition({
+                id,
+                name: "New fixture",
+                kind: "clamp",
+                model: null,
+                color: "#a2aab3",
+                defaultEnabled: false,
+                defaultPosition: [x, y, top],
+                defaultRotation: [0, 0, 0],
+              })
               edit(id)
             }}
           >
@@ -158,14 +172,10 @@ export function DeviceFixtures({
         <ItemGroup className="gap-2">
           {definitions.map((definition) => (
             <FixtureItem
-              key={`${selectedId}:${definition.id}`}
+              key={definition.id}
               definition={definition}
               onEdit={() => edit(definition.id)}
-              onRemove={() =>
-                onChange(
-                  definitions.filter((item) => item.id !== definition.id)
-                )
-              }
+              onRemove={() => fixtures.removeDefinition(definition.id)}
             />
           ))}
         </ItemGroup>

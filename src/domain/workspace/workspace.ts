@@ -4,9 +4,13 @@ import type {
   FixtureDefinition,
   FixtureInstance,
 } from "@/domain/fixtures/definitions"
+import { withInstanceOrigin } from "@/domain/fixtures/definitions"
 import type { Tool } from "@/domain/tools/tool"
 import type { Stock } from "@/domain/stock/stock"
 import { kitForPlate } from "../fixtures/catalog"
+import { sameFixtureFamily } from "../fixtures/fixture-catalog"
+import { setupOnProject } from "./project-profile"
+import type { ProjectProfile } from "./project-profile"
 import { kindOf, resolveOperation } from "../operations/kinds"
 import {
   OperationSchema,
@@ -55,6 +59,7 @@ import {
 export type WorkspaceProject = {
   readonly name: string
   readonly fileName: string
+  readonly profile: ProjectProfile
 }
 
 /** Everything the user works on; derived data (compiled programs) is never stored here. */
@@ -136,16 +141,14 @@ export type WorkspaceCommand =
       readonly bedSetupId: string | null
     } & PlateTarget)
   /**
-   * The fixtures defined as `definition` on the plates set up on `deviceId`'s bed setup
-   * `bedSetupId` (and on the plates set up on none of its bed setups, where it is the default)
-   * take it as it now is, where they are.
+   * Placed snapshots of a global fixture take its new definition, keeping their placement.
+   * A previous definition distinguishes legacy variants that shared the same id.
    */
   | {
       readonly type: "fixtures.redefine"
-      readonly deviceId: string | null
-      readonly bedSetupId: string
-      readonly isDefault: boolean
       readonly definition: FixtureDefinition
+      readonly previous?: FixtureDefinition
+      readonly origin?: Point3
     }
   /**
    * Moves a setup item by `delta` millimetres: a fixture, the stock with the design on it, or
@@ -161,9 +164,8 @@ export type WorkspaceCommand =
       readonly noticeId: string
     } & PlateTarget)
   /**
-   * A device's anchors changed (read from it, or realigned): plates set up for it, or for no
-   * device yet, follow them; the connected device's, every plate moves to it. `deviceId` null
-   * is the workspace profile: unassigned plates only.
+   * A device's anchors changed (read from it, or realigned): only plates assigned to that
+   * device follow them. `deviceId` null is the workspace profile.
    */
   | {
       readonly type: "anchors.sync"
@@ -171,15 +173,22 @@ export type WorkspaceCommand =
       readonly anchors: StoredAnchorSetup
       /** The device's bed setups' anchors, which plates on them keep after the device's. */
       readonly bedSetups: BedSetupAnchors
-      readonly connected?: boolean
     }
-  /** The plate moves to a device, whichever it was set up for, and takes its anchors. */
-  | ({
-      readonly type: "plate.useDevice"
-      readonly deviceId: string
-      readonly anchors: StoredAnchorSetup
+  /**
+   * The connected profile is adopted by the plates present when this command is applied,
+   * including when undo replays it. Same-device plates keep their chosen bed setup; only an
+   * empty starter plate takes the profile's default fixtures.
+   */
+  | {
+      readonly type: "plates.useProfile"
+      readonly deviceId: string | null
+      readonly anchors: StoredAnchorSetup | null
+      readonly bedSetupId: string
       readonly bedSetups: BedSetupAnchors
-    } & PlateTarget)
+      readonly fixtures: readonly FixtureInstance[]
+      /** Only connection adoption replaces the empty starter plate's default fixtures. */
+      readonly useDefaults?: boolean
+    }
   | ({
       readonly type: "operation.add"
       readonly operation: Operation
@@ -318,7 +327,7 @@ function updateOperation(
 
 const sameAnchors = (
   left: StoredAnchorSetup | null,
-  right: StoredAnchorSetup
+  right: StoredAnchorSetup | null
 ) => JSON.stringify(left) === JSON.stringify(right)
 
 const sameGroups = (left: readonly Group[], right: readonly Group[]) =>
@@ -340,10 +349,10 @@ function withDeviceAnchors(plate: Plate, device: DeviceAnchors): Plate {
   return { ...plate, setup: { ...setup, deviceId: device.deviceId } }
 }
 
-/** A plate follows a device's anchors when it is set up for that device, or for none yet. */
+/** Anchor refreshes never change the profile assigned to a plate. */
 function syncAnchors(plate: Plate, sync: DeviceAnchors): Plate {
   const { deviceId } = plate.setup
-  if (deviceId !== null && deviceId !== sync.deviceId) return plate
+  if (deviceId !== sync.deviceId) return plate
   return withDeviceAnchors(plate, sync)
 }
 
@@ -425,23 +434,27 @@ function commandResult(
       const kept = state.plates.filter((plate) => !plate.example)
       if (kept.length + command.plates.length > 100)
         return fail("A workspace holds at most 100 plates.")
-      for (const [index, plate] of command.plates.entries()) {
+      const incoming = command.plates.map((plate) => {
+        const setup = setupOnProject(plate.setup, state.project.profile)
+        return setup === plate.setup ? plate : { ...plate, setup }
+      })
+      for (const [index, plate] of incoming.entries()) {
         const issue = schemaIssue(PlateSchema, plate)
         if (issue)
           return fail(`${plateLabel(plate, kept.length + index)}: ${issue}`)
       }
       const ids = new Set(kept.map((plate) => plate.id))
-      for (const plate of command.plates) {
+      for (const plate of incoming) {
         if (ids.has(plate.id))
           return fail("The workspace already holds this plate.")
         ids.add(plate.id)
       }
       const name = state.plates.find((plate) => plate.example)?.name
-      const first = command.plates.at(0)
+      const first = incoming.at(0)
       const added =
         first && name && !first.name
-          ? [{ ...first, name }, ...command.plates.slice(1)]
-          : command.plates
+          ? [{ ...first, name }, ...incoming.slice(1)]
+          : incoming
       const plates = [...kept, ...added]
       const selected = command.select
         ? command.plates.at(0)?.id
@@ -492,6 +505,11 @@ function commandResult(
       // The fixture commands own the fixtures' rules: one bed, locks and the limit.
       if ("fixtures" in command.patch)
         return fail("Fixtures change through their own commands.")
+      if (
+        "deviceId" in command.patch &&
+        command.patch.deviceId !== state.project.profile.deviceId
+      )
+        return fail("Choose the device for the whole project.")
       return updateSetup(state, command.plateId, (setup) =>
         ok(patchedSetup(setup, command.patch))
       )
@@ -529,20 +547,30 @@ function commandResult(
         )
       })
     case "fixtures.redefine": {
-      const { deviceId, bedSetupId, isDefault, definition } = command
+      const { definition, previous, origin } = command
       const plates = state.plates.map((plate) => {
         const { setup } = plate
-        const onBedSetup =
-          setup.bedSetupId === bedSetupId || (!setup.bedSetupId && isDefault)
-        if (
-          setup.deviceId !== deviceId ||
-          !onBedSetup ||
-          !setup.fixtures.some((item) => item.definition.id === definition.id)
-        )
+        const matches = (held: FixtureDefinition) =>
+          previous
+            ? sameFixtureFamily(held, previous)
+            : held.id === definition.id
+        if (!setup.fixtures.some((item) => matches(item.definition)))
           return plate
-        const fixtures = setup.fixtures.map((item) =>
-          item.definition.id === definition.id ? { ...item, definition } : item
-        )
+        const fixtures = setup.fixtures.map((item) => {
+          if (!matches(item.definition)) return item
+          const reframed = origin ? withInstanceOrigin(item, origin) : item
+          const { defaultEnabled, defaultPosition, defaultRotation } =
+            reframed.definition
+          return {
+            ...reframed,
+            definition: {
+              ...definition,
+              defaultEnabled,
+              defaultPosition,
+              defaultRotation,
+            },
+          }
+        })
         return { ...plate, setup: patchedSetup(setup, { fixtures }) }
       })
       return plates.every((plate, index) => plate === state.plates[index])
@@ -550,21 +578,85 @@ function commandResult(
         : ok({ ...state, plates })
     }
     case "anchors.sync": {
-      const plates = state.plates.map((plate) =>
-        command.connected
-          ? withDeviceAnchors(plate, command)
-          : syncAnchors(plate, command)
+      if (state.project.profile.deviceId !== command.deviceId) return ok(state)
+      const plates = state.plates.map((plate) => syncAnchors(plate, command))
+      const profile = {
+        ...state.project.profile,
+        anchors: command.anchors,
+        bedSetups: command.bedSetups,
+      }
+      const project =
+        JSON.stringify(profile) === JSON.stringify(state.project.profile)
+          ? state.project
+          : { ...state.project, profile }
+      if (
+        project === state.project &&
+        plates.every((plate, index) => plate === state.plates[index])
       )
-      return plates.every((plate, index) => plate === state.plates[index])
-        ? ok(state)
-        : ok({ ...state, plates })
+        return ok(state)
+      return ok({ ...state, plates, project })
     }
-    case "plate.useDevice":
-      return updatePlate(state, command.plateId, (plate) => {
-        if (command.anchors.deviceId !== command.deviceId)
-          return fail("The anchors belong to another device.")
-        return ok(withDeviceAnchors(plate, command))
-      })
+    case "plates.useProfile": {
+      if (command.anchors && command.anchors.deviceId !== command.deviceId)
+        return fail("The anchors belong to another device.")
+      const profile: ProjectProfile = {
+        deviceId: command.deviceId,
+        anchors:
+          command.anchors ??
+          (state.project.profile.deviceId === command.deviceId
+            ? state.project.profile.anchors
+            : null),
+        bedSetupId: command.bedSetupId,
+        bedSetups: command.bedSetups,
+      }
+      let next =
+        JSON.stringify(profile) === JSON.stringify(state.project.profile)
+          ? state
+          : { ...state, project: { ...state.project, profile } }
+      for (const plate of state.plates) {
+        const { setup } = plate
+        const sameDevice = setup.deviceId === command.deviceId
+        const defaults =
+          command.useDefaults &&
+          plate.example &&
+          !plate.operations.length &&
+          !setup.stock &&
+          (!sameDevice || !setup.bedSetupId)
+        const bedSetupId =
+          sameDevice && !defaults
+            ? (setup.bedSetupId ?? null)
+            : command.bedSetupId
+        // A saved same-device setup can hold anchors before the local library has read them.
+        let anchors = sameDevice ? setup.anchors : null
+        if (command.anchors)
+          anchors = plateAnchors(
+            { bedSetupId, anchors },
+            command.anchors,
+            command.bedSetups
+          )
+        if (
+          !defaults &&
+          sameDevice &&
+          (setup.bedSetupId ?? null) === bedSetupId &&
+          sameAnchors(setup.anchors, anchors)
+        )
+          continue
+        const result = updateSetup(next, plate.id, (current) => {
+          const assigned = patchedSetup(current, {
+            deviceId: command.deviceId,
+            bedSetupId,
+            anchors,
+          })
+          if (!defaults) return ok(assigned)
+          const fixtures = defaultFixtures(assigned, command.fixtures)
+          if (!fixtures.ok) return fixtures
+          return ok(patchedSetup(assigned, { fixtures: fixtures.value }))
+        })
+        if (!result.ok) return result
+        next = result.value
+      }
+      return ok(next)
+    }
     case "plate.dismissNotice":
       return updatePlate(state, command.plateId, (plate) =>
         ok({
@@ -734,7 +826,16 @@ function commandResult(
       )
     }
     case "workspace.replace":
-      return ok(command.state)
+      return ok({
+        ...command.state,
+        plates: command.state.plates.map((plate) => {
+          const setup = setupOnProject(
+            plate.setup,
+            command.state.project.profile
+          )
+          return setup === plate.setup ? plate : { ...plate, setup }
+        }),
+      })
     case "batch": {
       let next = state
       for (const item of command.commands) {

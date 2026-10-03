@@ -5,6 +5,10 @@ import { EntityIdSchema, TextSchema } from "@/domain/primitives"
 import { RuleSettingsSchema } from "@/domain/rules/settings"
 import { libraryOf } from "@/domain/workspace/library"
 import type { WorkspaceState } from "@/domain/workspace/workspace"
+import {
+  ProjectProfileSchema,
+  projectProfileOf,
+} from "@/domain/workspace/project-profile"
 import { ruleSettingsFromDesignRules } from "@/formats/project/rule-settings"
 import { PROJECT_LIMITS } from "@/formats/project/step-nc"
 import { upgradeWorkspaceSources } from "@/formats/project/upgrade"
@@ -14,6 +18,10 @@ import { upgradeStrategies } from "@/formats/upgrade/strategies"
 import { KEPT_WORKSPACE_MAX_LENGTH } from "@/platform/contract/window"
 import type { WindowHost } from "@/platform/host"
 import { log } from "@/app/errors/log"
+import {
+  adoptedProfileConnection,
+  rememberProfileConnection,
+} from "@/app/fixtures/connection-profile"
 import {
   hasUnsavedChanges,
   markProjectEdited,
@@ -99,12 +107,14 @@ const KeptSchema = z.preprocess(
     project: z.object({
       name: TextSchema,
       fileName: z.string().min(1).max(1000),
+      profile: ProjectProfileSchema.optional(),
     }),
     unsaved: z.boolean(),
+    adoptedConnectionId: z.string().uuid().nullable().default(null),
   })
 )
 
-const keptOf = (state: WorkspaceState) => ({
+const keptOf = (state: WorkspaceState, adoptedConnectionId: string | null) => ({
   version: KEPT_VERSION,
   plates: state.plates,
   selectedPlateId: state.selectedPlateId,
@@ -112,6 +122,7 @@ const keptOf = (state: WorkspaceState) => ({
   ruleSettings: state.ruleSettings,
   project: state.project,
   unsaved: hasUnsavedChanges(state),
+  adoptedConnectionId,
 })
 
 /**
@@ -132,18 +143,29 @@ function restore(workspace: WorkspaceStore, text: string): boolean {
     )
     return false
   }
-  const { unsaved, selectedPlateId, version: _version, ...kept } = read.data
+  const {
+    unsaved,
+    selectedPlateId,
+    version: _version,
+    adoptedConnectionId,
+    ...kept
+  } = read.data
   const selected = kept.plates.some((plate) => plate.id === selectedPlateId)
   workspace.dispatch({
     type: "workspace.replace",
     state: {
       ...libraryOf(workspace.state),
       ...kept,
+      project: {
+        ...kept.project,
+        profile: kept.project.profile ?? projectProfileOf(kept.plates),
+      },
       selectedPlateId: selected
         ? selectedPlateId
         : (kept.plates[0]?.id ?? null),
     },
   })
+  rememberProfileConnection(workspace, adoptedConnectionId)
   if (unsaved) markProjectEdited()
   else markProjectSaved(workspace.state)
   return true
@@ -178,7 +200,9 @@ export async function keepWorkspaceAcrossReloads(
     }
     let text: string | null = null
     try {
-      text = JSON.stringify(keptOf(workspace.state))
+      text = JSON.stringify(
+        keptOf(workspace.state, adoptedProfileConnection(workspace))
+      )
     } catch {
       // Longer than a string can be: nothing is kept.
     }

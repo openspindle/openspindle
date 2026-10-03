@@ -6,6 +6,11 @@ import { PlateSchema } from "@/domain/plate/plate"
 import { EntityIdSchema, TextSchema } from "@/domain/primitives"
 import { RuleSettingsSchema } from "@/domain/rules/settings"
 import type { WorkspaceState } from "@/domain/workspace/workspace"
+import {
+  ProjectProfileSchema,
+  projectProfileOf,
+} from "@/domain/workspace/project-profile"
+import type { ProjectProfile } from "@/domain/workspace/project-profile"
 import { libraryModelId } from "@/domain/fixtures/definitions"
 import { validateGlb } from "@/formats/models/glb"
 import { TOOL_MODEL_BYTES, isTool } from "@/domain/tools/tool"
@@ -56,6 +61,8 @@ export type ProjectDocument = WorkspaceData & {
   readonly schemaVersion: typeof PROJECT_SCHEMA_VERSION
   readonly name: WorkspaceState["project"]["name"]
   readonly models: readonly ProjectModel[]
+  /** Absent in earlier projects, whose first plate identifies their device. */
+  readonly profile?: ProjectProfile
 }
 
 /** The Models library models the plates' fixtures use, each once. */
@@ -185,6 +192,7 @@ export const ProjectDocumentSchema = z
   .strictObject({
     schemaVersion: z.literal(PROJECT_SCHEMA_VERSION),
     name: TextSchema,
+    profile: ProjectProfileSchema.optional(),
     plates: z.array(PlateSchema).max(PROJECT_LIMITS.plates),
     selectedPlateId: EntityIdSchema.nullable(),
     tools: z.array(ToolSchema).max(PROJECT_LIMITS.tools),
@@ -228,6 +236,7 @@ export function projectDocument(
   return {
     schemaVersion: PROJECT_SCHEMA_VERSION,
     name: state.project.name,
+    profile: state.project.profile,
     plates,
     selectedPlateId,
     tools,
@@ -249,7 +258,15 @@ export function projectWorkspace(
     schemaVersion: _schemaVersion,
     name,
     models: _models,
+    profile,
     ...data
   } = document
-  return { ...data, project: { name, fileName } }
+  return {
+    ...data,
+    project: {
+      name,
+      fileName,
+      profile: profile ?? projectProfileOf(data.plates),
+    },
+  }
 }

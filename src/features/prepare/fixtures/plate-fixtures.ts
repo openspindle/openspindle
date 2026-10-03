@@ -8,9 +8,10 @@ import type {
   FixtureKind,
 } from "@/domain/fixtures/definitions"
 import {
+  DEFAULT_BED_SETUP,
   WORKSPACE_PROFILE,
+  bedSetupDefinitions,
   bedSetupOf,
-  defaultFixtureProfile,
 } from "@/domain/fixtures/profiles"
 import type { BedSetup } from "@/domain/fixtures/profiles"
 import type { Plate } from "@/domain/plate/plate"
@@ -30,19 +31,29 @@ export const FIXTURE_KIND_GROUPS: readonly (readonly [FixtureKind, string])[] =
   ]
 
 /**
- * The bed setup a plate adds fixtures from: of the plate's own device, not whichever one the
- * Device tab currently shows.
+ * Compatible shared fixtures with the defaults of the plate's bed setup applied.
  */
-export function usePlateBedSetup(plate: Plate): BedSetup {
+export function usePlateBedSetup(
+  plate: Plate
+): BedSetup & { definitions: FixtureDefinition[] } {
   const profiles = useFixtureLibrary((library) => library.profiles)
-  const profileId = plate.setup.deviceId ?? WORKSPACE_PROFILE
-  const { bedSetupId } = plate.setup
+  const definitions = useFixtureLibrary((library) => library.definitions)
+  const { deviceId, bedSetupId } = plate.setup
+  const profileId = deviceId ?? WORKSPACE_PROFILE
   return useMemo(() => {
-    const profile = Object.hasOwn(profiles, profileId)
-      ? profiles[profileId]
-      : defaultFixtureProfile()
-    return bedSetupOf(profile, bedSetupId)
-  }, [profiles, profileId, bedSetupId])
+    const setup: BedSetup = Object.hasOwn(profiles, profileId)
+      ? bedSetupOf(profiles[profileId], bedSetupId)
+      : {
+          id: bedSetupId ?? DEFAULT_BED_SETUP,
+          name: "Not on this computer",
+          fixtures: [],
+          anchors: [],
+        }
+    return {
+      ...setup,
+      definitions: bedSetupDefinitions(definitions, setup, deviceId),
+    }
+  }, [profiles, definitions, profileId, deviceId, bedSetupId])
 }
 
 /**

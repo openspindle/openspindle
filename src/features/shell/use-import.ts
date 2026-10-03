@@ -1,7 +1,7 @@
 import { useMutation } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { useFixtureLibraryStore } from "@/app/fixtures/fixture-context"
-import { profilePlacement } from "@/app/fixtures/fixture-library-store"
+import { projectPlacement } from "@/app/fixtures/plate-profile"
 import {
   isEmptyPlaceholder,
   keptSetup,
@@ -51,6 +51,7 @@ export const workspaceScope = { id: "workspace" }
 const bedOf = (setup: PlateSetup): PlatePlacement => ({
   fixtures: structuredClone(setup.fixtures),
   deviceId: setup.deviceId,
+  bedSetupId: setup.bedSetupId,
   anchors: setup.anchors ? structuredClone(setup.anchors) : null,
 })
 
@@ -72,8 +73,11 @@ export function useImportContext(): () => ImportContext {
         state.stocks.find((stock) => stock.id === state.defaultStockId) ??
         state.stocks.at(0) ??
         createDefaultStockLibrary()[0],
-      placement: empty ? bedOf(empty.setup) : profilePlacement(fixtures.state),
+      placement: empty
+        ? bedOf(empty.setup)
+        : projectPlacement(state, fixtures.state),
       fixtureProfiles: fixtures.state.profiles,
+      fixtureDefinitions: fixtures.state.definitions,
       setup: empty ? keptSetup(empty) : undefined,
     }
   }

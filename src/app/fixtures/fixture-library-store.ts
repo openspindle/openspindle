@@ -4,7 +4,9 @@ import type { PlatePlacement } from "@/app/workspace/import-program"
 import {
   BED_SETUP_LIMIT,
   WORKSPACE_PROFILE,
+  bedFixture,
   bedSetupAnchors,
+  bedSetupDefinitions,
   bedSetupOf,
   defaultFixtureProfile,
   profileBedSetupAnchors,
@@ -17,8 +19,20 @@ import type {
   FixtureProfiles,
 } from "@/domain/fixtures/profiles"
 import type { BedSetupAnchors } from "@/domain/plate/bed-setup"
-import { defaultFixtureInstances } from "@/domain/fixtures/definitions"
+import {
+  FIXTURE_LIMIT,
+  defaultFixtureInstances,
+  isBedKind,
+  withDefinitionOrigin,
+} from "@/domain/fixtures/definitions"
 import type { FixtureDefinition } from "@/domain/fixtures/definitions"
+import type { Point3 } from "@/domain/primitives"
+import { FIXTURE_KITS } from "@/domain/fixtures/catalog"
+import {
+  FIXTURE_CATALOG_LIMIT,
+  defaultFixtureCompatibility,
+} from "@/domain/fixtures/compatibility"
+import { internFixtureDefinitions } from "@/domain/fixtures/fixture-catalog"
 import { storedAnchorsMerged } from "@/domain/fixtures/stored-anchors"
 import {
   anchorsFromDevice,
@@ -34,15 +48,27 @@ import type { AnchorConfiguration, ConnectedDevice } from "@/machine/contract"
 import type { FixtureLibrary } from "@/persistence/fixture-document"
 import type { DocumentTarget } from "@/persistence/bind-document"
 
-export const createFixtureLibrary = (): FixtureLibrary => ({
-  selectedId: WORKSPACE_PROFILE,
-  profiles: { [WORKSPACE_PROFILE]: defaultFixtureProfile() },
-})
+export const createFixtureLibrary = (): FixtureLibrary => {
+  const definitions = FIXTURE_KITS.flatMap((kit) => kit.definitions()).map(
+    (definition) => ({
+      ...definition,
+      compatibility: defaultFixtureCompatibility(definition),
+    })
+  )
+  return {
+    selectedId: WORKSPACE_PROFILE,
+    definitions,
+    bundles: Object.fromEntries(
+      FIXTURE_KITS.map((kit) => [kit.id, kit.version])
+    ),
+    profiles: { [WORKSPACE_PROFILE]: defaultFixtureProfile(null, definitions) },
+  }
+}
 
 export function selectedProfile(library: FixtureLibrary): FixtureProfile {
   return Object.hasOwn(library.profiles, library.selectedId)
     ? library.profiles[library.selectedId]
-    : defaultFixtureProfile()
+    : defaultFixtureProfile(null, library.definitions)
 }
 
 /**
@@ -52,11 +78,14 @@ export function selectedProfile(library: FixtureLibrary): FixtureProfile {
 export function bedSetupPlacement(
   profileId: string,
   profile: FixtureProfile,
-  bedSetupId?: string | null
+  bedSetupId?: string | null,
+  definitions: readonly FixtureDefinition[] = []
 ): PlatePlacement {
   const setup = bedSetupOf(profile, bedSetupId)
   return {
-    fixtures: defaultFixtureInstances(setup.definitions),
+    fixtures: defaultFixtureInstances(
+      bedSetupDefinitions(definitions, setup, profileDeviceId(profileId))
+    ),
     deviceId: profileDeviceId(profileId),
     anchors: bedSetupAnchors(profile, setup),
     bedSetupId: setup.id,
@@ -65,7 +94,12 @@ export function bedSetupPlacement(
 
 /** Where new plates are set up: the selected profile's default bed setup. */
 export const profilePlacement = (library: FixtureLibrary): PlatePlacement =>
-  bedSetupPlacement(library.selectedId, selectedProfile(library))
+  bedSetupPlacement(
+    library.selectedId,
+    selectedProfile(library),
+    null,
+    library.definitions
+  )
 
 /** A device's anchors and its bed setups' anchors, which plates set up for it follow. */
 export type ProfileAnchors = {
@@ -114,7 +148,9 @@ export function changedAnchors(
 
 /** Whether two states of the library hold the same profiles, whichever is selected. */
 const sameProfiles = (left: FixtureLibrary, right: FixtureLibrary) =>
-  sameData(left.profiles, right.profiles)
+  sameData(left.profiles, right.profiles) &&
+  sameData(left.definitions, right.definitions) &&
+  sameData(left.bundles, right.bundles)
 
 /**
  * What an edit of a profile's definitions changes, so that quick edits of one field (typing a
@@ -161,17 +197,17 @@ export class FixtureLibraryStore implements DocumentTarget<FixtureLibrary> {
   }
 
   readonly hydrate = (value: FixtureLibrary) => {
-    // Profiles made from an earlier version of their kit catch up (saved with the next change).
-    const profiles = Object.entries({
-      ...createFixtureLibrary().profiles,
-      ...value.profiles,
-    }).map(([id, profile]) => [id, withCurrentBundle(profile)] as const)
+    // Bundled fixtures update globally once; profiles keep only their bed placements.
+    const current = withCurrentBundle({
+      ...value,
+      profiles: {
+        [WORKSPACE_PROFILE]: defaultFixtureProfile(null, value.definitions),
+        ...value.profiles,
+      },
+    })
     // The stored library replaces the one the steps edited.
     this.history.clear()
-    this.store.setState(() => ({
-      ...value,
-      profiles: Object.fromEntries(profiles),
-    }))
+    this.store.setState(() => current)
   }
 
   readonly subscribe = (listener: (value: FixtureLibrary) => void) => {
@@ -204,10 +240,14 @@ export class FixtureLibraryStore implements DocumentTarget<FixtureLibrary> {
       if (library.selectedId === id && Object.hasOwn(library.profiles, id))
         return library
       return {
+        ...library,
         selectedId: id,
         profiles: Object.hasOwn(library.profiles, id)
           ? library.profiles
-          : { ...library.profiles, [id]: defaultFixtureProfile(device) },
+          : {
+              ...library.profiles,
+              [id]: defaultFixtureProfile(device, library.definitions),
+            },
       }
     })
   }
@@ -227,7 +267,7 @@ export class FixtureLibraryStore implements DocumentTarget<FixtureLibrary> {
     this.change((library) => {
       const profile = Object.hasOwn(library.profiles, id)
         ? library.profiles[id]
-        : defaultFixtureProfile(device)
+        : defaultFixtureProfile(device, library.definitions)
       const read =
         profile.anchors?.source === "firmware-config" &&
         profile.anchors.fetchedAt === configuration.fetchedAt
@@ -284,25 +324,165 @@ export class FixtureLibraryStore implements DocumentTarget<FixtureLibrary> {
     }, null)
   }
 
-  /**
-   * Replaces the fixture definitions of one of a profile's bed setups: the selected profile's
-   * unless `profileId` names another.
-   */
-  setDefinitions(
+  /** Adds one global fixture. Larger migrated catalogs keep their entries but cannot grow. */
+  addDefinition(definition: FixtureDefinition) {
+    this.edit((library) => {
+      if (
+        library.definitions.length >= FIXTURE_CATALOG_LIMIT ||
+        library.definitions.some((item) => item.id === definition.id)
+      )
+        return library
+      return {
+        ...library,
+        definitions: [
+          ...library.definitions,
+          {
+            ...definition,
+            compatibility:
+              definition.compatibility ??
+              defaultFixtureCompatibility(definition),
+          },
+        ],
+      }
+    }, null)
+  }
+
+  /** Edits one global definition; bed placement overrides stay on their beds. */
+  setDefinition(definition: FixtureDefinition, origin?: Point3) {
+    const previous = this.state.definitions.find(
+      (item) => item.id === definition.id
+    )
+    if (!previous) return
+    const changed = origin
+      ? {
+          ...definition,
+          defaultPosition: withDefinitionOrigin(previous, origin)
+            .defaultPosition,
+        }
+      : definition
+    const key = definitionsKey([previous], [changed])
+    this.edit(
+      (library) => {
+        const profiles = origin
+          ? Object.fromEntries(
+              Object.entries(library.profiles).map(([id, profile]) => [
+                id,
+                {
+                  ...profile,
+                  bedSetups: profile.bedSetups.map((setup) => ({
+                    ...setup,
+                    fixtures: setup.fixtures.map((placement) =>
+                      placement.definitionId === definition.id
+                        ? {
+                            ...placement,
+                            position: withDefinitionOrigin(
+                              {
+                                ...previous,
+                                defaultPosition: placement.position,
+                                defaultRotation: placement.rotation,
+                              },
+                              origin
+                            ).defaultPosition,
+                          }
+                        : placement
+                    ),
+                  })),
+                },
+              ])
+            )
+          : library.profiles
+        return {
+          ...library,
+          profiles,
+          definitions: library.definitions.map((item) =>
+            item.id === definition.id ? changed : item
+          ),
+        }
+      },
+      key === null ? null : `definition:${key}`
+    )
+  }
+
+  /** Removes a global definition and its bed references; placed plate snapshots stay. */
+  removeDefinition(id: string) {
+    this.edit((library) => {
+      if (!library.definitions.some((item) => item.id === id)) return library
+      return {
+        ...library,
+        definitions: library.definitions.filter((item) => item.id !== id),
+        profiles: Object.fromEntries(
+          Object.entries(library.profiles).map(([profileId, profile]) => [
+            profileId,
+            {
+              ...profile,
+              bedSetups: profile.bedSetups.map((setup) => ({
+                ...setup,
+                fixtures: setup.fixtures.filter(
+                  (item) => item.definitionId !== id
+                ),
+              })),
+            },
+          ])
+        ),
+      }
+    }, null)
+  }
+
+  /** Changes only this bed's use and placement of a global fixture. */
+  setBedFixture(
     bedSetupId: string,
-    definitions: FixtureDefinition[],
+    definitionId: string,
+    patch: Partial<
+      Pick<
+        FixtureDefinition,
+        "defaultEnabled" | "defaultPosition" | "defaultRotation"
+      >
+    >,
     profileId: string = this.state.selectedId
   ) {
-    if (!Object.hasOwn(this.state.profiles, profileId)) return
-    const setup = this.state.profiles[profileId].bedSetups.find(
-      (item) => item.id === bedSetupId
-    )
-    if (!setup) return
-    const key = definitionsKey(setup.definitions, definitions)
     this.edit(
-      (library) =>
-        this.withBedSetup(library, bedSetupId, { definitions }, profileId),
-      key === null ? null : `definitions:${profileId}:${bedSetupId}:${key}`
+      (library) => {
+        if (!Object.hasOwn(library.profiles, profileId)) return library
+        const setup = library.profiles[profileId].bedSetups.find(
+          (item) => item.id === bedSetupId
+        )
+        const definition = library.definitions.find(
+          (item) => item.id === definitionId
+        )
+        if (!setup || !definition) return library
+        const held = setup.fixtures.find(
+          (item) => item.definitionId === definitionId
+        )
+        if (!held && setup.fixtures.length >= FIXTURE_CATALOG_LIMIT)
+          return library
+        const before = held ?? { ...bedFixture(definition), enabled: false }
+        const changed = {
+          ...before,
+          enabled: patch.defaultEnabled ?? before.enabled,
+          position: patch.defaultPosition ?? before.position,
+          rotation: patch.defaultRotation ?? before.rotation,
+        }
+        const byId = new Map(library.definitions.map((item) => [item.id, item]))
+        const placed = held
+          ? setup.fixtures.map((item) =>
+              item.definitionId === definitionId ? changed : item
+            )
+          : [...setup.fixtures, changed]
+        const fixtures = placed.map((item) => {
+          const other = byId.get(item.definitionId)
+          return item.definitionId !== definitionId &&
+            changed.enabled &&
+            isBedKind(definition.kind) &&
+            other &&
+            isBedKind(other.kind)
+            ? { ...item, enabled: false }
+            : item
+        })
+        if (fixtures.filter((item) => item.enabled).length > FIXTURE_LIMIT)
+          return library
+        return this.withBedSetup(library, bedSetupId, { fixtures }, profileId)
+      },
+      `bed-fixture:${profileId}:${bedSetupId}:${definitionId}:${Object.keys(patch).sort().join(",")}`
     )
   }
 
@@ -326,7 +506,7 @@ export class FixtureLibraryStore implements DocumentTarget<FixtureLibrary> {
     const setup: BedSetup = {
       id: crypto.randomUUID(),
       name,
-      definitions: structuredClone(source.definitions),
+      fixtures: structuredClone(source.fixtures),
       anchors: from
         ? source.anchors.map((anchor) => ({
             ...anchor,
@@ -398,7 +578,11 @@ export class FixtureLibraryStore implements DocumentTarget<FixtureLibrary> {
    * Keeps a bed setup in a device's profile, such as one a plate set up on another computer
    * names, unless the profile has one of its id or holds as many as it can.
    */
-  keepBedSetup(profileId: string, setup: BedSetup) {
+  keepBedSetup(
+    profileId: string,
+    setup: BedSetup,
+    snapshots: readonly FixtureDefinition[] = []
+  ) {
     this.edit((library) => {
       if (!Object.hasOwn(library.profiles, profileId)) return library
       const profile = library.profiles[profileId]
@@ -407,11 +591,40 @@ export class FixtureLibraryStore implements DocumentTarget<FixtureLibrary> {
         profile.bedSetups.some((item) => item.id === setup.id)
       )
         return library
+      const firstSnapshots = snapshots.filter(
+        (item, index) =>
+          snapshots.findIndex((other) => other.id === item.id) === index
+      )
+      const imported = internFixtureDefinitions(
+        library.definitions,
+        firstSnapshots
+      )
+      const ids = new Set(
+        imported.definitions.map((definition) => definition.id)
+      )
+      const kept = {
+        ...setup,
+        fixtures: setup.fixtures
+          .filter(
+            (item, index) =>
+              setup.fixtures.findIndex(
+                (other) => other.definitionId === item.definitionId
+              ) === index
+          )
+          .map((item) => ({
+            ...item,
+            definitionId:
+              imported.ids.get(item.definitionId) ?? item.definitionId,
+          })),
+      }
+      if (kept.fixtures.some((item) => !ids.has(item.definitionId)))
+        return library
       return {
         ...library,
+        definitions: imported.definitions,
         profiles: {
           ...library.profiles,
-          [profileId]: { ...profile, bedSetups: [...profile.bedSetups, setup] },
+          [profileId]: { ...profile, bedSetups: [...profile.bedSetups, kept] },
         },
       }
     }, null)

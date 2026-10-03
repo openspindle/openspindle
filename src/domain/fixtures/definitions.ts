@@ -6,9 +6,10 @@ import { EntityIdSchema, Point3Schema, toMicrometre } from "@/domain/primitives"
 import type { Point3 } from "../nc/gcode"
 import { SurfaceMaterialSchema } from "@/domain/materials/surface-material"
 import { MountPointsSchema } from "./mount-points"
+import { FixtureCompatibilitySchema } from "./compatibility"
 import type { MountPoint } from "./mount-points"
 
-/** The most fixtures a plate holds, and the most definitions a device profile holds. */
+/** The most fixtures a plate or a saved bed setup holds. */
 export const FIXTURE_LIMIT = 32
 
 /** The length limit of a fixture's name, as the Device tab takes it: above `TEXT_LIMIT`. */
@@ -85,7 +86,7 @@ export const FixtureModelSchema = z
   )
 export type FixtureModel = z.infer<typeof FixtureModelSchema>
 
-/** A fixture as a profile defines it: what it is, how it is drawn, where new plates put it. */
+/** A shared fixture definition, with template placement defaults for bed setups. */
 export const FixtureDefinitionSchema = z.object({
   id: EntityIdSchema,
   name: z
@@ -95,6 +96,8 @@ export const FixtureDefinitionSchema = z.object({
     .max(FIXTURE_NAME_LIMIT)
     .refine((name) => !hasControlCharacter(name), "Remove control characters."),
   kind: FixtureKindSchema,
+  /** Absent in older snapshots: compatible with all machine types. */
+  compatibility: FixtureCompatibilitySchema.optional(),
   color: z.string().regex(/^#[\da-f]{6}$/i),
   /** What it is made of, as it is drawn; without one, as its model or its kind is. */
   material: SurfaceMaterialSchema.optional(),

@@ -1,6 +1,7 @@
 import { toast } from "sonner"
 import { useFixtureLibraryStore } from "@/app/fixtures/fixture-context"
 import { profileAnchors } from "@/app/fixtures/fixture-library-store"
+import { selectProjectProfile } from "@/app/fixtures/plate-profile"
 import { useWorkspaceStore } from "@/app/workspace/workspace-context"
 import { operationStart } from "@/domain/design-rules/check"
 import { resolvedFileSource } from "@/domain/design-rules/program-rules"
@@ -21,8 +22,8 @@ export const QUICK_FIX_LABELS: Record<QuickFix["kind"], string> = {
 
 /**
  * The read-anchors fix of a plate as a machine action, gated by availability like the Device
- * tab's Read anchors button, so a double click cannot send two reads. The plate then uses the
- * connected device and its anchors, also when it was set up for another one.
+ * tab's Read anchors button, so a double click cannot send two reads. The project then uses
+ * the connected device and its anchors, also when it was set up for another one.
  */
 export function useReadAnchorsFix(plateId: string | null) {
   const { availability, connection } = useMachineSnapshot()
@@ -34,7 +35,9 @@ export function useReadAnchorsFix(plateId: string | null) {
   return {
     reason: entry.allowed ? null : (entry.reason ?? "Unavailable."),
     pending: readAnchors.isPending,
-    run: () =>
+    run: () => {
+      const session = workspace.session
+      const projectDeviceId = workspace.state.project.profile.deviceId
       readAnchors.mutate(undefined, {
         onSuccess: (configuration) => {
           if (device && plateId) {
@@ -46,21 +49,19 @@ export function useReadAnchorsFix(plateId: string | null) {
               ? profileAnchors(deviceId, profiles[deviceId])
               : null
             if (
+              workspace.session === session &&
+              workspace.state.project.profile.deviceId === projectDeviceId &&
+              workspace.state.plates.some((plate) => plate.id === plateId) &&
               profile?.anchors.source === "firmware-config" &&
               profile.anchors.fetchedAt === configuration.fetchedAt
             )
-              workspace.dispatch({
-                type: "plate.useDevice",
-                plateId,
-                deviceId,
-                anchors: profile.anchors,
-                bedSetups: profile.bedSetups,
-              })
+              selectProjectProfile(workspace, fixtures, deviceId)
           }
           toast.success("Stored anchors updated.")
         },
         onError: (error) => toast.error(error.message),
-      }),
+      })
+    },
   }
 }
 

@@ -2,8 +2,13 @@ import { createAtom } from "@tanstack/react-store"
 import { libraryOf } from "@/domain/workspace/library"
 import type { WorkspaceState } from "@/domain/workspace/workspace"
 import type { Result } from "@/domain/primitives"
+import type { FixtureProfile } from "@/domain/fixtures/profiles"
+import type { FixtureDefinition } from "@/domain/fixtures/definitions"
+import { projectProfileOf } from "@/domain/workspace/project-profile"
+import { profileBedSetupAnchors } from "@/domain/fixtures/profiles"
+import { bedSetupPlacement } from "@/app/fixtures/fixture-library-store"
 import type { ProfileAnchors } from "@/app/fixtures/fixture-library-store"
-import { emptyPlate, isEmptyPlaceholder, newProject } from "./defaults"
+import { emptyPlate, newProject } from "./defaults"
 import type { PlatePlacement } from "./import-program"
 import type { WorkspaceStore } from "./store"
 
@@ -16,6 +21,7 @@ type Baseline = Pick<
   "plates" | "heightMaps" | "ruleSettings"
 > & {
   readonly name: string
+  readonly profile: WorkspaceState["project"]["profile"]
 }
 
 /**
@@ -29,6 +35,7 @@ const baselineOf = (state: WorkspaceState): Baseline => ({
   heightMaps: state.heightMaps,
   ruleSettings: state.ruleSettings,
   name: state.project.name,
+  profile: state.project.profile,
 })
 
 /** The workspace now matches its project: saved, opened, or the new one the app starts with. */
@@ -45,14 +52,19 @@ export function startNewProject(
   workspace: WorkspaceStore,
   placement: PlatePlacement
 ): Result<WorkspaceState> {
+  const plate = emptyPlate(placement)
+  const initial = newProject(libraryOf(workspace.state))
   const result = workspace.dispatch({
     type: "batch",
     commands: [
       {
         type: "workspace.replace",
-        state: newProject(libraryOf(workspace.state)),
+        state: {
+          ...initial,
+          project: { ...initial.project, profile: projectProfileOf([plate]) },
+        },
       },
-      { type: "plates.add", plates: [emptyPlate(placement)], select: true },
+      { type: "plates.add", plates: [plate], select: true },
     ],
   })
   if (result.ok) markProjectSaved(workspace.state)
@@ -72,6 +84,7 @@ export function hasUnsavedChanges(state: WorkspaceState): boolean {
     current.plates !== baseline.plates ||
     current.heightMaps !== baseline.heightMaps ||
     current.ruleSettings !== baseline.ruleSettings ||
+    current.profile !== baseline.profile ||
     current.name !== baseline.name
   )
 }
@@ -85,14 +98,12 @@ export function markProjectEdited() {
 }
 
 /**
- * Plates set up for a device (or for none yet) follow its anchors and those of their bed setups;
- * the connected device's, every plate moves to it. That is not an edit of the project: a
+ * Plates assigned to a device follow its anchors and those of their bed setups. That is not an edit of the project: a
  * project without unsaved changes keeps none, since following them again is the same.
  */
 export function followDeviceAnchors(
   workspace: WorkspaceStore,
-  { deviceId, anchors, bedSetups }: ProfileAnchors,
-  connected = false
+  { deviceId, anchors, bedSetups }: ProfileAnchors
 ) {
   const unchanged = !hasUnsavedChanges(workspace.state)
   workspace.dispatch({
@@ -100,52 +111,41 @@ export function followDeviceAnchors(
     deviceId,
     anchors,
     bedSetups,
-    connected,
   })
   if (unchanged) markProjectSaved(workspace.state)
 }
 
 /**
- * Sets the empty plate a project starts with up on a device's bed (`placement`: its default bed
- * setup's fixtures and anchors) while it is still empty, without stock: the plate a program
- * imported then replaces it with looks for the program's fixtures there. A plate with stock
- * keeps its setup, as programs that replace it keep it.
+ * Adopts the connected device's profile once, before its anchors are read. Existing plates keep
+ * their stock, operations and placed fixtures; an empty starter plate moving to the device
+ * takes its default fixtures too. The same device keeps each plate's chosen bed setup.
  */
 export function followDeviceBed(
   workspace: WorkspaceStore,
-  placement: PlatePlacement
+  profileId: string,
+  profile: FixtureProfile,
+  definitions: readonly FixtureDefinition[]
 ) {
-  const behind = workspace.state.plates.filter(
-    (plate) =>
-      isEmptyPlaceholder(plate) &&
-      !plate.setup.stock &&
-      (plate.setup.deviceId !== placement.deviceId ||
-        plate.setup.bedSetupId !== placement.bedSetupId)
+  const placement = bedSetupPlacement(
+    profileId,
+    profile,
+    undefined,
+    definitions
   )
-  if (!behind.length) return
   const unchanged = !hasUnsavedChanges(workspace.state)
-  workspace.dispatch({
-    type: "batch",
-    commands: behind.flatMap((plate) => [
-      // The device with its anchors at once: a plate's anchors are its device's.
-      {
-        type: "plate.setup" as const,
-        plateId: plate.id,
-        patch: {
-          deviceId: placement.deviceId ?? null,
-          anchors: placement.anchors ?? null,
-        },
-      },
-      {
-        type: "fixtures.useDefaults" as const,
-        plateId: plate.id,
-        fixtures: placement.fixtures,
-        anchors: placement.anchors ?? null,
-        bedSetupId: placement.bedSetupId ?? null,
-      },
-    ]),
-  })
-  if (unchanged) markProjectSaved(workspace.state)
+  const result = workspace.dispatch(
+    {
+      type: "plates.useProfile",
+      deviceId: placement.deviceId ?? null,
+      bedSetupId: profile.defaultBedSetupId,
+      anchors: profile.anchors ?? null,
+      bedSetups: profileBedSetupAnchors(profile),
+      fixtures: placement.fixtures,
+      useDefaults: true,
+    },
+    { record: false }
+  )
+  if (result.ok && unchanged) markProjectSaved(workspace.state)
 }
 
 /** Calls `listener` whenever the project is saved or opened; edits come from the workspace. */

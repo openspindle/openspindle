@@ -15,6 +15,7 @@ import {
 import { useWorkspaceStore } from "@/app/workspace/workspace-context"
 import { useFixtureLibrary } from "@/app/fixtures/fixture-context"
 import { WORKSPACE_PROFILE, bedSetupOf } from "@/domain/fixtures/profiles"
+import { sameFixtureFamily } from "@/domain/fixtures/fixture-catalog"
 import type { FixtureLibrary } from "@/persistence/fixture-document"
 import { openDialog } from "@/features/shell/dialogs"
 import type { WorkspaceDialog } from "@/features/shell/dialogs"
@@ -33,8 +34,8 @@ const isMoveAxes = (value: unknown): value is MoveAxes =>
   MOVE_AXES.some((axes) => axes === value)
 
 /**
- * The dialog that edits a fixture's definition, as its plate's device's bed setup defines it;
- * null for other items, and for a fixture that bed setup does not define.
+ * The shared definition's editor with the plate's bed setup as its default-placement context.
+ * Legacy snapshots match by intrinsic identity when migration reassigned a duplicate id.
  */
 function fixtureDialog(
   { plate, item }: ArrangeTarget,
@@ -49,16 +50,19 @@ function fixtureDialog(
     library.profiles[profileId],
     plate.setup.bedSetupId
   )
-  const definitionId = instance.definition.id
-  if (
-    !bedSetup.definitions.some((definition) => definition.id === definitionId)
-  )
-    return null
+  const matches = (definition: (typeof library.definitions)[number]) =>
+    sameFixtureFamily(definition, instance.definition)
+  const definition =
+    library.definitions.find(
+      (candidate) =>
+        candidate.id === instance.definition.id && matches(candidate)
+    ) ?? library.definitions.find(matches)
+  if (!definition) return null
   return {
     kind: "fixture-definition",
     profileId,
     bedSetupId: bedSetup.id,
-    definitionId,
+    definitionId: definition.id,
   }
 }
 

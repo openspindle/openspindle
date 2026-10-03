@@ -74,7 +74,7 @@ function FixtureChoice({
   )
 }
 
-/** The plate's bed setup's fixtures by kind, each added to the plate when chosen. */
+/** Compatible shared fixtures by kind, each added to the plate when chosen. */
 function FixtureChoices({
   plate,
   label,
@@ -100,7 +100,7 @@ function FixtureChoices({
   return (
     <AppDialog
       title="Add fixture"
-      description={`${label} · ${bedSetup.name}`}
+      description={label}
       width="wide"
       onClose={onClose}
     >
@@ -150,7 +150,7 @@ function FixtureChoices({
 }
 
 /**
- * Adds a fixture of the plate's bed setup, chosen by its picture among those of its kind: a
+ * Adds a compatible shared fixture, chosen by its picture among those of its kind: a
  * bed replaces the plate's bed. The fixture added is selected, to be moved into place.
  */
 export function AddFixtureDialog({

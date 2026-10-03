@@ -1,6 +1,6 @@
 import { toast } from "sonner"
 import { useFixtureLibraryStore } from "@/app/fixtures/fixture-context"
-import { profilePlacement } from "@/app/fixtures/fixture-library-store"
+import { projectPlacement } from "@/app/fixtures/plate-profile"
 import { newPlate } from "@/app/workspace/import-program"
 import { useWorkspaceStore } from "@/app/workspace/workspace-context"
 import type { WorkspaceCommand } from "@/domain/workspace/workspace"
@@ -20,7 +20,7 @@ export function useAddPlate() {
   return () => {
     const plate = newPlate({
       stock: context().stock,
-      placement: profilePlacement(fixtures.state),
+      placement: projectPlacement(workspace.state, fixtures.state),
     })
     const keep = workspace.state.plates
       .filter((item) => item.example)

@@ -1,7 +1,7 @@
 import { useNavigate } from "@tanstack/react-router"
 import { toast } from "sonner"
 import { useFixtureLibraryStore } from "@/app/fixtures/fixture-context"
-import { profilePlacement } from "@/app/fixtures/fixture-library-store"
+import { projectPlacement } from "@/app/fixtures/plate-profile"
 import {
   useWorkspace,
   useWorkspaceStore,
@@ -31,7 +31,7 @@ export function useProbeAnchor(): { reason: string | null; run: () => void } {
   const fixtures = useFixtureLibraryStore()
   const navigate = useNavigate()
   const library = useWorkspace((state) => state.tools)
-  const placement = profilePlacement(fixtures.state)
+  const placement = projectPlacement(workspace.state, fixtures.state)
   const kit = kitForSetup(placement)
   const machine = kit.probing
   const strategy = strategyById("inside-corner")

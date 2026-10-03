@@ -6,20 +6,24 @@ import { ReasonButton } from "@/components/workspace/reason-button"
 import {
   useFixtureLibrary,
   useFixtureLibraryStore,
-  useSelectedFixtureProfile,
 } from "@/app/fixtures/fixture-context"
-import {
-  profileAnchors,
-  selectedProfile,
-} from "@/app/fixtures/fixture-library-store"
+import { profileAnchors } from "@/app/fixtures/fixture-library-store"
+import { selectProjectProfile } from "@/app/fixtures/plate-profile"
 import {
   retryStoredAnchors,
   useStoredAnchorsFailure,
 } from "@/app/fixtures/use-stored-anchors-sync"
 import { followDeviceAnchors } from "@/app/workspace/project-session"
 import { deviceAnchorsOf } from "@/domain/anchors/stored-anchors"
-import { bedSetupOf } from "@/domain/fixtures/profiles"
-import { useWorkspaceStore } from "@/app/workspace/workspace-context"
+import {
+  WORKSPACE_PROFILE,
+  bedSetupOf,
+  defaultFixtureProfile,
+} from "@/domain/fixtures/profiles"
+import {
+  useWorkspace,
+  useWorkspaceStore,
+} from "@/app/workspace/workspace-context"
 import type { AnchorXY } from "@/domain/anchors/stored-anchors"
 import { openDialog } from "@/features/shell/dialogs"
 import { isFresh, machineId } from "@/machine/contract"
@@ -49,8 +53,14 @@ export function DevicePage() {
   const writeAnchors = useWriteAnchors()
   const fixtures = useFixtureLibraryStore()
   const profiles = useFixtureLibrary((library) => library.profiles)
-  const selectedId = useFixtureLibrary((library) => library.selectedId)
-  const { profile, deviceId } = useSelectedFixtureProfile()
+  const projectProfile = useWorkspace((state) => state.project.profile)
+  const { deviceId } = projectProfile
+  const selectedId = deviceId ?? WORKSPACE_PROFILE
+  const available = Object.hasOwn(profiles, selectedId)
+  const profile = available ? profiles[selectedId] : defaultFixtureProfile()
+  const shownAnchors = available
+    ? profile.anchors
+    : (projectProfile.anchors ?? undefined)
   const workspace = useWorkspaceStore()
   const { map } = useDeviceHeightMap()
   const probeAnchor = useProbeAnchor()
@@ -63,8 +73,11 @@ export function DevicePage() {
   const bedSetup = bedSetupOf(profile, shownBedSetup)
   /** Plates set up for the shown profile's device follow its anchors and its bed setups'. */
   const follow = () => {
-    const { selectedId: id } = fixtures.state
-    const anchors = profileAnchors(id, selectedProfile(fixtures.state))
+    if (!available) return
+    const anchors = profileAnchors(
+      selectedId,
+      fixtures.state.profiles[selectedId]
+    )
     if (anchors) followDeviceAnchors(workspace, anchors)
   }
   // A connected machine that stores no anchors has none to read; its kit may still place some.
@@ -76,7 +89,7 @@ export function DevicePage() {
     ? [telemetry.machine.x, telemetry.machine.y]
     : null
   // Where the machine is from the shown device's first anchor, to keep as a bed setup's anchor.
-  const first = profile.anchors ? deviceAnchorsOf(profile.anchors)[0] : null
+  const first = shownAnchors ? deviceAnchorsOf(shownAnchors)[0] : null
   const shownConnected =
     !!machine.connection.device &&
     deviceId === machineId(machine.connection.device)
@@ -98,9 +111,10 @@ export function DevicePage() {
   const read = machine.anchors.value
   // Edits start from the anchors shown, so they must be what the connected device stores now:
   // its own, as read since it connected, never another device's or the defaults.
-  let reason = entry.allowed ? null : (entry.reason ?? "Unavailable.")
+  let reason = available ? null : "This device profile is not on this computer."
+  if (!reason && !entry.allowed) reason = entry.reason ?? "Unavailable."
   if (!reason && device && deviceId !== machineId(device))
-    reason = `These are another device's anchors. Choose ${device.name} as the Fixtures device to edit its own.`
+    reason = `These are another device's anchors. Choose ${device.name} as the project device to edit its own.`
   else if (!reason && (!read || profile.anchors?.fetchedAt !== read.fetchedAt))
     reason = "Read the anchors first."
   const writing: AnchorWriting = {
@@ -135,7 +149,7 @@ export function DevicePage() {
               onOpen={() => openDialog({ kind: "height-map" })}
             />
             <DeviceAnchors
-              setup={profile.anchors}
+              setup={shownAnchors}
               loading={machine.anchors.reading}
               error={machine.anchors.error ?? undefined}
               action={
@@ -166,7 +180,7 @@ export function DevicePage() {
               }
               writing={storesAnchors ? writing : undefined}
               storing={
-                storesAnchors && deviceId
+                available && storesAnchors && deviceId
                   ? {
                       enabled: !!profile.storeAnchors,
                       onChange: (enabled) => {
@@ -180,17 +194,25 @@ export function DevicePage() {
                     }
                   : undefined
               }
-              onAlign={(bedOffset) => {
-                if (!profile.anchors) return
-                fixtures.setAnchors({ ...profile.anchors, bedOffset })
-                follow()
-              }}
+              onAlign={
+                available
+                  ? (bedOffset) => {
+                      if (!profile.anchors) return
+                      fixtures.setAnchors({ ...profile.anchors, bedOffset })
+                      follow()
+                    }
+                  : undefined
+              }
             />
             <DeviceBedSetup
               profiles={profiles}
               selectedId={selectedId}
               onProfileChange={(id) => {
-                fixtures.select(id)
+                const result = selectProjectProfile(workspace, fixtures, id)
+                if (!result.ok) {
+                  toast.error(result.error)
+                  return
+                }
                 setShownBedSetup(null)
               }}
               bedSetups={profile.bedSetups}
@@ -217,14 +239,7 @@ export function DevicePage() {
                 follow()
               }}
             />
-            <DeviceFixtures
-              definitions={bedSetup.definitions}
-              onChange={(definitions) =>
-                fixtures.setDefinitions(bedSetup.id, definitions)
-              }
-              selectedId={selectedId}
-              bedSetupId={bedSetup.id}
-            />
+            <DeviceFixtures selectedId={selectedId} bedSetupId={bedSetup.id} />
           </>
         }
       />

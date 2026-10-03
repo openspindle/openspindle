@@ -4,6 +4,7 @@ import { createPlate, createPlateSetup } from "@/domain/plate/plate"
 import type { Plate, PlateSetup } from "@/domain/plate/plate"
 import type { WorkspaceLibrary } from "@/domain/workspace/library"
 import type { WorkspaceState } from "@/domain/workspace/workspace"
+import { projectProfileOf } from "@/domain/workspace/project-profile"
 import { newPlate } from "./import-program"
 import type { ImportContext, PlatePlacement } from "./import-program"
 
@@ -99,7 +100,7 @@ export function newProject(library: WorkspaceLibrary): WorkspaceState {
     plates: [],
     selectedPlateId: null,
     ...library,
-    project: { ...DEFAULT_PROJECT },
+    project: { ...DEFAULT_PROJECT, profile: projectProfileOf([]) },
     heightMaps: {},
     ruleSettings: {},
   }

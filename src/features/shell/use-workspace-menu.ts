@@ -8,6 +8,7 @@ import { usePersistence } from "@/persistence/persistence"
 import { useHost, useMenuCommands } from "@/platform/host-context"
 import { useFixtureLibraryStore } from "@/app/fixtures/fixture-context"
 import { changedAnchors } from "@/app/fixtures/fixture-library-store"
+import { followFixtureDefinitions } from "@/app/fixtures/definition-sync"
 import {
   followDeviceAnchors,
   hasUnsavedChanges,
@@ -37,8 +38,8 @@ function editsText(element: Element | null): boolean {
 
 /**
  * Undo and Redo of the section on show: the workspace's edits on Prepare and Job, the fixture
- * library's on Device. Plates set up for a device follow the anchors an undo or a redo there
- * restores, as they follow them when they are aligned.
+ * library's on Device. Plates follow restored shared definitions and their device's anchors,
+ * as they follow them when they are edited.
  */
 function useSectionHistory() {
   const router = useRouter()
@@ -53,6 +54,7 @@ function useSectionHistory() {
       case "device": {
         const before = fixtures.state
         if (!fixtures[step]()) return
+        followFixtureDefinitions(workspace, before, fixtures.state)
         const restored = changedAnchors(before, fixtures.state)
         for (const anchors of restored) followDeviceAnchors(workspace, anchors)
         return

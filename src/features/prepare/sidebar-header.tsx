@@ -22,11 +22,7 @@ import {
   useWorkspaceStore,
 } from "@/app/workspace/workspace-context"
 import { kitForDevice } from "@/domain/fixtures/catalog"
-import {
-  WORKSPACE_PROFILE,
-  bedSetupOf,
-  defaultFixtureProfile,
-} from "@/domain/fixtures/profiles"
+import { WORKSPACE_PROFILE, bedSetupOf } from "@/domain/fixtures/profiles"
 import { newId } from "@/domain/primitives"
 import { openDialog } from "@/features/shell/dialogs"
 import { useMachineSnapshot } from "@/platform/machine"
@@ -77,22 +73,24 @@ export function BedSetupField() {
   const fixtureLibrary = useFixtureLibraryStore()
   const plate = useSelectedPlate()
   const profiles = useFixtureLibrary((library) => library.profiles)
+  const definitions = useFixtureLibrary((library) => library.definitions)
   const setup = plate?.setup ?? null
-  // The plate's own device, not whichever one the Device tab shows.
+  // Every plate shares the project's device, with its own bed setup.
   const profileId = setup?.deviceId ?? WORKSPACE_PROFILE
   const profile = Object.hasOwn(profiles, profileId)
     ? profiles[profileId]
-    : defaultFixtureProfile()
+    : null
   // A bed setup this computer does not have, such as one the plate was set up on elsewhere.
   const missing =
     setup?.bedSetupId &&
-    !profile.bedSetups.some((item) => item.id === setup.bedSetupId)
+    !profile?.bedSetups.some((item) => item.id === setup.bedSetupId)
       ? setup.bedSetupId
       : null
-  const bedSetup = bedSetupOf(profile, setup?.bedSetupId)
+  const bedSetup = profile ? bedSetupOf(profile, setup?.bedSetupId) : null
+  const selectedId = missing ?? bedSetup?.id ?? ""
   const apply = (id: string) => {
-    if (!plate) return
-    const placement = bedSetupPlacement(profileId, profile, id)
+    if (!plate || !profile) return
+    const placement = bedSetupPlacement(profileId, profile, id, definitions)
     const result = workspace.dispatch({
       type: "fixtures.useDefaults",
       plateId: plate.id,
@@ -103,18 +101,22 @@ export function BedSetupField() {
     if (!result.ok) toast.error(result.error)
   }
   const keep = () => {
-    if (!plate || !setup) return
-    fixtureLibrary.keepBedSetup(profileId, {
-      id: setup.bedSetupId ?? newId(),
-      name: plate.name || "Plate's bed setup",
-      definitions: setup.fixtures.map((item) => ({
-        ...item.definition,
-        defaultEnabled: item.enabled,
-        defaultPosition: item.position,
-        defaultRotation: item.rotation,
-      })),
-      anchors: setup.anchors ? bedSetupAnchorsOf(setup.anchors) : [],
-    })
+    if (!plate || !setup || !profile) return
+    fixtureLibrary.keepBedSetup(
+      profileId,
+      {
+        id: setup.bedSetupId ?? newId(),
+        name: plate.name || "Plate's bed setup",
+        fixtures: setup.fixtures.map((item) => ({
+          definitionId: item.definition.id,
+          enabled: item.enabled,
+          position: item.position,
+          rotation: item.rotation,
+        })),
+        anchors: setup.anchors ? bedSetupAnchorsOf(setup.anchors) : [],
+      },
+      setup.fixtures.map((item) => item.definition)
+    )
   }
   return (
     <Field orientation="horizontal">
@@ -126,46 +128,47 @@ export function BedSetupField() {
         aria-description={BED_SETUP_HINT}
         className="min-w-0 flex-1"
         options={[
-          ...profile.bedSetups.map((item) => ({
+          ...(profile?.bedSetups ?? []).map((item) => ({
             value: item.id,
             label: item.name,
           })),
-          ...(missing
+          ...(missing || !profile
             ? [
                 {
-                  value: missing,
+                  value: selectedId,
                   label: "Not on this computer",
                   disabled: true,
                 },
               ]
             : []),
         ]}
-        value={missing ?? bedSetup.id}
-        disabled={!plate}
+        value={selectedId}
+        disabled={!plate || !profile}
         onValueChange={apply}
       />
-      {!missing ? (
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          aria-label="Apply bed setup again"
-          title="Apply bed setup again: its fixtures as they are now"
-          disabled={!plate}
-          onClick={() => apply(bedSetup.id)}
-        >
-          <RotateCcw />
-        </Button>
-      ) : (
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          aria-label="Add bed setup"
-          title="Add the plate's bed setup to its device"
-          onClick={keep}
-        >
-          <Plus />
-        </Button>
-      )}
+      {bedSetup &&
+        (!missing ? (
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-label="Apply bed setup again"
+            title="Apply bed setup again: its fixtures as they are now"
+            disabled={!plate}
+            onClick={() => apply(bedSetup.id)}
+          >
+            <RotateCcw />
+          </Button>
+        ) : (
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-label="Add bed setup"
+            title="Add the plate's bed setup to its device"
+            onClick={keep}
+          >
+            <Plus />
+          </Button>
+        ))}
     </Field>
   )
 }
