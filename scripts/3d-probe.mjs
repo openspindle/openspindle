@@ -5,7 +5,7 @@
  *   node scripts/3d-probe.mjs
  *
  * In millimetres, Z up, as tools are: the tip of the ruby ball at the origin and the axis along
- * Z, with the 1/8″ shank fitted and the cable's plug in its port. The dimensions are estimated from
+ * Z, with the 1/8″ shank fitted and no cable plugged in. The dimensions are estimated from
  * Makera's product photos, scaled by the shank's known diameter; the Ø2 mm ball, the M2 stylus's
  * Ø3 mm base and the USB-C port agree with that scale. Makera publishes none. The GLB is written by
  * the app's own writer (src/formats/models/glb.ts), in glTF's metres, Y up.
@@ -36,17 +36,6 @@ const SCREWS = { radius: 0.8, height: 32.1 }
 /** A thin collar on the body's top, then the shank's neck and the 1/8″ shank. */
 const COLLAR = { radius: 5.2, top: 35 }
 const SHANK = { neck: 1.25, neckTop: 37, radius: 3.175 / 2, top: 45.5, round: 0.5 }
-/**
- * The cable's USB-C plug: its steel shell in the port, the overmould and a strain relief, then
- * the cable, cut off.
- */
-const PLUG = {
-  height: 27.8,
-  shell: { width: 8.3, depth: 2.5, round: 1.2, inside: 0.3, out: 1.2 },
-  mould: { radius: 4, length: 17, chamfer: 0.8 },
-  relief: { radius: 2.25, length: 3 },
-  cable: { radius: 1.75, length: 5 },
-}
 /** Facets around the axis. */
 const SEGMENTS = 48
 /** Arc steps per quarter circle. */
@@ -59,7 +48,6 @@ const RUBY = { color: [0.5, 0.03, 0.12], metallic: 0, roughness: 0.12 }
 /** The LED ring's frosted diffuser, which glows green while the probe is ready. */
 const DIFFUSER = { color: [0.3, 0.55, 0.32], metallic: 0, roughness: 0.4 }
 const HOLE = { color: [0.012, 0.012, 0.014], metallic: 0.2, roughness: 0.6 }
-const RUBBER = { color: [0.007, 0.007, 0.007], metallic: 0, roughness: 0.65 }
 
 function mesh() {
   return { positions: [], normals: [], indices: [] }
@@ -131,25 +119,6 @@ function arc(center, radius, from, to) {
 const arcNormals = (points, center) =>
   points.map(([r, z]) => normalize([r - center[0], z - center[1]]))
 
-/**
- * A rounded rectangle's outline, counter-clockwise seen from above, with each point's outward
- * normal: corners of `round` about the rectangle [x0, x1] × [y0, y1].
- */
-function roundedRectangle(x0, x1, y0, y1, round) {
-  const corners = [
-    [x1 - round, y0 + round, -Math.PI / 2],
-    [x1 - round, y1 - round, 0],
-    [x0 + round, y1 - round, Math.PI / 2],
-    [x0 + round, y0 + round, Math.PI],
-  ]
-  return corners.flatMap(([cx, cy, start]) =>
-    arc([0, 0], 1, start, start + Math.PI / 2).map(([nx, ny]) => ({
-      point: [cx + round * nx, cy + round * ny],
-      normal: [nx, ny],
-    }))
-  )
-}
-
 /** A flat convex cap over `points` (counter-clockwise seen from above), facing up or down. */
 function cap(target, points, z, up) {
   const first = target.positions.length / 3
@@ -219,21 +188,6 @@ function disc(target, center, [nx, ny], radius, segments = 20) {
       first + 1 + step,
       first + 1 + ((step + 1) % segments)
     )
-}
-
-/**
- * Appends `part`, built about the Z axis, turned so that its Z runs along +Y from `origin`: a
- * quarter turn about X, (x, y, z) → (x, z, −y).
- */
-function alongY(target, part, origin) {
-  const first = target.positions.length / 3
-  for (let index = 0; index < part.positions.length; index += 3) {
-    const [x, y, z] = part.positions.slice(index, index + 3)
-    const [nx, ny, nz] = part.normals.slice(index, index + 3)
-    target.positions.push(origin[0] + x, origin[1] + z, origin[2] - y)
-    target.normals.push(nx, nz, -ny)
-  }
-  target.indices.push(...part.indices.map((index) => first + index))
 }
 
 // The ruby ball, whole: its tip at the origin.
@@ -323,44 +277,6 @@ lathe(
   }
 )
 
-// The plug's shell, from inside the port out to the overmould.
-const plugShell = mesh()
-const { shell, mould, relief, cable } = PLUG
-const shellBack = BODY.radius - shell.inside
-const shellFront = BODY.radius + shell.out
-const shellPart = mesh()
-extrude(
-  shellPart,
-  roundedRectangle(
-    -shell.width / 2,
-    shell.width / 2,
-    -shell.depth / 2,
-    shell.depth / 2,
-    shell.round
-  ),
-  0,
-  shellFront - shellBack
-)
-alongY(plugShell, shellPart, [0, shellBack, PLUG.height])
-
-// The overmould, the strain relief and the cable, cut off.
-const plug = mesh()
-const plugPart = mesh()
-const reliefStart = mould.length
-const cableStart = reliefStart + relief.length
-lathe(plugPart, [
-  [0, 0],
-  [mould.radius - mould.chamfer, 0],
-  [mould.radius, mould.chamfer],
-  [mould.radius, mould.length - mould.chamfer],
-  [relief.radius + 0.6, reliefStart],
-  [relief.radius, reliefStart + 0.6],
-  [cable.radius, cableStart],
-  [cable.radius, cableStart + cable.length],
-  [0, cableStart + cable.length],
-])
-alongY(plug, plugPart, [0, shellFront, PLUG.height])
-
 const output = resolve(
   dirname(fileURLToPath(import.meta.url)),
   "../public/models/makera-3d-probe.glb"
@@ -375,8 +291,6 @@ await writeFile(
       { name: "LED ring", mesh: diffuser, material: DIFFUSER },
       { name: "Set screw holes", mesh: holes, material: HOLE },
       { name: "Shank", mesh: shank, material: STEEL },
-      { name: "Plug shell", mesh: plugShell, material: STEEL },
-      { name: "Plug and cable", mesh: plug, material: RUBBER },
     ],
     {
       name: "Makera 3D Probe",
