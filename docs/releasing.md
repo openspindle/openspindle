@@ -105,7 +105,7 @@ The release notes are the release's section of CHANGELOG.md: the titles of the `
 
 ## Signing on Windows
 
-The Windows installer is not signed yet, so SmartScreen warns before it runs ("Windows protected your PC") until the user chooses **More info**, then **Run anyway**. It is to be signed through [SignPath Foundation](https://signpath.org), which signs open-source projects' releases for free with its own certificate: Windows then names SignPath Foundation as the publisher. The foundation signs only what a project already releases, so the first Windows releases ship unsigned. Its [terms](https://signpath.org/terms) also ask for a code signing policy on the project's site, naming who writes, reviews and approves releases, multi-factor sign-in for everyone on the team, and a person's approval of every signing request.
+The Windows installer is not signed yet, so SmartScreen warns before it runs ("Windows protected your PC") until the user chooses **More info**, then **Run anyway**. It is to be signed through [SignPath Foundation](https://signpath.org), which signs open-source projects' releases for free with its own certificate: Windows then names SignPath Foundation as the publisher. The foundation signs only what a project already releases, so the first Windows releases ship unsigned. Its [terms](https://signpath.org/terms) also ask for a code signing policy on the project's site, naming who writes, reviews and approves releases ([CODE_SIGNING.md](../CODE_SIGNING.md)), multi-factor sign-in for everyone on the team, and a person's approval of every signing request.
 
 ## Releasing from a Mac
 
