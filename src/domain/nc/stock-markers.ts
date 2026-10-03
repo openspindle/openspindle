@@ -5,7 +5,7 @@ import {
 } from "@/domain/fixtures/definitions"
 import { COORDINATE_LIMIT, EntityIdSchema } from "@/domain/primitives"
 import type { Point3 } from "@/domain/primitives"
-import { isStock } from "@/domain/stock/stock"
+import { UNSPECIFIED_STOCK_NAME, isStock } from "@/domain/stock/stock"
 import type { Stock } from "@/domain/stock/stock"
 
 /** Where a program puts its stock, as its markers describe it, in millimetres. */
@@ -130,7 +130,7 @@ export function markedStock(
   const stock: Stock = {
     ...fallback,
     id: `source-${fileName}`,
-    name: "Unspecified material",
+    name: UNSPECIFIED_STOCK_NAME,
     material: "Unspecified",
     color: "#a9b3c0",
     width: Number(size.width),

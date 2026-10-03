@@ -1,6 +1,6 @@
 import { camLabel } from "@/domain/nc/cam-markers"
 import type { CamMarkers, ProgramTool } from "@/domain/nc/cam-markers"
-import { isStock } from "@/domain/stock/stock"
+import { UNSPECIFIED_STOCK_NAME, isStock } from "@/domain/stock/stock"
 import type { Stock } from "@/domain/stock/stock"
 
 function metadata(
@@ -35,7 +35,7 @@ function stockFromMetadata(
   const stock: Stock = {
     ...fallback,
     id: `source-${fileName}`,
-    name: material.name2 || material.name1 || "Unspecified material",
+    name: material.name2 || material.name1 || UNSPECIFIED_STOCK_NAME,
     material: material.name1 || "Unspecified",
     color: "#a9b3c0",
     width: Number(sourceStock.length) * scale,

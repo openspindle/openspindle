@@ -4,6 +4,9 @@ import { COORDINATE_LIMIT } from "@/domain/primitives"
 /** Persisted library shapes shared by the UI and its runtime validators. */
 export const STOCK_MATERIALS = ["Wood", "Metal", "Plastic", "PCB"] as const
 
+/** What stock a program describes is called while its material is not known. */
+export const UNSPECIFIED_STOCK_NAME = "Unspecified material"
+
 /** Stored stock is bounded like bed coordinates; the machine's work area bounds it where it is edited. */
 const dimension = (label: string) =>
   z

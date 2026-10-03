@@ -7,10 +7,19 @@ import {
   FieldLegend,
   FieldSet,
 } from "@/components/ui/field"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
+import { ColorField } from "@/components/color-field"
+import { OptionSelect } from "@/components/option-select"
 import { BoundedMeasurementInput } from "@/components/workspace/coordinate-input"
 import { DIMENSION_AXES } from "@/components/workspace/measurement-input"
 import { kitForSetup } from "@/domain/fixtures/catalog"
 import type { PlateSetup } from "@/domain/plate/plate"
+import { STOCK_MATERIALS, UNSPECIFIED_STOCK_NAME } from "@/domain/stock/stock"
+import type { Stock } from "@/domain/stock/stock"
 import { openDialog } from "@/features/shell/dialogs"
 import { StockSwatch } from "../stock/stock-swatch"
 
@@ -20,6 +29,82 @@ const DIMENSIONS = [
   { key: "depth", label: "Depth", axis: 1 },
   { key: "height", label: "Height", axis: 2 },
 ] as const
+
+/** A colour as the colour picker takes it: #rrggbb, a three-digit colour spelt out. */
+const fullHex = (color: string) =>
+  /^#[\da-f]{3}$/i.test(color)
+    ? `#${[...color.slice(1)].map((digit) => digit + digit).join("")}`
+    : color
+
+/**
+ * The stock's material and colour, from its swatch: its block stays as it is. A stock still
+ * called for its unknown material takes the material's name.
+ */
+function StockMaterial({
+  stock,
+  disabled,
+  onChange,
+}: {
+  stock: Stock
+  disabled?: boolean
+  onChange: (stock: Stock) => void
+}) {
+  const known = STOCK_MATERIALS.some((material) => material === stock.material)
+  const options = [
+    ...(known ? [] : [{ value: stock.material, label: stock.material }]),
+    ...STOCK_MATERIALS.map((material) => ({
+      value: material,
+      label: material,
+    })),
+  ]
+  return (
+    <Popover>
+      <PopoverTrigger
+        disabled={disabled}
+        render={
+          <button
+            type="button"
+            className="flex shrink-0 rounded-sm outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:opacity-50"
+            aria-label="Stock material and colour"
+            title="Material and colour"
+          />
+        }
+      >
+        <StockSwatch color={stock.color} />
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-64">
+        <FieldGroup className="gap-4">
+          <Field>
+            <FieldLabel htmlFor="stock-swatch-material">Material</FieldLabel>
+            <OptionSelect
+              id="stock-swatch-material"
+              aria-label="Stock material"
+              options={options}
+              value={stock.material}
+              onValueChange={(material) =>
+                onChange({
+                  ...stock,
+                  material,
+                  name:
+                    stock.name === UNSPECIFIED_STOCK_NAME
+                      ? material
+                      : stock.name,
+                })
+              }
+              className="w-full"
+            />
+          </Field>
+          <ColorField
+            id="stock-swatch-color"
+            label="Colour"
+            value={fullHex(stock.color)}
+            onChange={(color) => onChange({ ...stock, color })}
+          />
+        </FieldGroup>
+      </PopoverContent>
+    </Popover>
+  )
+}
 
 /** The plate's stock: which material block, and its size. */
 export function StockFields({
@@ -39,7 +124,17 @@ export function StockFields({
     <FieldSet aria-label="Stock">
       <FieldLegend className="w-full">
         <div className="flex items-center gap-3">
-          <StockSwatch color={stock?.color} />
+          {stock ? (
+            <StockMaterial
+              stock={stock}
+              disabled={disabled}
+              onChange={(next) =>
+                onChange({ stock: next, stockSource: "assigned" })
+              }
+            />
+          ) : (
+            <StockSwatch />
+          )}
           <span className="min-w-0 flex-1 truncate">
             {stock?.name ?? "No stock"}
           </span>
