@@ -1,7 +1,7 @@
 {
   "name": "openspindle",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "A desktop app for preparing, checking and running jobs on a Makera Z1 CNC machine.",
   "author": "OpenSpindle contributors",
   "license": "MIT",
