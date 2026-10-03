@@ -31,8 +31,9 @@ export function PrepareToolbar() {
       className="absolute top-4 left-1/2 z-10 max-w-[calc(100%-140px)] -translate-x-1/2 p-1"
     >
       <TooltipProvider>
+        {/* Scrolls sideways only: a pressed button sinks, which would show a vertical scrollbar. */}
         <div
-          className="flex items-center gap-1 overflow-x-auto"
+          className="flex items-center gap-1 overflow-x-auto overflow-y-hidden"
           role="toolbar"
           aria-label="Prepare tools"
         >
