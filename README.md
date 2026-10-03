@@ -9,20 +9,22 @@ OpenSpindle is a desktop app for preparing, checking and running jobs on a Maker
 
 ## Features
 
-- Plates on a 3D model of the Z1's bed, each with its stock, fixtures, work origin and tool table
-- Fixtures: the MDF bed, L-brackets, top clamps, dowel pins and 4th axis, or your own STEP and GLB models
+- Plates on a 3D model of the Z1's bed, each with its stock, fixtures, work origin and tool table, drawn as Smooth Shades or as Shaded Edges with fine edge lines
+- Fixtures: the MDF bed, L-brackets, top clamps, dowel pins and 4th axis, or your own STEP and GLB models, each drawn as what it is made of
 - Placement relative to the machine's stored anchors, with move, snap and lock in the 3D view
 - Import of `.nc`, `.cnc`, `.gcode`, `.tap` and `.ngc` programs from your CAM or from Finder, split into operations by tool or toolpath
 - Discover NC programs in Fusion 360, import them directly through the installable Python add-in, and update imported operations from them
-- Probing chosen by what it does, with a probe from your tool library that can do it: Z surface sets work Z on the stock top, Height map compensates later cuts for an uneven surface, and Outline trace traces where the plate cuts, or the edges you choose, with the probe's laser
+- Probing chosen by what it does, each strategy pictured as it probes, with a probe from your tool library that can do it: Z surface sets work Z on the stock top, Height map compensates later cuts for an uneven surface, and Outline trace traces where the plate cuts, or the edges you choose, with the probe's laser
 - The work origin found with the Makera 3D Probe: Outside corner, Inside corner, Pocket center or Boss center, on the stock or on a bracket or anything else on the bed, from a start picked in the 3D view that snaps to the corners, holes and centres there
 - Design rules that catch what the Z1 would not run as written, with fixes, checked before Run and marked where they are in the 3D view
-- Playback of the program as the firmware runs it, at its feeds, with depth and width of cut
+- Playback of the program as the firmware runs it, timed as the Z1's planner would move it by the machine's own limits, with how long it takes and the depth and width of cut
 - The G-code exactly as the machine receives it, and a glossary of the Z1's codes (**Help › G-code Glossary**)
 - A run checklist, upload read-back and large programs sent in parts
+- The job followed live in the 3D view, with the moves ahead, where the probe touches next and the time left
 - Machine controls, a console to send the machine one line at a time, the machine's camera, its height map and its stored anchors
-- A simulated Z1 to try jobs on without a machine, its camera picture drawn as the Z1's camera sees the bed (**Settings › General › Z1 Simulator device**)
-- A firmware configuration editor with verified saves, a saved vacuum-power default, and work-light brightness for each appearance with an inactivity timer
+- Machine alarms by name, with what clears them; a pressed E-stop and failed homing diagnosed, with a read of the home switches
+- A simulated Z1 to try jobs on without a machine, moving as the Z1's planner moves it, its camera picture drawn as the Z1's camera sees the bed (**Settings › General › Z1 Simulator device**)
+- A firmware configuration editor with verified saves, a saved vacuum-power default, and work-light brightness for each appearance with an inactivity timer; the machine's own light timer, which darkens a dimmed light as a job starts, turned off from the Device page
 - A tool library with Fusion 360 import and Makera, Genmitsu, SpeTool, Dreanique and FoxAlien catalogs
 - STEP-NC project files, and NC export with the plate's setup
 - Built-in PCB preparation from KiCad Gerber and Excellon files, using your local pcb2gcode installation
@@ -63,9 +65,9 @@ If something behaves differently, **Help › Export Protocol Trace…** saves th
 - [PCB operations](docs/pcb.md) from KiCad Gerber and Excellon files, and setting up pcb2gcode
 - [Fusion 360](docs/fusion360.md): install the add-in, connect, and import and update NC programs
 - [Stored anchors](docs/stored-anchors.md), [models](docs/models.md) and [design rules](docs/design-rules.md)
-- [Device controls](docs/device-controls.md), [running programs](docs/device-jobs.md) and [the height map](docs/device-height-map.md)
+- [Device controls](docs/device-controls.md) and [diagnosis](docs/device-controls.md#diagnosis), [running programs](docs/device-jobs.md) and [the height map](docs/device-height-map.md)
 - [Project files](docs/step-nc-projects.md) and [exported NC](docs/plate-definition.md)
-- For developers: [architecture](docs/architecture.md), [the workspace model](docs/workspace-model.md) and [releasing](docs/releasing.md)
+- For developers: [architecture](docs/architecture.md), [the workspace model](docs/workspace-model.md), [the firmware in the preview and its timing](docs/firmware-preview.md) and [releasing](docs/releasing.md)
 
 ## Contributing
 

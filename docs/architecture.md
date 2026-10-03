@@ -14,12 +14,12 @@ electron/machine/     the machine process: the machine controller, its Node port
 electron/preload/     a generic bridge that hands the renderer its RPC MessagePorts
 packages/rpc          typed RPC: Zod contracts, endpoints, cancellation, subscriptions, transports
 src/machine/          the machine domain (host-agnostic; runs in the machine process and the simulator)
-src/domain/           the workspace domain: plates, operations, tools, stock, fixtures and machine kits, stored anchors, NC reading, compile, probing, geometry, the rules and design rules (pure)
+src/domain/           the workspace domain: plates, operations, tools, stock, fixtures and machine kits, stored anchors, NC reading, compile, probing, motion plans and their timing, tracking a job, machine diagnosis, geometry, the rules and design rules (pure)
 src/formats/          file formats: plate envelope, STEP-NC project, shared base64 JSON, GLB models, the tool library
 src/lib/              generic building blocks with no domain knowledge: zip reading, three.js helpers, appearance and fonts
 src/persistence/      versioned repositories: the tool and stock libraries, the fixture library; the Models library
 src/platform/         the Host (the main and machine processes over RPC), RPC clients, machine hooks
-src/app/              application state: TanStack stores, command dispatch, diagnostics
+src/app/              application state: TanStack stores, command dispatch, diagnostics, a job's plans, tracking and playback
 src/features/         UI features: shell, prepare, job, device, tool library, models, project, PCB, design rules, settings, workspace settings
 src/routes/           thin TanStack Router file routes: /prepare, /job, /device
 src/components/       shadcn ui components and shared workspace components (bed viewer)
@@ -64,9 +64,23 @@ Probing is one of those kinds: a strategy, what the operation is to do, and a pr
 
 The compiled program is the NC as written, in work coordinates. How the machine's firmware moves for what the NC leaves to it (tool changes, probing routines, machine coordinates) is its kit's `FirmwareModel` (Strategy, `src/domain/firmware/firmware-model.ts`); the 3D view draws each plate's machine program, the NC parsed with it and placed by the plate's setup ([firmware-preview.md](firmware-preview.md)).
 
+## Motion plans and following a job
+
+What a plate's machine does with its program, and when, is one immutable motion plan, which the Job tab's preview, Play and live follow all draw from. The plan is built once; a status report only moves an estimate of where in it the machine is, and the views show that estimate one frame at a time.
+
+- **The plan** (`MotionPlan`, `planMotion` in `src/domain/motion/plan.ts`) is the plate's machine program ([firmware-preview.md](firmware-preview.md)) as typed arrays, one entry per move: where it goes, its kind (rapid, feed, arc chord or probe search), whether a routine makes it, the position it is reported by (work or machine), its line, the tool drawn, and what the firmware reports during it (the line, the tool held and the tool asked for). Beside them it holds the checkpoints where the machine waits for the user, the work offsets the program sets, its timing and the limits it was timed by. Its key is the kit, the setup, the limits and the program's source.
+- **Timing** (`timePlan`, `src/domain/motion/timing.ts`) runs the moves through a replica of the machine's planner (`BlockPlanner`, `planner.ts`) by the limits its firmware's motion model reads from the machine's configuration (`FirmwareModel.motion`, a `MotionModel`; the Z1's `Z1_MOTION`), which also says which blocks stop the machine between moves. The Z1 simulator moves on the same planner (`tools/z1-simulator/motion-queue.ts`), so `src/domain/motion` and the Z1's `motion.ts` use relative `.ts` imports only.
+- **Queries** (`PlanIndex`, `plan-index.ts`) go between plan time, moves, lines and points: binary search on when moves start, kinematics along a move, the moves near a point through a 5 mm XY grid made on first use (`spatial.ts`), the next touch, the moves ahead and the checkpoints. Lines, moves and plan seconds are branded numbers (`spaces.ts`), so the compiler tells them apart.
+- **The plan store** (`src/app/job/plan-store.ts`) parses a program's machine program once per setup, keeping the last four setups of each program and any that holds a pinned plan, and builds one plan per program, setup, start and limits. A plate's own plan starts where its machine waits once homed and is timed by its device's configuration while that device is connected and its configuration read, else by its firmware's defaults (`useMotionLimits`, `use-plan.ts`). Run plans from where the machine is, and the job session holds that plan (`pinPlan`) until it is dismissed or another Run replaces it.
+- **Tracking** (`src/domain/tracking`) is a pure reducer from status reports to an estimate of where the machine is in the plan (`Tracker`). `observationOf` makes a report an observation: the tip by work and by machine position (the positions trusted only in states where they are where the machine is), the reported line and how far the machine has read its file, the tools, the state, the feed, the override and new contacts. The default tracker is a hidden Markov model over a beam of 16 places in the plan (`hmm.ts`: a beam Viterbi, as map matching finds a vehicle on its roads), with each frame's bias learnt from reports it is sure of (`registration.ts`) and a learnt pace for feed and for rapid moves. It reports whether it is acquiring, locked, ambiguous, off the plan, waiting or lost, holds still while ambiguous, and finds the machine anew on a first report, an empty beam, three misses or 10 s without a report. The greedy tracker (`greedy.ts`) places each report at the nearest point of the moves near where it last placed the machine.
+- **Following** (`useJobTrackingSync`, `src/app/job/tracking-sync.ts`), mounted once in the root route after `useMachineSync`, observes each fresh snapshot of this window's job into `jobTrackingStore`, whichever page is open, and clears it when the session ends or another Run starts.
+- **Playback** (`src/app/job`): a `PlaybackClock` (`clock.ts`) turns the estimate into time going on smoothly, or plays the plan on its own at the playback speed, and each animation frame is one `PlaybackFrame` (`frame.ts`, built by `frames.ts`): the time, the move and how far along it, the moves drawn made, the tool and its tip, the line and the timeline's step, the moves ahead and the next touch. The Job tab's 3D view and the simulator's camera panel take frames from one `FrameStore` without the page rendering; the timeline, the G-code listing, the cut facts and the time left follow at 10 Hz (`useJobTimeline`, `src/features/job/use-job-timeline.ts`).
+
+Developer switches in `localStorage`, read when the window loads (`src/app/job/dev-flags.ts`): `openspindle:dev:tracker` set to `greedy` follows jobs with the greedy tracker; `openspindle:dev:tracker-overlay` set to `1` shows the tracker's readout over the Job tab's 3D view; `openspindle:dev:tracker-record` set to `1` records the job's observations, which the overlay's **Save tracking session** then saves as JSON with the plate, the program and the limits, to replay offline. The simulator's `--truth <file>` writes what it does at each status query, to compare a tracker with.
+
 ## Rules
 
-What requests to the machine, plates (their tools, operations, moves and NC) and height maps are checked against is one ordered list of `Rule`s (`RULES`, `src/domain/rules/rules.ts`), which one runner (`runRules`) tests subjects against. Reading input (Zod schemas), compiling and the firmware's dialect are not rules: they decide what there is to check. A rule only says whether a subject passes, and words and fixes its failures; what a failure becomes (a refused or deferred request, a diagnostic, a design rule result, an import question, a form's error) is up to the view that runs the rules ([workspace-model.md](workspace-model.md#rules)). The `Rule` type, the runner and `rulesSchema`, which makes rules a Standard Schema for a form, are in the machine contract (`src/machine/contract/rules.ts`), the one layer both the machine and the workspace domain import, and so are the command rules admission runs, which the list starts with. `src/domain/rules/` holds the list, the stages' subjects and the project's rule settings.
+What requests to the machine, plates (their tools, operations, moves and NC), height maps and the connected machine (its diagnosis, [device-controls.md](device-controls.md#diagnosis)) are checked against is one ordered list of `Rule`s (`RULES`, `src/domain/rules/rules.ts`), which one runner (`runRules`) tests subjects against. Reading input (Zod schemas), compiling and the firmware's dialect are not rules: they decide what there is to check. A rule only says whether a subject passes, and words and fixes its failures; what a failure becomes (a refused or deferred request, a diagnostic, a design rule result, an import question, a form's error) is up to the view that runs the rules ([workspace-model.md](workspace-model.md#rules)). The `Rule` type, the runner and `rulesSchema`, which makes rules a Standard Schema for a form, are in the machine contract (`src/machine/contract/rules.ts`), the one layer both the machine and the workspace domain import, and so are the command rules admission runs, which the list starts with. `src/domain/rules/` holds the list, the stages' subjects and the project's rule settings.
 
 ## State and persistence
 
@@ -81,6 +95,7 @@ What requests to the machine, plates (their tools, operations, moves and NC) and
 - **Routes**: `/prepare`, `/job` and `/device` share the `_workspace` layout (tabs, the job indicator, the dialog host, window-wide drop import and files opened from Finder, menu commands). Search params hold UI selection (the selected operation, the inspector panel); the selected plate lives in the workspace.
 - **Dialogs**: one typed dialog atom and one host that renders it; features open dialogs by value. **Settings…** (⌘,) is one of them.
 - **Appearance**: the color mode and the display and mono fonts chosen in Settings › General are kept in `localStorage` and applied before the page paints (`appearance-init.js`, generated from `src/lib/appearance.ts` and `src/lib/fonts.ts`). A font sets the theme's `--app-font-*` variables; `src/styles.css` declares every face the settings offer.
+- **3D views**: the bed viewer and the fixture model preview draw with three.js's `WebGPURenderer` (WebGPU, else WebGL 2), and the bed viewer blooms what glows, such as the next touch, in a render pipeline. Its visual style (`SolidStyle`, `src/components/workspace/viewer/solid-style.ts`) is one for Prepare's and the Job tab's views, kept in `localStorage` (`src/features/viewer/visual-style.ts`): Smooth Shades, or Shaded Edges, which lights the solids by a studio environment and draws their creases as fine see-through lines, 0.3 mm on the solid and 0.35 to 1 px on screen. Tool, fixture and probing strategy pictures are drawn once each, fixtures and strategies by an orthographic camera from the isometric view (`src/lib/isometric-view.ts`).
 - **Async work**: TanStack Query mutations with a shared workspace scope serialize imports, project open and save; errors surface as sonner toasts or inline alerts.
 - **Components**: shadcn (Base UI) components with their variants; forms use TanStack Form with Zod schemas; long lists use TanStack Table and TanStack Virtual; layout uses Tailwind utilities only.
 
@@ -100,14 +115,15 @@ The typed `host.pcb` service invokes the local conversion service in `electron/m
 
 ## Patterns at a glance
 
-| Pattern                 | Where                                                                |
-| ----------------------- | -------------------------------------------------------------------- |
-| Facade                  | `MachineController`                                                  |
-| Protection Proxy        | `MachineGateway` principals                                          |
-| Strategy                | firmware adapters; operation kinds; probing methods; firmware models |
-| Chain of Responsibility | machine admission, a chain of command rules                          |
-| Command                 | machine operations; workspace commands (`applyCommand`)              |
-| Observer                | telemetry store; TanStack stores and atoms                           |
-| Rules                   | one `Rule` type, one list (`RULES`), one runner (`runRules`)         |
-| State                   | the job view (`deriveJobView`)                                       |
-| Repository              | persisted documents                                                  |
+| Pattern                 | Where                                                                                                  |
+| ----------------------- | ------------------------------------------------------------------------------------------------------ |
+| Facade                  | `MachineController`                                                                                    |
+| Protection Proxy        | `MachineGateway` principals                                                                            |
+| Strategy                | firmware adapters; operation kinds; probing methods; firmware models and their motion models; trackers |
+| Chain of Responsibility | machine admission, a chain of command rules; diagnosis's alarm chain                                   |
+| Command                 | machine operations; workspace commands (`applyCommand`)                                                |
+| Observer                | telemetry store; TanStack stores and atoms; the playback frame store                                   |
+| Rules                   | one `Rule` type, one list (`RULES`), one runner (`runRules`)                                           |
+| State                   | the job view (`deriveJobView`)                                                                         |
+| Reducer                 | job tracking (`Tracker.observe`)                                                                       |
+| Repository              | persisted documents                                                                                    |
