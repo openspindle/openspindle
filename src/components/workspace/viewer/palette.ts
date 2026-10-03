@@ -22,7 +22,11 @@ export type ViewerPalette = {
 }
 
 /** A theme colour token, such as `--primary`, in the sRGB Three.js accepts. */
-function themeColor(element: HTMLElement, token: string, fallback: string) {
+export function themeColor(
+  element: HTMLElement,
+  token: string,
+  fallback: string
+) {
   // Canvas resolves CSS Color 4 / oklch theme tokens into sRGB.
   const probe = document.createElement("span")
   probe.style.color = `var(${token}, ${fallback})`

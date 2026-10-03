@@ -1,5 +1,5 @@
 import type * as THREE from "three"
-import { Line2NodeMaterial } from "three/webgpu"
+import { SeeThroughLineMaterial } from "./see-through-line"
 import { LineSegments2 } from "three/addons/lines/webgpu/LineSegments2.js"
 import { LineSegmentsGeometry } from "three/addons/lines/LineSegmentsGeometry.js"
 import type { MoveIndex, Vec3 } from "@/domain/motion/spaces"
@@ -31,7 +31,7 @@ export class PathAhead {
     geometry.instanceCount = 0
     this.object = new LineSegments2(
       geometry,
-      new Line2NodeMaterial({
+      new SeeThroughLineMaterial({
         color,
         linewidth: LOOK.width,
         transparent: true,

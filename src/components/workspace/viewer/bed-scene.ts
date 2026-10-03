@@ -29,7 +29,9 @@ import { PlateView, bedGrid } from "./plate-view"
 import type { PlatePresentation, PlateViewContext } from "./plate-view"
 import { CLICK_TOLERANCE, SetupArranger } from "./setup-arranger"
 import type { ArrangeEvents, ArrangeLabel, ArrangeView } from "./setup-arranger"
-import { SolidStyle } from "./solid-style"
+import { millimetresPerPixel } from "./screen-scale"
+import { SolidStyle, edgeWidth } from "./solid-style"
+import { studioEnvironment } from "./studio"
 import type { VisualStyle } from "./solid-style"
 import { GLOW } from "./touch-marker"
 import { ViewerAssets } from "./viewer-assets"
@@ -140,8 +142,13 @@ export class BedScene {
   /** The scene through the eye, its glow bloomed over it (`renderPipeline`). */
   private readonly scenePass: PassNode
   private readonly pipeline: RenderPipeline
-  /** How the solids are drawn: smoothly, or toon shaded with their edges. */
+  /** How the solids are drawn: smoothly shaded, or with their edges too. */
   private readonly solids: SolidStyle
+  /** Where the view looks, which the solids' edges are measured at. */
+  private readonly focus = new THREE.Object3D()
+  private style: VisualStyle = "smooth"
+  /** The studio Shaded Edges lights the solids from too, made once it is first shown. */
+  private studio: THREE.Texture | null = null
   private readonly camera = new THREE.OrthographicCamera(
     -190,
     190,
@@ -386,6 +393,7 @@ export class BedScene {
 
   /** Draws the solids in `style` from the next frame. */
   setStyle(style: VisualStyle) {
+    this.style = style
     this.solids.set(style)
     this.stage.invalidate()
   }
@@ -499,6 +507,7 @@ export class BedScene {
     for (const view of this.views.values()) view.dispose()
     this.views.clear()
     this.solids.dispose()
+    this.studio?.dispose()
     this.assets.dispose()
     this.pipeline.dispose()
     this.stage.dispose()
@@ -568,7 +577,18 @@ export class BedScene {
   private readonly frame = () => {
     const settling = this.controls.update()
     this.scenePass.camera = this.eye
+    // Edges as wide on the solids where the view looks, within what reads on screen.
+    this.focus.position.copy(this.controls.target)
+    this.solids.lineWidth = edgeWidth(
+      millimetresPerPixel(this.stage.renderer, this.eye, this.focus)
+    )
     this.solids.update(this.stage.scene, this.eye)
+    // Shaded Edges lights the solids from a studio, as a CAD model's shaded view is.
+    this.stage.useStudio(
+      this.style === "edges"
+        ? (this.studio ??= studioEnvironment(this.stage.renderer))
+        : null
+    )
     this.pipeline.render()
     this.positionLabels()
     return settling

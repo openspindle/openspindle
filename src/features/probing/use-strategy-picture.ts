@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react"
+import { useAppearance } from "@/components/appearance-provider"
 import type { FixtureKit } from "@/domain/fixtures/fixture-kit"
 import type { ProbingStrategy } from "@/domain/probing/strategy"
 import type { Tool } from "@/domain/tools/tool"
@@ -16,8 +17,10 @@ export function useStrategyPicture(
   kit: FixtureKit,
   library: readonly Tool[]
 ): string | null {
+  // Drawn in the theme's colours: once for each appearance.
+  const { resolvedAppearance } = useAppearance()
   const key = tool
-    ? `${kit.id}:${strategy.id}:${tool.id}:${tool.diameter ?? ""}`
+    ? `${kit.id}:${strategy.id}:${tool.id}:${tool.diameter ?? ""}:${resolvedAppearance ?? ""}`
     : null
   const [picture, setPicture] = useState<{ key: string; url: string } | null>(
     null
