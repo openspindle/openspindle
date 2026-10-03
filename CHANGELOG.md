@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0](https://github.com/openspindle/openspindle/compare/v0.3.0...v0.4.0) (2026-10-03)
+
+
+### Features
+
+* **windows:** A Windows installer, built and released with the Mac app ([#39](https://github.com/openspindle/openspindle/issues/39)) ([dbc8f2b](https://github.com/openspindle/openspindle/commit/dbc8f2b83d4bb495837dcfd87525f0f4c6b34c54))
+
 ## [0.3.0](https://github.com/openspindle/openspindle/compare/v0.2.0...v0.3.0) (2026-10-03)
 
 
