@@ -52,13 +52,22 @@ export function useRunChecklist(
   const device = snapshot.connection.device
   const connectedDeviceId = device ? machineId(device) : null
   const anchors = snapshot.anchors.value
+  const compensation = snapshot.telemetry?.compensation ?? null
+  const originX = snapshot.telemetry?.workOrigin?.x ?? null
+  const originY = snapshot.telemetry?.workOrigin?.y ?? null
   const runFailures = useMemo(
     () =>
       runRules(
         rulesOf("run"),
-        runSubjects(plate, { connectedDeviceId, anchors })
+        runSubjects(plate, {
+          connectedDeviceId,
+          anchors,
+          compensation,
+          workOrigin:
+            originX === null || originY === null ? null : [originX, originY],
+        })
       ),
-    [plate, connectedDeviceId, anchors]
+    [plate, connectedDeviceId, anchors, compensation, originX, originY]
   )
   return evaluateRunChecklist({
     plate,
@@ -159,18 +168,21 @@ export function useRunJob() {
   const configuration = useCachedConfiguration(connection.id)
   const run = useRunProgram()
   const simulateBed = useSimulateBed()
+  /** `keptTool`: the tool the machine holds, kept for the program's first tool change. */
   const start = (
     plate: Plate,
     compiled: CompiledPlate,
-    library: readonly Tool[]
+    library: readonly Tool[],
+    keptTool: number | null = null
   ) => {
     const label = plateLabel(plate, plateIndex(workspace.state, plate.id))
-    // Planned from where the machine is, as it starts the program there.
+    // Planned from where the machine is, as it starts the program there with what it holds.
     const plan = planFor(
       plate,
       compiled.program,
       limitsFor(kitForPlate(plate), configuration),
-      tipInProgram(plate, telemetry)
+      tipInProgram(plate, telemetry),
+      keptTool
     )
     const runPlate = () => {
       const session = createJobSession(plate, label, compiled, library, plan)
@@ -181,6 +193,7 @@ export function useRunJob() {
           name: toDisplayName(label, "Plate"),
           source: compiled.program.source,
           assists: plate.setup.assists,
+          ...(keptTool !== null && { keepTool: true }),
         },
         { onError: report }
       )

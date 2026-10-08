@@ -2,6 +2,7 @@ import { machineToBed } from "@/domain/anchors/stored-anchors"
 import { operationSubject } from "@/domain/diagnostics"
 import type { Area } from "@/domain/diagnostics"
 import type { Point3 } from "@/domain/nc/gcode"
+import type { Plate } from "@/domain/plate/plate"
 import type { Stock } from "@/domain/stock/stock"
 import { EPSILON, formatMillimetres } from "../../../geometry/millimetres"
 import { boxRect, contains, rectAt } from "../../../geometry/rect"
@@ -10,7 +11,7 @@ import { checkGridParams, gridStart } from "./plan"
 import type { GridParams } from "./params"
 import { placementContext } from "../../placement"
 import type { PlacementContext, ProbeStart } from "../../placement"
-import { editOperation } from "../../rules"
+import { editOperation } from "../../../rules/diagnostics"
 import { methodSpecs } from "../../strategies"
 
 /** The plate a grid operation belongs to. `Plate` satisfies it. */
@@ -201,3 +202,31 @@ export const GRID_RULES: readonly StageRule<"operation">[] = [
   gridExceedsStock,
   gridOutsideStock,
 ]
+
+/** Whether a plate probes a grid of its own, which clears the machine's earlier one first. */
+const probesGrid = (plate: Plate) =>
+  plate.operations.some(
+    ({ source }) => source.kind === "probing" && source.task === "grid"
+  )
+
+const earlierHeightMap: StageRule<"run"> = {
+  id: "grid/earlier-map",
+  stage: "run",
+  label: "No height map from earlier probing",
+  description:
+    "The machine applies the height map it probed last until it is cleared, another replaces it or it restarts. A plate that probes none cuts along that map, with work Z set against it.",
+  severity: "warning",
+  configurable: false,
+  test: ({ plate, operation, machine }) =>
+    !plate ||
+    operation !== null ||
+    machine.compensation === null ||
+    probesGrid(plate),
+  explain: ({ first }) => ({
+    problem: `The machine still applies a height map from earlier probing (${formatMillimetres(Number((first.machine.compensation ?? 0).toFixed(3)))} mm from lowest to highest), and this plate probes none, so its cuts follow that map. Keep it only for the same stock where it was probed; otherwise clear it and set work Z again.`,
+  }),
+  fixes: { offer: () => [{ kind: "show-height-map" }] },
+}
+
+/** What a plate's grids depend on in the machine: the height map it already applies. */
+export const GRID_RUN_RULES: readonly StageRule<"run">[] = [earlierHeightMap]

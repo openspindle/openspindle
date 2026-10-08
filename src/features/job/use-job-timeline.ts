@@ -114,7 +114,7 @@ const planEta = (index: PlanIndex): JobEta => ({
 
 /**
  * The time left from where a followed job's frame is, at the rate the machine goes when it does:
- * its feed override, while it waits too.
+ * its feed override, while it waits too. Unrounded: what shows settles on it (`settleEta`).
  */
 function remainingEta(
   index: PlanIndex,
@@ -125,12 +125,35 @@ function remainingEta(
   const override = tracking?.state.last?.feed.override ?? 100
   const rate = estimate?.rate ? estimate.rate : override / 100
   return {
-    seconds: Math.round(
-      (index.duration - frame.time) / Math.max(rate, SLOWEST_RATE)
-    ),
+    seconds: (index.duration - frame.time) / Math.max(rate, SLOWEST_RATE),
     toolChanges: toolChangesFrom(index, frame.move),
     remaining: true,
   }
+}
+
+/** How long the time left that shows takes to settle on a new estimate, for the most part (63 %), s. */
+const ETA_SETTLE_SECONDS = 10
+
+/** The time left that shows while a job is followed, and when (ms). */
+type SettledEta = { readonly seconds: number; readonly at: number }
+
+/**
+ * The time left to show at `now`: what showed, counted down in real time while the machine goes
+ * on (`going`), moved toward the new estimate `seconds` by how long ago it showed, so that the
+ * tracker's corrections and the swings of its rate do not make it jump. The first estimate shows
+ * as it is.
+ */
+function settleEta(
+  shown: SettledEta | null,
+  seconds: number,
+  now: number,
+  going: boolean
+): SettledEta {
+  if (!shown) return { seconds, at: now }
+  const elapsed = Math.max(0, (now - shown.at) / 1000)
+  const counted = Math.max(0, shown.seconds - (going ? elapsed : 0))
+  const weight = 1 - Math.exp(-elapsed / ETA_SETTLE_SECONDS)
+  return { seconds: counted + (seconds - counted) * weight, at: now }
 }
 
 /** Where a followed job is in its plan by the tracker's estimate, with the line it reported. */
@@ -305,6 +328,7 @@ export function useJobTimeline(
     let aheadFloor: MoveIndex | undefined
     let steppedAt = -Infinity
     let last: Shown | null = null
+    let settled: SettledEta | null = null
     let request = 0
     const tick = (stamp: number) => {
       const now = performance.timeOrigin + stamp
@@ -337,12 +361,19 @@ export function useJobTimeline(
       if (!sameFrame(frame, frames.get())) frames.set(frame)
       if (stamp - steppedAt >= STEP_INTERVAL_MS) {
         steppedAt = stamp
+        const eta = frame ? remainingEta(index, frame, followed) : null
+        // A rate of 0 is the machine waiting, which the time left waits out too.
+        if (eta)
+          settled = settleEta(settled, eta.seconds, now, !!estimate?.rate)
         const next: Shown = {
           by: liveJob,
           step: frame?.step ?? stepForLine(timeline, reported.current),
           line: frame?.line ?? reported.current,
           tool: toolShown(frame),
-          eta: frame ? remainingEta(index, frame, followed) : null,
+          eta:
+            eta && settled
+              ? { ...eta, seconds: Math.round(settled.seconds) }
+              : null,
         }
         if (!sameShown(last, next)) {
           last = next

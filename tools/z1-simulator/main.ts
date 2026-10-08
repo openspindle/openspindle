@@ -24,6 +24,7 @@ const { values } = parseArgs({
     speed: { type: "string", default: "1" },
     "no-done-snapshot": { type: "boolean", default: false },
     "fail-at-line": { type: "string" },
+    "drop-line": { type: "string" },
     "drop-acks": { type: "string" },
     "other-file": { type: "boolean", default: false },
     estop: { type: "boolean", default: false },
@@ -51,6 +52,7 @@ if (values.help) {
   --speed <n>              move this many times faster than the machine (default 1)
   --no-done-snapshot       P disappears without the completion snapshot
   --fail-at-line <n>       halt with a probe failure at this program line
+  --drop-line <n>          leave out this program line with a push queue error, and play on
   --drop-acks <regexp>     never acknowledge matching commands
   --other-file             every play gets another file, one line longer (a name CRC clash)
   --estop                  E-stop pressed at power-on: the boot homing fails (alarm 2)
@@ -92,6 +94,7 @@ const simulator = await serveSimulator({
     speed: Math.max(Number(values.speed) || 1, 0.01),
     noDoneSnapshot: values["no-done-snapshot"],
     failAtLine: values["fail-at-line"] ? Number(values["fail-at-line"]) : null,
+    dropLine: values["drop-line"] ? Number(values["drop-line"]) : null,
     dropAcks: values["drop-acks"] ? new RegExp(values["drop-acks"]) : null,
     otherFile: values["other-file"],
     estop: values.estop,

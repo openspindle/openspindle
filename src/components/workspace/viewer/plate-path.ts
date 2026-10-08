@@ -1,7 +1,10 @@
 import * as THREE from "three"
 import type { PlaybackFrame } from "@/app/job/frame"
 import type { Point3 } from "@/domain/nc/gcode"
-import type { ViewerPlate } from "@/components/workspace/viewer/viewer-input"
+import type {
+  ViewerGhost,
+  ViewerPlate,
+} from "@/components/workspace/viewer/viewer-input"
 import {
   PATH_DISPLAY_LIFT,
   plateProbeGrids,
@@ -9,6 +12,7 @@ import {
   probeGridVertices,
   probeTouchPoint,
 } from "../bed-viewer-layout"
+import { GhostView } from "./ghost-view"
 import type { ViewerPalette } from "./palette"
 import { samePlate } from "./plate-identity"
 import { ProbeGridView } from "./probe-grid-view"
@@ -34,6 +38,8 @@ export type PathPresentation = Omit<
    * to the tool. Null or absent shows the whole program.
    */
   frame?: PlaybackFrame | null
+  /** What the plate leaves out of its program, drawn faint; absent for none. */
+  ghosts?: readonly ViewerGhost[]
 }
 
 /**
@@ -53,6 +59,8 @@ function probeCursor(
     previewProbePoint: probePoint < 0 ? null : probePoint,
   }
 }
+
+const NO_GHOSTS: readonly ViewerGhost[] = []
 
 /** Where outlines lie: the stock top, or the work origin's height without stock. */
 const surfaceZ = (plate: ViewerPlate) =>
@@ -85,6 +93,7 @@ export class PlatePath {
   private toolpath: ToolpathView
   private workArea: WorkAreaView
   private probes: ProbeGridView
+  private readonly ghosts: GhostView
 
   /** `collide` finds what the probe meets, for where it is going to touch. */
   constructor(
@@ -110,7 +119,14 @@ export class PlatePath {
     this.workArea = new WorkAreaView(plate.toolpathBounds, palette.workArea)
     this.workArea.place(plate.workOrigin, surfaceZ(plate))
     this.probes = probeGrids(plate, palette)
-    this.group.add(this.toolpath.group, this.workArea.group, this.probes.group)
+    this.ghosts = new GhostView(palette.suppressed, palette.selectedPath)
+    this.ghosts.place(plate.workOrigin)
+    this.group.add(
+      this.toolpath.group,
+      this.workArea.group,
+      this.probes.group,
+      this.ghosts.group
+    )
   }
 
   /**
@@ -146,6 +162,7 @@ export class PlatePath {
       this.group.add(this.workArea.group)
     }
     this.workArea.place(workOrigin, surfaceZ(plate))
+    this.ghosts.place(workOrigin)
     // Probe grids have no cheap reposition: rebuild only when what they are drawn from changed,
     // not on every update (a fixture move, say, touches none of these fields).
     if (
@@ -169,6 +186,7 @@ export class PlatePath {
     const origin: Point3 = [x + delta[0], y + delta[1], z + delta[2]]
     this.toolpath.place(origin)
     this.workArea.place(origin, surfaceZ(this.plate))
+    this.ghosts.place(origin)
   }
 
   present(state: PathPresentation) {
@@ -180,11 +198,9 @@ export class PlatePath {
         : null
     this.toolpath.hide(state.hidden)
     this.toolpath.select(state.ranges)
-    const selectionShown = this.toolpath.apply(frame, state.showRapids)
-    this.toolpath.emphasize(
-      state.active,
-      selectionShown || (state.active && this.probes.intersects(state.ranges))
-    )
+    this.ghosts.show(state.ghosts ?? NO_GHOSTS)
+    this.toolpath.apply(frame, state.showRapids)
+    this.toolpath.emphasize(state.active)
     this.workArea.emphasize(state.active)
     this.probes.present({ ...state, ...probeCursor(frame) })
     if (state.liveTool && !frame) {
@@ -201,5 +217,6 @@ export class PlatePath {
     this.toolpath.dispose()
     this.workArea.dispose()
     this.probes.dispose()
+    this.ghosts.dispose()
   }
 }

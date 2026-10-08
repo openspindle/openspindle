@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import {
   columnFilteringFeature,
   createColumnHelper,
@@ -28,7 +28,12 @@ import { useWorkspace } from "@/app/workspace/workspace-context"
 import { openDialog } from "@/features/shell/dialogs"
 import { useArrangeSelection } from "../arrange/arrange-state"
 import { useSelectSetupItem } from "../arrange/use-arrange-events"
-import { sectionSelectionAtom, selectSections } from "../selection"
+import {
+  revealRow,
+  sectionSelectionAtom,
+  selectSections,
+  useRevealRequest,
+} from "../selection"
 import { SelectionBar } from "./selection-bar"
 import { TreeRowView } from "./tree-row"
 import { buildTreeRows, expandedState } from "./tree-rows"
@@ -57,6 +62,23 @@ const columns = columnHelper.columns([
 
 const ROW_HEIGHT = 36
 
+/** What a selectable row selects: a section or a path, of an operation; null for other rows. */
+function selectableOf(row: TreeRow) {
+  if (row.kind === "section")
+    return {
+      kind: row.kind,
+      plateId: row.plate.id,
+      operationId: row.section.operationId,
+    }
+  if (row.kind === "path")
+    return {
+      kind: row.kind,
+      plateId: row.plate.id,
+      operationId: row.operation.id,
+    }
+  return null
+}
+
 /**
  * Plates with their fixtures and operations, and the operations' program sections: select,
  * hide, add, reorder, group and search.
@@ -72,6 +94,10 @@ export function PlateTree({ className }: { className?: string }) {
   const selectedFixtureId =
     arranged?.item.kind === "fixture" && arranged.plateId === selectedPlateId
       ? arranged.item.id
+      : null
+  const selectedStockPlateId =
+    arranged?.item.kind === "stock" && arranged.plateId === selectedPlateId
+      ? selectedPlateId
       : null
   const addPlate = useAddPlate()
   const [query, setQuery] = useState("")
@@ -102,7 +128,7 @@ export function PlateTree({ className }: { className?: string }) {
     getSubRows: (row) => row.subRows,
     filterFromLeafRows: true,
     globalFilterFn: "includesString",
-    enableRowSelection: (row) => row.original.kind === "section",
+    enableRowSelection: (row) => selectableOf(row.original) !== null,
     enableSubRowSelection: false,
     atoms: { rowSelection: sectionSelectionAtom },
     state: {
@@ -119,25 +145,44 @@ export function PlateTree({ className }: { className?: string }) {
     overscan: 10,
     getItemKey: (index) => rows[index].id,
   })
+  // A row selected in the 3D view: its ancestors expand, then it scrolls into view.
+  const reveal = useRevealRequest()
+  useEffect(() => {
+    if (!reveal) return
+    setExpanded((current) => ({
+      ...current,
+      ...Object.fromEntries(reveal.ancestors.map((id) => [id, true])),
+    }))
+  }, [reveal])
+  useEffect(() => {
+    if (!reveal) return
+    const index = rows.findIndex((row) => row.id === reveal.rowId)
+    if (index < 0) return
+    virtualizer.scrollToIndex(index, { align: "auto" })
+    revealRow(null)
+  }, [reveal, rows, virtualizer])
   const toggle = (row: TreeTableRow) =>
     (searching ? setSearchExpanded : setExpanded)((current) => ({
       ...current,
       [row.id]: !row.getIsExpanded(),
     }))
+  // A section or a path selects its operation too; Shift extends over its kind in that operation.
   const selectSection = (row: TreeTableRow, event: React.MouseEvent) => {
-    if (row.original.kind !== "section") return
-    const { plate, section } = row.original
-    selection.selectOperation(plate.id, section.operationId)
+    const selected = selectableOf(row.original)
+    if (!selected) return
+    selection.selectOperation(selected.plateId, selected.operationId)
     if (event.metaKey || event.ctrlKey) {
       row.toggleSelected()
       return
     }
-    const peers = rows.filter(
-      (item) =>
-        item.original.kind === "section" &&
-        item.original.plate.id === plate.id &&
-        item.original.section.operationId === section.operationId
-    )
+    const peers = rows.filter((item) => {
+      const peer = selectableOf(item.original)
+      return (
+        peer?.kind === selected.kind &&
+        peer.plateId === selected.plateId &&
+        peer.operationId === selected.operationId
+      )
+    })
     const anchor = peers.findIndex((item) => item.getIsSelected())
     const target = peers.indexOf(row)
     if (event.shiftKey && anchor >= 0)
@@ -215,6 +260,14 @@ export function PlateTree({ className }: { className?: string }) {
                   selectedPlateId={selectedPlateId}
                   selectedOperationId={selection.operationId}
                   selectedFixtureId={selectedFixtureId}
+                  selectedStockPlateId={selectedStockPlateId}
+                  // As clicking the stock in the viewer; without stock, its panel to add one.
+                  onSelectStock={(plateId) => {
+                    const plate = plates.find(({ id }) => id === plateId)
+                    if (plate?.setup.stock)
+                      selectItem(plateId, { kind: "stock" })
+                    else selection.showPlateSetup(plateId, "stock")
+                  }}
                   onToggle={() => toggle(row)}
                   // As clicking beside the plate's setup in the viewer: the plate alone.
                   onSelectPlate={(plateId) => selectItem(plateId, null)}

@@ -1,6 +1,7 @@
 import {
   NC_BLOCK_PROBLEMS,
   RUN_LIMITS,
+  firstToolChange,
   readNcBlock,
 } from "../../contract/index.ts"
 import type {
@@ -313,14 +314,5 @@ export function prepareMakeraProgram(source: string): PreparedProgram {
  * Whether a prepared program changes tools (M6 with a T word) before it starts the spindle
  * (M3 or M4), which the firmware refuses while no cutting tool is set.
  */
-export function changesToolBeforeSpindle(text: string): boolean {
-  for (const line of text.split("\n")) {
-    const { words, message } = readNcBlock(line)
-    if (message !== null) continue
-    const m = (code: number) =>
-      words.some((word) => word.letter === "M" && word.value === code)
-    if (m(3) || m(4)) return false
-    if (m(6) && words.some((word) => word.letter === "T")) return true
-  }
-  return false
-}
+export const changesToolBeforeSpindle = (text: string): boolean =>
+  firstToolChange(text) !== null

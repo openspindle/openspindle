@@ -10,6 +10,7 @@ import type {
   DesignRuleCheck,
   DesignRuleViolation,
 } from "@/domain/design-rules/check"
+import { activePlate } from "@/domain/plate/active"
 import type { Plate } from "@/domain/plate/plate"
 import type { Tool } from "@/domain/tools/tool"
 import type { WorkspaceState } from "@/domain/workspace/workspace"
@@ -46,8 +47,9 @@ export function plateDesignRuleCheck(
 ): DesignRuleCheck {
   const saved = checked.get(plate)
   if (saved?.settings === settings && saved.tools === tools) return saved.check
+  // The plate as it machines: its suppressed operations break no rules.
   const check = checkDesignRules(
-    plate,
+    activePlate(plate),
     compilePlate(plate, tools),
     settings,
     tools

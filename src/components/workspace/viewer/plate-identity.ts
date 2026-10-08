@@ -1,6 +1,7 @@
 import type { Point3 } from "@/domain/nc/gcode"
 import type {
   StoredAnchor,
+  ViewerGhost,
   ViewerPlate,
   ViewerProblem,
   ViewerToolRun,
@@ -48,6 +49,16 @@ export const sameRanges = sameList<LineRange>(
 )
 
 export const sameIds = sameList<string>(Object.is)
+
+/** A ghost's program comes from its operation's cached compile: unchanged, it is the same. */
+export const sameGhosts = sameList<ViewerGhost>(
+  (a, b) =>
+    a === b ||
+    (a.operationId === b.operationId &&
+      a.program === b.program &&
+      sameRanges(a.lines, b.lines) &&
+      sameRanges(a.selected, b.selected))
+)
 
 /** A problem's places come from its plate's cached diagnostics: unchanged, they are the same. */
 export const sameProblems = sameList<ViewerProblem>(

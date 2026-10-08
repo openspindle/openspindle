@@ -28,6 +28,7 @@ import {
 import { ProblemText } from "@/components/workspace/problem-text"
 import { useWorkspaceStore } from "@/app/workspace/workspace-context"
 import { checkPlateDesignRules } from "@/features/design-rules/design-rule-check"
+import { openDialog } from "@/features/shell/dialogs"
 import type { MachineAction } from "./job-hooks"
 import type {
   RunCheck,
@@ -101,6 +102,16 @@ function RunFixAction({
       )
     case "design-rules":
       return <ShowDesignRules fix={fix} />
+    case "height-map":
+      return (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => openDialog({ kind: "height-map" })}
+        >
+          {fix.label}
+        </Button>
+      )
   }
 }
 

@@ -22,6 +22,15 @@ import type { OperationContext } from "./context.ts"
 const STEP_MS = 10_000
 /** Upload, readback and both preflights together, for each file sent. */
 const PREPARATION_MS = 80_000
+/**
+ * The slowest a program may go up and be read back, bytes per second: under half the slowest
+ * seen over a Z1's network. A transfer that stalls fails sooner, at `STEP_MS` without progress.
+ */
+const MIN_TRANSFER_RATE = 8 * 1024
+
+/** How long preparing a file of `bytes` may take: `PREPARATION_MS`, and its upload and readback at `MIN_TRANSFER_RATE`. */
+const preparationMs = (bytes: number) =>
+  PREPARATION_MS + ((2 * bytes) / MIN_TRANSFER_RATE) * 1000
 const START_MS = 8_000
 
 export type JobRunnerHooks = {
@@ -120,7 +129,7 @@ export async function prepareAndStart(
   const parts = programParts(program)
   const { scoped, release } = withDeadline(
     context,
-    PREPARATION_MS * parts.length
+    parts.reduce((total, part) => total + preparationMs(part.bytes), 0)
   )
   try {
     let telemetry = await preflight(scoped)
@@ -158,7 +167,10 @@ export async function prepareAndStart(
     const identity = session.identity
     if (!identity)
       throw new MachineError("connection-lost", "The device is disconnected.")
-    const reset = job.toolReset(program, identity, telemetry)
+    // Kept, the tool the machine holds stays: a first change to it changes nothing.
+    const reset = request.keepTool
+      ? null
+      : job.toolReset(program, identity, telemetry)
     if (reset)
       await applySetting(
         scoped,

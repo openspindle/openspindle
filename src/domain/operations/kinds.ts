@@ -30,6 +30,12 @@ export type ResolvedNc = {
   readonly policy: NcPolicy
   /** 1-based lines of `nc` where the program pauses for a review. */
   readonly reviewLines: readonly number[]
+  /**
+   * Where its first cut starts, in work X and Y, for NC that moves down before it moves in X
+   * and Y, as pcb2gcode's goes to its tool change and travel heights where the tool is:
+   * combining travels there at the machine's clearance before its lines.
+   */
+  readonly start?: readonly [x: number, y: number]
 }
 
 export type OperationOf<TKind extends SourceKind> = Operation & {

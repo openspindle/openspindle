@@ -1,6 +1,9 @@
 import { defineContract } from "@openspindle/rpc"
 import { z } from "zod"
 import {
+  LinkedFileReadSchema,
+  LinkedFileRequestSchema,
+  LinkedFileStatusSchema,
   OpenFileRequestSchema,
   OpenFileResultSchema,
   OpenedFilesSchema,
@@ -28,6 +31,14 @@ export const hostContract = defineContract({
       params: SaveFileRequestSchema,
       result: SaveFileResultSchema,
       timeoutMs: 0,
+    },
+    "files.linkedStatus": {
+      params: LinkedFileRequestSchema,
+      result: LinkedFileStatusSchema,
+    },
+    "files.readLinked": {
+      params: LinkedFileRequestSchema,
+      result: LinkedFileReadSchema,
     },
     ...pcbMethods,
     ...storageMethods,

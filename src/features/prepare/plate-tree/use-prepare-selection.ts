@@ -1,6 +1,7 @@
 import { useMatch, useNavigate } from "@tanstack/react-router"
 import { useWorkspaceStore } from "@/app/workspace/workspace-context"
 import type { PrepareSearch } from "@/routes/_workspace/prepare"
+import { selectSetupItem } from "../arrange/arrange-state"
 import { clearSectionSelection } from "../selection"
 
 const NO_SELECTION: PrepareSearch = {}
@@ -32,6 +33,8 @@ export function usePrepareSelection() {
     },
     selectOperation: (plateId: string, operationId: string) => {
       workspace.dispatch({ type: "plate.select", plateId })
+      // One thing is selected at a time: the operation, not a setup item too.
+      selectSetupItem(null)
       if (current.operation !== operationId) clearSectionSelection()
       show({ operation: operationId })
     },

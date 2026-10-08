@@ -2,6 +2,7 @@ import { compilePlate } from "@/domain/compile/compile"
 import { operationSubject, toolSubject } from "@/domain/diagnostics"
 import type { Diagnostic } from "@/domain/diagnostics"
 import { kitForPlate } from "@/domain/fixtures/catalog"
+import { activePlate } from "@/domain/plate/active"
 import type { Plate } from "@/domain/plate/plate"
 import { failureDiagnostic } from "@/domain/rules/diagnostics"
 import { rulesOf } from "@/domain/rules/rules"
@@ -22,9 +23,10 @@ const gathered = new WeakMap<
 
 /**
  * Everything that blocks or qualifies Run and export for a plate, in one list: what compiling
- * reports, then the operations' advice and the tool table's failures. A plate without
- * operations is not a problem to report: Run and export refuse it on their own. Kept per plate
- * object while the tools stay the same, so unchanged plates gather nothing again.
+ * reports, then the operations' advice and the tool table's failures, of the plate as it
+ * machines (`activePlate`). A plate without operations is not a problem to report: Run and
+ * export refuse it on their own. Kept per plate object while the tools stay the same, so
+ * unchanged plates gather nothing again.
  */
 export function plateDiagnostics(
   plate: Plate,
@@ -34,8 +36,14 @@ export function plateDiagnostics(
   if (saved?.tools === context.tools) return saved.diagnostics
   const compiled = compilePlate(plate, context.tools)
   const kit = kitForPlate(plate)
-  const operations = plate.operations.map(
-    (operation): OperationRuleSubject => ({ operation, plate, kit, compiled })
+  const machined = activePlate(plate)
+  const operations = machined.operations.map(
+    (operation): OperationRuleSubject => ({
+      operation,
+      plate: machined,
+      kit,
+      compiled,
+    })
   )
   const run = { machine: kit.id }
   const diagnostics = [
@@ -45,7 +53,7 @@ export function plateDiagnostics(
     ),
     ...runRules(
       rulesOf("tool"),
-      toolRuleSubjects(plate, context.tools),
+      toolRuleSubjects(machined, context.tools),
       run
     ).map((failure) =>
       failureDiagnostic(failure, toolSubject(failure.first.entry.number))

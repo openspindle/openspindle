@@ -27,6 +27,8 @@ export type RunFix =
     }
   | { readonly kind: "device"; readonly label: string }
   | { readonly kind: "read-anchors"; readonly label: string }
+  /** Opens the height map the machine applies, with its work Z. */
+  | { readonly kind: "height-map"; readonly label: string }
   /** Checks the plate's design rules in Prepare, which shows what the check finds. */
   | {
       readonly kind: "design-rules"
@@ -119,6 +121,8 @@ export function fixFor(diagnostic: Diagnostic): RunFix {
       return { kind: "prepare", label, search: { operation: fix.operationId } }
     case "read-anchors":
       return { kind: "read-anchors", label }
+    case "show-height-map":
+      return { kind: "height-map", label }
     case "resolve-rule":
       return {
         kind: "prepare",

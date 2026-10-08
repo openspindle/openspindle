@@ -16,6 +16,7 @@ import {
   parameters,
   LIMITS,
 } from "../../../src/domain/pcb/manifest.mjs"
+import { maskProgram } from "./mask-paths.mjs"
 import { runProcess } from "./runtime.mjs"
 
 export class InputError extends Error {}
@@ -35,12 +36,6 @@ const bytes = (text) => Buffer.byteLength(text, "utf8")
 const roles = new Set(inputs.map(({ id }) => id))
 const names = Object.fromEntries(inputs.map(({ id, label }) => [id, label]))
 const isMask = (role) => role === "front-mask" || role === "back-mask"
-
-/**
- * Clears the openings completely. pcb2gcode stops offsetting once no opening remains;
- * keep this finite because it converts the theoretical pass count to an integer.
- */
-const MASK_CLEARANCE = 10_000
 
 export function validateRequest(input) {
   if (
@@ -209,12 +204,9 @@ export function buildArguments(
       millVertfeed: "mill-vertfeed",
       millSpeed: "mill-speed",
     })
+  // One pass round each opening: `maskProgram` lays out the passes inside it.
   if (mask) {
-    args.push(
-      "--invert-gerbers",
-      `--isolation-width=${MASK_CLEARANCE}`,
-      `--milling-overlap=${100 - p.maskStepover}%`
-    )
+    args.push("--invert-gerbers", "--isolation-width=0")
     Object.assign(fields, {
       maskDepth: "zwork",
       maskDiameter: "mill-diameters",
@@ -335,7 +327,8 @@ function plungedWider(program, diameter) {
   return `The ${listed} holes are smaller than the ${millimetres(diameter)} end mill and come out ${millimetres(diameter)} wide.`
 }
 
-export function augmentProgram(source, label, request) {
+/** `laidOut`: OpenSpindle laid out the cuts in pcb2gcode's program (`maskProgram`). */
+export function augmentProgram(source, label, request, laidOut = false) {
   const sources = request.files.map(
     (file) =>
       `; Input: ${comment(file.name)} | SHA256 ${createHash("sha256").update(file.content).digest("hex")}`
@@ -344,7 +337,9 @@ export function augmentProgram(source, label, request) {
     "; OpenSpindle PCB",
     `; Toolpath: ${comment(label)}`,
     ...sources,
-    "; Original machining commands follow unchanged. Review setup and tooling before Run.",
+    laidOut
+      ? "; pcb2gcode's setup and end follow unchanged; OpenSpindle laid out the passes in each opening. Review setup and tooling before Run."
+      : "; Original machining commands follow unchanged. Review setup and tooling before Run.",
     "",
     source,
   ].join("\n")
@@ -473,11 +468,13 @@ export async function generate(
         const drillPreview =
           name === "original_drill.svg" || name === "original_milldrill.svg"
         if (!keepGerbers && role !== "drill" && !drillPreview) continue
-        const content = new TextDecoder("utf-8", { fatal: true }).decode(
+        const produced = new TextDecoder("utf-8", { fatal: true }).decode(
           await readFile(path)
         )
-        if (!content.trim())
+        if (!produced.trim())
           throw new Error(`pcb2gcode produced an empty ${name}.`)
+        const laidOut = isMask(role)
+        const content = laidOut ? maskProgram(produced, parameters) : produced
         if (role) {
           requireSingleTool(content, role)
           const wider =
@@ -488,7 +485,7 @@ export async function generate(
           let label = names[role]
           if (role === "drill" && drills.length > 1)
             label += `: ${drills[drillIndex].name}`
-          const source = augmentProgram(content, label, request)
+          const source = augmentProgram(content, label, request, laidOut)
           if (bytes(source) > LIMITS.outputFile)
             throw new Error("Annotated output exceeded its size limit.")
           returnedTotal += bytes(source)

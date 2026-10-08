@@ -10,6 +10,7 @@ import type { LineRange } from "../bed-viewer-layout"
 import type { ViewerPalette } from "./palette"
 import { sameRanges } from "./plate-identity"
 import { PathAhead } from "./path-ahead"
+import { SelectedLines, selectedLineMaterial } from "./selected-lines"
 import { TouchMarker } from "./touch-marker"
 import type { Collide } from "./touch-marker"
 import { disposeToolModel, toolMaterials, toolModel } from "./tool-model"
@@ -31,10 +32,13 @@ type PathLines<TMaterial extends THREE.Material | THREE.Material[]> =
 
 type MotionLayer = {
   motion: Motion
-  /** Groups mark the revealed windows that no hidden range covers. */
+  /**
+   * Groups mark the windows that no hidden range covers: the revealed ones in the motion's
+   * material, those after them in its faint one (`coming`).
+   */
   base: PathLines<THREE.LineBasicMaterial[]>
-  /** Groups mark the selected windows; the draw range clips them to the revealed prefix. */
-  selected: PathLines<THREE.LineBasicMaterial[]>
+  /** The selected windows, drawn wide; those of the revealed prefix show. */
+  selected: SelectedLines
 }
 
 function pathMaterial(color: THREE.Color) {
@@ -53,11 +57,11 @@ function bufferView(attribute: THREE.BufferAttribute, bounds: THREE.Sphere) {
   return geometry
 }
 
-function cutOpacity(active: boolean, dimmed: boolean) {
-  if (dimmed) return 0.2
-  if (active) return 1
-  return 0.65
-}
+/** The active plate's paths draw at full strength, the others' fainter. */
+const cutOpacity = (active: boolean) => (active ? 1 : 0.65)
+
+/** The share of a made move's opacity a move still to come is drawn with, while a frame shows. */
+const COMING_OPACITY = 0.3
 
 /** Loads tool models for playback, and asks for a frame once one has arrived. */
 export type ToolModels = {
@@ -134,10 +138,9 @@ export class ToolpathView {
   private readonly path = new THREE.Group()
   private readonly program: GCodeProgram
   private readonly buffers: ToolpathBuffers
-  private readonly materials: Record<
-    Motion | "selected" | "selectedProbe",
-    THREE.LineBasicMaterial
-  >
+  private readonly materials: Record<Motion, THREE.LineBasicMaterial>
+  /** Each motion's moves that a frame has still to come, faint so that the whole path shows. */
+  private readonly coming: Record<Motion, THREE.LineBasicMaterial>
   private readonly layers: MotionLayer[]
   private tools: MoveTools
   private readonly toolMaterials: ToolMaterials
@@ -208,9 +211,16 @@ export class ToolpathView {
       cut: pathMaterial(palette.primary),
       rapid: pathMaterial(palette.rapid),
       probe: pathMaterial(palette.probePath),
-      selected: pathMaterial(palette.primary),
-      // A selected probe path stays the probe's colour.
-      selectedProbe: pathMaterial(palette.probePath),
+    }
+    // A selected probe path stays the probe's colour.
+    const selectedMaterials = {
+      path: selectedLineMaterial(palette.selectedPath),
+      probe: selectedLineMaterial(palette.probePath),
+    }
+    this.coming = {
+      cut: pathMaterial(palette.primary),
+      rapid: pathMaterial(palette.rapid),
+      probe: pathMaterial(palette.probePath),
     }
     this.layers = MOTIONS.flatMap((motion): MotionLayer[] => {
       const vertices = this.buffers.vertices[motion]
@@ -221,13 +231,14 @@ export class ToolpathView {
       )
       const base = new THREE.LineSegments(bufferView(attribute, bounds), [
         this.materials[motion],
+        this.coming[motion],
       ])
       base.renderOrder = 3
-      const selected = new THREE.LineSegments(bufferView(attribute, bounds), [
-        this.materials[motion === "probe" ? "selectedProbe" : "selected"],
-      ])
-      selected.renderOrder = 5
-      this.path.add(base, selected)
+      const selected = new SelectedLines(
+        selectedMaterials[motion === "probe" ? "probe" : "path"],
+        5
+      )
+      this.path.add(base, selected.object)
       return [{ motion, base, selected }]
     })
     this.toolMaterials = toolMaterials(palette.primary)
@@ -353,8 +364,9 @@ export class ToolpathView {
   }
 
   /**
-   * Draws a frame of a plan of this program: the segments before it made, the move under way up
-   * to the tool, the tool, where the probe touches next and the moves ahead. Null, or a frame of
+   * Draws a frame of a plan of this program: the segments before it made and those after it
+   * faint, the move under way up to the tool, the tool, where the probe touches next and the
+   * moves ahead. Null, or a frame of
    * another program's plan, shows the whole program and no tool. Rapids show only with
    * `showRapids`. Returns whether a selected segment shows.
    */
@@ -379,43 +391,41 @@ export class ToolpathView {
     this.selection = segmentWindows(this.program, this.ranges).flatMap((part) =>
       this.shownWindows(part.first, part.last)
     )
-    for (const layer of this.layers) {
-      const geometry = layer.selected.geometry
-      geometry.clearGroups()
-      for (const part of this.selection) {
-        const { start, count } = this.vertexRange(
-          layer.motion,
-          part.first,
-          part.last
-        )
-        if (count > 0) geometry.addGroup(start, count)
-      }
-    }
+    for (const layer of this.layers)
+      layer.selected.set(
+        this.buffers.vertices[layer.motion],
+        this.selection
+          .map((part) => this.vertexRange(layer.motion, part.first, part.last))
+          .filter(({ count }) => count > 0)
+      )
   }
 
   /**
-   * Shows the first `count` program segments, the rapids only with `showRapids`; reports
-   * whether a selected one shows.
+   * Shows the first `count` program segments made and the rest faint, the rapids only with
+   * `showRapids`; reports whether a selected one shows.
    */
   private reveal(count: number, showRapids: boolean) {
     const drawn = (motion: Motion) => motion !== "rapid" || showRapids
     const shown = this.shownWindows(0, count)
+    const coming = this.shownWindows(count, this.program.segments.length)
     for (const { motion, base, selected } of this.layers) {
       const revealed = this.vertexRange(motion, 0, count).count
       base.geometry.clearGroups()
-      for (const part of shown) {
+      const windows = [
+        ...shown.map((part) => ({ part, material: 0 })),
+        ...coming.map((part) => ({ part, material: 1 })),
+      ]
+      for (const { part, material } of windows) {
         const { start, count: vertices } = this.vertexRange(
           motion,
           part.first,
           part.last
         )
-        if (vertices > 0) base.geometry.addGroup(start, vertices)
+        if (vertices > 0) base.geometry.addGroup(start, vertices, material)
       }
       base.visible = drawn(motion) && base.geometry.groups.length > 0
-      selected.geometry.setDrawRange(0, revealed)
-      selected.visible =
-        drawn(motion) &&
-        selected.geometry.groups.some((group) => group.start < revealed)
+      const selectedShown = selected.show(revealed)
+      selected.object.visible = drawn(motion) && selectedShown
     }
     return this.selection.some((part) =>
       MOTIONS.some(
@@ -427,11 +437,17 @@ export class ToolpathView {
     )
   }
 
-  /** A revealed selection dims the rest of the path; the active plate draws at full strength. */
-  emphasize(active: boolean, dimmed: boolean) {
-    this.materials.cut.opacity = cutOpacity(active, dimmed)
-    this.materials.probe.opacity = cutOpacity(active, dimmed)
-    this.materials.rapid.opacity = dimmed ? 0.12 : 0.55
+  /**
+   * The active plate draws at full strength. A selection changes nothing of the rest of the
+   * path: the selected moves stand out by themselves (`SelectedLines`).
+   */
+  emphasize(active: boolean) {
+    this.materials.cut.opacity = cutOpacity(active)
+    this.materials.probe.opacity = cutOpacity(active)
+    this.materials.rapid.opacity = 0.55
+    for (const motion of MOTIONS)
+      this.coming[motion].opacity =
+        this.materials[motion].opacity * COMING_OPACITY
   }
 
   /**

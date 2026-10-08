@@ -7,6 +7,8 @@ export type Severity = "error" | "warning"
 export type QuickFix =
   | { readonly kind: "assign-tool"; readonly toolNumber: number | null }
   | { readonly kind: "read-anchors" }
+  /** The height map the connected machine applies, with its work Z. */
+  | { readonly kind: "show-height-map" }
   | { readonly kind: "edit-operation"; readonly operationId: string }
   /** Changes an operation's NC as one of its machine's program rules offers (`ProgramFix`). */
   | {
@@ -89,6 +91,8 @@ export type Diagnostic = {
   readonly severity: Severity
   readonly code: string
   readonly message: string
+  /** What resolves it where its fix does not, in words. */
+  readonly advice?: string
   readonly subject: Subject
   /** Where it is on the plate's bed. */
   readonly places?: readonly Place[]

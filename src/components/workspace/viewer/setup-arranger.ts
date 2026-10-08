@@ -10,11 +10,16 @@ import type {
   SetupItemRef,
   SetupPoint,
 } from "@/domain/plate/setup-items"
+import { isBedKind } from "@/domain/fixtures/definitions"
 import type { Point3 } from "@/domain/nc/gcode"
 import { sameEdge } from "@/domain/plate/item-edges"
 import type { ItemEdge, ItemEdgeRef } from "@/domain/plate/item-edges"
 import type { PickTarget } from "@/domain/plate/pick-targets"
-import { WORK_AXIS_LENGTH, plateItemEdges } from "../bed-viewer-layout"
+import {
+  PATH_DISPLAY_LIFT,
+  WORK_AXIS_LENGTH,
+  plateItemEdges,
+} from "../bed-viewer-layout"
 import type { EdgeHighlight } from "./edge-highlights"
 import type { PlateView } from "./plate-view"
 import type { Marker, MarkerStyle } from "./setup-markers"
@@ -32,6 +37,28 @@ const SNAP_RADIUS = 10
 const EDGE_RADIUS = 10
 /** How near the pointer must be to the work origin's axes to pick the design. */
 const DESIGN_RADIUS = 8
+/** How near a toolpath part's cuts, in CSS pixels, the pointer picks it. */
+const PART_RADIUS = 6
+
+/** How far a point (in X and Y) lies from the nearest of cuts given as four numbers each. */
+function nearestCut(cuts: Float32Array, x: number, y: number) {
+  let nearest = Infinity
+  for (let index = 0; index + 3 < cuts.length; index += 4) {
+    const ax = cuts[index]
+    const ay = cuts[index + 1]
+    const dx = cuts[index + 2] - ax
+    const dy = cuts[index + 3] - ay
+    const length = dx * dx + dy * dy
+    const along = length
+      ? Math.min(1, Math.max(0, ((x - ax) * dx + (y - ay) * dy) / length))
+      : 0
+    nearest = Math.min(
+      nearest,
+      Math.hypot(x - (ax + along * dx), y - (ay + along * dy))
+    )
+  }
+  return nearest
+}
 /** Free moves step by a tenth of a millimetre. */
 const STEP = 0.1
 const ZERO: Point3 = [0, 0, 0]
@@ -63,6 +90,27 @@ export type ArrangePicking =
       /** The edges chosen so far, drawn while edges are picked. */
       readonly edges: readonly ItemEdgeRef[]
     }
+  | {
+      readonly kind: "parts"
+      readonly plateId: string
+      /** The parts of the operation's toolpath a click suppresses or runs again. */
+      readonly parts: readonly PickablePart[]
+    }
+
+/** A part of a toolpath as picking finds it: where it cuts, flat at the height it is drawn. */
+export type PickablePart = {
+  readonly operationId: string
+  readonly index: number
+  /** What hovering it says. */
+  readonly label: string
+  /** The corners of where it cuts, in bed coordinates, with the same Z. */
+  readonly min: Point3
+  readonly max: Point3
+  /** Its cuts' ends in X and Y, four numbers per cut, from `origin`. */
+  readonly cuts: Float32Array
+  /** Its program's zero in bed X and Y: the plate's work origin. */
+  readonly origin: readonly [number, number]
+}
 
 /** A point picked on a plate: a target it snapped to, or else where the pointer met a surface. */
 export type PickedPoint = {
@@ -79,6 +127,11 @@ export type ArrangeView = {
   readonly axes: MoveAxes
   readonly snap: boolean
   readonly picking: ArrangePicking | null
+  /** The paths of a plate's toolpaths a click selects, outside picking; null for none. */
+  readonly paths: {
+    readonly plateId: string
+    readonly parts: readonly PickablePart[]
+  } | null
 }
 
 /** The point picked on the moving item, which the next other point it is aligned to. */
@@ -117,6 +170,10 @@ export type ArrangeEvents = {
   pickPoint: (plateId: string, pick: PickedPoint) => void
   /** An edge was clicked while picking edges. */
   pickEdge: (plateId: string, edge: ItemEdgeRef) => void
+  /** A part of a toolpath was clicked while picking parts (its `PickablePart.index`). */
+  pickPart: (plateId: string, index: number) => void
+  /** A path of a toolpath was clicked, to select it alone. */
+  selectPart: (plateId: string, operationId: string, index: number) => void
 }
 
 /** Text the host shows beside a point of a plate's bed (in bed coordinates). */
@@ -284,6 +341,7 @@ export class SetupArranger {
     axes: "xy",
     snap: true,
     picking: null,
+    paths: null,
   }
   private from: SetupPoint | null = null
   private hover: SetupPoint | null = null
@@ -291,6 +349,10 @@ export class SetupArranger {
   private hoverPick: PickedPoint | null = null
   /** The edge under the pointer while edges are picked. */
   private hoverEdge: ItemEdge | null = null
+  /** The part under the pointer while parts are picked. */
+  private hoverPart: PickablePart | null = null
+  private readonly partPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1))
+  private readonly partHit = new THREE.Vector3()
   private drag: Drag | null = null
   private press: Press | null = null
   /** A committed move, drawn until a new version of its plate (which carries it) arrives. */
@@ -330,6 +392,7 @@ export class SetupArranger {
       this.hover = null
       this.hoverEdge = null
       this.hoverPick = null
+      this.hoverPart = null
       this.host.label(null)
       this.host.canvas.style.cursor = state.picking ? "crosshair" : ""
       this.host.canvas.removeAttribute("title")
@@ -504,9 +567,12 @@ export class SetupArranger {
       if (picking.kind === "point") {
         const pick = this.pickAt(event)
         if (pick) this.events.pickPoint(picking.plateId, pick)
-      } else {
+      } else if (picking.kind === "edges") {
         const edge = this.edgeAt(event)
         if (edge) this.events.pickEdge(picking.plateId, edge.ref)
+      } else {
+        const part = this.partAt(event, picking.plateId, picking.parts, true)
+        if (part) this.events.pickPart(picking.plateId, part.index)
       }
       return
     }
@@ -514,8 +580,21 @@ export class SetupArranger {
       this.openMenu(event)
       return
     }
+    // A path drawn over the stock is selected before what it cuts; the design's axes, over
+    // everything, before it.
+    const { paths } = this.state
+    const path =
+      paths && !this.designAt(event)
+        ? this.partAt(event, paths.plateId, paths.parts, false)
+        : null
+    if (paths && path) {
+      this.events.selectPart(paths.plateId, path.operationId, path.index)
+      return
+    }
+    // The bed is what everything stands on: a click there is on empty space, which deselects.
     const hit = this.itemAt(event)
-    if (hit) this.events.select(hit.plateId, hit.item)
+    if (hit && !this.isBackground(hit.plateId, hit.item))
+      this.events.select(hit.plateId, hit.item)
     else this.events.select(this.host.plateAt(event), null)
   }
 
@@ -523,12 +602,13 @@ export class SetupArranger {
     if (
       this.drag ||
       this.press ||
-      (!this.hover && !this.hoverEdge && !this.hoverPick)
+      (!this.hover && !this.hoverEdge && !this.hoverPick && !this.hoverPart)
     )
       return
     this.hover = null
     this.hoverEdge = null
     this.hoverPick = null
+    this.hoverPart = null
     this.host.label(null)
     this.refresh()
   }
@@ -620,9 +700,29 @@ export class SetupArranger {
     this.host.invalidate()
   }
 
-  /** The edges chosen so far and the one under the pointer, while edges are picked. */
+  /**
+   * The edges chosen so far and the one under the pointer, while edges are picked; the outline of
+   * the part under the pointer, while parts are.
+   */
   private edgesFor(plateId: string): EdgeHighlight[] | null {
     const { picking } = this.state
+    if (picking?.kind === "parts") {
+      const part = this.hoverPart
+      if (picking.plateId !== plateId || !part) return null
+      const [x0, y0, z] = part.min
+      const [x1, y1] = part.max
+      const corners: Point3[] = [
+        [x0, y0, z],
+        [x1, y0, z],
+        [x1, y1, z],
+        [x0, y1, z],
+      ]
+      return corners.map((start, index) => ({
+        start,
+        end: corners[(index + 1) % corners.length],
+        hovered: true,
+      }))
+    }
     const view = this.host.view(plateId)
     if (picking?.kind !== "edges" || picking.plateId !== plateId || !view)
       return null
@@ -638,6 +738,62 @@ export class SetupArranger {
         ? [{ start: hovered.start, end: hovered.end, hovered: true }]
         : []),
     ]
+  }
+
+  /**
+   * The path under the pointer, where it meets the height the paths are drawn at: the one whose
+   * cuts pass nearest, within a few pixels. With `inside`, as picking parts does, else the
+   * smallest whose cuts lie around the pointer (a pad's clearing, a loop around a pad).
+   */
+  private partAt(
+    event: MouseEvent,
+    plateId: string,
+    parts: readonly PickablePart[],
+    inside: boolean
+  ): PickablePart | null {
+    if (!parts.length) return null
+    this.host.aim(event)
+    const { ray } = this.host.raycaster
+    const offset = this.host.offset(plateId)
+    const rect = this.host.canvas.getBoundingClientRect()
+    let nearest: PickablePart | null = null
+    let distance = Infinity
+    let around: PickablePart | null = null
+    let smallest = Infinity
+    let reach: number | null = null
+    for (const part of parts) {
+      const z = part.min[2] + PATH_DISPLAY_LIFT
+      this.partPlane.constant = -z
+      const hit = ray.intersectPlane(this.partPlane, this.partHit)
+      if (!hit) continue
+      const x = hit.x - offset
+      const { y } = hit
+      // The paths lie at one height, so the pixels reach as far for each.
+      reach ??= PART_RADIUS / this.pixelsPerMillimetre(plateId, [x, y, z], rect)
+      const [x0, y0] = part.min
+      const [x1, y1] = part.max
+      if (x < x0 - reach || x > x1 + reach || y < y0 - reach || y > y1 + reach)
+        continue
+      const [ox, oy] = part.origin
+      const away = nearestCut(part.cuts, x - ox, y - oy)
+      if (away <= reach && away < distance) {
+        nearest = part
+        distance = away
+      }
+      const area = (x1 - x0) * (y1 - y0)
+      if (inside && area < smallest) {
+        around = part
+        smallest = area
+      }
+    }
+    return nearest ?? around
+  }
+
+  /** How many CSS pixels a millimetre along X spans at a point of the plate's bed. */
+  private pixelsPerMillimetre(plateId: string, point: Point3, rect: DOMRect) {
+    const a = this.screen(plateId, point, rect)
+    const b = this.screen(plateId, [point[0] + 1, point[1], point[2]], rect)
+    return Math.max(Math.hypot(b.x - a.x, b.y - a.y), 1e-6)
   }
 
   /** The edge of the picking plate nearest the pointer on screen, within reach. */
@@ -848,6 +1004,16 @@ export class SetupArranger {
   }
 
   /** The item under the pointer, the nearest along the picking ray. */
+  /** The machine's bed, or a bed on it: what a click selects nothing on. */
+  private isBackground(plateId: string, item: SetupItemRef) {
+    if (item.kind === "bed") return true
+    if (item.kind !== "fixture") return false
+    const fixture = this.host
+      .view(plateId)
+      ?.plate.fixtures?.find(({ id }) => id === item.id)
+    return !!fixture && isBedKind(fixture.definition.kind)
+  }
+
   private itemAt(event: MouseEvent): ItemUnderPointer | null {
     const design = this.designAt(event)
     if (design) return design
@@ -915,6 +1081,17 @@ export class SetupArranger {
       )
       if (snapped) this.refresh()
       canvas.style.cursor = pick?.target ? "pointer" : "crosshair"
+      return
+    }
+    if (picking.kind === "parts") {
+      const part = this.partAt(event, picking.plateId, picking.parts, true)
+      if (part?.index !== this.hoverPart?.index) {
+        this.hoverPart = part
+        this.refresh()
+      }
+      if (part) canvas.title = part.label
+      else canvas.removeAttribute("title")
+      canvas.style.cursor = part ? "pointer" : "crosshair"
       return
     }
     const edge = this.edgeAt(event)

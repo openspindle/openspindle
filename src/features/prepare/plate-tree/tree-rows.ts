@@ -7,10 +7,12 @@ import { namedFixtures } from "@/domain/fixtures/definitions"
 import type { FixtureInstance } from "@/domain/fixtures/definitions"
 import { operationPhase } from "@/domain/operations/kinds"
 import type { Operation, Phase } from "@/domain/operations/operation"
+import { suppressedParts } from "@/domain/operations/toolpath-parts"
+import type { ToolpathPart } from "@/domain/operations/toolpath-parts"
 import { numberedPlate, plateLabel } from "@/domain/plate/plate"
 import type { Group, Plate } from "@/domain/plate/plate"
 import type { Tool } from "@/domain/tools/tool"
-import { sectionRowId } from "../selection"
+import { pathRowId, sectionRowId } from "../selection"
 
 type RowBase = {
   readonly id: string
@@ -26,6 +28,11 @@ export type TreeRow =
       readonly kind: "plate"
       readonly index: number
       readonly errors: number
+    })
+  /** The plate's stock and where it sits; `owner` is the plate's label. */
+  | (RowBase & {
+      readonly kind: "stock"
+      readonly owner: string
     })
   /** The plate's fixtures, those on its bed; `owner` is the plate's label. */
   | (RowBase & {
@@ -53,6 +60,19 @@ export type TreeRow =
     })
   | (RowBase & { readonly kind: "group"; readonly group: Group })
   | (RowBase & { readonly kind: "section"; readonly section: CompiledSection })
+  /** The parts of an operation's toolpath, which can be suppressed one by one (`toolpathParts`). */
+  | (RowBase & {
+      readonly kind: "paths"
+      readonly operation: Operation
+      readonly count: number
+      readonly suppressed: number
+    })
+  | (RowBase & {
+      readonly kind: "path"
+      readonly operation: Operation
+      readonly part: ToolpathPart
+      readonly suppressed: boolean
+    })
 
 export const PHASE_LABELS: Record<Phase, string> = {
   setup: "Setup",
@@ -144,6 +164,44 @@ function operationChildren(
   return rows
 }
 
+/** The paths of an operation's toolpath, with which it suppresses; none for an operation without parts. */
+function pathRows(
+  plate: Plate,
+  operation: Operation,
+  parent: string
+): TreeRow[] {
+  const parts = suppressedParts(operation)
+  if (!parts?.parts.length) return []
+  const label = "Paths"
+  const search = `${parent} ${label}`
+  return [
+    {
+      kind: "paths",
+      id: `paths:${plate.id}:${operation.id}`,
+      plate,
+      operation,
+      count: parts.parts.length,
+      suppressed: parts.matched.size,
+      label,
+      search,
+      subRows: parts.parts.map((part) => {
+        const name = `Path ${part.index + 1}`
+        return {
+          kind: "path",
+          id: pathRowId(plate.id, operation.id, part.index),
+          plate,
+          operation,
+          part,
+          suppressed: parts.matched.has(part.index),
+          label: name,
+          search: `${search} ${name}`,
+          subRows: [],
+        }
+      }),
+    },
+  ]
+}
+
 /** The plate's fixtures on its bed, named as the Fixtures panel lists them. */
 function fixturesRow(
   plate: Plate,
@@ -210,15 +268,18 @@ export function buildTreeRows(
         errors: errorsOf(diagnostics, operation.id),
         label: operationLabel,
         search,
-        subRows: operationChildren(
-          plate,
-          compiled.sections.filter(
-            (section) => section.operationId === operation.id
+        subRows: [
+          ...operationChildren(
+            plate,
+            compiled.sections.filter(
+              (section) => section.operationId === operation.id
+            ),
+            groups,
+            byId,
+            search
           ),
-          groups,
-          byId,
-          search
-        ),
+          ...pathRows(plate, operation, search),
+        ],
       }
     })
     return {
@@ -230,6 +291,15 @@ export function buildTreeRows(
       label,
       search: plateSearch,
       subRows: [
+        {
+          kind: "stock",
+          id: `stock:${plate.id}`,
+          plate,
+          owner: label,
+          label: "Stock",
+          search: `${plateSearch} Stock ${plate.setup.stock?.name ?? ""}`,
+          subRows: [],
+        },
         fixturesRow(plate, label, plateSearch),
         {
           kind: "operations",

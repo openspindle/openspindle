@@ -44,6 +44,8 @@ export function createHostHandlers(
     methods: {
       "files.open": ({ kind }) => files.open(kind),
       "files.save": (request) => files.save(request),
+      "files.linkedStatus": (request) => files.linkedStatus(request),
+      "files.readLinked": (request) => files.readLinked(request),
       "fusion.snapshot": () => fusion.snapshot(),
       "fusion.pair": ({ requestId, code }, { signal }) =>
         fusion.pair(requestId, code, signal),

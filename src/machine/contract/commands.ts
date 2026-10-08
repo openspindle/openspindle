@@ -20,6 +20,15 @@ export const ControlLimitsSchema = z.object({
 })
 export type ControlLimits = z.infer<typeof ControlLimitsSchema>
 
+/** Where a go-to move ends in X and Y. */
+export const GoToTargetSchema = z.enum([
+  "clearance",
+  "origin",
+  "anchor1",
+  "anchor2",
+])
+export type GoToTarget = z.infer<typeof GoToTargetSchema>
+
 const toggle = <TType extends string>(type: TType) =>
   z.strictObject({ type: z.literal(type), enabled: z.boolean() })
 const override = <TType extends string>(type: TType) =>
@@ -59,6 +68,23 @@ export const MachineCommandSchema = z.discriminatedUnion("type", [
         "Choose unique axes to zero."
       ),
   }),
+  /**
+   * Sets where the tool is to `position` in work coordinates on `axis`, mm: zeroing is the same
+   * at 0 (`zero`). Z also takes the tool now in the spindle as the one later lengths are from.
+   */
+  z.strictObject({
+    type: z.literal("setWork"),
+    axis: AxisSchema,
+    position: z.number().min(-10000).max(10000),
+  }),
+  /**
+   * Up to the clearance height, then over to `target` in X and Y: the clearance position, work
+   * X0 Y0, or one of the anchors, where the machine keeps them.
+   */
+  z.strictObject({
+    type: z.literal("goTo"),
+    target: GoToTargetSchema,
+  }),
   z.strictObject({
     type: z.literal("spindleStart"),
     rpm: z.int().positive("Spindle target must be a whole number of RPM."),
@@ -84,6 +110,24 @@ export const MachineCommandSchema = z.discriminatedUnion("type", [
   bare("pause"),
   bare("resume"),
   bare("confirmToolChange"),
+  /** Stops applying the height map the machine probed last. */
+  bare("clearHeightMap"),
+  /**
+   * Tells the machine which tool its spindle holds, -1 for none, without changing or measuring
+   * it: its tool offset stays.
+   */
+  z.strictObject({
+    type: z.literal("setTool"),
+    tool: z.int().min(-1).max(999999),
+  }),
+  /**
+   * The machine's own tool change to `tool`: it waits for the tool to be installed
+   * (`confirmToolChange`), then measures it. A change to the tool it holds changes nothing.
+   */
+  z.strictObject({
+    type: z.literal("changeTool"),
+    tool: z.int().min(0).max(999999),
+  }),
 ])
 export type MachineCommand = z.infer<typeof MachineCommandSchema>
 
@@ -137,6 +181,8 @@ export const COMMAND_KINDS = [
   "home",
   "unlock",
   "zero",
+  "setWork",
+  "goTo",
   "spindleStart",
   "spindleStop",
   "light",
@@ -150,6 +196,9 @@ export const COMMAND_KINDS = [
   "pause",
   "resume",
   "confirmToolChange",
+  "clearHeightMap",
+  "setTool",
+  "changeTool",
 ] as const satisfies readonly CommandKind[]
 
 /** Admitted while a program streams; verified by telemetry only, never by acknowledgements. */
@@ -168,6 +217,8 @@ export const COMMAND_LABELS: Record<CommandKind, string> = {
   home: "Home",
   unlock: "Unlock",
   zero: "Set work zero",
+  setWork: "Set work position",
+  goTo: "Go to",
   spindleStart: "Start spindle",
   spindleStop: "Stop spindle",
   light: "Work light",
@@ -181,4 +232,7 @@ export const COMMAND_LABELS: Record<CommandKind, string> = {
   pause: "Pause",
   resume: "Resume",
   confirmToolChange: "Tool installed",
+  clearHeightMap: "Clear height map",
+  setTool: "Set tool",
+  changeTool: "Change tool",
 }

@@ -13,9 +13,12 @@ import type {
   SetupItemRef,
 } from "@/domain/plate/setup-items"
 
-/** Picking in the viewer for an operation: a point to start it at, or edges for it to trace. */
+/**
+ * Picking in the viewer for an operation: a point to start it at, edges for it to trace, or
+ * parts of its toolpath to suppress or run again.
+ */
 export type OperationPicking = {
-  readonly kind: "point" | "edges"
+  readonly kind: "point" | "edges" | "parts"
   readonly plateId: string
   readonly operationId: string
 }

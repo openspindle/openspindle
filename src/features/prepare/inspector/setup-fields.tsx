@@ -1,4 +1,5 @@
 import { useId } from "react"
+import { Crosshair } from "lucide-react"
 import {
   Field,
   FieldDescription,
@@ -14,6 +15,8 @@ import type { AssistMode } from "@/machine/contract"
 import type { PlateSetup } from "@/domain/plate/plate"
 import { COORDINATE_LIMIT } from "@/domain/primitives"
 import type { Point3 } from "@/domain/primitives"
+import type { MachineAction } from "@/features/job/job-hooks"
+import { MachineActionButton } from "@/features/job/stage-card"
 import {
   AnchorPlacementFields,
   RelativePointFields,
@@ -55,7 +58,10 @@ const STOCK_ANCHOR_HINT =
   "Where the stock sits: its front-left bottom corner, in bed coordinates from Anchor 1 or relative to another stored anchor."
 
 const WORK_ORIGIN_HINT =
-  "The plate's NC zero, which every operation machines from. Run sets its X and Y once the plate's anchors are read from its device; until then, set the physical work zero on Device."
+  "The plate's NC zero, which every operation machines from. Run sets its X and Y once the plate's anchors are read from its device; until then, set the physical work zero on Device. On Machine Origin, Run leaves X and Y where the machine keeps them. Read device puts its X and Y where the connected device keeps its work zero."
+
+const MACHINE_ORIGIN_LOCK =
+  "The machine's own work zero: Run does not set it. Read device to show where it is now."
 
 /** Where the stock sits on the bed, by its anchor, like each fixture. */
 export function StockPlacementFields({
@@ -100,10 +106,13 @@ export function WorkOriginFields({
   setup,
   disabled,
   zLock,
+  readDevice,
   onChange,
 }: SetupFieldsProps & {
   /** Why the work origin's Z is fixed; absent while it can be edited. */
   zLock?: string
+  /** Reads where the connected device keeps its work zero into the work origin's X and Y. */
+  readDevice?: MachineAction
 }) {
   const id = useId()
   const origins = stockOrigins(setup)
@@ -120,40 +129,62 @@ export function WorkOriginFields({
           (zLock !== undefined && value.endsWith("-bottom"))),
     }
   })
+  const onMachine = setup.machineOrigin === true
+  // From stock moves X and Y, which on the machine's origin are the machine's.
+  const fromStockDisabled = disabled || !setup.stock || onMachine
   return (
-    <FieldSet aria-label="Work origin">
+    <FieldSet aria-label="Origin">
       <FieldLegend>
-        <Hint text={WORK_ORIGIN_HINT}>Work origin</Hint>
+        <Hint text={WORK_ORIGIN_HINT}>Origin</Hint>
       </FieldLegend>
       <RelativePointFields
-        label="Work origin"
+        label="Origin"
         value={setup.workOrigin}
         relativeTo={setup.workOriginAnchor}
         anchorSetup={setup.anchors}
         disabled={disabled}
         zLock={zLock}
+        machineOrigin={{
+          selected: onMachine,
+          lock: MACHINE_ORIGIN_LOCK,
+          onSelect: () => {
+            onChange({ machineOrigin: true })
+            // Where the machine has it now, as the view and checks place the plate by it.
+            if (readDevice && readDevice.reason === null) readDevice.run()
+          },
+        }}
         onChange={(workOrigin) => onChange({ workOrigin })}
         onRelativeToChange={(workOriginAnchor) =>
-          onChange({ workOriginAnchor })
+          onChange({ workOriginAnchor, machineOrigin: false })
         }
       />
-      <Field data-disabled={disabled || !setup.stock}>
-        <FieldLabel className="sr-only" htmlFor={`${id}-origin`}>
-          Set work origin from stock
-        </FieldLabel>
-        <OptionSelect
-          id={`${id}-origin`}
-          className="w-full"
-          aria-label="Set work origin from stock"
-          options={originOptions}
-          value=""
-          disabled={disabled || !setup.stock}
-          onValueChange={(value) => {
-            const workOrigin = value ? originOf(value) : undefined
-            if (workOrigin && isPoint(workOrigin)) onChange({ workOrigin })
-          }}
-        />
-      </Field>
+      <div className="flex items-end gap-2">
+        <Field data-disabled={fromStockDisabled}>
+          <FieldLabel className="sr-only" htmlFor={`${id}-origin`}>
+            Set origin from stock
+          </FieldLabel>
+          <OptionSelect
+            id={`${id}-origin`}
+            className="w-full"
+            aria-label="Set origin from stock"
+            options={originOptions}
+            value=""
+            disabled={fromStockDisabled}
+            onValueChange={(value) => {
+              const workOrigin = value ? originOf(value) : undefined
+              if (workOrigin && isPoint(workOrigin)) onChange({ workOrigin })
+            }}
+          />
+        </Field>
+        {readDevice && (
+          <MachineActionButton
+            action={readDevice}
+            label="Read device"
+            pendingLabel="Reading device…"
+            icon={<Crosshair data-icon="inline-start" />}
+          />
+        )}
+      </div>
     </FieldSet>
   )
 }

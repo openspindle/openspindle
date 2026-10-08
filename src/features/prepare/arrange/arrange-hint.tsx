@@ -18,7 +18,11 @@ import {
   findsCorner,
 } from "@/domain/probing/tasks/origin/params"
 import { useArrange, useArrangeDrag } from "./arrange-state"
-import type { ArrangeState, ArrangeTarget } from "./arrange-state"
+import type {
+  ArrangeState,
+  ArrangeTarget,
+  OperationPicking,
+} from "./arrange-state"
 
 const signed = (value: number) => {
   const rounded = toMicrometre(value)
@@ -67,9 +71,14 @@ function snapTargets(strategy: string) {
 }
 
 /** What a click picks for an operation: where it starts, or which edges it traces. */
-function pickingText(kind: "point" | "edges", operation: Operation | null) {
+function pickingText(
+  kind: OperationPicking["kind"],
+  operation: Operation | null
+) {
   if (kind === "edges")
     return "Click edges of the stock or fixtures to trace them, or click one again to drop it. Esc when done."
+  if (kind === "parts")
+    return "Click a path to suppress it, or a faint one to run it again. Esc when done."
   const source = operation?.source
   const snapping = `snapping to ${snapTargets(source?.kind === "probing" ? source.strategy : "")}`
   if (source?.kind === "probing" && source.task === "origin") {

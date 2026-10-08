@@ -175,13 +175,16 @@ function upgradeGroups(groups: unknown): unknown {
  * - `bed-frame`: its bed positions move to bed coordinates from Anchor 1 (`upgradeBedFrame`),
  *   before format 9 and version 8;
  * - `strategies`: its probing operations name their strategy by what it does
- *   (`upgradeStrategies`), before format 10 and version 9.
+ *   (`upgradeStrategies`), before format 10 and version 9;
+ * - `suppression`: nothing, for format 10 and version 9: an operation saved without
+ *   `suppressed` runs, as it did then.
  */
-export type PlateUpgrade = "operations" | "bed-frame" | "strategies"
+export type PlateUpgrade =
+  "operations" | "bed-frame" | "strategies" | "suppression"
 
 /**
- * A plate's saved data as earlier formats saved it (projects before format 10, exports before
- * version 9), in the current one: a project's plate, or an export's payload, which holds the
+ * A plate's saved data as earlier formats saved it (projects before format 11, exports before
+ * version 10), in the current one: a project's plate, or an export's payload, which holds the
  * plate's setup, tool table and operations alike. It takes the steps from the first its format
  * needs (`from`) on, and no earlier one: a step changes what the formats before it saved, as the
  * bed frame's moves positions. The names it gives as saved are those the plate was saved with.
@@ -191,6 +194,8 @@ export function upgradePlate(
   library: readonly unknown[],
   from: PlateUpgrade
 ): UpgradedPlate {
+  if (from === "suppression")
+    return { plate: saved, notices: [], savedNames: new Map() }
   const operations =
     from === "operations"
       ? upgradeOperations(saved, library)

@@ -35,6 +35,16 @@ export function parseFileSize(text: string): number | null {
   return match ? Number(match[1]) : null
 }
 
+/**
+ * SerialConsole.cpp prints "Alarm:push queue error at line %lu" when a line the ESP32 streams
+ * does not fit the player's queue, and the player goes on without it. It counts the file's
+ * lines from 0, so the line left out is one more.
+ */
+export function parseDroppedLine(text: string): number | null {
+  const match = /^alarm:\s*push queue error at line (\d+)$/i.exec(text.trim())
+  return match ? Number(match[1]) + 1 : null
+}
+
 /** Endstops G28.6: "X:1 Y:1 Z:1 ..." optionally followed by its acknowledgement. */
 export function parseHomedReport(
   text: string

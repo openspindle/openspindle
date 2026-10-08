@@ -1,6 +1,7 @@
 import { kitForPlate } from "../fixtures/catalog"
 import type { FixtureKit } from "../fixtures/fixture-kit"
 import { machiningPrograms } from "../operations/kept-nc"
+import { activePlate } from "../plate/active"
 import type { Plate } from "../plate/plate"
 import {
   stockWorkArea,
@@ -36,8 +37,8 @@ export type PlateMachining = {
 }
 
 /**
- * A plate's machining on its machine (`PlateMachining`): its NC resolved and measured once, when
- * first read.
+ * A plate's machining on its machine (`PlateMachining`): the NC of the operations it machines
+ * (`activePlate`) resolved and measured once, when first read.
  */
 export function plateMachining(
   plate: Plate,
@@ -45,7 +46,7 @@ export function plateMachining(
 ): PlateMachining {
   let programs: (string | null)[] | undefined
   let bounds: ToolpathBoundsResult | undefined
-  const read = () => (programs ??= machiningPrograms(plate, kit))
+  const read = () => (programs ??= machiningPrograms(activePlate(plate), kit))
   const toolpath = () => (bounds ??= toolpathBoundsOf(read()))
   return {
     toolpath,

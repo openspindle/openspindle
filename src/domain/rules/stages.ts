@@ -82,6 +82,16 @@ export type OperationRuleSubject = {
 export type ConnectedMachine = {
   readonly connectedDeviceId: string | null
   readonly anchors: AnchorConfiguration | null
+  /**
+   * How far apart the lowest and highest points of the height map the machine applies are, mm;
+   * null while it applies none, or does not say.
+   */
+  readonly compensation: number | null
+  /**
+   * Where the machine keeps work zero in X and Y, machine coordinates (its Origin); null while it
+   * does not report it.
+   */
+  readonly workOrigin: readonly [x: number, y: number] | null
 }
 
 /** Before Run: the plate to run (null without one), or one of its operations, against the connected machine. */

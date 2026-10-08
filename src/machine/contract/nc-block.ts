@@ -195,3 +195,22 @@ export function readNcBlock(line: string): NcBlock {
     return problem("number")
   return { code, words, message: null, delimiter: null, problem: null }
 }
+
+/**
+ * The tool a program changes to (M6, to its T word or the last one selected) before it starts
+ * the spindle (M3 or M4); null when it starts the spindle first or never changes tools.
+ */
+export function firstToolChange(text: string): number | null {
+  let selected: number | null = null
+  for (const line of text.split("\n")) {
+    const { words, message } = readNcBlock(line)
+    if (message !== null) continue
+    const m = (code: number) =>
+      words.some((word) => word.letter === "M" && word.value === code)
+    if (m(3) || m(4)) return null
+    const tool = words.find((word) => word.letter === "T")
+    if (tool) selected = tool.value
+    if (m(6) && selected !== null) return selected
+  }
+  return null
+}

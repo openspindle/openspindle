@@ -69,6 +69,12 @@ export const PlateSetupSchema = z
      * itself is always `workOrigin`, in bed coordinates.
      */
     workOriginAnchor: EntityIdSchema.nullable().optional(),
+    /**
+     * The work origin's X and Y are where the machine keeps its work zero (set on Device): the
+     * program does not set them. `workOrigin` is where they were read from the machine
+     * (Read device), which the 3D view and the checks place the plate by.
+     */
+    machineOrigin: z.boolean().optional(),
     assists: PlateAssistsSchema,
     /**
      * What is on the bed: the bed itself, wasteboards, clamps and the rest. The fixture commands

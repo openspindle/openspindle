@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useDefaultLayout } from "react-resizable-panels"
 import { FileCode } from "lucide-react"
 import {
@@ -6,6 +6,9 @@ import {
   useSelectedPlate,
   useWorkspace,
 } from "@/app/workspace/workspace-context"
+import { activePlate } from "@/domain/plate/active"
+import { firstToolChange } from "@/machine/contract"
+import { useFreshTelemetry } from "@/platform/machine"
 import {
   Empty,
   EmptyDescription,
@@ -62,12 +65,27 @@ function JobPanel({
     subject?.compiled ?? null,
     check
   )
+  // The machine holds the program's first tool: Run may keep it rather than change to it.
+  const held = useFreshTelemetry()?.tool ?? null
+  const source = subject?.compiled.program.source ?? null
+  const firstTool = useMemo(
+    () => (source === null ? null : firstToolChange(source)),
+    [source]
+  )
+  const [keep, setKeep] = useState(false)
+  const keepable =
+    view.kind === "idle" && firstTool !== null && held === firstTool
   const run: MachineAction = {
     reason: checklist.blocker,
     pending: runJob.pending,
     run: () => {
       if (subject && checklist.ready)
-        runJob.start(subject.plate, subject.compiled, library)
+        runJob.start(
+          subject.plate,
+          subject.compiled,
+          library,
+          keepable && keep ? firstTool : null
+        )
     },
   }
   return (
@@ -78,7 +96,16 @@ function JobPanel({
       <div className="shrink-0 p-3 pb-0">
         <DeviceCard />
       </div>
-      <JobToolbar view={view} actions={actions} run={run} />
+      <JobToolbar
+        view={view}
+        actions={actions}
+        run={run}
+        keepTool={
+          keepable
+            ? { tool: firstTool, kept: keep, onKeptChange: setKeep }
+            : null
+        }
+      />
       <ScrollArea className="min-h-0 flex-1">
         <div className="flex flex-col gap-3 p-3">
           <JobSummary view={view} subject={subject} />
@@ -169,10 +196,11 @@ export function JobPage({
   const view = useJobView()
   const selectedPlate = useSelectedPlate()
   const selectedCompiled = useCompiledPlate(selectedPlate)
+  // The plate as it machines: what Run checks, sends and follows.
   const selected = useMemo(
     () =>
       selectedPlate && selectedCompiled
-        ? { plate: selectedPlate, compiled: selectedCompiled }
+        ? { plate: activePlate(selectedPlate), compiled: selectedCompiled }
         : null,
     [selectedPlate, selectedCompiled]
   )

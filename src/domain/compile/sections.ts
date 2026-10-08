@@ -70,7 +70,7 @@ const commentText = (line: string) =>
 
 /** Comments about the program or its tools rather than headings of its toolpaths. */
 const NOT_HEADINGS =
-  /(?:thumbnail|preview|verified|warning|stock|created|material setup|manual nc|tool change|collet|paused|feedrate|diameter)/i
+  /(?:thumbnail|preview|verified|warning|stock|created|material setup|manual nc|tool change|collet|paused|suppressed|feedrate|diameter)/i
 
 /** Conservative CAM headings, not arbitrary comments, tool descriptions or thumbnails. */
 function commentHeading(line: string): Heading | null {

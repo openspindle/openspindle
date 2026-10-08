@@ -5,11 +5,13 @@ import { PROGRAM_RULES } from "../design-rules/common-rules"
 import { MOVE_RULES } from "../design-rules/move-rules"
 import { Z1_DIAGNOSIS_RULES } from "../fixtures/makera-z1/diagnosis"
 import { Z1_RULES } from "../fixtures/makera-z1/program-rules"
+import { PART_RULES } from "../operations/part-rules"
+import { PCB_RULES } from "../pcb/rules"
 import { PLATE_RUN_RULES } from "../plate/run-rules"
 import { WORK_ORIGIN_RULES } from "../plate/work-origin"
 import { PROBING_RUN_RULES } from "../probing/rules"
 import { HEIGHT_MAP_RULES } from "../probing/tasks/grid/analysis"
-import { GRID_RULES } from "../probing/tasks/grid/rules"
+import { GRID_RULES, GRID_RUN_RULES } from "../probing/tasks/grid/rules"
 import { ORIGIN_RULES } from "../probing/tasks/origin/rules"
 import { OUTLINE_RULES } from "../probing/tasks/outline/rules"
 import { TOUCH_OFF_RULES } from "../probing/tasks/touch-off/rules"
@@ -27,12 +29,15 @@ export const RULES: readonly AnyRule[] = [
   ...PLATE_RUN_RULES,
   ...WORK_ORIGIN_RULES,
   ...PROBING_RUN_RULES,
+  ...GRID_RUN_RULES,
   ...TOOL_RULES,
   ...GRID_RULES,
   ...TOUCH_OFF_RULES,
   ...ORIGIN_RULES,
   ...OUTLINE_RULES,
   ...STOCK_DEPTH_RULES,
+  ...PCB_RULES,
+  ...PART_RULES,
   ...MOVE_RULES,
   ...PROGRAM_RULES,
   ...Z1_RULES,

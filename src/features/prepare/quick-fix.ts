@@ -16,6 +16,7 @@ import { usePrepareSelection } from "./plate-tree/use-prepare-selection"
 export const QUICK_FIX_LABELS: Record<QuickFix["kind"], string> = {
   "assign-tool": "Assign tool",
   "read-anchors": "Read anchors",
+  "show-height-map": "Show height map",
   "edit-operation": "Edit",
   "resolve-rule": "Apply",
 }
@@ -23,9 +24,13 @@ export const QUICK_FIX_LABELS: Record<QuickFix["kind"], string> = {
 /**
  * The read-anchors fix of a plate as a machine action, gated by availability like the Device
  * tab's Read anchors button, so a double click cannot send two reads. The project then uses
- * the connected device and its anchors, also when it was set up for another one.
+ * the connected device and its anchors, also when it was set up for another one. `then` takes
+ * the plate as it is with them, in place of saying the anchors were updated.
  */
-export function useReadAnchorsFix(plateId: string | null) {
+export function useReadAnchorsFix(
+  plateId: string | null,
+  then?: (plate: Plate) => void
+) {
   const { availability, connection } = useMachineSnapshot()
   const readAnchors = useReadAnchors()
   const fixtures = useFixtureLibraryStore()
@@ -57,7 +62,9 @@ export function useReadAnchorsFix(plateId: string | null) {
             )
               selectProjectProfile(workspace, fixtures, deviceId)
           }
-          toast.success("Stored anchors updated.")
+          const plate = workspace.state.plates.find(({ id }) => id === plateId)
+          if (then && plate) then(plate)
+          else toast.success("Stored anchors updated.")
         },
         onError: (error) => toast.error(error.message),
       })
@@ -112,6 +119,9 @@ export function useQuickFix() {
         return
       case "read-anchors":
         // DiagnosticsList renders this fix through useReadAnchorsFix instead.
+        return
+      case "show-height-map":
+        openDialog({ kind: "height-map" })
         return
       case "edit-operation":
         selection.selectOperation(plate.id, fix.operationId)

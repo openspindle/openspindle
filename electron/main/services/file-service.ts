@@ -4,6 +4,7 @@ import type {
   OpenDialogOptions,
   SaveDialogOptions,
 } from "electron"
+import { createHash } from "node:crypto"
 import { readFile, stat } from "node:fs/promises"
 import path from "node:path"
 import { RpcError } from "@openspindle/rpc"
@@ -14,6 +15,9 @@ import {
 } from "../../../src/platform/contract/files"
 import type {
   FileKind,
+  LinkedFileRead,
+  LinkedFileRequest,
+  LinkedFileStatus,
   OpenFileResult,
   SaveFileRequest,
   SaveFileResult,
@@ -44,6 +48,27 @@ export async function readKindFile(
   }
   return validateOpenedFile(kind, fileName, contents)
 }
+
+/**
+ * A linked file read as `readKindFile` reads it, with when it was last modified. The path must
+ * be absolute and of the kind's extensions: the renderer asks only for files the user chose,
+ * and gets no other file read this way.
+ */
+async function readLinkedFile(
+  request: LinkedFileRequest
+): Promise<LinkedFileRead> {
+  const { kind, path: filePath } = request
+  if (!path.isAbsolute(filePath) || !hasFileExtension(kind, filePath))
+    throw new RpcError(
+      "INVALID_PARAMS",
+      `Only ${FILE_KINDS[kind].title} files can be linked.`
+    )
+  const { mtimeMs } = await stat(filePath)
+  return { ...(await readKindFile(kind, filePath)), modifiedAt: mtimeMs }
+}
+
+const sha256 = (text: string) =>
+  createHash("sha256").update(text, "utf8").digest("hex")
 
 /** Native open/save dialogs for every file kind; one dialog at a time. */
 export class FileService {
@@ -89,6 +114,27 @@ export class FileService {
       await writeFileAtomic(filePath, request.contents)
       return { status: "saved", fileName: path.basename(filePath) }
     })
+  }
+
+  /** How a linked file is on disk now, which no dialog holds up. */
+  async linkedStatus(request: LinkedFileRequest): Promise<LinkedFileStatus> {
+    try {
+      const { contents, modifiedAt } = await readLinkedFile(request)
+      return { status: "found", sha256: sha256(contents), modifiedAt }
+    } catch (error) {
+      if (error instanceof RpcError) throw error
+      if ((error as NodeJS.ErrnoException).code === "ENOENT")
+        return { status: "missing" }
+      return {
+        status: "unreadable",
+        reason: error instanceof Error ? error.message : String(error),
+      }
+    }
+  }
+
+  /** A linked file's text, read again. */
+  readLinked(request: LinkedFileRequest): Promise<LinkedFileRead> {
+    return readLinkedFile(request)
   }
 
   private async exclusive<T>(run: () => Promise<T>): Promise<T> {

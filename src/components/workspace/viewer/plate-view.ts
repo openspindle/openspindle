@@ -44,6 +44,7 @@ import { PlatePath } from "./plate-path"
 import type { PathPresentation } from "./plate-path"
 import {
   sameFields,
+  sameGhosts,
   sameIds,
   samePlate,
   sameProblems,
@@ -53,6 +54,7 @@ import type { FieldEquality } from "./plate-identity"
 import { EdgeHighlights } from "./edge-highlights"
 import type { EdgeHighlight } from "./edge-highlights"
 import { ProblemView } from "./problem-view"
+import { SelectionTint } from "./selection-tint"
 import { SetupMarkers } from "./setup-markers"
 import type { Marker } from "./setup-markers"
 import type { Collide } from "./touch-marker"
@@ -162,6 +164,7 @@ const PRESENTATION_EQUALITY: FieldEquality<PlatePresentation> = {
   machineOrigin: (a, b) =>
     a === b || (!!a && !!b && a.every((value, index) => value === b[index])),
   hiddenFixtures: sameIds,
+  ghosts: sameGhosts,
   liveTool: (a, b) =>
     a === b ||
     (!!a &&
@@ -521,6 +524,10 @@ export class PlateView {
   private readonly markers: SetupMarkers
   private readonly problems: ProblemView
   private readonly edges: EdgeHighlights
+  /** Edges are picked: the item they are of keeps its colour, its edges drawn blue. */
+  private edgesShown = false
+  /** The selected stock or fixture, in the selection's colour. */
+  private readonly tint: SelectionTint
   private readonly machineOrigin: THREE.Group
   private selectedItem: SetupItemRef | null = null
   /** An item drawn moved by a delta, while it is dragged or until its move arrives. */
@@ -554,6 +561,7 @@ export class PlateView {
     this.markers = new SetupMarkers(context.palette.primary)
     this.problems = new ProblemView(context.palette)
     this.edges = new EdgeHighlights(context.palette.primary)
+    this.tint = new SelectionTint(context.palette.primary)
     this.machineOrigin = machineOriginMarker(context.palette.primary)
     this.decoration.add(
       this.axes,
@@ -659,6 +667,10 @@ export class PlateView {
   /** Shows edges being picked; null hides them. */
   showEdges(edges: readonly EdgeHighlight[] | null) {
     this.edges.show(edges)
+    const shown = !!edges?.length
+    if (shown === this.edgesShown) return
+    this.edgesShown = shown
+    this.applyTint()
   }
 
   /**
@@ -710,6 +722,7 @@ export class PlateView {
     this.markers.dispose()
     this.problems.dispose()
     this.edges.dispose()
+    this.tint.dispose()
     // Bed and fixture clones share their templates' geometry; release only owned resources.
     disposeObjects(
       this.stock,
@@ -801,6 +814,10 @@ export class PlateView {
     placed.visible = !this.presentation.hiddenFixtures.includes(instance.id)
     this.fixtureGroups.set(instance.id, placed)
     this.fixtures.add(placed)
+    // A selected fixture that loads shows selected by its colour rather than its box.
+    const selected = this.selectedItem
+    if (selected?.kind === "fixture" && selected.id === instance.id)
+      this.renderOutline()
     // A fixture that loads while it is dragged starts where the drag has it.
     this.applyPreview()
     this.context.invalidate()
@@ -835,11 +852,32 @@ export class PlateView {
     }
   }
 
+  /**
+   * Shows the selected item: the stock or a fixture in the selection's colour, while none of
+   * its edges are picked; the bed and the design, which are not one solid, by their box.
+   */
   private renderOutline() {
     disposeObjects(this.outline)
     this.outline.clear()
-    const frame = this.selectedItem && this.itemFrame(this.selectedItem)
+    this.applyTint()
+    const item = this.selectedItem
+    if (!item || this.tinted(item)) return
+    const frame = this.itemFrame(item)
     if (frame) this.outline.add(boxOutline(frame, this.context.palette.primary))
+  }
+
+  /** The solids that show an item selected in the selection's colour: the stock's or a fixture's. */
+  private tinted(item: SetupItemRef): THREE.Object3D | null {
+    if (item.kind === "stock") return this.stock
+    if (item.kind === "fixture") return this.fixtureGroups.get(item.id) ?? null
+    return null
+  }
+
+  /** Tints the selected item's solids, as they are now; none while its edges are picked. */
+  private applyTint() {
+    const item = this.selectedItem
+    this.tint.apply(item && !this.edgesShown ? this.tinted(item) : null)
+    this.context.invalidate()
   }
 
   /** Draws every movable part where the plate has it, and the previewed item moved. */

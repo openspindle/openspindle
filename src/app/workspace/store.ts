@@ -25,6 +25,7 @@ const AMBIENT = new Set<WorkspaceCommand["type"]>([
   "plate.select",
   "plate.dismissNotice",
   "anchors.sync",
+  "machineOrigin.sync",
   "heightMap.store",
   "project.saved",
 ])

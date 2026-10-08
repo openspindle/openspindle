@@ -3,7 +3,7 @@ import { z } from "zod"
 import { PreparePage } from "@/features/prepare/prepare-page"
 
 /** Inspector panels of the Prepare section. */
-export const PREPARE_PANELS = ["setup", "tools", "fixtures"] as const
+export const PREPARE_PANELS = ["setup", "stock", "tools", "fixtures"] as const
 
 /** UI selection only; the selected plate lives in the workspace (it is shared and persisted). */
 const PrepareSearchSchema = z.object({

@@ -10,6 +10,7 @@ import { pictureFov } from "@/domain/fixtures/fixture-kit"
 import type { MachineCamera } from "@/domain/fixtures/fixture-kit"
 import type { Point3 } from "@/domain/nc/gcode"
 import type {
+  ViewerGhost,
   ViewerPlate,
   ViewerProblem,
   ViewerProblemRef,
@@ -52,6 +53,8 @@ export type ViewerPresentation = {
   hiddenLineRanges?: Readonly<Record<string, readonly LineRange[]>>
   /** Fixtures each plate leaves out of the view (their ids), by plate id. */
   hiddenFixtures?: Readonly<Record<string, readonly string[]>>
+  /** What each plate leaves out of its program, drawn faint, by plate id. */
+  ghosts?: Readonly<Record<string, readonly ViewerGhost[]>>
   showRapids: boolean
   showStock: boolean
   /** Problems to mark where they are on their plates' beds, and the one shown. */
@@ -533,6 +536,7 @@ export class BedScene {
     const { machineOrigin, liveTool } = this.presentation
     const marked = {
       hiddenFixtures,
+      ghosts: this.presentation.ghosts?.[id],
       problems: problems.filter((problem) => problem.plateId === id),
       shownProblem: shownProblem?.plateId === id ? shownProblem.key : null,
       machineOrigin:

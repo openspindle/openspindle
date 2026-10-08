@@ -1,10 +1,13 @@
 import { readFileSync } from "node:fs"
+import { createRequire } from "node:module"
+import { dirname } from "node:path"
 import { fileURLToPath } from "node:url"
 import { sentryVitePlugin } from "@sentry/vite-plugin"
 import tailwindcss from "@tailwindcss/vite"
 import { tanstackRouter } from "@tanstack/router-plugin/vite"
 import viteReact from "@vitejs/plugin-react"
 import { defineConfig } from "electron-vite"
+import { searchForWorkspaceRoot } from "vite"
 import { appearanceInit } from "./tools/vite/appearance-init.ts"
 import { thirdPartyNotices } from "./tools/vite/third-party.ts"
 
@@ -12,6 +15,11 @@ const path = (relative: string) =>
   fileURLToPath(new URL(relative, import.meta.url))
 
 const alias = { "@": path("./src") }
+
+/** The node_modules packages resolve from: the project's, or a git worktree's checkout's. */
+const nodeModules = dirname(
+  dirname(createRequire(import.meta.url).resolve("vite/package.json"))
+)
 
 const { version } = JSON.parse(
   readFileSync(path("./package.json"), "utf8")
@@ -90,6 +98,14 @@ export default defineConfig(({ command }) => {
       // The STEP worker's CommonJS dependency. Dependency discovery does not follow workers:
       // without this, the first conversion in development re-optimizes and reloads the page.
       optimizeDeps: { include: ["occt-import-js"] },
+      // Development serves files under the project, and those of the node_modules packages
+      // resolve from: in a git worktree that has none of its own, its checkout's, whose fonts
+      // (@fontsource) the dev server would otherwise refuse.
+      server: {
+        fs: {
+          allow: [searchForWorkspaceRoot(process.cwd()), nodeModules],
+        },
+      },
       plugins: [
         tanstackRouter({ target: "react", autoCodeSplitting: true }),
         viteReact(),

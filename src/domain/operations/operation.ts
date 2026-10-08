@@ -21,6 +21,8 @@ export const OPERATION_LIMITS = {
   operationsPerPlate: 100,
   /** NC text in UTF-8 bytes (`utf8ByteLength`), as it is stored and exchanged. */
   ncBytes: 10 * MiB,
+  /** Parts of one operation's toolpath it keeps suppressed. */
+  suppressedParts: 10_000,
 } as const
 
 /** Control characters other than tab, line feed and carriage return. */
@@ -188,6 +190,20 @@ export const OperationSchema = z.object({
   revision: z.int().nonnegative(),
   /** Pause the program before this operation (a program stop the dialect maps). */
   stopBefore: z.boolean(),
+  /**
+   * Kept on its plate but left out of what the plate machines (`activePlate`): its program,
+   * Run, export and their checks. Absent is false.
+   */
+  suppressed: z.boolean().optional(),
+  /**
+   * The parts of its toolpath it leaves out, each by its middle in program X and Y
+   * (`toolpathParts`), so it finds them in a toolpath generated again. Absent for none.
+   */
+  suppressedParts: z
+    .array(z.tuple([z.number(), z.number()]).readonly())
+    .max(OPERATION_LIMITS.suppressedParts)
+    .readonly()
+    .optional(),
   tools: z.array(BindingSchema).max(100),
   source: OperationSourceSchema,
 })
