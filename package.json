@@ -59,7 +59,7 @@
     "@tanstack/react-table": "^9.2.4",
     "@tanstack/react-virtual": "^3.14.13",
     "@tanstack/router-plugin": "^1.168.40",
-    "@types/node": "^24.13.6",
+    "@types/node": "^26.6.2",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/three": "^0.186.0",
