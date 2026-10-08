@@ -2,7 +2,7 @@
   "version": 18,
   "data": [
     {
-      "type": "chamfer mill",
+      "type": "engraving",
       "unit": "millimeters",
       "BMC": "ti coated",
       "description": "Engraving bit 15° × 0.2 mm tip",
@@ -11,7 +11,7 @@
       "vendor": "Genmitsu",
       "guid": "69c5b5c2-a254-494b-99ba-d379ad43bc68",
       "geometry": {
-        "DC": 5,
+        "DC": 0.2,
         "HAND": true,
         "LB": 32,
         "LCF": 17.5,
@@ -79,7 +79,7 @@
       "coating": "Nano Blue"
     },
     {
-      "type": "chamfer mill",
+      "type": "engraving",
       "unit": "millimeters",
       "BMC": "ti coated",
       "description": "Engraving bit 20° × 0.2 mm tip, 6.35 mm shank",
@@ -88,7 +88,7 @@
       "vendor": "Genmitsu",
       "guid": "9db61281-2690-440b-9ba4-d3e0804276d4",
       "geometry": {
-        "DC": 6.15,
+        "DC": 0.2,
         "HAND": true,
         "LB": 32,
         "LCF": 17,
@@ -1962,7 +1962,7 @@
       "vendor-description": "Genmitsu V 30° groove [VE10C]"
     },
     {
-      "type": "chamfer mill",
+      "type": "engraving",
       "unit": "millimeters",
       "BMC": "hss",
       "description": "Triangular engraving bit 90° × 0.1 mm tip",
@@ -1971,7 +1971,7 @@
       "vendor": "Genmitsu",
       "guid": "a8dc4a2f-e27b-43e2-a711-a1352beee079",
       "geometry": {
-        "DC": 3.175,
+        "DC": 0.1,
         "HAND": true,
         "LB": 20,
         "LCF": 1.5,
@@ -2057,7 +2057,7 @@
       "vendor-description": "Genmitsu V 90° engraving triangular [TR10C]"
     },
     {
-      "type": "chamfer mill",
+      "type": "engraving",
       "unit": "millimeters",
       "BMC": "hss",
       "description": "Triangular engraving bit 60° × 0.1 mm tip",
@@ -2066,7 +2066,7 @@
       "vendor": "Genmitsu",
       "guid": "6e698dc4-a2fe-427b-8e28-701a1352beed",
       "geometry": {
-        "DC": 3.175,
+        "DC": 0.1,
         "HAND": true,
         "LB": 20,
         "LCF": 2.6,
@@ -2152,7 +2152,7 @@
       "vendor-description": "Genmitsu V 60° engraving triangular [TR10B]"
     },
     {
-      "type": "chamfer mill",
+      "type": "engraving",
       "unit": "millimeters",
       "BMC": "hss",
       "description": "Triangular engraving bit 30° × 0.1 mm tip",
@@ -2161,7 +2161,7 @@
       "vendor": "Genmitsu",
       "guid": "c5c1e43a-1865-48d2-a58f-d77179b82555",
       "geometry": {
-        "DC": 3.175,
+        "DC": 0.1,
         "HAND": true,
         "LB": 20,
         "LCF": 5.75,
@@ -14903,7 +14903,7 @@
       "vendor-description": "Genmitsu flat end [MC40A]"
     },
     {
-      "type": "chamfer mill",
+      "type": "engraving",
       "unit": "millimeters",
       "BMC": "hss",
       "description": "Engraving bit 30° × 0.1 mm tip, 27 mm long",
@@ -14912,7 +14912,7 @@
       "vendor": "Genmitsu",
       "guid": "5d04c3c4-919c-4a1b-8d12-15ae114ba34d",
       "geometry": {
-        "DC": 3.175,
+        "DC": 0.1,
         "HAND": true,
         "LB": 9,
         "LCF": 5.75,
@@ -16941,7 +16941,7 @@
       "coating": "Nano Blue"
     },
     {
-      "type": "chamfer mill",
+      "type": "engraving",
       "unit": "millimeters",
       "BMC": "ti coated",
       "description": "Engraving bit 30° × 0.1 mm tip, 38 mm long",
@@ -16950,7 +16950,7 @@
       "vendor": "Genmitsu",
       "guid": "8e805d59-7c7e-49ce-b16a-cd176ef9b241",
       "geometry": {
-        "DC": 3.175,
+        "DC": 0.1,
         "HAND": true,
         "LB": 20,
         "LCF": 5.75,
@@ -17037,7 +17037,7 @@
       "coating": "Nano Blue"
     },
     {
-      "type": "chamfer mill",
+      "type": "engraving",
       "unit": "millimeters",
       "BMC": "ti coated",
       "description": "Engraving bit 30° × 0.2 mm tip",
@@ -17046,7 +17046,7 @@
       "vendor": "Genmitsu",
       "guid": "90be65de-8e03-4f9b-abc4-68265abca264",
       "geometry": {
-        "DC": 3.175,
+        "DC": 0.2,
         "HAND": true,
         "LB": 20,
         "LCF": 5.5,
@@ -18173,7 +18173,7 @@
       "coating": "Nano Blue"
     },
     {
-      "type": "chamfer mill",
+      "type": "engraving",
       "unit": "millimeters",
       "BMC": "ti coated",
       "description": "Engraving bit 10° × 0.1 mm tip",
@@ -18182,7 +18182,7 @@
       "vendor": "Genmitsu",
       "guid": "1269040b-4ba4-4d3e-8804-276d4b98b15c",
       "geometry": {
-        "DC": 3.175,
+        "DC": 0.1,
         "HAND": true,
         "LB": 19.5,
         "LCF": 17.5,
@@ -18269,7 +18269,7 @@
       "coating": "Chromatic"
     },
     {
-      "type": "chamfer mill",
+      "type": "engraving",
       "unit": "millimeters",
       "BMC": "ti coated",
       "description": "Engraving bit 20° × 0.2 mm tip, 3.175 mm shank",
@@ -18278,7 +18278,7 @@
       "vendor": "Genmitsu",
       "guid": "26c3874d-00f1-4cac-9a9e-01d6a83de5de",
       "geometry": {
-        "DC": 3.175,
+        "DC": 0.2,
         "HAND": true,
         "LB": 10.5,
         "LCF": 8.5,
@@ -19861,7 +19861,7 @@
       "coating": "Nano Blue"
     },
     {
-      "type": "chamfer mill",
+      "type": "engraving",
       "unit": "millimeters",
       "BMC": "ti coated",
       "description": "Engraving bit 30° × 0.1 mm tip, 27 mm long, Nano Blue",
@@ -19870,7 +19870,7 @@
       "vendor": "Genmitsu",
       "guid": "9e66b896-e710-4a7d-a7be-9955d14c3c49",
       "geometry": {
-        "DC": 3.175,
+        "DC": 0.1,
         "HAND": true,
         "LB": 9,
         "LCF": 6,
@@ -19957,7 +19957,7 @@
       "coating": "Nano Blue"
     },
     {
-      "type": "chamfer mill",
+      "type": "engraving",
       "unit": "millimeters",
       "BMC": "ti coated",
       "description": "Engraving bit 20° × 0.1 mm tip",
@@ -19966,7 +19966,7 @@
       "vendor": "Genmitsu",
       "guid": "e8777842-4d51-4678-9c6f-a96b96ad8840",
       "geometry": {
-        "DC": 3.175,
+        "DC": 0.1,
         "HAND": true,
         "LB": 10.75,
         "LCF": 8.75,
@@ -20053,7 +20053,7 @@
       "coating": "Nano Blue"
     },
     {
-      "type": "chamfer mill",
+      "type": "engraving",
       "unit": "millimeters",
       "BMC": "ti coated",
       "description": "Engraving bit 15° × 0.1 mm tip",
@@ -20062,7 +20062,7 @@
       "vendor": "Genmitsu",
       "guid": "6e710a7d-a7be-4995-9d14-c3c49d997cb3",
       "geometry": {
-        "DC": 3.175,
+        "DC": 0.1,
         "HAND": true,
         "LB": 13.5,
         "LCF": 11.5,

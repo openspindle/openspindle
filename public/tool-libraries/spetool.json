@@ -6201,7 +6201,7 @@
       },
       "geometry": {
         "CSP": false,
-        "DC": 0.25,
+        "DC": 0.005,
         "HAND": true,
         "LB": 1.25,
         "LCF": 0.457086614173228,
@@ -6335,7 +6335,7 @@
           }
         ]
       },
-      "type": "chamfer mill",
+      "type": "engraving",
       "unit": "inches",
       "vendor": "SpeTool",
       "vendor-description": "SpeTool W06009 SPE-X Extra Tool Life Coated Solid Carbide 30 Degree Engraving 0.005\" Tip Width x 1/4\" Shank x 2-1/4\" Long Signmaking Router Bit",
@@ -9968,7 +9968,7 @@
       },
       "geometry": {
         "CSP": false,
-        "DC": 0.25,
+        "DC": 0.005,
         "HAND": true,
         "LB": 1.25,
         "LCF": 0.69488188976378,
@@ -10102,7 +10102,7 @@
           }
         ]
       },
-      "type": "chamfer mill",
+      "type": "engraving",
       "unit": "inches",
       "vendor": "SpeTool",
       "vendor-description": "SpeTool W06008 SPE-X Extra Tool Life Coated Solid Carbide 20 Degree Engraving 0.005\" Tip Width x 1/4\" Shank x 2-1/4\" Long Signmaking Router Bit",
@@ -11263,7 +11263,7 @@
       },
       "geometry": {
         "CSP": false,
-        "DC": 0.25,
+        "DC": 0.015,
         "HAND": true,
         "LB": 1.25,
         "LCF": 0.457086614173228,
@@ -11397,7 +11397,7 @@
           }
         ]
       },
-      "type": "chamfer mill",
+      "type": "engraving",
       "unit": "inches",
       "vendor": "SpeTool",
       "vendor-description": "SpeTool W06010 SPE-X Extra Tool Life Coated Solid Carbide 30 Degree Engraving 0.015\" Tip Width x 1/4\" Shank x 2-1/4\" Long Signmaking Router Bit",
@@ -20222,7 +20222,7 @@
       "expressions": {
         "tool_bodyLength": "35 mm",
         "tool_description": "'Engraving bit 30° × 0.2 mm tip'",
-        "tool_diameter": "6 mm",
+        "tool_diameter": "0.2 mm",
         "tool_fluteLength": "11.12 mm",
         "tool_number": "242",
         "tool_overallLength": "50 mm",
@@ -20236,7 +20236,7 @@
       },
       "geometry": {
         "CSP": false,
-        "DC": 6,
+        "DC": 0.2,
         "HAND": true,
         "LB": 35,
         "LCF": 11.12,
@@ -20300,7 +20300,7 @@
           }
         ]
       },
-      "type": "chamfer mill",
+      "type": "engraving",
       "unit": "millimeters",
       "vendor": "SpeTool",
       "vendor-description": "SpeTool W06505 Solid Carbide 30 Degree Engraving 0.2mm Tip Width x 6mm Shank x 50mm Long Signmaking Router Bit"

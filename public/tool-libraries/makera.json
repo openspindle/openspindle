@@ -14043,7 +14043,7 @@
       },
       "geometry": {
         "CSP": false,
-        "DC": 6,
+        "DC": 0.3,
         "HAND": true,
         "LB": 31,
         "LCF": 17,
@@ -14181,7 +14181,7 @@
           }
         ]
       },
-      "type": "chamfer mill",
+      "type": "engraving",
       "unit": "millimeters",
       "vendor": "Makera",
       "vendor-description": "Two Flute Engraving Bit - 6mm 20 deg .3 tip"
@@ -14195,7 +14195,7 @@
       },
       "geometry": {
         "CSP": false,
-        "DC": 6,
+        "DC": 0.4,
         "HAND": true,
         "LB": 31,
         "LCF": 17,
@@ -14333,7 +14333,7 @@
           }
         ]
       },
-      "type": "chamfer mill",
+      "type": "engraving",
       "unit": "millimeters",
       "vendor": "Makera",
       "vendor-description": "Two Flute Engraving Bit - 6mm 20 deg .4 tip"
@@ -14347,7 +14347,7 @@
       },
       "geometry": {
         "CSP": false,
-        "DC": 6,
+        "DC": 0.5,
         "HAND": true,
         "LB": 31,
         "LCF": 17,
@@ -14485,7 +14485,7 @@
           }
         ]
       },
-      "type": "chamfer mill",
+      "type": "engraving",
       "unit": "millimeters",
       "vendor": "Makera",
       "vendor-description": "Two Flute Engraving Bit - 6mm 20 deg .5 tip"
@@ -14499,7 +14499,7 @@
       },
       "geometry": {
         "CSP": false,
-        "DC": 4,
+        "DC": 0.3,
         "HAND": true,
         "LB": 26,
         "LCF": 7,
@@ -14745,7 +14745,7 @@
           }
         ]
       },
-      "type": "chamfer mill",
+      "type": "engraving",
       "unit": "millimeters",
       "vendor": "Makera",
       "vendor-description": "Single Flute Engraving Metal 30 deg*.3mm 4mm shaft"
@@ -14759,7 +14759,7 @@
       },
       "geometry": {
         "CSP": false,
-        "DC": 4,
+        "DC": 0.4,
         "HAND": true,
         "LB": 26,
         "LCF": 7,
@@ -15005,7 +15005,7 @@
           }
         ]
       },
-      "type": "chamfer mill",
+      "type": "engraving",
       "unit": "millimeters",
       "vendor": "Makera",
       "vendor-description": "Single Flute Engraving Metal 30 deg*.4mm 4mm shaft"
@@ -15019,7 +15019,7 @@
       },
       "geometry": {
         "CSP": false,
-        "DC": 4,
+        "DC": 0.5,
         "HAND": true,
         "LB": 26,
         "LCF": 7,
@@ -15265,7 +15265,7 @@
           }
         ]
       },
-      "type": "chamfer mill",
+      "type": "engraving",
       "unit": "millimeters",
       "vendor": "Makera",
       "vendor-description": "Single Flute Engraving Metal 30 deg*.5mm 4mm shaft"
@@ -15279,7 +15279,7 @@
       },
       "geometry": {
         "CSP": false,
-        "DC": 4,
+        "DC": 0.1,
         "HAND": true,
         "LB": 23,
         "LCF": 7,
@@ -15417,7 +15417,7 @@
           }
         ]
       },
-      "type": "chamfer mill",
+      "type": "engraving",
       "unit": "millimeters",
       "vendor": "Makera",
       "vendor-description": "Single Flute Engraving 30 deg*.1mm 4mm shaft"
@@ -15431,7 +15431,7 @@
       },
       "geometry": {
         "CSP": false,
-        "DC": 4,
+        "DC": 0.2,
         "HAND": true,
         "LB": 23,
         "LCF": 7,
@@ -15569,7 +15569,7 @@
           }
         ]
       },
-      "type": "chamfer mill",
+      "type": "engraving",
       "unit": "millimeters",
       "vendor": "Makera",
       "vendor-description": "Single Flute Engraving 30 deg*.2mm 4mm shaft"
@@ -15583,7 +15583,7 @@
       },
       "geometry": {
         "CSP": false,
-        "DC": 4,
+        "DC": 0.3,
         "HAND": true,
         "LB": 23,
         "LCF": 7,
@@ -15721,7 +15721,7 @@
           }
         ]
       },
-      "type": "chamfer mill",
+      "type": "engraving",
       "unit": "millimeters",
       "vendor": "Makera",
       "vendor-description": "Single Flute Engraving 30 deg*.3mm 4mm shaft"
@@ -15735,7 +15735,7 @@
       },
       "geometry": {
         "CSP": false,
-        "DC": 4,
+        "DC": 0.4,
         "HAND": true,
         "LB": 23,
         "LCF": 7,
@@ -15873,7 +15873,7 @@
           }
         ]
       },
-      "type": "chamfer mill",
+      "type": "engraving",
       "unit": "millimeters",
       "vendor": "Makera",
       "vendor-description": "Single Flute Engraving 30 deg*.4mm 4mm shaft"
@@ -15887,7 +15887,7 @@
       },
       "geometry": {
         "CSP": false,
-        "DC": 4,
+        "DC": 0.5,
         "HAND": true,
         "LB": 23,
         "LCF": 7,
@@ -16025,7 +16025,7 @@
           }
         ]
       },
-      "type": "chamfer mill",
+      "type": "engraving",
       "unit": "millimeters",
       "vendor": "Makera",
       "vendor-description": "Single Flute Engraving 30 deg*.5mm 4mm shaft"
@@ -16039,7 +16039,7 @@
       },
       "geometry": {
         "CSP": false,
-        "DC": 3.175,
+        "DC": 0.1,
         "HAND": true,
         "LB": 19,
         "LCF": 8,
@@ -16285,7 +16285,7 @@
           }
         ]
       },
-      "type": "chamfer mill",
+      "type": "engraving",
       "unit": "millimeters",
       "vendor": "Makera",
       "vendor-description": "Single Flute Engraving Metal 60 deg*.1mm"
@@ -16299,7 +16299,7 @@
       },
       "geometry": {
         "CSP": false,
-        "DC": 3.175,
+        "DC": 0.2,
         "HAND": true,
         "LB": 19,
         "LCF": 9,
@@ -16545,7 +16545,7 @@
           }
         ]
       },
-      "type": "chamfer mill",
+      "type": "engraving",
       "unit": "millimeters",
       "vendor": "Makera",
       "vendor-description": "Single Flute Engraving Metal 30 deg*.2mm"
@@ -16559,7 +16559,7 @@
       },
       "geometry": {
         "CSP": false,
-        "DC": 3.175,
+        "DC": 0.3,
         "HAND": true,
         "LB": 19,
         "LCF": 9,
@@ -16805,7 +16805,7 @@
           }
         ]
       },
-      "type": "chamfer mill",
+      "type": "engraving",
       "unit": "millimeters",
       "vendor": "Makera",
       "vendor-description": "Single Flute Engraving Metal 30 deg*.3mm"
@@ -16819,7 +16819,7 @@
       },
       "geometry": {
         "CSP": false,
-        "DC": 3.175,
+        "DC": 0.4,
         "HAND": true,
         "LB": 19,
         "LCF": 9,
@@ -17065,7 +17065,7 @@
           }
         ]
       },
-      "type": "chamfer mill",
+      "type": "engraving",
       "unit": "millimeters",
       "vendor": "Makera",
       "vendor-description": "Single Flute Engraving Metal 30 deg*.4mm"
@@ -17079,7 +17079,7 @@
       },
       "geometry": {
         "CSP": false,
-        "DC": 3.175,
+        "DC": 0.5,
         "HAND": true,
         "LB": 19,
         "LCF": 9,
@@ -17325,7 +17325,7 @@
           }
         ]
       },
-      "type": "chamfer mill",
+      "type": "engraving",
       "unit": "millimeters",
       "vendor": "Makera",
       "vendor-description": "Single Flute Engraving Metal 30 deg*.5mm"
@@ -17339,7 +17339,7 @@
       },
       "geometry": {
         "CSP": false,
-        "DC": 3.175,
+        "DC": 0.1,
         "HAND": true,
         "LB": 19,
         "LCF": 9,
@@ -17477,7 +17477,7 @@
           }
         ]
       },
-      "type": "chamfer mill",
+      "type": "engraving",
       "unit": "millimeters",
       "vendor": "Makera",
       "vendor-description": "Single Flute Engraving 30 deg*.1mm"
@@ -17491,7 +17491,7 @@
       },
       "geometry": {
         "CSP": false,
-        "DC": 3.175,
+        "DC": 0.2,
         "HAND": true,
         "LB": 19,
         "LCF": 9,
@@ -17629,7 +17629,7 @@
           }
         ]
       },
-      "type": "chamfer mill",
+      "type": "engraving",
       "unit": "millimeters",
       "vendor": "Makera",
       "vendor-description": "Single Flute Engraving 30 deg*.2mm"
@@ -17643,7 +17643,7 @@
       },
       "geometry": {
         "CSP": false,
-        "DC": 3.175,
+        "DC": 0.3,
         "HAND": true,
         "LB": 19,
         "LCF": 9,
@@ -17781,7 +17781,7 @@
           }
         ]
       },
-      "type": "chamfer mill",
+      "type": "engraving",
       "unit": "millimeters",
       "vendor": "Makera",
       "vendor-description": "Single Flute Engraving 30 deg*.3mm"
@@ -17795,7 +17795,7 @@
       },
       "geometry": {
         "CSP": false,
-        "DC": 3.175,
+        "DC": 0.4,
         "HAND": true,
         "LB": 19,
         "LCF": 9,
@@ -17933,7 +17933,7 @@
           }
         ]
       },
-      "type": "chamfer mill",
+      "type": "engraving",
       "unit": "millimeters",
       "vendor": "Makera",
       "vendor-description": "Single Flute Engraving 30 deg*.4mm"
@@ -17947,7 +17947,7 @@
       },
       "geometry": {
         "CSP": false,
-        "DC": 3.175,
+        "DC": 0.5,
         "HAND": true,
         "LB": 19,
         "LCF": 9,
@@ -18085,7 +18085,7 @@
           }
         ]
       },
-      "type": "chamfer mill",
+      "type": "engraving",
       "unit": "millimeters",
       "vendor": "Makera",
       "vendor-description": "Single Flute Engraving 30 deg*.5mm"
