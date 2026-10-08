@@ -112,6 +112,18 @@ function runningReason({ request, context }: CommandSubject): string {
     : "The machine is running a program. Stop it before using this control."
 }
 
+/**
+ * Whether Stop has something to stop: a lockout to confirm, an operation in progress, a
+ * program, or a machine that does not freshly report Idle, which may be moving.
+ */
+const hasSomethingToStop = (context: AdmissionContext) =>
+  context.lockout !== null ||
+  context.activity !== null ||
+  context.streaming ||
+  isJobActive(context.job) ||
+  !isFresh(context.telemetry, context.now) ||
+  context.telemetry.state !== "Idle"
+
 /** Why the machine's state refuses a request, as the firmware and its anchors say; null without status. */
 function stateReason({ request, context }: CommandSubject): string | null {
   const { telemetry } = context
@@ -154,6 +166,21 @@ export const COMMAND_RULES: readonly CommandRule[] = [
     chain: ADMISSION,
     test: ({ context }) => context.connected,
     explain: () => ({ problem: "Connect a device first." }),
+  },
+  {
+    id: "machine/stop-needed",
+    stage: "command",
+    label: "Something to stop",
+    description:
+      "Stop halts the controller into an alarm, so it goes only while there is something to stop: a program, an operation in progress, a Stop to confirm, or a machine that is not reporting Idle (or not reporting at all). Stopping an idle machine would only leave it to unlock.",
+    severity: "error",
+    configurable: false,
+    chain: ADMISSION,
+    test: ({ request, context }) =>
+      request.key !== "stop" || hasSomethingToStop(context),
+    explain: () => ({
+      problem: "The machine is idle: there is nothing to stop.",
+    }),
   },
   {
     id: "machine/anchors-stored",

@@ -13,7 +13,7 @@ Every request passes one admission chain, the command rules (`contract/command-r
 5. the capability is reported by the machine (for example, no tool confirmation on ATC machines);
 6. the firmware's machine-state rules (`firmware/makera/commands.ts`).
 
-The same chain produces `snapshot.availability`, so every disabled control shows the exact reason the controller would refuse it. Stop only needs a connection. Reset needs a connection, no lockout and no running program or operation, whatever the machine's state. A typed console line goes in any machine state: the firmware answers what it will not run.
+The same chain produces `snapshot.availability`, so every disabled control shows the exact reason the controller would refuse it. Stop needs a connection and something to stop (`machine/stop-needed`): a lockout to confirm, an operation in progress, a program, or a machine not freshly reporting Idle. On the Z1 Stop halts the controller into an alarm, so on an idle machine it would only leave it to unlock. Machine › Stop follows the same availability. Reset needs a connection, no lockout and no running program or operation, whatever the machine's state. A typed console line goes in any machine state: the firmware answers what it will not run.
 
 Reads are shared by kind (anchors, height map). A read asked for while one of its kind runs joins it instead of being refused as busy, and one the chain defers joins the read of its kind that waits already, so the deferred list holds at most one per kind. One read answers every caller; a caller that cancels withdraws only itself, and a deferred read that every caller left is dropped.
 
