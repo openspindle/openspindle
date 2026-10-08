@@ -34,6 +34,7 @@ import { DeviceOverridesCard } from "./device-overrides-card"
 import { DeviceSimulatorCard } from "./device-simulator-card"
 import { DeviceSpindleCard } from "./device-spindle-card"
 import { DeviceStatusCard } from "./device-status-card"
+import { DeviceToolCard } from "./device-tool-card"
 import { MachineDiagnosis } from "./machine-diagnosis"
 import { ResetMachineDialog } from "./reset-machine-dialog"
 
@@ -80,6 +81,22 @@ export function DevicePanel({
     if (!allowed(action)) return
     setNotice("")
     command.mutate(action, { onSuccess: () => setNotice("Command confirmed") })
+  }
+  /**
+   * The machine's tool change to `tool`. It changes nothing for the tool it holds, so to measure
+   * that one again it first sets no tool. A failure shows as the command's error.
+   */
+  const changeTool = (tool: number) => {
+    const change: MachineCommand = { type: "changeTool", tool }
+    if (!allowed(change)) return
+    setNotice("")
+    const run = async () => {
+      if (telemetry?.tool === tool)
+        await command.mutateAsync({ type: "setTool", tool: -1 })
+      await command.mutateAsync(change)
+      setNotice("Command confirmed")
+    }
+    run().catch(() => {})
   }
 
   let state = "Disconnected"
@@ -259,6 +276,15 @@ export function DevicePanel({
             pending={pending}
             reason={reason}
             execute={execute}
+          />
+          <DeviceToolCard
+            device={device}
+            features={features}
+            telemetry={telemetry}
+            pending={pending}
+            reason={reason}
+            execute={execute}
+            change={changeTool}
           />
           <DeviceSimulatorCard device={device} />
         </div>

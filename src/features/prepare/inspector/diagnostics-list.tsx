@@ -2,6 +2,7 @@ import { CircleAlert, TriangleAlert, Waypoints } from "lucide-react"
 import { Alert, AlertAction, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { Toggle } from "@/components/ui/toggle"
+import { ProblemText } from "@/components/workspace/problem-text"
 import type { KeyedDiagnostic } from "@/domain/diagnostics"
 import type { Plate } from "@/domain/plate/plate"
 import { MachineActionButton } from "@/features/job/stage-card"
@@ -37,7 +38,16 @@ export function DiagnosticsList({
         return (
           <Alert key={key} variant={error ? "warning" : "default"}>
             <Icon />
-            <AlertDescription>{diagnostic.message}</AlertDescription>
+            <AlertDescription>
+              {diagnostic.advice ? (
+                <ProblemText
+                  problem={diagnostic.message}
+                  suggestion={diagnostic.advice}
+                />
+              ) : (
+                diagnostic.message
+              )}
+            </AlertDescription>
             {(fix || placed) && (
               <AlertAction className="flex items-center gap-1">
                 {placed && (

@@ -2,23 +2,16 @@ import { useEffect, useId, useMemo, useRef, useState } from "react"
 import type { ReactNode } from "react"
 import { RpcError } from "@openspindle/rpc"
 import { toast } from "sonner"
-import { CircleAlert, FileText, FileUp } from "lucide-react"
+import { CircleAlert } from "lucide-react"
 import { useWorkspace } from "@/app/workspace/workspace-context"
 import { useHost } from "@/platform/host-context"
+import type { FileLink } from "@/domain/file-link"
 import type { OperationOf } from "@/domain/operations/kinds"
 import type { Plate } from "@/domain/plate/plate"
 import type { Tool } from "@/domain/tools/tool"
 import { Alert, AlertAction, AlertDescription } from "@/components/ui/alert"
-import {
-  Attachment,
-  AttachmentAction,
-  AttachmentActions,
-  AttachmentContent,
-  AttachmentDescription,
-  AttachmentMedia,
-  AttachmentTitle,
-} from "@/components/ui/attachment"
 import { Button } from "@/components/ui/button"
+import { LinkedFileField, linkOf } from "@/features/files/linked-file-field"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
   Field,
@@ -26,7 +19,6 @@ import {
   FieldGroup,
   FieldLabel,
 } from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
 import {
   Select,
   SelectContent,
@@ -349,7 +341,6 @@ export function OperationEditor({
   const mounted = useRef(true)
   const request = useRef<AbortController | null>(null)
   const readLock = useRef(false)
-  const replaceInput = useRef<HTMLInputElement>(null)
   const rejectedSource = useRef<string | null>(null)
   const lastSaved = useRef<{ revision: number; key: string } | null>(null)
   useEffect(() => {
@@ -575,7 +566,14 @@ export function OperationEditor({
       const generated = await host.pcb.generate(
         {
           schemaVersion: 1,
-          files: [{ ...startedFrom.file, role }],
+          // The file's link to disk stays in the project: the generator takes its contents.
+          files: [
+            {
+              role,
+              name: startedFrom.file.name,
+              content: startedFrom.file.content,
+            },
+          ],
           parameters: settings,
         },
         controller.signal
@@ -740,19 +738,22 @@ export function OperationEditor({
     })
   }
 
-  async function replace(file: File | undefined) {
-    if (!file || inactive || readLock.current) return
+  /** Another file, chosen or the linked one read again, in place of the operation's. */
+  async function replace(
+    read: () => Promise<{
+      name: string
+      content: string
+      link: FileLink | null
+    }>
+  ) {
+    if (inactive || readLock.current) return
     stopUpdate()
     readLock.current = true
     setReadingSource(true)
     setError(null)
     try {
-      if (!hasAcceptedExtension(file.name))
-        throw new Error("Choose a Gerber or drill file.")
-      if (file.size > LIMITS.inputFile)
-        throw new Error("Choose a source file smaller than 8 MiB.")
-      const content = await file.text()
-      const roles = matchInputs({ name: file.name, content })
+      const { name, content, link } = await read()
+      const roles = matchInputs({ name, content })
       const detected = roles.length === 1 ? roles[0] : ""
       // Keeping the operation's identity, a file of another type starts over.
       let next = data
@@ -763,7 +764,7 @@ export function OperationEditor({
         next = { ...data, values: { ...data.values, drillMethod: method } }
       changeSource({
         ...next,
-        file: { name: file.name, content, role: detected },
+        file: { name, content, role: detected, ...(link && { link }) },
       })
     } catch (problem) {
       setError(errorText(problem, "Could not read this file."))
@@ -929,44 +930,37 @@ export function OperationEditor({
         className="flex flex-col gap-5"
         onSubmit={(event) => event.preventDefault()}
       >
-        <Attachment
-          className="w-full"
-          state={readingSource ? "processing" : "done"}
-        >
-          <AttachmentMedia>
-            <FileText />
-          </AttachmentMedia>
-          <AttachmentContent>
-            <AttachmentTitle title={data.file.name}>
-              {data.file.name}
-            </AttachmentTitle>
-            <AttachmentDescription>
-              {sourceType} · {sourceSize} KB
-            </AttachmentDescription>
-          </AttachmentContent>
-          <AttachmentActions>
-            <AttachmentAction
-              type="button"
-              aria-label="Replace file"
-              title="Replace file"
-              disabled={inactive}
-              onClick={() => replaceInput.current?.click()}
-            >
-              <FileUp />
-            </AttachmentAction>
-          </AttachmentActions>
-        </Attachment>
-        <Input
-          ref={replaceInput}
-          hidden
-          type="file"
+        <LinkedFileField
+          kind="pcb"
+          name={data.file.name}
+          description={`${sourceType} · ${sourceSize} KB`}
+          content={data.file.content}
+          link={data.file.link}
           accept={ACCEPT}
-          aria-label="Replace operation source"
           disabled={inactive}
-          onChange={(event) => {
-            void replace(event.target.files?.[0])
-            event.target.value = ""
-          }}
+          processing={readingSource}
+          onReplace={(file) =>
+            void replace(async () => {
+              if (!hasAcceptedExtension(file.name))
+                throw new Error("Choose a Gerber or drill file.")
+              if (file.size > LIMITS.inputFile)
+                throw new Error("Choose a source file smaller than 8 MiB.")
+              return {
+                name: file.name,
+                content: await file.text(),
+                link: linkOf(host, file),
+              }
+            })
+          }
+          onUpdate={(read, link) =>
+            void replace(() =>
+              Promise.resolve({
+                name: read.fileName,
+                content: read.contents,
+                link,
+              })
+            )
+          }
         />
         <FieldGroup>
           <Field>

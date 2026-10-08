@@ -17,6 +17,10 @@ export type ViewerPalette = {
   pathAhead: THREE.Color
   /** The outline of where a plate cuts. */
   workArea: THREE.Color
+  /** What a plate leaves out of its program: the theme's muted text, apart from any path. */
+  suppressed: THREE.Color
+  /** Selected paths: the primary, darker, apart from the paths around them. */
+  selectedPath: THREE.Color
   /** Where problems are: errors in the theme's warning colour, as alerts show them; warnings amber. */
   problem: Record<Severity, THREE.Color>
 }
@@ -59,6 +63,8 @@ export function viewerPalette(element: HTMLElement): ViewerPalette {
     nextTouch: new THREE.Color(0xd946ef),
     pathAhead: new THREE.Color(0xef4444),
     workArea: primary.clone().lerp(new THREE.Color(0xe39a2d), 0.7),
+    suppressed: themeColor(element, "--muted-foreground", "#71717a"),
+    selectedPath: primary.clone().lerp(new THREE.Color(0x000000), 0.35),
     problem: {
       error: themeColor(element, "--warning", "#c2410c"),
       warning: new THREE.Color(0xf59e0b),

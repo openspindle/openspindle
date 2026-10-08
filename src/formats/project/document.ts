@@ -25,8 +25,9 @@ import { PROJECT_LIMITS } from "./step-nc"
  * Version 8: probing is one kind of operation: a strategy doing a task with a probe tool.
  * Version 9: bed coordinates are from Anchor 1, with Z 0 on the MDF bed's top.
  * Version 10: a probing operation's strategy is what it does, not who writes its NC.
+ * Version 11: an operation can be suppressed, which an earlier version would run.
  */
-export const PROJECT_SCHEMA_VERSION = 10
+export const PROJECT_SCHEMA_VERSION = 11
 
 /** The workspace fields a project stores exactly as the workspace holds them. */
 type WorkspaceData = Pick<

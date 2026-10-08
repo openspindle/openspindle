@@ -232,6 +232,7 @@ class Z1Preview implements GCodeFirmware {
   constructor(setup: FirmwareSetup) {
     this.frame = new Z1Frame(setup)
     if (setup.start) this.initialPosition = setup.start
+    this.active = setup.tool ?? null
   }
 
   handles(letter: "G" | "M", code: number) {

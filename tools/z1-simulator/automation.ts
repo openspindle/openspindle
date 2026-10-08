@@ -42,6 +42,8 @@ export type AutomationMachine = {
   readonly lengths: ToolLengths
   /** What the probe meets going down at machine X Y. */
   readonly surfaceAt: (x: number, y: number) => number
+  /** The applied height map's span (Robot max_delta); null while it applies none. */
+  compensation: number | null
 }
 
 /** set_ref_tool_mz: setting work Z makes the measured tool the reference, with no offset. */
@@ -281,6 +283,22 @@ export function heightTable(grid: Grid): string[] {
   ]
 }
 
+/** Robot max_delta after a grid: how far apart its lowest and highest heights are. */
+export function heightSpan({
+  width,
+  depth,
+  columns,
+  rows,
+}: Omit<Grid, "height">): number {
+  const heights = Array.from({ length: columns * rows }, (_, index) =>
+    surfaceHeight(
+      (width * (index % columns)) / (columns - 1),
+      (depth * Math.floor(index / columns)) / (rows - 1)
+    )
+  )
+  return Math.max(...heights) - Math.min(...heights)
+}
+
 /**
  * fill_autolevel_scripts and CartGridStrategy's rectangular probe: over X Y (work), then G32 R1
  * reports its start, every point it probes (serpentine rows) and the height map.
@@ -330,6 +348,8 @@ export function levelGrid(
       output: (machine) => {
         start[0] = machine.mpos[0]
         start[1] = machine.mpos[1]
+        // The earlier grid is cleared before probing.
+        machine.compensation = null
         return [
           "Rectangular Grid Probe...",
           "Leveling start, offset by XY",
@@ -342,13 +362,16 @@ export function levelGrid(
     {
       echo: null,
       ms,
-      output: () => [
-        ...heightTable(grid),
-        `Max deviation from zero: ${f3(maxDeviation)}`,
-        `Max deviation between highest and lowest: ${f3(highest - lowest)}`,
-        "Probe completed.",
-        "ok",
-      ],
+      output: (machine) => {
+        machine.compensation = highest - lowest
+        return [
+          ...heightTable(grid),
+          `Max deviation from zero: ${f3(maxDeviation)}`,
+          `Max deviation between highest and lowest: ${f3(highest - lowest)}`,
+          "Probe completed.",
+          "ok",
+        ]
+      },
     },
   ]
 }

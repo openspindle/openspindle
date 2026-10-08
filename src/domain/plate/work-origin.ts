@@ -13,6 +13,7 @@ import type {
 import { WORK_ORIGIN_SUBJECT } from "../diagnostics"
 import type { QuickFix } from "../diagnostics"
 import type { FixtureKit } from "../fixtures/fixture-kit"
+import { formatMillimetres } from "../geometry/millimetres"
 import type { Point3 } from "../primitives"
 import type { RunRuleSubject, StageRule } from "../rules/stages"
 import type { Plate, PlateSetup } from "./plate"
@@ -180,10 +181,13 @@ function machineReference(setup: PlateSetup): AnchorReference | null {
 }
 
 /**
- * Where a work origin is on the machine: its anchor's stored machine position plus the offsets.
- * Null at the bed origin when its anchors were not read from the plate's device.
+ * Where a work origin is on the machine, which the program sets work X and Y to: its anchor's
+ * stored machine position plus the offsets. Null at the bed origin when its anchors were not
+ * read from the plate's device, and for the machine's own origin (`machineOrigin`), which the
+ * program leaves as it is.
  */
 export function workOriginOnMachine(setup: PlateSetup): MachineOrigin | null {
+  if (setup.machineOrigin) return null
   const reference = machineReference(setup)
   const anchor = setup.anchors?.anchors.find(
     (item) => item.id === reference?.anchorId
@@ -197,6 +201,56 @@ export function workOriginOnMachine(setup: PlateSetup): MachineOrigin | null {
     position: [toNanometre(mx + dx), toNanometre(my + dy)],
     factory: setup.anchors?.source === "factory",
   }
+}
+
+/**
+ * The work origin that puts a plate's work X and Y at machine X and Y `machine`, where the
+ * machine keeps its work zero: the inverse of `workOriginOnMachine`, keeping Z, which the work
+ * zero set on Device or a touch-off sets. Null unless the plate's anchors were read from its
+ * device: only those place machine X and Y on the bed.
+ */
+export function workOriginFromMachine(
+  setup: PlateSetup,
+  [mx, my]: AnchorXY
+): Point3 | null {
+  const { anchors, deviceId } = setup
+  if (anchors?.source !== "firmware-config" || anchors.deviceId !== deviceId)
+    return null
+  const reference = machineReference(setup)
+  const anchor = anchors.anchors.find((item) => item.id === reference?.anchorId)
+  if (!reference || !anchor) return null
+  const [ax, ay] = anchor.machinePosition
+  return pointFromOffset(
+    [toNanometre(mx - ax), toNanometre(my - ay), setup.workOrigin[2]],
+    reference
+  )
+}
+
+/** How far a reported work zero may wander, mm, before a plate on it follows: rounding noise. */
+const FOLLOW_TOLERANCE = 0.001
+
+/**
+ * A plate on the machine's origin, assigned to device `deviceId`, with its origin's X and Y where
+ * that device reports its work zero, at machine X and Y `machine`. Other plates, and plates
+ * whose anchors were not read from the device, stay as they are.
+ */
+export function followedMachineOrigin(
+  plate: Plate,
+  deviceId: string,
+  machine: AnchorXY
+): Plate {
+  const { setup } = plate
+  if (!setup.machineOrigin || setup.deviceId !== deviceId) return plate
+  const origin = workOriginFromMachine(setup, machine)
+  if (
+    !origin ||
+    Math.hypot(
+      origin[0] - setup.workOrigin[0],
+      origin[1] - setup.workOrigin[1]
+    ) <= FOLLOW_TOLERANCE
+  )
+    return plate
+  return { ...plate, setup: { ...setup, workOrigin: origin } }
 }
 
 /**
@@ -315,13 +369,56 @@ const anchorsChanged: StageRule<"run"> = {
   fixes: readAnchors,
 }
 
+/** How far the machine's origin may be from where the plate read it, mm. */
+const MACHINE_ORIGIN_TOLERANCE = 0.01
+
+/**
+ * How far the connected machine's work zero is in X and Y from where a plate on the machine's
+ * origin last read it (`machineOrigin`), which its view and checks place it by, mm; null where
+ * they agree, or this cannot tell: the plate's anchors not read from the connected device, or no
+ * origin reported.
+ */
+function machineOriginApart({
+  plate,
+  operation,
+  machine,
+}: RunRuleSubject): number | null {
+  if (!plate || operation || !plate.setup.machineOrigin) return null
+  if (!machine.workOrigin || plate.setup.deviceId !== machine.connectedDeviceId)
+    return null
+  const [mx, my] = machine.workOrigin
+  const at = workOriginFromMachine(plate.setup, [mx, my])
+  if (!at) return null
+  const [x, y] = plate.setup.workOrigin
+  const apart = Math.hypot(at[0] - x, at[1] - y)
+  return apart > MACHINE_ORIGIN_TOLERANCE ? apart : null
+}
+
+const machineOriginRead: StageRule<"run"> = {
+  id: "work-origin/machine-origin-read",
+  stage: "run",
+  label: "Machine origin read",
+  description:
+    "A plate on the machine's origin runs from wherever the machine keeps work zero; where it last read it places it in the 3D view and its checks, which must still agree.",
+  severity: "warning",
+  configurable: false,
+  test: (subject) => machineOriginApart(subject) === null,
+  explain: ({ first }) => ({
+    problem: `The machine's origin is ${formatMillimetres(Number((machineOriginApart(first) ?? 0).toFixed(2)))} mm from where the plate last read it, so the 3D view and its checks place the plate elsewhere.`,
+    advice: "Use Read device in the plate's Origin.",
+    about: WORK_ORIGIN_SUBJECT,
+  }),
+}
+
 /**
  * What Run needs of a work origin set from an anchor: its anchors read from the connected
  * device, which the plate is set up for, and still the device's current ones; otherwise the work
- * offset would land where the machine's anchor is not.
+ * offset would land where the machine's anchor is not. On the machine's origin, that the plate
+ * still has it where the machine does.
  */
 export const WORK_ORIGIN_RULES: readonly StageRule<"run">[] = [
   anchorsNotRead,
   liveAnchorsUnavailable,
   anchorsChanged,
+  machineOriginRead,
 ]

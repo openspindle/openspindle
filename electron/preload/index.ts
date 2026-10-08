@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from "electron"
+import { contextBridge, ipcRenderer, webUtils } from "electron"
 import "@sentry/electron/preload"
 import {
   RPC_CONNECT_CHANNEL,
@@ -22,6 +22,9 @@ ipcRenderer.on(RPC_PORT_CHANNEL, (event, service: unknown) => {
     )
 })
 
+// Besides, the path of a file the page was given (dropped or chosen), which the page cannot see:
+// files it keeps link to it, to tell when it changed and read it again.
 contextBridge.exposeInMainWorld("openSpindleBridge", {
   connect: () => ipcRenderer.send(RPC_CONNECT_CHANNEL),
+  pathOf: (file: File) => webUtils.getPathForFile(file),
 })

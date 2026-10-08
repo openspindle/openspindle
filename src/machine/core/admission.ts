@@ -64,6 +64,10 @@ function representative(
       }
     case "zero":
       return { key, command: { type: key, axes: ["X"] } }
+    case "setWork":
+      return { key, command: { type: key, axis: "X", position: 0 } }
+    case "goTo":
+      return { key, command: { type: key, target: "clearance" } }
     case "spindleStart":
       return {
         key,
@@ -129,7 +133,11 @@ function representative(
     case "pause":
     case "resume":
     case "confirmToolChange":
+    case "clearHeightMap":
       return { key, command: { type: key } }
+    case "setTool":
+    case "changeTool":
+      return { key, command: { type: key, tool: 1 } }
     case "run":
     case "readAnchors":
     case "writeAnchors":

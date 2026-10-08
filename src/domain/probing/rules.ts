@@ -8,21 +8,10 @@ import type { StoredAnchor } from "../anchors/stored-anchors"
 import { PLATE_SUBJECT, operationSubject } from "../diagnostics"
 import type { QuickFix } from "../diagnostics"
 import { EPSILON } from "../geometry/millimetres"
-import type {
-  OperationRuleSubject,
-  RunRuleSubject,
-  StageRule,
-} from "../rules/stages"
+import type { RunRuleSubject, StageRule } from "../rules/stages"
 import { placementContext } from "./placement"
 import type { PlacementContext } from "./placement"
 import { outlineTarget } from "./tasks/outline/params"
-
-/** What a probing operation's advice offers: editing the operation. */
-export const editOperation: RuleFixes<OperationRuleSubject, QuickFix> = {
-  offer: ({ first }) => [
-    { kind: "edit-operation", operationId: first.operation.id },
-  ],
-}
 
 /**
  * An anchored probing operation among Run's subjects (a grid, a touch-off or 3D probing from a

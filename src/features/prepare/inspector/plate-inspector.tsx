@@ -10,12 +10,15 @@ import { useKeyedDiagnostics } from "@/app/workspace/use-plate-diagnostics"
 import { diagnosticOperation } from "@/domain/diagnostics"
 import { DiagnosticsList } from "./diagnostics-list"
 import { PlateFixturesPanel } from "./plate-fixtures-panel"
-import { PlateSetupPanel } from "./plate-setup-panel"
+import { PlateSetupPanel, PlateStockPanel } from "./plate-setup-panel"
 import { PlateToolsPanel } from "./plate-tools-panel"
 
 type Panel = NonNullable<PrepareSearch["panel"]>
 const isPanel = (value: unknown): value is Panel =>
-  value === "setup" || value === "tools" || value === "fixtures"
+  value === "setup" ||
+  value === "stock" ||
+  value === "tools" ||
+  value === "fixtures"
 
 /** What an import changed on a plate, until the user dismisses it. */
 function PlateNotices({ plate }: { plate: Plate }) {
@@ -48,7 +51,7 @@ function PlateNotices({ plate }: { plate: Plate }) {
   )
 }
 
-/** The selected plate: its setup, tool table and fixtures, with what needs attention. */
+/** The selected plate: its setup, stock, tool table and fixtures, with what needs attention. */
 export function PlateInspector({
   plate,
   panel,
@@ -83,6 +86,7 @@ export function PlateInspector({
           aria-label="Plate settings"
         >
           <TabsTrigger value="setup">Setup</TabsTrigger>
+          <TabsTrigger value="stock">Stock</TabsTrigger>
           <TabsTrigger value="tools">
             Tools
             <Badge variant="secondary" className="font-numeric">
@@ -93,6 +97,9 @@ export function PlateInspector({
         </TabsList>
         <TabsContent value="setup" className="min-h-0 overflow-y-auto">
           <PlateSetupPanel plate={plate} />
+        </TabsContent>
+        <TabsContent value="stock" className="min-h-0 overflow-y-auto">
+          <PlateStockPanel plate={plate} />
         </TabsContent>
         <TabsContent value="tools" className="min-h-0 overflow-y-auto">
           <PlateToolsPanel plate={plate} />

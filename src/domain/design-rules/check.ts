@@ -17,6 +17,7 @@ import { kitForPlate } from "../fixtures/catalog"
 import type { FixtureKit } from "../fixtures/fixture-kit"
 import { keptNcContext, kindOf } from "../operations/kinds"
 import type { Operation } from "../operations/operation"
+import { ownLine } from "../operations/toolpath-parts"
 import type { Plate } from "../plate/plate"
 import { capitalize } from "../primitives"
 import { rulesOf } from "../rules/rules"
@@ -424,13 +425,15 @@ function programViolations(
               }
             : undefined
         const report = failure.severity === "error" ? error : warning
+        // The rules read the NC the operation resolves to; the message names its own lines.
+        const own = issue.lines.map((line) => ownLine(operation, line))
         return {
           ...report(
             ruleCode(rule.id),
-            `${issue.problem} ${capitalize(linesText(issue.lines))} of ${operation.name}.`,
+            `${issue.problem} ${capitalize(linesText(own))} of ${operation.name}.`,
             {
               subject: operationSubject(operation.id),
-              line: issue.lines[0],
+              line: own[0],
               places,
               fix,
             }
@@ -537,9 +540,13 @@ export function checkDesignRules(
     const operation = plate.operations.find((item) => item.id === operationId)
     const span = operationId ? spans.get(operationId) : undefined
     // Lines are the operation's own, as its NC numbers them.
-    const line = span
-      ? worst.segment.line - span.bodyStartLine + 1
-      : worst.segment.line
+    const resolved = span ? worst.segment.line - span.bodyStartLine + 1 : null
+    const line =
+      resolved === null
+        ? worst.segment.line
+        : operation
+          ? ownLine(operation, resolved)
+          : resolved
     const { problem, advice, worst: named = "first" } = rule.explain(failure)
     const subject = operation?.name ?? "The program"
     const message = `${subject} ${problem}. ${where(failure.count, named, line)}`

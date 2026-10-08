@@ -14,7 +14,7 @@ import {
   touchesGridStarts,
 } from "../../placement"
 import type { ProbeStart } from "../../placement"
-import { editOperation } from "../../rules"
+import { editOperation } from "../../../rules/diagnostics"
 import { methodSpecs } from "../../strategies"
 
 /**

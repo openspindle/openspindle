@@ -65,6 +65,7 @@
     "@types/three": "^0.186.0",
     "@vitejs/plugin-react": "^6",
     "class-variance-authority": "^0.7.1",
+    "clipper2-ts": "2.0.1-18",
     "cn": "^0.2.6",
     "electron": "^44.4.5",
     "electron-builder": "^26.15.3",

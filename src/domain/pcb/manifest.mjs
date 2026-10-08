@@ -40,6 +40,9 @@ const parameterGroups = {
   maskVertfeed: "mask",
   maskSpeed: "mask",
   maskStepover: "mask",
+  maskPasses: "mask",
+  maskEdgePasses: "mask",
+  maskLeadRadius: "mask",
   drillMethod: "drilling",
   zdrill: "drilling",
   milldrillDiameter: "drilling",
@@ -196,6 +199,14 @@ export const parameters = [
   number("maskVertfeed", "Plunge feed", 60, 1, 10000, 1, "mm/min"),
   number("maskSpeed", "Spindle speed", 12000, 1, 100000, 1, "rpm"),
   number("maskStepover", "Stepover", 50, 1, 50, 1, "%"),
+  // How many times each opening is cleared: every ring goes round that many times.
+  number("maskPasses", "Passes", 1, 1, 10, 1),
+  // The outermost pass only grazes the opening's edge: going round it again clears the edge
+  // about as soon as the rest of the opening. Per pass.
+  number("maskEdgePasses", "Edge passes", 2, 1, 6, 1),
+  // The vertical arc the tool leads in to depth on along each pass, and out again: a larger
+  // radius comes down more gently over a longer stretch.
+  number("maskLeadRadius", "Lead-in/out radius", 5, 0.1, 100, 0.1, "mm"),
   {
     // Drill plunges one drill per hole size; Mill makes every hole with one end mill,
     // circling those wider than it (pcb2gcode's milldrill).

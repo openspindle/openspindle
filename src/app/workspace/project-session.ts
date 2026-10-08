@@ -116,6 +116,20 @@ export function followDeviceAnchors(
 }
 
 /**
+ * Plates on the machine's origin follow where device `deviceId` reports its work zero, at
+ * machine X and Y `position`; like its anchors, it leaves a saved project saved.
+ */
+export function followMachineOrigin(
+  workspace: WorkspaceStore,
+  deviceId: string,
+  position: readonly [number, number]
+) {
+  const unchanged = !hasUnsavedChanges(workspace.state)
+  workspace.dispatch({ type: "machineOrigin.sync", deviceId, position })
+  if (unchanged) markProjectSaved(workspace.state)
+}
+
+/**
  * Adopts the connected device's profile once, before its anchors are read. Existing plates keep
  * their stock, operations and placed fixtures; an empty starter plate moving to the device
  * takes its default fixtures too. The same device keeps each plate's chosen bed setup.

@@ -1,6 +1,7 @@
 import { Outlet, createFileRoute } from "@tanstack/react-router"
 import { useDeviceProfileSync } from "@/app/fixtures/use-device-profile-sync"
 import { useStoredAnchorsSync } from "@/app/fixtures/use-stored-anchors-sync"
+import { useMachineOriginSync } from "@/app/workspace/use-machine-origin-sync"
 import { SectionErrorPlacement } from "@/features/error-report/error-fallback"
 import { JobIndicator } from "@/features/job/job-indicator"
 import { FileDropZone } from "@/features/shell/file-drop-zone"
@@ -14,6 +15,7 @@ export const Route = createFileRoute("/_workspace")({
 function WorkspaceLayout() {
   useDeviceProfileSync()
   useStoredAnchorsSync()
+  useMachineOriginSync()
   useToolPictures()
   return (
     <FileDropZone>

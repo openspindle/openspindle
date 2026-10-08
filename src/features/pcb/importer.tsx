@@ -19,7 +19,9 @@ import {
   useImportContext,
   workspaceScope,
 } from "@/features/shell/use-import"
+import { linkOf } from "@/features/files/linked-file-field"
 import { closeDialog } from "@/features/shell/dialogs"
+import { useHost } from "@/platform/host-context"
 import { usePrepareSelection } from "@/features/prepare/plate-tree/use-prepare-selection"
 import { pcbJobActive, pcbLocked, usePcbLocked } from "./use-pcb-locked"
 import { LIMITS } from "@/domain/pcb/manifest.mjs"
@@ -48,6 +50,7 @@ export function ImporterView({
   onClose?: () => void
 }) {
   const workspace = useWorkspaceStore()
+  const host = useHost()
   const queryClient = useQueryClient()
   const locked = usePcbLocked()
   const plates = useWorkspace((state) => state.plates)
@@ -106,7 +109,10 @@ export function ImporterView({
           if (!matches.length && /\.txt$/i.test(file.name)) continue
           // Ambiguous and undetected files keep an empty role for the editor to set.
           const role = matches.length === 1 ? matches[0] : ""
-          const data = newData({ name: file.name, content }, role)
+          const data = newData(
+            { name: file.name, content, link: linkOf(host, file) },
+            role
+          )
           if (dataBytes(data) > OPERATION_DATA_BYTES)
             throw new Error(
               `${file.name} is too large to keep in an operation.`

@@ -18,12 +18,14 @@ import {
   revise,
 } from "../operations/operation"
 import type { Operation, OperationSource } from "../operations/operation"
+import type { PartPoint } from "../operations/toolpath-parts"
 import {
   PlateSchema,
   PlateSetupSchema,
   plateLabel,
   withStockChange,
 } from "../plate/plate"
+import { isSuppressed } from "../plate/active"
 import type { Group, Plate, PlateSetup } from "../plate/plate"
 import {
   addFixture,
@@ -38,7 +40,11 @@ import { moveSetupItem } from "../plate/setup-items"
 import type { SetupItemRef } from "../plate/setup-items"
 import { plateAnchors } from "../plate/bed-setup"
 import type { BedSetupAnchors } from "../plate/bed-setup"
-import { withAnchors, withTouchedWorkOrigin } from "../plate/work-origin"
+import {
+  followedMachineOrigin,
+  withAnchors,
+  withTouchedWorkOrigin,
+} from "../plate/work-origin"
 import { fail, normalizeText, ok, schemaIssue } from "../primitives"
 import {
   RuleSettingsSchema,
@@ -175,6 +181,15 @@ export type WorkspaceCommand =
       readonly bedSetups: BedSetupAnchors
     }
   /**
+   * A device reports its work zero at machine X and Y `position`: plates on its machine origin
+   * follow it (`followedMachineOrigin`).
+   */
+  | {
+      readonly type: "machineOrigin.sync"
+      readonly deviceId: string
+      readonly position: readonly [number, number]
+    }
+  /**
    * The connected profile is adopted by the plates present when this command is applied,
    * including when undo replays it. Same-device plates keep their chosen bed setup; only an
    * empty starter plate takes the profile's default fixtures.
@@ -208,6 +223,16 @@ export type WorkspaceCommand =
   | ({
       readonly type: "operation.stopBefore"
       readonly value: boolean
+    } & OperationTarget)
+  /** Leaves the operation out of what its plate machines (`activePlate`), or back in. */
+  | ({
+      readonly type: "operation.suppress"
+      readonly value: boolean
+    } & OperationTarget)
+  /** The parts of the operation's toolpath it leaves out, by their middles (`toolpathParts`). */
+  | ({
+      readonly type: "operation.suppressParts"
+      readonly points: readonly PartPoint[]
     } & OperationTarget)
   | ({
       readonly type: "operation.source"
@@ -596,6 +621,15 @@ function commandResult(
         return ok(state)
       return ok({ ...state, plates, project })
     }
+    case "machineOrigin.sync": {
+      const [x, y] = command.position
+      const plates = state.plates.map((plate) =>
+        followedMachineOrigin(plate, command.deviceId, [x, y])
+      )
+      return plates.every((plate, index) => plate === state.plates[index])
+        ? ok(state)
+        : ok({ ...state, plates })
+    }
     case "plates.useProfile": {
       if (command.anchors && command.anchors.deviceId !== command.deviceId)
         return fail("The anchors belong to another device.")
@@ -734,6 +768,31 @@ function commandResult(
             : revise(operation, { stopBefore: command.value })
         )
       )
+    case "operation.suppress":
+      return updateOperation(state, command, (operation) => {
+        if (command.value === isSuppressed(operation)) return ok(operation)
+        // Absent is false, as operations are saved without it.
+        const { suppressed: _suppressed, ...active } = operation
+        return ok(revise(active, command.value ? { suppressed: true } : {}))
+      })
+    case "operation.suppressParts":
+      return updateOperation(state, command, (operation) => {
+        const { points } = command
+        const current = operation.suppressedParts ?? []
+        if (
+          points.length === current.length &&
+          points.every(
+            (point, index) =>
+              point[0] === current[index][0] && point[1] === current[index][1]
+          )
+        )
+          return ok(operation)
+        // Absent for none, as operations are saved without it.
+        const { suppressedParts: _parts, ...rest } = operation
+        return ok(
+          revise(rest, points.length ? { suppressedParts: points } : {})
+        )
+      })
     case "operation.source":
       return updateOperation(
         state,

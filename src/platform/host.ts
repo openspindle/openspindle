@@ -25,6 +25,9 @@ import type {
 import type { ModelStore } from "@/persistence/models/model-library"
 import type {
   FileKind,
+  LinkedFileRead,
+  LinkedFileRequest,
+  LinkedFileStatus,
   OpenFileResult,
   OpenedFiles,
   SaveFileRequest,
@@ -108,6 +111,12 @@ export interface FileHost {
   save: (request: SaveFileRequest) => Promise<SaveFileResult>
   /** Files the system asks the app to open, such as with Finder's Open With. */
   subscribeOpened: (listener: (files: OpenedFiles) => void) => () => void
+  /** Where a file the page was given (dropped or chosen) is on disk; null where it is not. */
+  pathOf: (file: File) => string | null
+  /** How a file loaded from disk is there now. */
+  linkedStatus: (request: LinkedFileRequest) => Promise<LinkedFileStatus>
+  /** A file loaded from disk, read again. */
+  readLinked: (request: LinkedFileRequest) => Promise<LinkedFileRead>
 }
 
 /** Discover live NC programs in Fusion; reading posts the selected program for import. */

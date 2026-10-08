@@ -25,9 +25,21 @@ type RelativePointFieldsProps = {
   disabled?: boolean
   /** Why Z is fixed, shown on its field; absent while Z can be edited. */
   zLock?: string
+  /**
+   * Offers the machine's own origin as a reference too: its X and Y are then the machine's, read
+   * from it (`lock` says so on their fields). Choosing another reference leaves it.
+   */
+  machineOrigin?: {
+    readonly selected: boolean
+    readonly lock: string
+    readonly onSelect: () => void
+  }
   onChange: (value: Point3) => void
   onRelativeToChange: (anchorId: string | null) => void
 }
+
+/** The reference value of the machine's own origin, which no anchor id is. */
+const MACHINE_ORIGIN = "machine"
 
 const AXES = ["X", "Y", "Z"] as const
 
@@ -45,6 +57,7 @@ export function RelativePointFields({
   anchorSetup,
   disabled,
   zLock,
+  machineOrigin,
   onChange,
   onRelativeToChange,
 }: RelativePointFieldsProps) {
@@ -63,20 +76,31 @@ export function RelativePointFields({
       label: anchorDisplayName(anchor, factory),
       axes: AXES,
     })),
+    ...(machineOrigin
+      ? [{ value: MACHINE_ORIGIN, label: "Machine Origin", axes: AXES }]
+      : []),
   ]
   const reference = anchorReference(anchorSetup, relativeTo)
   const [x, y, z] = offsetFromAnchor(value, reference)
+  let chosen =
+    reference && reference.anchorId !== origin?.id ? reference.anchorId : ""
+  if (machineOrigin?.selected) chosen = MACHINE_ORIGIN
+  const machineLock = machineOrigin?.selected ? machineOrigin.lock : undefined
   return (
     <ReferencePointFields
       label={label}
       references={references}
-      reference={
-        reference && reference.anchorId !== origin?.id ? reference.anchorId : ""
-      }
+      reference={chosen}
       point={{ X: x, Y: y, Z: z }}
-      locks={zLock === undefined ? {} : { Z: zLock }}
+      locks={{
+        ...(machineLock !== undefined && { X: machineLock, Y: machineLock }),
+        ...(zLock !== undefined && { Z: zLock }),
+      }}
       disabled={disabled}
-      onReferenceChange={(item) => onRelativeToChange(item || null)}
+      onReferenceChange={(item) => {
+        if (item === MACHINE_ORIGIN) machineOrigin?.onSelect()
+        else onRelativeToChange(item || null)
+      }}
       onPointChange={({ X = x, Y = y, Z = z }) =>
         onChange(pointFromOffset([X, Y, Z], reference))
       }

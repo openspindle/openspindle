@@ -11,6 +11,7 @@ import type { FrameSource } from "@/app/job/frame"
 import { useHost } from "@/platform/host-context"
 import { plateLabel } from "@/domain/plate/plate"
 import type {
+  ViewerGhost,
   ViewerPlate,
   ViewerProblem,
   ViewerProblemRef,
@@ -24,6 +25,7 @@ import type { ArrangeEvents, ArrangeView } from "./viewer/setup-arranger"
 
 export type { Stock } from "@/domain/stock/stock"
 export type {
+  ViewerGhost,
   ViewerPlate,
   ViewerProblem,
   ViewerProblemRef,
@@ -37,6 +39,7 @@ export type {
   ArrangePick,
   ArrangeSelection,
   ArrangeView,
+  PickablePart,
   PickedPoint,
 } from "./viewer/setup-arranger"
 type Props = {
@@ -48,6 +51,8 @@ type Props = {
   hiddenLineRanges?: Readonly<Record<string, readonly LineRange[]>>
   /** Fixtures each plate leaves out of the view (their ids), by plate id. */
   hiddenFixtures?: Readonly<Record<string, readonly string[]>>
+  /** What each plate leaves out of its program, drawn faint, by plate id. */
+  ghosts?: Readonly<Record<string, readonly ViewerGhost[]>>
   /**
    * The frames of playback the selected plate is drawn at, which the scene follows every frame on
    * its own; without them, or while they have none, it shows its whole program.
@@ -87,6 +92,7 @@ export function BedViewer({
   selectedLineRanges,
   hiddenLineRanges,
   hiddenFixtures,
+  ghosts,
   frames,
   showRapids,
   showStock,
@@ -136,6 +142,9 @@ export function BedViewer({
       drag: (drag) => arrange.current?.drag(drag),
       pickPoint: (plateId, pick) => arrange.current?.pickPoint(plateId, pick),
       pickEdge: (plateId, edge) => arrange.current?.pickEdge(plateId, edge),
+      pickPart: (plateId, index) => arrange.current?.pickPart(plateId, index),
+      selectPart: (plateId, operationId, index) =>
+        arrange.current?.selectPart(plateId, operationId, index),
     }
     const scene = BedScene.create(
       container.current,
@@ -164,6 +173,7 @@ export function BedViewer({
       selectedLineRanges,
       hiddenLineRanges,
       hiddenFixtures,
+      ghosts,
       showRapids,
       showStock,
       problems,
@@ -176,6 +186,7 @@ export function BedViewer({
     selectedLineRanges,
     hiddenLineRanges,
     hiddenFixtures,
+    ghosts,
     showRapids,
     showStock,
     problems,

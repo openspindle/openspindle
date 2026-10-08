@@ -12,6 +12,7 @@ import type { Plate } from "../plate/plate"
 import { fail, ok } from "../primitives"
 import type { OperationKind, ResolveContext, ResolvedNc } from "./kinds"
 import type { Operation, SourceKind } from "./operation"
+import { operationParts, suppressedParts, withoutParts } from "./toolpath-parts"
 
 const plain = (nc: string): ResolvedNc => ({
   nc,
@@ -44,19 +45,35 @@ export const pcbKind: OperationKind<"pcb"> = {
   verbatim: true,
   generated: false,
   phase: () => "machining",
-  resolve: (operation) =>
-    operation.source.nc === null
-      ? fail(
-          error(
-            "operation-pending",
-            `Generate the toolpath for "${operation.name}" before running it.`,
-            {
-              subject: operationSubject(operation.id),
-              fix: { kind: "edit-operation", operationId: operation.id },
-            }
-          )
+  /**
+   * Its program without the parts it suppresses (`withoutParts`), and where the first part it
+   * cuts starts: pcb2gcode goes down to its tool change height, and after the change to its
+   * travel height, wherever the tool is before its first move in X and Y.
+   */
+  resolve: (operation) => {
+    const { nc } = operation.source
+    if (nc === null)
+      return fail(
+        error(
+          "operation-pending",
+          `Generate the toolpath for "${operation.name}" before running it.`,
+          {
+            subject: operationSubject(operation.id),
+            fix: { kind: "edit-operation", operationId: operation.id },
+          }
         )
-      : ok(plain(operation.source.nc)),
+      )
+    const parts = operation.suppressedParts?.length
+      ? suppressedParts(operation)
+      : null
+    const first = (parts?.parts ?? operationParts(operation))?.find(
+      (part) => !parts?.matched.has(part.index)
+    )
+    return ok({
+      ...plain(parts ? withoutParts(nc, parts.parts, parts.matched) : nc),
+      ...(first && { start: first.start }),
+    })
+  },
 }
 
 export const unsupportedKind: OperationKind<"unsupported"> = {

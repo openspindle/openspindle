@@ -5,10 +5,12 @@ import { PLATE_SUBJECT, error, operationSubject } from "../diagnostics"
 import type { Diagnostic } from "../diagnostics"
 import { kitForPlate } from "../fixtures/catalog"
 import type { FixtureKit } from "../fixtures/fixture-kit"
+import { formatMillimetres } from "../geometry/millimetres"
 import { kindOf } from "../operations/kinds"
 import type { ResolveContext, ResolvedNc } from "../operations/kinds"
 import { OPERATION_LIMITS } from "../operations/operation"
 import type { Operation } from "../operations/operation"
+import { activePlate } from "../plate/active"
 import type { Plate } from "../plate/plate"
 import { workOriginNc } from "../plate/work-origin"
 import { plural } from "../primitives"
@@ -155,6 +157,11 @@ function compose(
     if (operation.stopBefore) {
       output.push("M0")
       stopLines.set(output.length, operation.id)
+    }
+    // At the clearance, over where it starts cutting, before NC that goes down where it is.
+    if (nc.start) {
+      const [x, y] = nc.start
+      output.push(`G0 X${formatMillimetres(x)} Y${formatMillimetres(y)}`)
     }
     const bodyStartLine = output.length + 1
     const toolMap = new Map(numberedBindings(operation))
@@ -303,6 +310,8 @@ function compileUncached(plate: Plate, tools: readonly Tool[]): CompiledPlate {
     !preamble.length &&
     kindOf(lone.operation).verbatim &&
     !lone.operation.stopBefore &&
+    // NC that needs the travel to where it starts is combined, which adds it.
+    !lone.nc.start &&
     identity(lone.operation)
   ) {
     // A single program is machined exactly as imported: its bytes are never rewritten.
@@ -376,7 +385,8 @@ const cache = new WeakMap<
 >()
 
 /**
- * Pure and total: always returns a program plus diagnostics, never throws. `tools` is the
+ * Pure and total: always returns a program plus diagnostics, never throws. It compiles the plate
+ * as it machines (`activePlate`), without its suppressed operations. `tools` is the
  * library the plate's table refers to. Results are cached per plate object, so unchanged plates
  * (structural sharing) never recompile, and a plate whose operations did not change keeps its
  * parsed program.
@@ -392,6 +402,9 @@ export function compilePlate(
   plate: Plate,
   tools: readonly Tool[]
 ): CompiledPlate {
+  // The plate and its projection share one result, kept for the projection.
+  const machined = activePlate(plate)
+  if (machined !== plate) return compilePlate(machined, tools)
   const held = heldTools(plate, tools)
   const cached = cache.get(plate)
   if (cached && sameTools(cached.held, held)) return cached.compiled

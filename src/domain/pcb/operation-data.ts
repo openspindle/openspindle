@@ -1,10 +1,18 @@
 import { z } from "zod"
+import { FileLinkSchema } from "../file-link"
+import type { FileLink } from "../file-link"
 import { operationKind, operationKindLabel } from "./operation-settings"
 
 /** The source and recipe kept by a PCB operation, including its last generated recipe. */
 export const PCBOperationDataSchema = z.object({
   schemaVersion: z.literal(1),
-  file: z.object({ name: z.string(), content: z.string(), role: z.string() }),
+  file: z.object({
+    name: z.string(),
+    content: z.string(),
+    role: z.string(),
+    /** Where it was loaded from, to update it from there; absent for a file not on disk. */
+    link: FileLinkSchema.optional(),
+  }),
   values: z.record(z.string(), z.union([z.string(), z.boolean()])),
   generatedValues: z
     .record(z.string(), z.union([z.string(), z.boolean()]))
@@ -28,12 +36,17 @@ export function readData(data: unknown): PCBOperationData | null {
 }
 
 export function newData(
-  file: { name: string; content: string },
+  file: { name: string; content: string; link?: FileLink | null },
   role: string
 ): PCBOperationData {
   return {
     schemaVersion: 1,
-    file: { name: file.name, content: file.content, role },
+    file: {
+      name: file.name,
+      content: file.content,
+      role,
+      ...(file.link && { link: file.link }),
+    },
     values: {},
     toolId: "",
     presetId: "",

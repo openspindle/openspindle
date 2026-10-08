@@ -5,6 +5,7 @@ import type { GCodeProgram, Point3 } from "@/domain/nc/gcode"
 import type { Stock } from "@/domain/stock/stock"
 import type { ToolShape } from "@/domain/tools/tool-shape"
 import type { StoredAnchorSetup } from "@/domain/anchors/stored-anchors"
+import type { LineRange } from "../bed-viewer-layout"
 
 /**
  * What the 3D viewer draws: the viewer feature compiles a plate into it (features/viewer), and
@@ -61,6 +62,20 @@ export type ViewerPlate = {
    * probe the plate is drawn with (`kitForSetup`).
    */
   deviceId: string | null
+}
+
+/**
+ * Moves a plate leaves out of its program, drawn faint where they would be: a suppressed
+ * operation's, or the suppressed parts of one.
+ */
+export type ViewerGhost = {
+  readonly operationId: string
+  /** The operation's own program as its machine moves through it, in work coordinates. */
+  readonly program: GCodeProgram
+  /** Inclusive one-based lines of `program` that are left out; absent for all of them. */
+  readonly lines?: readonly LineRange[]
+  /** Lines of `program` selected, such as a suppressed path picked in the plate tree. */
+  readonly selected?: readonly LineRange[]
 }
 
 /** A problem the viewer marks where it is on its plate's bed. */

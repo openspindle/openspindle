@@ -16,6 +16,7 @@ import {
   isTerminalJobPhase,
   machineId,
   programInfo,
+  programLineOf,
   simulatedBedLine,
   programParts,
 } from "../contract/index.ts"
@@ -874,7 +875,7 @@ export class MachineController {
 
   private onLine(session: MachineSession, line: Line) {
     if (session !== this.session || !this.tracker?.streaming) return
-    if (this.playsAnotherFile(line)) return
+    if (this.playsAnotherFile(line) || this.dropsLine(line)) return
     this.applyTracker(this.tracker.line(line, session.store.telemetry))
   }
 
@@ -990,6 +991,28 @@ export class MachineController {
       `The machine began playing a file of ${size} bytes instead of the ${bytes} bytes of ${sent}: it finds the file to play by a checksum of its name, so another file on its card may be running. OpenSpindle sent Stop; check the machine before running again.`
     )
     // A start still waiting for the part fails with this reason rather than Stop's.
+    if (this.activity?.kind === "run") this.activity.controller.abort(error)
+    this.failJob(error)
+    // An unconfirmed Stop sets the lockout, which the snapshot shows.
+    this.stop().catch(() => {})
+    return true
+  }
+
+  /**
+   * A machine that leaves out a line of the file it plays, as a Z1 does when the line does not
+   * fit its queue, plays on without it: what it runs is no longer the program sent, and the
+   * lines after may not be the ones it plays either. The job fails with that reason, and the
+   * machine is stopped as by Stop.
+   */
+  private dropsLine(line: Line): boolean {
+    const dropped = this.adapter.job.droppedLine(line.text)
+    const tracker = this.tracker
+    if (dropped === null || !tracker) return false
+    const at = programLineOf(tracker.parts[tracker.part], dropped)
+    const error = new MachineError(
+      "rejected",
+      `The machine left out line ${at} of the program as it read it, so it no longer runs the program sent. OpenSpindle sent Stop; check the machine before running again.`
+    )
     if (this.activity?.kind === "run") this.activity.controller.abort(error)
     this.failJob(error)
     // An unconfirmed Stop sets the lockout, which the snapshot shows.

@@ -13,6 +13,13 @@ import type { PrepareSearch } from "@/routes/_workspace/prepare"
 import { usePrepareSelection } from "../plate-tree/use-prepare-selection"
 import { withPickedEdge, withPickedStart } from "@/domain/probing/picked-start"
 import {
+  pathRowId,
+  revealRow,
+  selectSections,
+  clearSectionSelection,
+} from "../selection"
+import { useSuppressParts } from "../suppress-parts"
+import {
   currentPicking,
   dragAtom,
   isArrangeSelection,
@@ -20,6 +27,7 @@ import {
   setMoving,
   setPicking,
 } from "./arrange-state"
+import type { OperationPicking } from "./arrange-state"
 
 /** The inspector panel with an item's settings; undefined keeps the panel shown. */
 function panelOf(item: SetupItemRef): PrepareSearch["panel"] {
@@ -27,6 +35,7 @@ function panelOf(item: SetupItemRef): PrepareSearch["panel"] {
     case "fixture":
       return "fixtures"
     case "stock":
+      return "stock"
     case "design":
       return "setup"
     case "bed":
@@ -65,7 +74,8 @@ export function toggleLock(workspace: WorkspaceStore, target: LockTarget) {
 
 /**
  * Selects a plate's setup item as clicking it in the viewer does, and the inspector shows its
- * settings; no item selects the plate alone.
+ * settings: it alone, no operation, section or path besides. No item selects nothing but the
+ * plate clicked, else the selected plate, as a click on empty space does.
  */
 export function useSelectSetupItem() {
   const workspace = useWorkspaceStore()
@@ -74,10 +84,13 @@ export function useSelectSetupItem() {
     const plate = workspace.state.plates.find(({ id }) => id === plateId)
     if (!plate || !item) {
       selectSetupItem(null)
-      if (plate) selection.selectPlate(plate.id)
+      clearSectionSelection()
+      const selected = plate?.id ?? workspace.state.selectedPlateId
+      if (selected) selection.selectPlate(selected)
       return
     }
     const movable = !setupItem(plate.setup, item)?.fixed
+    clearSectionSelection()
     selectSetupItem({ plateId: plate.id, item }, movable)
     const panel = panelOf(item)
     // The machine bed has no settings of its own: what the inspector shows stays.
@@ -97,6 +110,8 @@ export function useArrangeEvents(handlers: {
 }): ArrangeEvents {
   const workspace = useWorkspaceStore()
   const select = useSelectSetupItem()
+  const parts = useSuppressParts()
+  const selection = usePrepareSelection()
   return {
     select,
     move: (plateId, item, delta) => {
@@ -157,6 +172,25 @@ export function useArrangeEvents(handlers: {
       })
       if (!result.ok) toast.error(result.error)
     },
+    pickPart: (plateId, index) => {
+      const picked = pickedOperation(workspace, plateId, "parts")
+      if (picked) parts.toggle(picked.plate, picked.operation, index)
+    },
+    // As the plate tree selects a path: its operation, then the path alone, which the tree shows.
+    selectPart: (plateId, operationId, index) => {
+      const rowId = pathRowId(plateId, operationId, index)
+      selection.selectOperation(plateId, operationId)
+      selectSections([rowId])
+      revealRow({
+        rowId,
+        ancestors: [
+          `plate:${plateId}`,
+          `operations:${plateId}`,
+          `operation:${operationId}`,
+          `paths:${plateId}:${operationId}`,
+        ],
+      })
+    },
   }
 }
 
@@ -167,7 +201,7 @@ export function useArrangeEvents(handlers: {
 function pickedOperation(
   workspace: WorkspaceStore,
   plateId: string,
-  kind: "point" | "edges"
+  kind: OperationPicking["kind"]
 ) {
   const picking = currentPicking()
   if (!picking || picking.kind !== kind || picking.plateId !== plateId)

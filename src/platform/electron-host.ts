@@ -9,7 +9,11 @@ import type { Host } from "./host"
 import { createMachineLink } from "./machine-link"
 
 /** Exposed by the preload script; it only asks the main process for the page's RPC ports. */
-export type OpenSpindleBridge = { readonly connect: () => void }
+export type OpenSpindleBridge = {
+  readonly connect: () => void
+  /** A file's path on disk, by Electron's webUtils; empty for one that is not on disk. */
+  readonly pathOf: (file: File) => string
+}
 
 declare global {
   interface Window {
@@ -65,6 +69,10 @@ export async function connectElectronHost(
       save: (request) => peer.call("files.save", request),
       subscribeOpened: (listener) =>
         peer.subscribe("files.opened", undefined, listener),
+      // An empty path is a file that is not on disk, such as one made in the page.
+      pathOf: (file) => bridge.pathOf(file) || null,
+      linkedStatus: (request) => peer.call("files.linkedStatus", request),
+      readLinked: (request) => peer.call("files.readLinked", request),
     },
     fusion: {
       snapshot: () => peer.call("fusion.snapshot", undefined),

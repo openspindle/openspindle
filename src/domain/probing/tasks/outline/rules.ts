@@ -7,7 +7,7 @@ import { operationPhase } from "../../../operations/kinds"
 import type { Operation } from "../../../operations/operation"
 import { workOriginOnMachine } from "../../../plate/work-origin"
 import type { OperationRuleSubject, StageRule } from "../../../rules/stages"
-import { editOperation } from "../../rules"
+import { editOperation } from "../../../rules/diagnostics"
 import { setsWorkXY } from "../origin/params"
 import { outlineTarget } from "./params"
 

@@ -18,32 +18,23 @@ export function useUnsavedChanges() {
   const host = useHost()
   const workspace = useWorkspaceStore()
   useEffect(() => {
-    // `reported` is the last state the host confirmed; `latest` is the last one asked for. A
-    // send only counts, or retries, while it is still the latest: a superseded one is dropped,
-    // since the newer send that replaced it already carries the state that now matters.
-    let reported: string | null = null
+    // `latest` is the last state asked for. The host gets them in order, so each change is sent,
+    // even one back before the host confirmed the last (edited, then saved again at once). A
+    // failed send retries while it is still the latest.
     let latest: string | null = null
     let retryTimer: ReturnType<typeof setTimeout> | undefined
     const send = (edited: boolean, name: string, key: string) => {
-      void host.window.setEdited(edited, name).then(
-        () => {
-          if (latest === key) reported = key
-        },
-        (error: unknown) => {
-          log.error("Reporting unsaved changes to the window failed", error)
-          if (latest === key)
-            retryTimer = setTimeout(
-              () => send(edited, name, key),
-              RETRY_DELAY_MS
-            )
-        }
-      )
+      void host.window.setEdited(edited, name).catch((error: unknown) => {
+        log.error("Reporting unsaved changes to the window failed", error)
+        if (latest === key)
+          retryTimer = setTimeout(() => send(edited, name, key), RETRY_DELAY_MS)
+      })
     }
     const report = () => {
       const state = workspace.state
       const edited = hasUnsavedChanges(state)
       const key = `${String(edited)}:${state.project.name}`
-      if (key === reported) return
+      if (key === latest) return
       latest = key
       clearTimeout(retryTimer)
       send(edited, state.project.name, key)

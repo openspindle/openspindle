@@ -230,18 +230,6 @@ export class ProbeGridView {
     })
   }
 
-  /** Whether any grid's or touch-off's source line is inside the selection. */
-  intersects(ranges: readonly LineRange[]) {
-    return (
-      this.grids.some(({ shape }) =>
-        lineInRanges(shape.grid.sourceLine, ranges)
-      ) ||
-      this.touches.some(({ shape }) =>
-        lineInRanges(shape.touch.sourceLine, ranges)
-      )
-    )
-  }
-
   includesLine(line?: number | null) {
     return this.grids.some(({ shape }) => shape.grid.sourceLine === line)
   }

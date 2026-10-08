@@ -37,7 +37,12 @@ import {
 import { changesToolBeforeSpindle, prepareMakeraProgram } from "./dialect.ts"
 import { parseMakeraHeightMap } from "./height-map.ts"
 import { MakeraInterpreter } from "./interpreter.ts"
-import { parseFileSize, parseHomedReport, parseSwitchReport } from "./lines.ts"
+import {
+  parseDroppedLine,
+  parseFileSize,
+  parseHomedReport,
+  parseSwitchReport,
+} from "./lines.ts"
 import { MakeraTransfer } from "./transfer.ts"
 
 const command = (payload: string): OutboundFrame => ({
@@ -113,6 +118,7 @@ const makeraJob: JobProtocol = {
   // go nowhere; alarms, halts and automation messages still report.
   play: (path) => command(`play ${path}`),
   playedFileSize: parseFileSize,
+  droppedLine: parseDroppedLine,
   createCompletion: (program, bedClean, now) =>
     new MakeraCompletion(program, bedClean, now),
 }

@@ -262,6 +262,11 @@ export interface JobProtocol {
    * sent is the one playing.
    */
   playedFileSize: (text: string) => number | null
+  /**
+   * The line of a playing file the machine reports leaving out, from the line it reports it
+   * with; null for other text. The machine no longer runs the program sent.
+   */
+  droppedLine: (text: string) => number | null
   createCompletion: (
     program: PreparedProgram,
     bedClean: boolean | null,

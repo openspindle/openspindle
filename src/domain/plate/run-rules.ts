@@ -21,13 +21,14 @@ const plateHasOperations: StageRule<"run"> = {
   stage: "run",
   label: "Operations",
   description:
-    "A plate without operations has nothing to run; Prepare reports nothing for it.",
+    "A plate without operations it machines (none, or only suppressed ones) has nothing to run; Prepare reports nothing for it.",
   severity: "error",
   configurable: false,
   chain: PLATE_CHAIN,
+  // Run's subjects are the plate as it machines (`activePlate`).
   test: ({ plate }) => !plate || plate.operations.length > 0,
   explain: () => ({
-    problem: "Add an operation to this plate.",
+    problem: "Add an operation to this plate, or stop suppressing one.",
     about: PLATE_SUBJECT,
   }),
 }

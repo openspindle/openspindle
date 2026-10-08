@@ -12,6 +12,7 @@ import {
   CLEARANCE_Z,
   DEFAULT_SURFACE_Z,
   changeTool,
+  heightSpan,
   heightTable,
   levelGrid,
   machineOf,
@@ -65,6 +66,11 @@ export type SimulatorOptions = {
   readonly noDoneSnapshot: boolean
   /** Halt with a probe failure when this 1-based line plays. */
   readonly failAtLine: number | null
+  /**
+   * Leave out this 1-based line of a played file, as the player does when a line the ESP32
+   * streams does not fit its queue: it reports the line counted from 0 and plays on.
+   */
+  readonly dropLine: number | null
   /** Commands (regular expression) whose acknowledgement is never sent. */
   readonly dropAcks: RegExp | null
   /**
@@ -152,6 +158,11 @@ export class SimulatedZ1 {
   homed: boolean
   halted = false
   haltReason = 0
+  /**
+   * The applied height map's span (Robot max_delta), from a grid until M370 or a restart; null
+   * while it applies none. Halts, homing and jobs keep it.
+   */
+  compensation: number | null = null
   /** Whether the E-stop is pressed (`pressEstop`). */
   estop = false
   answeringStatus = true
@@ -385,7 +396,7 @@ export class SimulatedZ1 {
     const player = this.player
     if (player?.suspended) return "Pause"
     if (player?.suspending) return "Wait"
-    if (player?.toolWait) return "Tool"
+    if (player?.toolWait || this.automation?.waiting) return "Tool"
     if (now < this.motionUntil) return this.motionState
     if (!this.queue.idle(now)) return "Run"
     if (now < this.cleaningUntil) return "Run"
@@ -452,6 +463,8 @@ export class SimulatedZ1 {
       progress
         ? `|P:${progress.line},${progress.percent},${progress.elapsed}`
         : "",
+      // Kernel.cpp: "|O:%1.3f" while auto leveling is active.
+      this.compensation === null ? "" : `|O:${f3(this.compensation)}`,
       this.halted ? `|H:${this.haltReason}` : "",
       `|C:${this.options.model},${this.options.atc ? 4 : 0},0,${flag(this.absolute)}>`,
     ].join("")
@@ -712,11 +725,13 @@ export class SimulatedZ1 {
       return
     }
     if (code.startsWith("G10 L20 P0")) {
-      for (const [index, axis] of ["X", "Y", "Z"].entries())
-        if (word(code, axis) !== null) {
-          if (axis === "Z") setReference(this.lengths)
-          this.offset[index] = this.mpos[index]!
-        }
+      // Robot.cpp: the work offset puts the tool at the value given, in work coordinates.
+      for (const [index, axis] of ["X", "Y", "Z"].entries()) {
+        const value = word(code, axis)
+        if (value === null) continue
+        if (axis === "Z") setReference(this.lengths)
+        this.offset[index] = this.mpos[index] - value
+      }
       this.ok(text)
       return
     }
@@ -727,10 +742,10 @@ export class SimulatedZ1 {
     if (code === "M490.2") {
       if (this.options.atc)
         this.log("M490.2 on an ATC machine: THE TOOL WAS LOOSENED")
-      else if (this.automation?.waiting && this.player) {
+      else if (this.automation?.waiting) {
         // The scripts go on: no tool, then the new one measured at the tool sensor.
         this.automation.waiting = false
-        this.player.toolWait = false
+        if (this.player) this.player.toolWait = false
         this.log(`measuring T${this.requestedTool} at the tool sensor`)
       }
       this.ok(text)
@@ -744,6 +759,22 @@ export class SimulatedZ1 {
         (line) => this.lines(line),
         () => this.ok(text)
       )
+      return
+    }
+    // ATCHandler takes an M6 with its T word from the console too, as from a played file.
+    const toolChange = /M0*6(?![\d.])/.test(code) ? word(code, "T") : null
+    if (toolChange !== null) {
+      this.afterDrain(() => {
+        this.changeToolTo(toolChange)
+        this.ok(text)
+      })
+      return
+    }
+    // ATCHandler answers M496.1 to M496.4 at once and moves in its main loop after.
+    const goTo = /^M0*496(?:\.([1-4]))?(?![\d.])/.exec(code)
+    if (goTo) {
+      this.ok(text)
+      this.afterDrain(() => this.goTo(Number(goTo[1] || "1")))
       return
     }
     this.motion(code, 0)
@@ -822,6 +853,12 @@ export class SimulatedZ1 {
       case "331.4":
       case "332.4":
         this.antiStatic = m === "331.4"
+        return true
+      case "370":
+      case "561":
+        // CartGridStrategy: the grid is cleared and compensation off.
+        this.compensation = null
+        this.lines("grid cleared and disabled")
         return true
       case "2":
       case "30":
@@ -930,13 +967,33 @@ export class SimulatedZ1 {
 
   /** G28 on the Z1 parks: up to the clearance, then over to its X and Y (ATCHandler). */
   private park() {
+    this.overClearance(PARK)
+  }
+
+  /**
+   * M496.1 to M496.4 (ATCHandler, in its main loop): up to the clearance, then over to the
+   * clearance position, work X0 Y0, anchor 1 or anchor 2.
+   */
+  private goTo(position: number) {
+    const [dx, dy] = [this.options.anchors[2], this.options.anchors[3]]
+    const state = { offset: this.offset, lengths: this.lengths }
+    if (position === 2)
+      this.overClearance([machineOf(state, 0, 0), machineOf(state, 1, 0)])
+    else if (position === 3) this.overClearance(this.anchor1)
+    else if (position === 4)
+      this.overClearance([this.anchor1[0] + dx, this.anchor1[1] + dy])
+    else this.overClearance(PARK)
+  }
+
+  /** Up to the clearance, then over to machine X and Y `to`, at the seek rate. */
+  private overClearance(to: readonly [number, number]) {
     const rate = (this.seekRate * this.feedOverride) / 100
     const from: Xyz = [...this.mpos]
     this.mpos[2] = CLEARANCE_Z
     this.queueMove(from, rate, 0, false)
     const up: Xyz = [...this.mpos]
-    this.mpos[0] = PARK[0]
-    this.mpos[1] = PARK[1]
+    this.mpos[0] = to[0]
+    this.mpos[1] = to[1]
     this.queueMove(up, rate, 0, false)
   }
 
@@ -957,6 +1014,7 @@ export class SimulatedZ1 {
       columns: count("I", this.probedGrid.columns),
       rows: count("J", this.probedGrid.rows),
     }
+    this.compensation = heightSpan(this.probedGrid)
   }
 
   private heightMap() {
@@ -1013,11 +1071,13 @@ export class SimulatedZ1 {
     this.queue.advance(now)
     this.drained(now)
     const player = this.player
-    if (!player || this.drains.length) return
+    if (this.drains.length) return
+    // A routine runs whether a file plays or the console started it.
     if (this.automation) {
       this.automate(now, since)
       return
     }
+    if (!player) return
     if (player.doneAt !== null) {
       if (now - player.doneAt >= 1000) this.finish()
       return
@@ -1051,6 +1111,10 @@ export class SimulatedZ1 {
         this.readAt = null
         this.halt(2, "ALARM: Probe failed to complete")
         return
+      }
+      if (this.options.dropLine === player.index) {
+        this.lines(`Alarm:push queue error at line ${player.index - 1}`)
+        continue
       }
       this.play(line)
     }
@@ -1392,7 +1456,6 @@ export class SimulatedZ1 {
       const player = this.player
       if (
         !automation ||
-        !player ||
         automation.waiting ||
         now < automation.nextAt ||
         this.drains.length
@@ -1411,7 +1474,7 @@ export class SimulatedZ1 {
   /** Runs a routine's next step at `now`. */
   private step(
     automation: NonNullable<SimulatedZ1["automation"]>,
-    player: Player,
+    player: Player | null,
     now: number
   ) {
     if (automation.index >= automation.steps.length) {
@@ -1440,9 +1503,11 @@ export class SimulatedZ1 {
       tool: this.tool,
       lengths: this.lengths,
       surfaceAt: (x: number, y: number) => this.surfaceAt(x, y),
+      compensation: this.compensation,
     }
     const output = step.output(machine)
     this.tool = machine.tool
+    this.compensation = machine.compensation
     // The routines come down slower by the override (M220 S10), which scales their G0s too.
     const percent = /^M0*220(?![\d.])/.test(script) ? word(script, "S") : null
     if (percent !== null) this.feedOverride = overrideOf(percent)
@@ -1474,7 +1539,7 @@ export class SimulatedZ1 {
     } else this.lines(...echo, ...output)
     if (step.waitsForTool !== undefined) {
       automation.waiting = true
-      player.toolWait = true
+      if (player) player.toolWait = true
       this.log(
         `tool change: waiting for T${step.waitsForTool} (confirm with M490.2)`
       )
@@ -1523,6 +1588,8 @@ export class SimulatedZ1 {
     this.automation = null
     this.halted = false
     this.haltReason = 0
+    // The grid lives in RAM only.
+    this.compensation = null
     this.stopMotion()
     this.cleaningUntil = 0
     this.player = null

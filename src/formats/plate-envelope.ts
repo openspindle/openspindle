@@ -30,8 +30,9 @@ export const carriesPlate = (source: string) =>
  * Version 7 makes probing one kind of operation: a strategy doing a task with a probe tool.
  * Version 8 has bed coordinates from Anchor 1, with Z 0 on the MDF bed's top.
  * Version 9 names a probing operation's strategy by what it does, not by who writes its NC.
+ * Version 10 can suppress an operation, which an earlier version would run.
  */
-export const PLATE_ENVELOPE_VERSION = 9
+export const PLATE_ENVELOPE_VERSION = 10
 
 /** The oldest envelope version that can be upgraded on import. */
 export const OLDEST_PLATE_ENVELOPE_VERSION = 4
@@ -44,7 +45,8 @@ export const OLDEST_PLATE_ENVELOPE_VERSION = 4
 function firstUpgrade(payload: JsonObject): PlateUpgrade {
   const version = payload.schemaVersion
   if (typeof version !== "number" || version < 7) return "operations"
-  return version < 8 ? "bed-frame" : "strategies"
+  if (version < 8) return "bed-frame"
+  return version < 9 ? "strategies" : "suppression"
 }
 
 /**

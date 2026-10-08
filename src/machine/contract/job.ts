@@ -34,6 +34,11 @@ export const RunRequestSchema = z.strictObject({
       `Run supports NC programs up to ${RUN_LIMITS.programBytes / MiB} MiB.`
     ),
   assists: PlateAssistsSchema.nullable(),
+  /**
+   * Keep the tool the machine holds: Run does not make it forget the tool before play, so a
+   * first tool change to that tool changes nothing and the job starts without stopping for it.
+   */
+  keepTool: z.boolean().optional(),
 })
 export type RunRequest = z.infer<typeof RunRequestSchema>
 

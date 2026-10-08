@@ -1,6 +1,7 @@
 import type {
   Axis,
   CommandKind,
+  GoToTarget,
   JobState,
   MachineCommand,
   Telemetry,
@@ -28,6 +29,52 @@ const command = (
   verify,
   ...(options.startsFromAlarm ? { startsFromAlarm: true } : {}),
 })
+
+/** ATCHandler's go-to codes: each lifts Z to the clearance height first. */
+const GO_TO: Record<GoToTarget, string> = {
+  clearance: "M496.1",
+  origin: "M496.2",
+  anchor1: "M496.3",
+  anchor2: "M496.4",
+}
+
+/** How long a go-to that moved nothing stays Idle before it counts as there already, ms. */
+const GO_TO_SETTLE_MS = 1500
+
+/**
+ * Whether a go-to has ended. ATCHandler moves in its main loop after the ok, so Idle alone does
+ * not tell: the machine must have moved since, or stayed put long enough to have been there
+ * already. Work X0 Y0 is also checked by position; the clearance position and the anchors are
+ * the machine's own settings, which telemetry does not report.
+ */
+function arrived(target: GoToTarget): CommandPlan["verify"] {
+  let moved = false
+  let since: number | null = null
+  return (after, before) => {
+    since ??= after.receivedAt
+    const [from, to] = [before.machine, after.machine]
+    if (
+      after.state !== "Idle" ||
+      (from &&
+        to &&
+        (["x", "y", "z"] as const).some(
+          (key) => Math.abs(to[key] - from[key]) > 0.001
+        ))
+    )
+      moved = true
+    if (after.state !== "Idle") return false
+    if (
+      target === "origin" &&
+      !(
+        after.work &&
+        Math.abs(after.work.x) < 0.005 &&
+        Math.abs(after.work.y) < 0.005
+      )
+    )
+      return false
+    return moved || after.receivedAt - since >= GO_TO_SETTLE_MS
+  }
+}
 
 /** SimpleShell, Robot, Player, SpindleControl and Switch handlers, each with its telemetry proof. */
 export function planMakeraCommand(
@@ -78,6 +125,24 @@ export function planMakeraCommand(
             (axis) => Math.abs(after.work![axisKey(axis)]) < 0.001
           )
       )
+    case "setWork": {
+      // G10 L20 takes the controller's unit mode; the UI works in millimetres.
+      const position =
+        telemetry.units === "in"
+          ? action.position / MM_PER_INCH
+          : action.position
+      const key = axisKey(action.axis)
+      return command(
+        `G10 L20 P0 ${action.axis}${decimal(position)}`,
+        (after) =>
+          !!after.work && Math.abs(after.work[key] - action.position) < 0.001
+      )
+    }
+    case "goTo":
+      return command(GO_TO[action.target], arrived(action.target), {
+        timeoutMs: 60000,
+        motion: true,
+      })
     case "spindleStart":
       return command(
         `M3 S${action.rpm}`,
@@ -145,6 +210,22 @@ export function planMakeraCommand(
         (after) => ["Idle", "Run", "Home"].includes(after.state),
         { acknowledged: false }
       )
+    case "clearHeightMap":
+      // CartGridStrategy: the grid is cleared and compensation off, so the status drops its O.
+      return command("M370", (after) => after.compensation === null)
+    case "setTool":
+      // ATCHandler: sets the active tool (kept in EEPROM), which T reports; nothing moves.
+      return command(
+        `M493.2 T${action.tool}`,
+        (after) => after.tool === action.tool
+      )
+    case "changeTool":
+      // ATCHandler's manual change: over to where it waits for the tool, which Tool reports.
+      return command(`M6 T${action.tool}`, (after) => after.state === "Tool", {
+        acknowledged: false,
+        timeoutMs: 60000,
+        motion: true,
+      })
   }
 }
 
@@ -158,8 +239,10 @@ export const makeraRules: FirmwareRules = {
   supports(kind: CommandKind, telemetry: Telemetry, identity: Identity) {
     switch (kind) {
       case "jog":
+      case "goTo":
         return telemetry.machine !== null
       case "zero":
+      case "setWork":
         return telemetry.work !== null
       case "spindleStart":
       case "spindleStop":
@@ -188,10 +271,16 @@ export const makeraRules: FirmwareRules = {
       case "confirmToolChange":
         // On ATC machines M490.2 loosens the tool instead of ending a manual change.
         return !identity.atc
+      case "setTool":
+      case "changeTool":
+        // A tool changer would take a tool set by hand to be in its spindle and on the rack,
+        // and changes tools from its rack rather than waiting for one.
+        return !identity.atc && telemetry.tool !== null
       case "home":
       case "unlock":
       case "pause":
       case "resume":
+      case "clearHeightMap":
         return true
     }
   },
@@ -281,7 +370,9 @@ export const makeraRules: FirmwareRules = {
           ? null
           : "Homing requires an idle machine with the spindle stopped."
       case "jog":
+      case "goTo":
       case "zero":
+      case "setWork":
         if (telemetry.estop !== false)
           return "Waiting for the device to report a released emergency stop."
         if (telemetry.spindleOn !== false)
@@ -296,6 +387,23 @@ export const makeraRules: FirmwareRules = {
         return state === "Idle"
           ? null
           : "This control requires an idle machine."
+      case "clearHeightMap":
+        if (telemetry.compensation === null)
+          return "The machine applies no height map."
+        return state === "Idle" && telemetry.job === null
+          ? null
+          : "Clearing the height map requires an idle machine with no active program."
+      case "setTool":
+        return state === "Idle" && telemetry.job === null
+          ? null
+          : "Setting the tool requires an idle machine with no active program."
+      case "changeTool":
+        if (state !== "Idle" || telemetry.job !== null)
+          return "Changing the tool requires an idle machine with no active program."
+        // The firmware halts a change while the spindle runs.
+        return spindleStopped(telemetry)
+          ? null
+          : "Stop the spindle before changing the tool."
     }
   },
 

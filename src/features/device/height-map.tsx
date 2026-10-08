@@ -22,6 +22,7 @@ import {
   HeightMapGrid,
 } from "@/components/workspace/height-map-grid"
 import { ReasonButton } from "@/components/workspace/reason-button"
+import { numberText } from "./device-format"
 
 export function HeightMapCard({
   map,
@@ -55,6 +56,18 @@ export function HeightMapCard({
   )
 }
 
+/** What the machine applies now, as its status reports it. */
+export type AppliedHeights = {
+  /** The applied map's span from lowest to highest, mm; null while it applies none. */
+  readonly compensation: number | null
+  /** Machine Z of work zero. */
+  readonly workZ: number | null
+  readonly toolOffset: number | null
+}
+
+const millimetres = (value: number | null) =>
+  value === null ? "—" : `${numberText(value, 3)} mm`
+
 export function HeightMapView({
   map,
   deviceName,
@@ -62,6 +75,10 @@ export function HeightMapView({
   deferred,
   reading,
   onRetrieve,
+  applied,
+  clearReason,
+  clearing,
+  onClear,
 }: {
   map?: HeightMap
   deviceName?: string
@@ -70,6 +87,12 @@ export function HeightMapView({
   deferred: boolean
   reading: boolean
   onRetrieve: () => Promise<void>
+  /** Null while the machine does not report it. */
+  applied: AppliedHeights | null
+  /** Why clearing is unavailable; null enables it. */
+  clearReason: string | null
+  clearing: boolean
+  onClear: () => void
 }) {
   const [error, setError] = useState("")
   const [view, setView] = useState<"map" | "source">("map")
@@ -104,17 +127,46 @@ export function HeightMapView({
             </>
           )}
         </div>
-        <ReasonButton
-          label="Retrieve height map"
-          reason={readError}
-          disabled={reading}
-          onClick={() => void retrieve()}
-        >
-          {reading
-            ? "Retrieving…"
-            : `Retrieve M375.1${deferred ? " after the program" : ""}`}
-        </ReasonButton>
+        <div className="flex flex-wrap gap-2">
+          <ReasonButton
+            label="Clear height map"
+            reason={clearReason}
+            variant="outline"
+            disabled={clearing}
+            onClick={onClear}
+          >
+            {clearing ? "Clearing…" : "Clear height map"}
+          </ReasonButton>
+          <ReasonButton
+            label="Retrieve height map"
+            reason={readError}
+            disabled={reading}
+            onClick={() => void retrieve()}
+          >
+            {reading
+              ? "Retrieving…"
+              : `Retrieve M375.1${deferred ? " after the program" : ""}`}
+          </ReasonButton>
+        </div>
       </div>
+      {applied && (
+        <HeightMapFacts
+          facts={[
+            {
+              label: "Compensation",
+              value:
+                applied.compensation === null
+                  ? "Off"
+                  : `On · ${formatSpan(applied.compensation)} mm range`,
+            },
+            {
+              label: "Work Z0 at machine Z",
+              value: millimetres(applied.workZ),
+            },
+            { label: "Tool offset", value: millimetres(applied.toolOffset) },
+          ]}
+        />
+      )}
       {error && <FieldError>{error}</FieldError>}
       {!map ? (
         <FieldDescription className="py-8 text-center">

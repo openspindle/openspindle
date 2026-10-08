@@ -72,6 +72,26 @@ export const FILE_KINDS = {
     maxBytes: 32 * MiB,
     mime: "text/plain",
   },
+  /** A Gerber or Excellon drill file a PCB operation keeps (the PCB inputs' extensions). */
+  pcb: {
+    title: "PCB file",
+    extensions: [
+      "gbr",
+      "ger",
+      "gtl",
+      "gbl",
+      "gts",
+      "gbs",
+      "gko",
+      "gm1",
+      "drl",
+      "xln",
+      "txt",
+    ],
+    saveExtensions: ["gbr"],
+    maxBytes: 8 * MiB,
+    mime: "text/plain",
+  },
 } as const satisfies Record<string, FileKindSpec>
 
 export const FileKindSchema = z.enum([
@@ -81,6 +101,7 @@ export const FileKindSchema = z.enum([
   "recovery",
   "trace",
   "log",
+  "pcb",
 ])
 export type FileKind = z.infer<typeof FileKindSchema>
 
@@ -157,6 +178,43 @@ export const OpenFileResultSchema = z.discriminatedUnion("status", [
   z.strictObject({ status: z.literal("canceled") }),
 ])
 export type OpenFileResult = z.infer<typeof OpenFileResultSchema>
+
+/** A file of a kind where it was loaded from on disk: an absolute path the user chose. */
+export const LinkedFileRequestSchema = z.strictObject({
+  kind: FileKindSchema,
+  path: z.string().min(1).max(4096),
+})
+export type LinkedFileRequest = z.infer<typeof LinkedFileRequestSchema>
+
+/** SHA-256 of a file's text as the app reads it, hex: the same text has the same hash. */
+const Sha256Schema = z.string().regex(/^[0-9a-f]{64}$/)
+
+/**
+ * A linked file as it is on disk: its text's hash and when it was last modified (ms since the
+ * epoch); missing where nothing is there any more; unreadable, saying why, where it no longer
+ * is a file of its kind.
+ */
+export const LinkedFileStatusSchema = z.discriminatedUnion("status", [
+  z.strictObject({
+    status: z.literal("found"),
+    sha256: Sha256Schema,
+    modifiedAt: z.number().nonnegative(),
+  }),
+  z.strictObject({ status: z.literal("missing") }),
+  z.strictObject({
+    status: z.literal("unreadable"),
+    reason: z.string().max(2000),
+  }),
+])
+export type LinkedFileStatus = z.infer<typeof LinkedFileStatusSchema>
+
+/** A linked file read again: its name and text, and when it was last modified. */
+export const LinkedFileReadSchema = z.strictObject({
+  fileName: z.string().min(1).max(1024),
+  contents: z.string(),
+  modifiedAt: z.number().nonnegative(),
+})
+export type LinkedFileRead = z.infer<typeof LinkedFileReadSchema>
 
 /** At most this many files the system hands the app at once are opened. */
 export const MAX_OPENED_FILES = 100

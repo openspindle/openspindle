@@ -1,4 +1,8 @@
+import { useId } from "react"
 import { Play, X } from "lucide-react"
+import { Field, FieldLabel } from "@/components/ui/field"
+import { Switch } from "@/components/ui/switch"
+import { Hint } from "@/components/workspace/hint"
 import { useMachineSnapshot } from "@/platform/machine"
 import type { JobActions, MachineAction } from "./job-hooks"
 import { JobStatusBadge } from "./job-status-badge"
@@ -78,6 +82,34 @@ function JobControls({
   }
 }
 
+/** Run keeping the tool the machine holds, which is the program's first. */
+export type KeepTool = {
+  readonly tool: number
+  readonly kept: boolean
+  readonly onKeptChange: (kept: boolean) => void
+}
+
+const keepToolHint = (tool: number) =>
+  `The machine holds T${tool}, the program's first tool. Kept, the job starts without stopping to change and measure it: for a bit you set work Z with.`
+
+function KeepToolSwitch({ keepTool }: { keepTool: KeepTool }) {
+  const id = useId()
+  const hint = keepToolHint(keepTool.tool)
+  return (
+    <Field orientation="horizontal" className="w-auto">
+      <Switch
+        id={id}
+        checked={keepTool.kept}
+        aria-description={hint}
+        onCheckedChange={keepTool.onKeptChange}
+      />
+      <FieldLabel htmlFor={id}>
+        <Hint text={hint}>Keep T{keepTool.tool}</Hint>
+      </FieldLabel>
+    </Field>
+  )
+}
+
 /**
  * The top of the job panel, in view however far its stages scroll: the job's controls, and
  * its status once there is a job.
@@ -86,11 +118,14 @@ export function JobToolbar({
   view,
   actions,
   run,
+  keepTool,
 }: {
   view: JobView
   actions: JobActions
   /** Disabled with the Run checklist's first blocker. */
   run: MachineAction
+  /** Offered beside Run while the machine holds the program's first tool. */
+  keepTool: KeepTool | null
 }) {
   return (
     <div
@@ -99,6 +134,9 @@ export function JobToolbar({
       className="flex shrink-0 flex-wrap items-center gap-2 border-b p-3"
     >
       <JobControls view={view} actions={actions} run={run} />
+      {view.kind === "idle" && keepTool && (
+        <KeepToolSwitch keepTool={keepTool} />
+      )}
       {view.kind !== "idle" && (
         <div className="ml-auto min-w-0">
           <JobStatusBadge view={view} />

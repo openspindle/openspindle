@@ -26,6 +26,11 @@ export type FirmwareSetup = {
    * origin: where the machine was at Run. Absent, the program starts at the work origin.
    */
   readonly start?: Point3
+  /**
+   * The tool the machine holds as the program starts, which a tool change to changes nothing:
+   * one kept at Run. Absent, it holds none the program knows.
+   */
+  readonly tool?: number
 }
 
 /**

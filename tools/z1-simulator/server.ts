@@ -20,6 +20,7 @@ export const DEFAULT_SIMULATOR_OPTIONS: SimulatorOptions = {
   speed: 1,
   noDoneSnapshot: false,
   failAtLine: null,
+  dropLine: null,
   dropAcks: null,
   otherFile: false,
   estop: false,

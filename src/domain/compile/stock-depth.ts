@@ -86,7 +86,11 @@ function cutsOf(compiled: CompiledPlate, operationId: string): Extent | null {
  * A machining operation's cuts on the bed, with the stock they are measured against; null
  * without stock, for a setup operation, or for one that cuts nothing.
  */
-function stockCuts({ operation, plate, compiled }: OperationRuleSubject): {
+export function stockCuts({
+  operation,
+  plate,
+  compiled,
+}: OperationRuleSubject): {
   readonly area: Area
   readonly bottom: number
   readonly top: number

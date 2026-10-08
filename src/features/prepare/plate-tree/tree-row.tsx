@@ -5,6 +5,7 @@ import {
   ArrowDownToLine,
   ArrowUp,
   Boxes,
+  Cylinder,
   ChevronDown,
   ChevronRight,
   Eye,
@@ -21,6 +22,7 @@ import {
   Pause,
   PencilLine,
   Plus,
+  Spline,
   SquareDashed,
   Ungroup,
   Wrench,
@@ -50,13 +52,15 @@ import {
   useWorkspaceStore,
 } from "@/app/workspace/workspace-context"
 import type { StepId } from "@/app/workspace/history"
+import { isProgramFileName } from "@/app/workspace/import-files"
 import type { WorkspaceStore } from "@/app/workspace/store"
 import type { SectionKind } from "@/domain/compile/sections"
 import { isBedKind, isLocked } from "@/domain/fixtures/definitions"
 import type { Operation } from "@/domain/operations/operation"
+import { isSuppressed } from "@/domain/plate/active"
 import { plateLabel } from "@/domain/plate/plate"
 import type { Plate } from "@/domain/plate/plate"
-import { TEXT_LIMIT } from "@/domain/primitives"
+import { TEXT_LIMIT, newId } from "@/domain/primitives"
 import { boundTools } from "@/domain/tools/tool-table"
 import type { WorkspaceCommand } from "@/domain/workspace/workspace"
 import { useFusionUpdate } from "@/features/fusion360/use-fusion-update"
@@ -65,6 +69,7 @@ import { openDialog } from "@/features/shell/dialogs"
 import { lockToggleCopy, toggleLock } from "../arrange/use-arrange-events"
 import { FIXTURE_ICONS } from "../fixtures/fixture-icon"
 import { selectSections } from "../selection"
+import { useSuppressParts } from "../suppress-parts"
 import {
   fixtureKey,
   setFixturesHidden,
@@ -77,6 +82,9 @@ import type { TreeRow } from "./tree-rows"
 import type { TreeTableRow } from "./plate-tree"
 
 const INDENT = ["pl-1", "pl-4", "pl-7", "pl-10", "pl-13"] as const
+
+/** A suppressed item's icon and name: faint, as the 3D view draws what it leaves out. */
+const SUPPRESSED = "opacity-45"
 
 const SECTION_ICONS: Partial<Record<SectionKind, LucideIcon>> = {
   "tool-change": Wrench,
@@ -92,6 +100,10 @@ type RowProps = {
   selectedOperationId: string | null
   /** The fixture selected in the viewer, on the selected plate. */
   selectedFixtureId: string | null
+  /** The selected plate, while its stock is selected in the viewer. */
+  selectedStockPlateId: string | null
+  /** Selects a plate's stock, else shows its Stock panel. */
+  onSelectStock: (plateId: string) => void
   onToggle: () => void
   onSelectPlate: (plateId: string) => void
   onSelectOperation: (plateId: string, operationId: string) => void
@@ -335,6 +347,33 @@ function GroupEye({
 }
 
 /** The plate's fixtures: hide them all, show the Fixtures panel, or add one. */
+/** The plate's stock: selecting it shows it selected in the viewer and its panel, with its name beside. */
+function StockRow(
+  props: RowProps & { node: Extract<TreeRow, { kind: "stock" }> }
+) {
+  const { node, row } = props
+  const { plate } = node
+  const active = props.selectedStockPlateId === plate.id
+  return (
+    <RowFrame row={row} selected={active}>
+      {/* In line with the groups beside it: their expand button and eye. */}
+      <span className="size-6 shrink-0" />
+      <span className="size-6 shrink-0" />
+      <RowButton
+        active={active}
+        title={`Stock of ${node.owner}`}
+        onClick={() => props.onSelectStock(plate.id)}
+      >
+        <Cylinder />
+        <span className="truncate">{node.label}</span>
+        <span className="truncate text-muted-foreground">
+          {plate.setup.stock?.name ?? "None"}
+        </span>
+      </RowButton>
+    </RowFrame>
+  )
+}
+
 function FixturesRow(
   props: RowProps & { node: Extract<TreeRow, { kind: "fixtures" }> }
 ) {
@@ -597,6 +636,35 @@ function transferCommand(
   }
 }
 
+/** A copy's name: "copy" after the name, before a program file's extension. */
+const copyName = (name: string) =>
+  isProgramFileName(name)
+    ? name.replace(/(\.[a-z0-9]+)$/i, " copy$1")
+    : `${name} copy`
+
+/**
+ * Adds a copy of an operation right after it, with its tools, as a new operation of its own:
+ * editing either leaves the other as it is.
+ */
+function duplicateCommand(
+  plate: Plate,
+  operation: Operation
+): Extract<WorkspaceCommand, { type: "operation.add" }> {
+  return {
+    type: "operation.add",
+    plateId: plate.id,
+    operation: {
+      ...structuredClone(operation),
+      id: newId(),
+      name: copyName(operation.name),
+      revision: 0,
+      tools: [],
+    },
+    preferredTools: boundTools(plate, operation),
+    index: plate.operations.findIndex(({ id }) => id === operation.id) + 1,
+  }
+}
+
 /**
  * Brings an operation up to date from where it came from: a Fusion 360 NC program posted
  * again.
@@ -632,25 +700,39 @@ function UpdateItems({
 }
 
 /**
- * An operation's context menu: update it from where it came from, move it to another plate, or
- * remove it.
+ * An operation's context menu: suppress it or include it again, update it from where it came
+ * from, move it to another plate, or remove it.
  */
 function OperationMenu({
   plate,
   operation,
+  onSuppress,
+  onDuplicate,
   onMove,
   onRemove,
 }: {
   plate: Plate
   operation: Operation
+  onSuppress: (value: boolean) => void
+  onDuplicate: () => void
   onMove: (plateId: string) => void
   onRemove: () => void
 }) {
   const plates = useWorkspace((state) => state.plates)
   const plateId = plate.id
+  const suppressed = isSuppressed(operation)
   return (
     <>
+      <ContextMenuItem onClick={() => onSuppress(!suppressed)}>
+        {suppressed ? "Unsuppress" : "Suppress"}
+      </ContextMenuItem>
       <UpdateItems plate={plate} operation={operation} />
+      <ContextMenuItem
+        disabled={plate.operations.length >= 100}
+        onClick={onDuplicate}
+      >
+        Duplicate
+      </ContextMenuItem>
       <ContextMenuSub>
         <ContextMenuSubTrigger disabled={plates.length < 2}>
           Move to
@@ -682,7 +764,15 @@ function OperationRow(
   const iconOf = useOperationIcon()
   const Icon = iconOf(operation)
   const hidden = useHiddenOperations().has(operation.id)
+  const suppressed = isSuppressed(operation)
   const active = props.selectedOperationId === operation.id
+  const suppress = (value: boolean) =>
+    workspace.dispatch({
+      type: "operation.suppress",
+      plateId: plate.id,
+      operationId: operation.id,
+      value,
+    })
   const move = (index: number) =>
     workspace.dispatch({
       type: "operation.move",
@@ -698,6 +788,16 @@ function OperationRow(
       operationId: operation.id,
     })
     if (removed.ok) toastUndoable(workspace, previous, `Removed ${node.label}.`)
+  }
+  // The copy is selected, as an operation just added is.
+  const duplicate = () => {
+    const command = duplicateCommand(plate, operation)
+    const added = workspace.dispatch(command)
+    if (!added.ok) {
+      toast.error(added.error)
+      return
+    }
+    props.onSelectOperation(plate.id, command.operation.id)
   }
   const moveTo = (targetId: string) => {
     const { plates } = workspace.state
@@ -738,11 +838,13 @@ function OperationRow(
         </IconAction>
         <RowButton
           active={active}
-          title={operation.name}
+          title={suppressed ? `${operation.name} (suppressed)` : operation.name}
           onClick={() => props.onSelectOperation(plate.id, operation.id)}
         >
-          <Icon />
-          <span className="truncate">{node.label}</span>
+          <Icon className={cn(suppressed && SUPPRESSED)} />
+          <span className={cn("truncate", suppressed && SUPPRESSED)}>
+            {node.label}
+          </span>
         </RowButton>
         <ErrorCount count={node.errors} />
         <IconAction
@@ -779,6 +881,8 @@ function OperationRow(
         <OperationMenu
           plate={plate}
           operation={operation}
+          onSuppress={suppress}
+          onDuplicate={duplicate}
           onMove={moveTo}
           onRemove={remove}
         />
@@ -895,11 +999,115 @@ function SectionRow(
   )
 }
 
+/** What suppressing paths offers for all of them: invert which run, or run all again. */
+function PathsMenuItems({
+  plate,
+  operation,
+}: {
+  plate: Plate
+  operation: Operation
+}) {
+  const parts = useSuppressParts()
+  return (
+    <>
+      <ContextMenuItem onClick={() => parts.invert(plate, operation)}>
+        Invert suppressed paths
+      </ContextMenuItem>
+      <ContextMenuItem
+        disabled={!operation.suppressedParts?.length}
+        onClick={() => parts.clear(plate, operation)}
+      >
+        Unsuppress all paths
+      </ContextMenuItem>
+    </>
+  )
+}
+
+function PathsRow(
+  props: RowProps & { node: Extract<TreeRow, { kind: "paths" }> }
+) {
+  const { node, row } = props
+  const { plate, operation, count, suppressed } = node
+  return (
+    <ContextMenu>
+      <ContextMenuTrigger
+        className="data-popup-open:bg-sidebar-accent"
+        render={<RowFrame row={row} selected={false} />}
+      >
+        <ExpandButton row={row} onToggle={props.onToggle} />
+        <RowButton active={false} onClick={props.onToggle}>
+          <Spline />
+          <span className="truncate">{node.label}</span>
+        </RowButton>
+        <Badge
+          variant="secondary"
+          className="font-numeric"
+          title={
+            suppressed
+              ? `${count - suppressed} of ${count} paths run; ${suppressed} suppressed`
+              : `${count} paths`
+          }
+        >
+          {suppressed ? `${count - suppressed}/${count}` : count}
+        </Badge>
+      </ContextMenuTrigger>
+      <ContextMenuContent>
+        <PathsMenuItems plate={plate} operation={operation} />
+      </ContextMenuContent>
+    </ContextMenu>
+  )
+}
+
+function PathRow(
+  props: RowProps & { node: Extract<TreeRow, { kind: "path" }> }
+) {
+  const { node, row } = props
+  const { plate, operation, part, suppressed } = node
+  const parts = useSuppressParts()
+  const selected = row.getIsSelected()
+  const [x, y] = part.center
+  const toggle = () => parts.toggle(plate, operation, part.index)
+  return (
+    <ContextMenu>
+      <ContextMenuTrigger
+        className="data-popup-open:bg-sidebar-accent"
+        render={<RowFrame row={row} selected={selected} />}
+      >
+        <span className="size-7 shrink-0" />
+        <RowButton
+          active={selected}
+          title={`${node.label} · X ${x.toFixed(2)} Y ${y.toFixed(2)}${suppressed ? " (suppressed)" : ""}`}
+          onClick={props.onSelectSection}
+        >
+          <Spline className={cn(suppressed && SUPPRESSED)} />
+          <span className={cn("truncate", suppressed && SUPPRESSED)}>
+            {node.label}
+          </span>
+        </RowButton>
+      </ContextMenuTrigger>
+      <ContextMenuContent>
+        <ContextMenuItem onClick={toggle}>
+          {suppressed ? "Unsuppress" : "Suppress"}
+        </ContextMenuItem>
+        <ContextMenuItem
+          onClick={() => parts.only(plate, operation, part.index)}
+        >
+          Run only this path
+        </ContextMenuItem>
+        <ContextMenuSeparator />
+        <PathsMenuItems plate={plate} operation={operation} />
+      </ContextMenuContent>
+    </ContextMenu>
+  )
+}
+
 export function TreeRowView(props: RowProps) {
   const node = props.row.original
   switch (node.kind) {
     case "plate":
       return <PlateRow {...props} node={node} />
+    case "stock":
+      return <StockRow {...props} node={node} />
     case "fixtures":
       return <FixturesRow {...props} node={node} />
     case "fixture":
@@ -912,5 +1120,9 @@ export function TreeRowView(props: RowProps) {
       return <GroupRow {...props} node={node} />
     case "section":
       return <SectionRow {...props} node={node} />
+    case "paths":
+      return <PathsRow {...props} node={node} />
+    case "path":
+      return <PathRow {...props} node={node} />
   }
 }
