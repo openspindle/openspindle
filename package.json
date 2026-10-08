@@ -68,7 +68,7 @@
     "clipper2-ts": "2.0.1-18",
     "cn": "^0.2.6",
     "electron": "^44.4.5",
-    "electron-builder": "^26.15.3",
+    "electron-builder": "^26.17.0",
     "electron-updater": "^6.8.9",
     "electron-vite": "^6.0.0-beta.1",
     "eslint": "^9",
@@ -94,5 +94,8 @@
     "@fontsource-variable/jetbrains-mono": "^5.3.0",
     "@fontsource-variable/roboto": "^5.3.0",
     "input-otp": "^1.5.0"
+  },
+  "overrides": {
+    "global-agent": "^4.1.3"
   }
 }
