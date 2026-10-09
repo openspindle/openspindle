@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.4.0](https://github.com/openspindle/openspindle/compare/v0.3.0...v0.4.0) (2026-10-09)
+
+
+### Features
+
+* Suppress operations and paths, even solder-mask clearing, machine origin and more device controls ([#41](https://github.com/openspindle/openspindle/issues/41)) ([04f0e9d](https://github.com/openspindle/openspindle/commit/04f0e9dd2bb94a63832a1056c85f0a07716610ae))
+* **windows:** A Windows installer, built and released with the Mac app ([#39](https://github.com/openspindle/openspindle/issues/39)) ([dbc8f2b](https://github.com/openspindle/openspindle/commit/dbc8f2b83d4bb495837dcfd87525f0f4c6b34c54))
+
 ## [0.3.0](https://github.com/openspindle/openspindle/compare/v0.2.0...v0.3.0) (2026-10-03)
 
 
