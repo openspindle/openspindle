@@ -1,4 +1,4 @@
-import { readFile, writeFile } from "node:fs/promises"
+import { readFile, rm, writeFile } from "node:fs/promises"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 import type { AfterPackContext } from "electron-builder"
@@ -280,7 +280,11 @@ export function compactCredits(html: string, electronVersion: string): string {
 
 let credits: Promise<string> | undefined
 
-/** electron-builder's afterPack hook: LICENSES.chromium.txt among the app's resources. */
+/**
+ * electron-builder's afterPack hook: LICENSES.chromium.txt among the app's resources, in place
+ * of the LICENSES.chromium.html that electron-builder keeps beside the executable on Windows and
+ * among the resources on macOS.
+ */
 export async function afterPack(context: AfterPackContext): Promise<void> {
   credits ??= Promise.all([
     readFile(path.join(ELECTRON, "dist/LICENSES.chromium.html"), "utf8"),
@@ -288,8 +292,11 @@ export async function afterPack(context: AfterPackContext): Promise<void> {
   ]).then(([html, manifest]) =>
     compactCredits(html, (JSON.parse(manifest) as { version: string }).version)
   )
-  await writeFile(
-    path.join(context.packager.getResourcesDir(context.appOutDir), FILE),
-    await credits
+  const resources = context.packager.getResourcesDir(context.appOutDir)
+  await writeFile(path.join(resources, FILE), await credits)
+  await Promise.all(
+    [resources, context.appOutDir].map((dir) =>
+      rm(path.join(dir, "LICENSES.chromium.html"), { force: true })
+    )
   )
 }
