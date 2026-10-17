@@ -186,6 +186,8 @@ export interface TransferProtocol {
   receive: (frame: InboundFrame) => OutboundFrame[]
   /** Frames that abandon an in-flight transfer. */
   cancel: () => OutboundFrame[]
+  /** Frames to send when the device has answered nothing for a while; none to keep waiting. */
+  stalled?: () => OutboundFrame[]
 }
 
 /** Download of one bounded configuration file; the runner verifies its digest and text. */
@@ -393,6 +395,21 @@ export interface FirmwareAdapter {
     admit: (telemetry: Telemetry) => string | null
     /** What a line reports of the switches; null for unrelated text. */
     parse: (text: string) => Omit<SwitchReport, "at"> | null
+  }
+  /**
+   * The machine's clock, which dates the files it writes, set when connecting finds it off;
+   * absent when it has none.
+   */
+  readonly clock?: {
+    /** Machine-state preconditions for reading and setting it, or null. */
+    admit: (telemetry: Telemetry) => string | null
+    readonly query: OutboundFrame
+    /** The clock's seconds from the line reporting them; null for other text. */
+    parse: (text: string) => number | null
+    /** Sets the clock; the machine answers nothing. */
+    set: (seconds: number) => OutboundFrame
+    /** What the clock reads at `now` (milliseconds since the epoch) when it is right. */
+    seconds: (now: number) => number
   }
   cameraUrl: (device: ConnectedDevice) => string | null
 }

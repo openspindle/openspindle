@@ -7,6 +7,7 @@ import type {
 import { withInstanceOrigin } from "@/domain/fixtures/definitions"
 import type { Tool } from "@/domain/tools/tool"
 import type { Stock } from "@/domain/stock/stock"
+import type { MarkedStock } from "@/domain/nc/stock-markers"
 import { kitForPlate } from "../fixtures/catalog"
 import { sameFixtureFamily } from "../fixtures/fixture-catalog"
 import { setupOnProject } from "./project-profile"
@@ -23,6 +24,7 @@ import {
   PlateSchema,
   PlateSetupSchema,
   plateLabel,
+  withProgramSetup,
   withStockChange,
 } from "../plate/plate"
 import { isSuppressed } from "../plate/active"
@@ -168,6 +170,15 @@ export type WorkspaceCommand =
   | ({
       readonly type: "plate.dismissNotice"
       readonly noticeId: string
+    } & PlateTarget)
+  /**
+   * The plate set up as its program describes it (`withProgramSetup`): an operation updated
+   * from its program reads its markers again.
+   */
+  | ({
+      readonly type: "plate.programSetup"
+      readonly marked: MarkedStock
+      readonly definitions: readonly FixtureDefinition[]
     } & PlateTarget)
   /**
    * A device's anchors changed (read from it, or realigned): only plates assigned to that
@@ -691,6 +702,17 @@ function commandResult(
       }
       return ok(next)
     }
+    case "plate.programSetup":
+      return updatePlate(state, command.plateId, (plate) => {
+        const next = withProgramSetup(
+          plate,
+          command.marked,
+          command.definitions
+        )
+        if (next === plate) return ok(plate)
+        const issue = schemaIssue(PlateSchema, next)
+        return issue ? fail(issue) : ok(next)
+      })
     case "plate.dismissNotice":
       return updatePlate(state, command.plateId, (plate) =>
         ok({

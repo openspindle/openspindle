@@ -141,27 +141,35 @@ export function bedSetupOf(
   )
 }
 
-/** All compatible catalog fixtures, with this bed setup's defaults where it places them. */
-export function bedSetupDefinitions(
+/** The fixtures, with this bed setup's defaults where it places them. */
+export function withBedSetupDefaults(
   definitions: readonly FixtureDefinition[],
-  setup: BedSetup,
-  deviceId: string | null
+  setup: BedSetup
 ): FixtureDefinition[] {
   const placements = new Map(
     setup.fixtures.map((item) => [item.definitionId, item])
   )
-  return definitions
-    .filter((definition) => fixtureCompatible(definition, deviceId))
-    .map((definition) => {
-      const placement = placements.get(definition.id)
-      return {
-        ...definition,
-        defaultEnabled: placement?.enabled ?? false,
-        defaultPosition: placement?.position ?? definition.defaultPosition,
-        defaultRotation: placement?.rotation ?? definition.defaultRotation,
-      }
-    })
+  return definitions.map((definition) => {
+    const placement = placements.get(definition.id)
+    return {
+      ...definition,
+      defaultEnabled: placement?.enabled ?? false,
+      defaultPosition: placement?.position ?? definition.defaultPosition,
+      defaultRotation: placement?.rotation ?? definition.defaultRotation,
+    }
+  })
 }
+
+/** All compatible catalog fixtures, with this bed setup's defaults where it places them. */
+export const bedSetupDefinitions = (
+  definitions: readonly FixtureDefinition[],
+  setup: BedSetup,
+  deviceId: string | null
+): FixtureDefinition[] =>
+  withBedSetupDefaults(
+    definitions.filter((definition) => fixtureCompatible(definition, deviceId)),
+    setup
+  )
 
 /** The placement a definition supplies when first added to a bed setup. */
 export const bedFixture = (definition: FixtureDefinition): BedFixture => ({

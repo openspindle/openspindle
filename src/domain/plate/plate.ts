@@ -16,6 +16,7 @@ import type {
   FixtureInstance,
 } from "@/domain/fixtures/definitions"
 import { formatMillimetres } from "@/domain/geometry/millimetres"
+import { fixtureCompatible } from "@/domain/fixtures/compatibility"
 import { kitForSetup } from "../fixtures/catalog"
 import { defaultPlateCoordinates } from "./placement"
 import type { WorkAreaXY } from "./placement"
@@ -24,7 +25,11 @@ import {
   bedAnchors,
 } from "@/domain/anchors/stored-anchors"
 import type { StoredAnchorSetup } from "@/domain/anchors/stored-anchors"
-import type { MarkedFixture, StockPlacement } from "@/domain/nc/stock-markers"
+import type {
+  MarkedFixture,
+  MarkedStock,
+  StockPlacement,
+} from "@/domain/nc/stock-markers"
 import { StockSchema } from "@/domain/stock/stock"
 import type { Stock } from "@/domain/stock/stock"
 import { OperationSchema } from "../operations/operation"
@@ -368,22 +373,76 @@ const sizeText = (size: readonly number[]) =>
   size.map((length) => formatMillimetres(Number(length.toFixed(2)))).join(" × ")
 
 /**
+ * The fixture library's fixture a program names (Fusion 360's use number, as in "Jig:1", aside):
+ * one for the plate's machine before others.
+ */
+function programFixtureDefinition(
+  definitions: readonly FixtureDefinition[],
+  name: string,
+  deviceId: string | null
+): FixtureDefinition | null {
+  const key = fixtureKey(name)
+  const named = definitions.filter((item) => fixtureKey(item.name) === key)
+  return (
+    named.find((item) => fixtureCompatible(item, deviceId)) ??
+    named.at(0) ??
+    null
+  )
+}
+
+/** Whether a fixture's box, as it is turned, is the program's size. */
+function fitsSize(instance: FixtureInstance, size: readonly number[]) {
+  const box = fixtureBounds({ ...instance, position: [0, 0, 0] })
+  return (
+    !!box &&
+    box.max.every(
+      (high, axis) =>
+        Math.abs(high - box.min[axis] - size[axis]) <= FIXTURE_SIZE_TOLERANCE
+    )
+  )
+}
+
+/** The fixture turned a quarter about Z when that fits the program's size and as it is does not. */
+function turnedToFit(
+  instance: FixtureInstance,
+  size: readonly number[]
+): FixtureInstance {
+  if (fitsSize(instance, size)) return instance
+  const [aboutX, aboutY, aboutZ] = instance.rotation
+  const turned: FixtureInstance = {
+    ...instance,
+    rotation: [aboutX, aboutY, (aboutZ + 90) % 360],
+  }
+  return fitsSize(turned, size) ? turned : instance
+}
+
+/** Whether a notice says a plate does not have a fixture its program names. */
+const missingFixtureNotice = (name: string, message: string) =>
+  message.startsWith(`${fixtureName(name)} holds the program's stock, but `)
+
+/** Whether a notice is one placing a program's fixtures gives (`withProgramFixtures`). */
+const programFixtureNotice = (message: string) =>
+  message.includes(" holds the program's stock, but ") ||
+  message.includes(" mm in the program but ") ||
+  message.endsWith(" so it stays where it is, not where the program has it.") ||
+  message.startsWith("The plate holds no more fixtures, so it does not have ")
+
+/**
  * The setup with the fixtures that hold its program's stock (`fixtures`, read from its markers)
- * where the program has them beside the stock: each is the device's fixture of that name
- * (`definitions`; Fusion 360's use number, as in "Jig:1", aside), the plate's own if it has one,
- * enabled. The stock and the fixtures under it keep the program's heights between them, the
- * lowest resting on what carries it (a wasteboard under it, else the bed), and the work origin
- * moves up with the stock; the other fixtures rest on what carries them. They stay relative to
- * the anchor the stock is. Beds stay as the plate has them. Notices say which fixtures the plate
- * could not have, and which differ in size from the program's. A setup without stock stays as it
- * is.
+ * where the program has them beside the stock: each is the fixture library's fixture of that
+ * name (`programFixtureDefinition`), the plate's own if it has one, enabled, turned a quarter
+ * when that fits the program's box. The stock and the fixtures under it keep the program's
+ * heights between them, the lowest resting on what carries it (a wasteboard under it, else the
+ * bed), and the work origin moves up with the stock; the other fixtures rest on what carries
+ * them. They stay relative to the anchor the stock is. Beds stay as the plate has them. Notices
+ * say which fixtures the plate could not have, and which differ in size from the program's. A
+ * setup without stock stays as it is.
  */
 export function withProgramFixtures(
   setup: PlateSetup,
   fixtures: readonly MarkedFixture[],
-  definitions: readonly FixtureDefinition[],
-  /** Where `definitions` come from, which the notices name; null without a profile. */
-  from: { readonly device: string; readonly bedSetup: string } | null = null
+  /** The fixture library, each turned as the plate's bed setup has it. */
+  definitions: readonly FixtureDefinition[]
 ): { readonly setup: PlateSetup; readonly notices: readonly string[] } {
   const { stock } = setup
   if (!stock || !fixtures.length) return { setup, notices: [] }
@@ -402,22 +461,20 @@ export function withProgramFixtures(
     readonly under: boolean
   }[] = []
   for (const marked of fixtures) {
-    const key = fixtureKey(marked.name)
-    const definition = definitions.find((item) => fixtureKey(item.name) === key)
-    const where = from
-      ? `${from.device} › ${from.bedSetup}`
-      : "the plate's device"
+    const definition = programFixtureDefinition(
+      definitions,
+      marked.name,
+      setup.deviceId
+    )
     if (!definition) {
       notices.push(
-        from
-          ? `${fixtureName(marked.name)} holds the program's stock, but ${where} has no fixture of that name, so the plate does not have it.`
-          : `${fixtureName(marked.name)} holds the program's stock, but the plate's device has no fixtures set up, so the plate does not have it.`
+        `${fixtureName(marked.name)} holds the program's stock, but the fixture library has no fixture of that name, so the plate does not have it.`
       )
       continue
     }
     if (!definition.model) {
       notices.push(
-        `${definition.name} holds the program's stock, but in ${where} it has no 3D model, so the plate does not have it.`
+        `${definition.name} holds the program's stock, but it has no 3D model, so the plate does not have it.`
       )
       continue
     }
@@ -444,21 +501,17 @@ export function withProgramFixtures(
       )
       continue
     }
-    const instance = own
-      ? { ...own, enabled: true }
-      : fixtureInstance(definition)
+    const instance = turnedToFit(
+      own ? { ...own, enabled: true } : fixtureInstance(definition),
+      marked.size
+    )
     // Its box from its position, as it is turned.
     const box = fixtureBounds({ ...instance, position: [0, 0, 0] })
     if (!box) continue
     const size = box.max.map((high, axis) => high - box.min[axis])
-    if (
-      size.some(
-        (length, axis) =>
-          Math.abs(length - marked.size[axis]) > FIXTURE_SIZE_TOLERANCE
-      )
-    )
+    if (!fitsSize(instance, marked.size))
       notices.push(
-        `${definition.name} is ${sizeText(marked.size)} mm in the program but ${sizeText(size)} mm in ${where}: check where the plate has it.`
+        `${definition.name} is ${sizeText(marked.size)} mm in the program but ${sizeText(size)} mm in the fixture library: check where the plate has it.`
       )
     const corner = [x + marked.corner[0], y + marked.corner[1]] as const
     const support = stockSupportHeight(
@@ -514,6 +567,112 @@ export function withProgramFixtures(
       workOrigin: [originX, originY, toMicrometre(originZ + bottom - rest)],
     },
     notices,
+  }
+}
+
+/**
+ * The plate set up as its program describes it again (`marked`, read from its markers when an
+ * operation is updated from it). A plate whose stock came from the program (`stockSource`
+ * "source") takes the program's stock size, its place and work origin (`withStockPlacement`) and
+ * the program's fixtures where it has them (`withProgramFixtures`; locked ones stay); its notices
+ * from placing fixtures before give way to the new ones. A plate with stock of its own keeps its
+ * setup and only gets the fixtures it does not have yet, its notices that they were missing going.
+ */
+export function withProgramSetup(
+  plate: Plate,
+  marked: MarkedStock,
+  /** The fixture library, each turned as the plate's bed setup has it. */
+  definitions: readonly FixtureDefinition[]
+): Plate {
+  const { setup } = plate
+  if (!setup.stock) return plate
+  if (setup.stockSource !== "source")
+    return withMissingFixtures(plate, marked.fixtures, definitions)
+  const kit = kitForSetup(setup)
+  // The program's fixtures are placed after the stock, as importing it places them: the stock
+  // rests on the others, and on locked ones that stay where they are.
+  const named = new Set(
+    marked.fixtures.flatMap((item) => {
+      const definition = programFixtureDefinition(
+        definitions,
+        item.name,
+        setup.deviceId
+      )
+      return definition ? [definition.id] : []
+    })
+  )
+  const placed = withStockPlacement(
+    {
+      ...setup,
+      stock: {
+        ...setup.stock,
+        width: marked.stock.width,
+        depth: marked.stock.depth,
+        height: marked.stock.height,
+      },
+      fixtures: setup.fixtures.filter(
+        (item) => !named.has(item.definition.id) || isLocked(item)
+      ),
+    },
+    marked.placement,
+    {
+      workArea: kit.workArea,
+      workAreaOrigin: kit.workAreaOrigin,
+      tableTop: kit.tableTop,
+      anchors: kit.factoryAnchors(setup.deviceId),
+    }
+  )
+  const held = withProgramFixtures(
+    { ...placed, fixtures: setup.fixtures },
+    marked.fixtures,
+    definitions
+  )
+  return {
+    ...plate,
+    setup: held.setup,
+    notices: [
+      ...plate.notices.filter((item) => !programFixtureNotice(item.message)),
+      ...held.notices.map(notice),
+    ],
+  }
+}
+
+/**
+ * The plate with the fixtures its program names that it does not have, placed as
+ * `withProgramFixtures` places them; the ones it has stay where they are. Its notices that a named
+ * fixture was missing go, and what placing them says comes instead.
+ */
+function withMissingFixtures(
+  plate: Plate,
+  fixtures: readonly MarkedFixture[],
+  definitions: readonly FixtureDefinition[]
+): Plate {
+  const { setup } = plate
+  const has = new Set(
+    setup.fixtures
+      .filter((item) => item.enabled)
+      .map((item) => item.definition.id)
+  )
+  const missing = fixtures.filter((marked) => {
+    const definition = programFixtureDefinition(
+      definitions,
+      marked.name,
+      setup.deviceId
+    )
+    return !definition || !has.has(definition.id)
+  })
+  const stale = plate.notices.filter((item) =>
+    fixtures.some((marked) => missingFixtureNotice(marked.name, item.message))
+  )
+  if (!missing.length && !stale.length) return plate
+  const held = withProgramFixtures(setup, missing, definitions)
+  return {
+    ...plate,
+    setup: held.setup,
+    notices: [
+      ...plate.notices.filter((item) => !stale.includes(item)),
+      ...held.notices.map(notice),
+    ],
   }
 }
 

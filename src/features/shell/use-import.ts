@@ -23,6 +23,7 @@ import type {
   ImportTarget,
   ProgramAnswer,
 } from "@/app/workspace/import-plan"
+import { programFixtureDefinitions } from "@/app/workspace/import-program"
 import type {
   ImportContext,
   PlatePlacement,
@@ -42,6 +43,7 @@ import type { FixtureKit } from "@/domain/fixtures/fixture-kit"
 import { clearSectionSelection } from "@/features/prepare/selection"
 import { openDialog } from "./dialogs"
 import { createDefaultStockLibrary } from "@/domain/stock/catalog"
+import { markedStock } from "@/domain/nc/stock-markers"
 
 /** Workspace changes that must not interleave (imports, opening and saving projects). */
 export const WORKSPACE_MUTATION = ["workspace"] as const
@@ -106,10 +108,13 @@ export function importKit(state: WorkspaceState): FixtureKit {
 /**
  * Updates an operation from its program as it comes again (a plan whose target is the
  * operation): its NC replaced by the program's, with the issues resolved as before and as
- * answered now, and where it came from kept up to date. Its name and tools stay.
+ * answered now, and where it came from kept up to date. Its name and tools stay. Its plate is set
+ * up as the program describes it again (`withProgramSetup`): stock, work origin and fixtures as
+ * the program has them now, and fixtures added to the fixture library since.
  */
 function useApplyUpdate() {
   const workspace = useWorkspaceStore()
+  const context = useImportContext()
   return (
     plan: ImportPlan,
     target: Extract<ImportTarget, { kind: "operation" }>,
@@ -140,21 +145,48 @@ function useApplyUpdate() {
       toast.error(nc.error)
       return
     }
+    const imports = context()
+    const marked = markedStock(
+      program.text.split(/\r\n?|\n/),
+      program.fileName,
+      imports.stock
+    )
     const result = workspace.dispatch({
-      type: "operation.source",
-      plateId: plate.id,
-      operationId: operation.id,
-      source: {
-        ...operation.source,
-        nc: nc.value,
-        origin: program.origin
-          ? { ...program.origin, part: target.part, resolutions }
-          : operation.source.origin,
-      },
-      expectedRevision: operation.revision,
+      type: "batch",
+      commands: [
+        {
+          type: "operation.source",
+          plateId: plate.id,
+          operationId: operation.id,
+          source: {
+            ...operation.source,
+            nc: nc.value,
+            origin: program.origin
+              ? { ...program.origin, part: target.part, resolutions }
+              : operation.source.origin,
+          },
+          expectedRevision: operation.revision,
+        },
+        ...(marked
+          ? [
+              {
+                type: "plate.programSetup" as const,
+                plateId: plate.id,
+                marked,
+                definitions: programFixtureDefinitions(imports, plate.setup),
+              },
+            ]
+          : []),
+      ],
     })
-    if (!result.ok) toast.error(result.error)
-    else if (nc.value === operation.source.nc)
+    if (!result.ok) {
+      toast.error(result.error)
+      return
+    }
+    const placed =
+      result.value.plates.find((item) => item.id === plate.id)?.setup !==
+      plate.setup
+    if (nc.value === operation.source.nc && !placed)
       toast.success(`${operation.name} is up to date.`)
     else toast.success(`Updated ${operation.name}.`)
   }

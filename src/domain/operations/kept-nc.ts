@@ -12,7 +12,7 @@ import type { Plate } from "../plate/plate"
 import { fail, ok } from "../primitives"
 import type { OperationKind, ResolveContext, ResolvedNc } from "./kinds"
 import type { Operation, SourceKind } from "./operation"
-import { operationParts, suppressedParts, withoutParts } from "./toolpath-parts"
+import { suppressedParts, withoutParts } from "./toolpath-parts"
 
 const plain = (nc: string): ResolvedNc => ({
   nc,
@@ -39,6 +39,62 @@ export const fileKind: OperationKind<"file"> = {
     ok(plain(source.park ? source.nc : withoutClosingPark(source.nc, kit))),
 }
 
+/** A line's words without its comments, in capitals. */
+const words = (line: string) =>
+  line
+    .replace(/\([^)]*\)|;.*$/g, "")
+    .trim()
+    .toUpperCase()
+
+/** A word's number as the line writes it; null without the word. */
+const wordText = (text: string, letter: string) =>
+  new RegExp(`(?:^|[^A-Z])${letter}\\s*([-+]?(?:\\d+\\.?\\d*|\\.\\d+))`).exec(
+    text
+  )?.[1] ?? null
+
+const changesTool = (text: string) => /(?:^|[^0-9.])M0*6(?![0-9.])/.test(text)
+
+/**
+ * pcb2gcode's program with travel over where each tool starts cutting, after the change to it:
+ * pcb2gcode goes down to its travel height wherever the change left the tool, then moves in X
+ * and Y. Before that descent the tool goes to its tool change height (the Z it retracted to for
+ * the change) and over its first move there, every axis in the line.
+ */
+function withTravelAfterChanges(nc: string): string {
+  const lines = nc.split(/\r?\n/)
+  const output: string[] = []
+  let z: string | null = null
+  let changedAt: string | null = null
+  for (const [index, line] of lines.entries()) {
+    const text = words(line)
+    const lineZ = wordText(text, "Z")
+    const movesXY = wordText(text, "X") !== null || wordText(text, "Y") !== null
+    if (changedAt !== null && (movesXY || lineZ !== null)) {
+      const height = changedAt
+      changedAt = null
+      if (!movesXY) {
+        const first = lines
+          .slice(index + 1)
+          .map(words)
+          .find(
+            (later) =>
+              changesTool(later) ||
+              wordText(later, "X") !== null ||
+              wordText(later, "Y") !== null
+          )
+        const x = first && wordText(first, "X")
+        const y = first && wordText(first, "Y")
+        if (first && !changesTool(first) && x !== null && y !== null)
+          output.push(`G00 Z${height}`, `G00 X${x} Y${y} Z${height}`)
+      }
+    }
+    if (changesTool(text) && z !== null) changedAt = z
+    if (lineZ !== null) z = lineZ
+    output.push(line)
+  }
+  return output.join("\n")
+}
+
 export const pcbKind: OperationKind<"pcb"> = {
   kind: "pcb",
   label: "PCB",
@@ -46,9 +102,8 @@ export const pcbKind: OperationKind<"pcb"> = {
   generated: false,
   phase: () => "machining",
   /**
-   * Its program without the parts it suppresses (`withoutParts`), and where the first part it
-   * cuts starts: pcb2gcode goes down to its tool change height, and after the change to its
-   * travel height, wherever the tool is before its first move in X and Y.
+   * Its program without the parts it suppresses (`withoutParts`), going over where each tool
+   * starts cutting before it goes down (`withTravelAfterChanges`).
    */
   resolve: (operation) => {
     const { nc } = operation.source
@@ -66,13 +121,13 @@ export const pcbKind: OperationKind<"pcb"> = {
     const parts = operation.suppressedParts?.length
       ? suppressedParts(operation)
       : null
-    const first = (parts?.parts ?? operationParts(operation))?.find(
-      (part) => !parts?.matched.has(part.index)
+    return ok(
+      plain(
+        withTravelAfterChanges(
+          parts ? withoutParts(nc, parts.parts, parts.matched) : nc
+        )
+      )
     )
-    return ok({
-      ...plain(parts ? withoutParts(nc, parts.parts, parts.matched) : nc),
-      ...(first && { start: first.start }),
-    })
   },
 }
 

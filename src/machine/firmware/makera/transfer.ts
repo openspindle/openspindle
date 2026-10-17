@@ -58,9 +58,13 @@ export function advertisedMd5(payload: Uint8Array): string | null {
     : null
 }
 
+/** How often the readback asks again for what the device has not answered. */
+const READBACK_REQUESTS = 2
+
 /**
  * Upload (B0 upload, B1 MD5, device-driven B2/B3 requests, B4 end) then a full
- * readback (B0 download, B1, B2 view, B3 blocks, B4). Data is never retried.
+ * readback (B0 download, B1, B2 view, B3 blocks, B4). Data is never retried; a readback request
+ * the device leaves unanswered is asked again (`stalled`).
  */
 export class MakeraTransfer implements TransferProtocol {
   private step: Stage = "upload-md5"
@@ -73,6 +77,11 @@ export class MakeraTransfer implements TransferProtocol {
   private readbackSequence = 0
   private endAcknowledgementPending = false
   private cancelled = false
+  /** The readback's view or block request the device has yet to answer, and how often it was asked again. */
+  private pending: OutboundFrame | null = null
+  private askedAgain = 0
+  /** Whether any request was asked again, so that the device may answer one twice. */
+  private reasked = false
   private readonly bytes: Uint8Array
   private readonly md5: string
   /** The digest as data, like the blocks: it is not a command. */
@@ -113,6 +122,24 @@ export class MakeraTransfer implements TransferProtocol {
     if (this.step === "done" || this.cancelled) return []
     this.cancelled = true
     return [{ type: FRAME_TYPES.fileCancel, payload: new Uint8Array(0) }]
+  }
+
+  /**
+   * The readback's unanswered request, asked again: the device cancels after about 9 s without
+   * one answered, as Makera's controller avoids by asking again. The upload's data is never sent
+   * twice, and its readback opens the file only once.
+   */
+  stalled(): OutboundFrame[] {
+    if (!this.pending || this.askedAgain >= READBACK_REQUESTS) return []
+    this.askedAgain++
+    this.reasked = true
+    return [this.pending]
+  }
+
+  private ask(frame: OutboundFrame): OutboundFrame[] {
+    this.pending = frame
+    this.askedAgain = 0
+    return [frame]
   }
 
   receive(frame: InboundFrame): OutboundFrame[] {
@@ -175,7 +202,10 @@ export class MakeraTransfer implements TransferProtocol {
           if (advertised !== null && advertised !== this.md5)
             throw new TransferError("Uploaded file checksum does not match.")
           this.step = "readback-view"
-          return [{ type: FRAME_TYPES.fileView, payload: new Uint8Array(0) }]
+          return this.ask({
+            type: FRAME_TYPES.fileView,
+            payload: new Uint8Array(0),
+          })
         }
         break
       case "readback-view":
@@ -192,10 +222,12 @@ export class MakeraTransfer implements TransferProtocol {
           )
             throw new TransferError("Invalid file verification size.")
           this.step = "readback-data"
-          return [this.requestReadbackBlock()]
+          return this.ask(this.requestReadbackBlock())
         }
         break
       case "readback-data":
+        // A request asked again may be answered twice: its later answer is one verified already.
+        if (this.answeredBefore(frame)) return []
         if (
           frame.type === FRAME_TYPES.fileData &&
           data.length > 4 &&
@@ -215,10 +247,11 @@ export class MakeraTransfer implements TransferProtocol {
             )
           this.verifiedBytes += content.length
           if (this.readbackSequence < this.readbackBlocks)
-            return [this.requestReadbackBlock()]
+            return this.ask(this.requestReadbackBlock())
           if (this.verifiedBytes !== this.bytes.length)
             throw new TransferError("Uploaded file readback is incomplete.")
           this.step = "done"
+          this.pending = null
           this.endAcknowledgementPending = true
           return [{ type: FRAME_TYPES.fileEnd, payload: new Uint8Array(0) }]
         }
@@ -228,9 +261,29 @@ export class MakeraTransfer implements TransferProtocol {
           this.endAcknowledgementPending = false
           return []
         }
+        if (this.answeredBefore(frame)) return []
         break
     }
     throw new TransferError("Unexpected file transfer response.")
+  }
+
+  /** A second answer to a request asked again: the view, or a block verified already. */
+  private answeredBefore(frame: InboundFrame) {
+    const data = frame.payload
+    return (
+      this.reasked &&
+      (frame.type === FRAME_TYPES.fileView ||
+        (frame.type === FRAME_TYPES.fileData &&
+          data.length > 4 &&
+          readU32(data) <= this.verifiedBlocks()))
+    )
+  }
+
+  /** How many readback blocks are verified. */
+  private verifiedBlocks() {
+    return this.step === "done"
+      ? this.readbackBlocks
+      : this.readbackSequence - 1
   }
 
   private requestReadbackBlock(): OutboundFrame {

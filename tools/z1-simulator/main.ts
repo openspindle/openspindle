@@ -31,6 +31,7 @@ const { values } = parseArgs({
     "md5-challenge": { type: "boolean", default: false },
     "placeholder-md5": { type: "boolean", default: false },
     "corrupt-upload": { type: "boolean", default: false },
+    "lose-readback": { type: "string" },
     "stall-after": { type: "string" },
     truth: { type: "string" },
     help: { type: "boolean", default: false },
@@ -59,6 +60,7 @@ if (values.help) {
   --md5-challenge          ask for the upload MD5 twice
   --placeholder-md5        advertise a placeholder MD5 on readback
   --corrupt-upload         corrupt the stored file (readback must fail)
+  --lose-readback <n>      leave the nth request of every readback unanswered once (1 = its view)
   --stall-after <ms>       stop answering status this long after a connection
   --truth <file>           write what the machine truly does at each status query (JSON lines)
 Keyboard: s = stall/unstall status, h = halt, e = press/release the E-stop, q = quit`)
@@ -102,6 +104,9 @@ const simulator = await serveSimulator({
       md5Challenge: values["md5-challenge"],
       placeholderMd5: values["placeholder-md5"],
       corrupt: values["corrupt-upload"],
+      loseReadback: values["lose-readback"]
+        ? Number(values["lose-readback"])
+        : null,
     },
     truth: truth && ((record) => truth.write(`${JSON.stringify(record)}\n`)),
   },

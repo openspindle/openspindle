@@ -57,6 +57,7 @@ import type { CameraEvent } from "./camera.ts"
 import { DiscoveryService } from "./discovery.ts"
 import { MachineError, cancelled } from "./errors.ts"
 import type { PartedCompletion } from "./parted-completion.ts"
+import { syncClock } from "./operations/clock.ts"
 import { executeCommand } from "./operations/command.ts"
 import { sendConsoleLine } from "./operations/console.ts"
 import type { OperationContext } from "./operations/context.ts"
@@ -209,6 +210,7 @@ export class MachineController {
     error: null,
   }
   private anchorsAttempted = false
+  private clockAttempted = false
   private readonly usedRunIds = new Set<string>()
   private readonly listeners = new Set<(snapshot: MachineSnapshot) => void>()
   private current = disconnectedSnapshot()
@@ -319,6 +321,7 @@ export class MachineController {
             this.lastError = null
             this.lockout = null
             this.anchorsAttempted = false
+            this.clockAttempted = false
             this.anchors = { value: null, reading: false, error: null }
             this.publish()
             resolve(this.snapshot())
@@ -870,6 +873,7 @@ export class MachineController {
     if (this.tracker) this.applyTracker(this.tracker.status(telemetry))
     this.maybeReadAnchorsOnConnect()
     this.scheduleDeferred()
+    this.maybeSyncClockOnConnect()
     this.publish()
   }
 
@@ -1272,6 +1276,33 @@ export class MachineController {
       return
     this.anchorsAttempted = true
     this.readAnchors().catch(() => {})
+  }
+
+  /**
+   * Each connection sets the machine's clock once, if it is off, when the machine is first idle
+   * with nothing else to do: after the anchors read and any deferred read.
+   */
+  private maybeSyncClockOnConnect() {
+    const session = this.session
+    const telemetry = session?.store.telemetry
+    const machineClock = this.adapter.clock
+    if (
+      this.clockAttempted ||
+      this.activity ||
+      this.lockout ||
+      this.deferred.length ||
+      !session?.ready ||
+      !telemetry ||
+      !machineClock ||
+      machineClock.admit(telemetry) !== null ||
+      this.streaming(telemetry)
+    )
+      return
+    this.clockAttempted = true
+    this.operate("inspection", "Setting the clock", syncClock).catch(
+      (error: unknown) =>
+        this.ports.log?.warn("Could not set the device's clock", error)
+    )
   }
 
   // ── Snapshot ───────────────────────────────────────────────────────────

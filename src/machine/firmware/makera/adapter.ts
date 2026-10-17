@@ -402,5 +402,22 @@ export const makeraAdapter: FirmwareAdapter = {
         : "The device must be idle or halted with no active program.",
     parse: parseSwitchReport,
   },
+  clock: {
+    admit: (telemetry) =>
+      telemetry.state === "Idle" && telemetry.job === null
+        ? null
+        : "The device must be idle with no active program.",
+    // SimpleShell::time_command prints "time = %ld"; given seconds, it sets the clock silently.
+    query: command("time"),
+    parse: (text) => {
+      const match = /^time = (-?\d{1,12})$/.exec(text.trim())
+      return match ? Number(match[1]) : null
+    },
+    set: (seconds) => command(`time ${seconds}`),
+    // get_fattime dates files with localtime() and no time zone, so the clock keeps local time
+    // (daylight saving included) counted as UTC, as Makera Studio and Carvera Controller set it.
+    seconds: (now) =>
+      Math.floor(now / 1000) - new Date(now).getTimezoneOffset() * 60,
+  },
   cameraUrl: (device) => `ws://${device.host}:82/ws_video`,
 }

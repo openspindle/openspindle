@@ -7,9 +7,11 @@ import type { ProgramTool } from "@/domain/nc/cam-markers"
 import { markedStock } from "@/domain/nc/stock-markers"
 import { programTools } from "@/domain/nc/tool-comments"
 import { fitsWorkArea } from "@/domain/plate/placement"
-import { bedSetupDefinitions, deviceBedSetup } from "@/domain/fixtures/profiles"
+import {
+  deviceBedSetup,
+  withBedSetupDefaults,
+} from "@/domain/fixtures/profiles"
 import type { FixtureDefinition } from "@/domain/fixtures/definitions"
-import { fixtureCompatible } from "@/domain/fixtures/compatibility"
 import type { FixtureProfiles } from "@/domain/fixtures/profiles"
 import {
   createPlate,
@@ -92,6 +94,23 @@ function leftOutNotice(leftOut: readonly string[]): string {
     more > 0 ? `${named.join(", ")}, and ${more} more` : named.join(", ")
   const verb = leftOut.length === 1 ? "was" : "were"
   return `${plural(leftOut.length, "field")} of its embedded setup ${verb} left out, which this version of OpenSpindle does not use: ${list}.`
+}
+
+/**
+ * Where a program's fixtures are found: the whole fixture library, whatever device a fixture is
+ * for, each turned as the plate's bed setup has it.
+ */
+export function programFixtureDefinitions(
+  context: Pick<ImportContext, "fixtureProfiles" | "fixtureDefinitions">,
+  setup: Pick<PlateSetup, "deviceId" | "bedSetupId">
+): FixtureDefinition[] {
+  const definitions = context.fixtureDefinitions ?? []
+  const bed = context.fixtureProfiles
+    ? deviceBedSetup(context.fixtureProfiles, setup.deviceId, setup.bedSetupId)
+    : null
+  return bed
+    ? withBedSetupDefaults(definitions, bed.bedSetup)
+    : [...definitions]
 }
 
 /** An empty plate for generated operations: the context's stock, on the selected profile. */
@@ -179,15 +198,7 @@ export function importProgram(
       stockSource: stock ? "source" : "unspecified",
       ...context.placement,
     })
-    // Where the markers put the stock, with the fixtures they say hold it, as the plate's
-    // device's bed setup defines them.
-    const bed = context.fixtureProfiles
-      ? deviceBedSetup(
-          context.fixtureProfiles,
-          setup.deviceId,
-          setup.bedSetupId
-        )
-      : null
+    // Where the markers put the stock, with the fixtures they say hold it.
     const held = marked
       ? withProgramFixtures(
           withStockPlacement(setup, marked.placement, {
@@ -197,16 +208,7 @@ export function importProgram(
             anchors: kit.factoryAnchors(setup.deviceId),
           }),
           marked.fixtures,
-          bed
-            ? bedSetupDefinitions(
-                context.fixtureDefinitions ?? [],
-                bed.bedSetup,
-                setup.deviceId
-              )
-            : (context.fixtureDefinitions ?? []).filter((definition) =>
-                fixtureCompatible(definition, setup.deviceId)
-              ),
-          bed && { device: bed.device, bedSetup: bed.bedSetup.name }
+          programFixtureDefinitions(context, setup)
         )
       : { setup, notices: [] }
     const plate = filePlate(

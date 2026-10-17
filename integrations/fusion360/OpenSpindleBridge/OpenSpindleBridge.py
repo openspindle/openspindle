@@ -183,6 +183,33 @@ def _part_position(setup):
     return distances
 
 
+def _solid_bodies(model):
+    # A fixture's solid bodies, its child occurrences' too, in the design's coordinates.
+    body = adsk.fusion.BRepBody.cast(model)
+    if body:
+        return [body] if body.isSolid else []
+    occurrence = adsk.fusion.Occurrence.cast(model)
+    if not occurrence:
+        return []
+    bodies = [item for item in occurrence.bRepBodies if item.isSolid]
+    for child in occurrence.childOccurrences:
+        bodies.extend(_solid_bodies(child))
+    return bodies
+
+
+def _fixture_box(model):
+    # The box of a fixture's solid bodies, the visible ones when it has any. An occurrence's own
+    # box takes in its sketches and work geometry too, which can reach far past the fixture.
+    bodies = _solid_bodies(model)
+    shown = [body for body in bodies if body.isVisible] or bodies
+    if not shown:
+        return model.boundingBox
+    box = shown[0].boundingBox.copy()
+    for body in shown[1:]:
+        box.combine(body.boundingBox)
+    return box
+
+
 def _fixtures(setup):
     # The setup's fixtures: each its name (its occurrence's, such as "Jig:1") and its box in the
     # design's coordinates in millimetres, which the post turns into the WCS. (The setup's own
@@ -193,7 +220,7 @@ def _fixtures(setup):
     models = setup.fixtures
     for index in range(min(models.count, _MAX_FIXTURES)):
         model = models.item(index)
-        box = model.boundingBox if model else None
+        box = _fixture_box(model) if model else None
         if box is None:
             continue
         occurrence = adsk.fusion.Occurrence.cast(model)

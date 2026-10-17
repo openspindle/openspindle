@@ -223,6 +223,8 @@ export class SimulatedZ1 {
   private motionState: "Home" | "Run" = "Run"
   private homing: { from: Xyz; startedAt: number; ms: number } | null = null
   private cleaningUntil = 0
+  /** The clock's seconds, as `time` sets them, less the seconds since the epoch then. */
+  private clockOffset = -Math.floor(Date.now() / 1000)
   private player: Player | null = null
   /** Lines the player may read before its next turn, a fraction of one included. */
   private reading = 0
@@ -653,6 +655,14 @@ export class SimulatedZ1 {
         if (!player) return this.lines("Not currently playing")
         this.abort("Aborted playing or paused file. ")
         return
+      case "time": {
+        // SimpleShell::time_command: the clock (from 0 at power-on), or sets it and says nothing.
+        const now = Math.floor(Date.now() / 1000)
+        if (!argument) return this.lines(`time = ${now + this.clockOffset}`)
+        this.clockOffset = (Number.parseInt(argument, 10) || 0) - now
+        this.log(`time set to ${now + this.clockOffset}`)
+        return
+      }
       case "reset":
         // SimpleShell::reset_command, then system_reset three seconds later.
         this.lines("Rebooting machine in 3 seconds...")

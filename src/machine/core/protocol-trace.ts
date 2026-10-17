@@ -42,6 +42,21 @@ const readable = (text: string) =>
     })
     .join("")
 
+/** The longest transfer payload the trace shows as text, as a cancel's reason. */
+const FRAME_TEXT_LIMIT = 64
+
+/** A received transfer frame by type and size, with its payload when that is short text. */
+function describeFrame(payload: Uint8Array, type: number) {
+  const size = `frame ${frameType(type)} · ${payload.byteLength} bytes`
+  if (!payload.byteLength || payload.byteLength > FRAME_TEXT_LIMIT) return size
+  const text = new TextDecoder("utf-8", { fatal: false }).decode(payload)
+  const printable = [...text.trimEnd()].every((character) => {
+    const code = character.charCodeAt(0)
+    return code === 9 || (code >= 32 && code < 127)
+  })
+  return printable && text.trim() ? `${size} · "${text.trim()}"` : size
+}
+
 /** Text frames as sent; binary frames (file transfer blocks) by type and size only. */
 export function describeOutbound(frame: OutboundFrame): string {
   if (typeof frame.payload === "string") return frame.payload
@@ -62,7 +77,7 @@ export function describeInbound(event: FirmwareEvent): string {
     case "config-error":
       return "config · error"
     case "transfer":
-      return `frame ${frameType(event.frame.type)} · ${event.frame.payload.byteLength} bytes`
+      return describeFrame(event.frame.payload, event.frame.type)
   }
 }
 

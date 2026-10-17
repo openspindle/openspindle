@@ -138,6 +138,17 @@ export function planMakeraCommand(
           !!after.work && Math.abs(after.work[key] - action.position) < 0.001
       )
     }
+    case "setOrigin": {
+      // G10 L2 takes the controller's unit mode; P0 is the work coordinate system in use.
+      const scale = telemetry.units === "in" ? 1 / MM_PER_INCH : 1
+      return command(
+        `G10 L2 P0 X${decimal(action.x * scale)} Y${decimal(action.y * scale)}`,
+        (after) =>
+          !!after.workOrigin &&
+          Math.abs(after.workOrigin.x - action.x) < 0.001 &&
+          Math.abs(after.workOrigin.y - action.y) < 0.001
+      )
+    }
     case "goTo":
       return command(GO_TO[action.target], arrived(action.target), {
         timeoutMs: 60000,
@@ -244,6 +255,8 @@ export const makeraRules: FirmwareRules = {
       case "zero":
       case "setWork":
         return telemetry.work !== null
+      case "setOrigin":
+        return telemetry.workOrigin !== null
       case "spindleStart":
       case "spindleStop":
         return telemetry.spindleRpm !== null && telemetry.laserMode !== true
@@ -373,6 +386,7 @@ export const makeraRules: FirmwareRules = {
       case "goTo":
       case "zero":
       case "setWork":
+      case "setOrigin":
         if (telemetry.estop !== false)
           return "Waiting for the device to report a released emergency stop."
         if (telemetry.spindleOn !== false)

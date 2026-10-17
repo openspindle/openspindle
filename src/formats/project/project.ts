@@ -45,8 +45,8 @@ type Saved = {
  * An operation's instruction: the exact NC it contributes (stored, or derived from its
  * parameters and the project's tool library `tools` for procedural kinds), or a pending entry
  * until it has NC. Opening a file documents the project as the file saved it (`saved`), as
- * derived NC: a procedural kind's, or kept NC with paths suppressed, whose lines newer versions
- * may write differently.
+ * derived NC: a procedural kind's, a PCB operation's (its travel after tool changes) or kept NC
+ * with paths suppressed, whose lines newer versions may write differently.
  */
 function instruction(
   plate: Plate,
@@ -57,7 +57,9 @@ function instruction(
   const id = `${plate.id}/${operation.id}`
   const name = saved?.names.get(id) ?? operation.name
   const derived =
-    kindOf(operation).generated || !!operation.suppressedParts?.length
+    kindOf(operation).generated ||
+    operation.source.kind === "pcb" ||
+    !!operation.suppressedParts?.length
   if (saved && derived) {
     const nc = saved.nc.get(id)
     return nc === undefined

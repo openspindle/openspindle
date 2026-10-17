@@ -20,6 +20,8 @@ import { freshStatus, requireAdmission } from "./context.ts"
 import type { OperationContext } from "./context.ts"
 
 const STEP_MS = 10_000
+/** Silence in a transfer after which it asks the device again (`TransferProtocol.stalled`). */
+const STALL_MS = 3000
 /** Upload, readback and both preflights together, for each file sent. */
 const PREPARATION_MS = 80_000
 /**
@@ -340,6 +342,16 @@ async function transferProgram(
   progress()
   hooks.transferring(protocol)
   const release = session.suspendPolling()
+  const { clock } = context
+  let stall: ReturnType<typeof clock.setTimeout> | null = null
+  const watch = () => {
+    clock.clearTimeout(stall)
+    stall = clock.setTimeout(() => {
+      for (const frame of protocol.stalled?.() ?? []) session.send(frame)
+      watch()
+    }, STALL_MS)
+  }
+  watch()
   try {
     await session.request<void>(
       protocol.start(),
@@ -354,6 +366,7 @@ async function transferProgram(
               }
             : "ignored"
         if (event.kind !== "transfer") return "ignored"
+        watch()
         let frames
         try {
           frames = protocol.receive(event.frame)
@@ -382,6 +395,7 @@ async function transferProgram(
       for (const frame of protocol.cancel()) session.send(frame)
     throw error
   } finally {
+    clock.clearTimeout(stall)
     hooks.transferring(null)
     release()
   }
