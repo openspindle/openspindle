@@ -5,7 +5,6 @@ import { PLATE_SUBJECT, error, operationSubject } from "../diagnostics"
 import type { Diagnostic } from "../diagnostics"
 import { kitForPlate } from "../fixtures/catalog"
 import type { FixtureKit } from "../fixtures/fixture-kit"
-import { formatMillimetres } from "../geometry/millimetres"
 import { kindOf } from "../operations/kinds"
 import type { ResolveContext, ResolvedNc } from "../operations/kinds"
 import { OPERATION_LIMITS } from "../operations/operation"
@@ -158,11 +157,6 @@ function compose(
       output.push("M0")
       stopLines.set(output.length, operation.id)
     }
-    // At the clearance, over where it starts cutting, before NC that goes down where it is.
-    if (nc.start) {
-      const [x, y] = nc.start
-      output.push(`G0 X${formatMillimetres(x)} Y${formatMillimetres(y)}`)
-    }
     const bodyStartLine = output.length + 1
     const toolMap = new Map(numberedBindings(operation))
     for (const line of unit.value.lines) output.push(rewrite(line, toolMap))
@@ -310,8 +304,6 @@ function compileUncached(plate: Plate, tools: readonly Tool[]): CompiledPlate {
     !preamble.length &&
     kindOf(lone.operation).verbatim &&
     !lone.operation.stopBefore &&
-    // NC that needs the travel to where it starts is combined, which adds it.
-    !lone.nc.start &&
     identity(lone.operation)
   ) {
     // A single program is machined exactly as imported: its bytes are never rewritten.

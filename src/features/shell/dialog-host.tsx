@@ -6,6 +6,7 @@ import { useFusionPairing } from "@/features/fusion360/use-fusion-pairing"
 import { useFusionSync } from "@/platform/fusion"
 import { FixtureDefinitionDialog } from "@/features/device/fixture-definition-dialog"
 import { HeightMapDialog } from "@/features/device/height-map-dialog"
+import { SetOriginDialog } from "@/features/device/set-origin-dialog"
 import { GCodeGlossaryDialog } from "@/features/glossary/gcode-glossary-dialog"
 import { ModelsDialog } from "@/features/models/models-dialog"
 import { AddOperationDialog } from "@/features/prepare/add-operation/add-operation-dialog"
@@ -63,6 +64,8 @@ function OpenDialog({ dialog }: { dialog: WorkspaceDialog }) {
       return <DeviceConfigurationDialog onClose={closeDialog} />
     case "height-map":
       return <HeightMapDialog onClose={closeDialog} />
+    case "set-origin":
+      return <SetOriginDialog onClose={closeDialog} />
     case "stock":
       return <StockDialog plateId={dialog.plateId} onClose={closeDialog} />
     case "add-fixture":

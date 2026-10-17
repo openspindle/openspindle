@@ -10,6 +10,7 @@ export type WorkspaceDialog =
   /** The Models library; closing it goes back to the dialog it opened from. */
   | { readonly kind: "models"; readonly back?: WorkspaceDialog }
   | { readonly kind: "height-map" }
+  | { readonly kind: "set-origin" }
   | { readonly kind: "fusion" }
   | {
       readonly kind: "fusion-pairing"

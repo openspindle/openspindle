@@ -66,6 +66,8 @@ function representative(
       return { key, command: { type: key, axes: ["X"] } }
     case "setWork":
       return { key, command: { type: key, axis: "X", position: 0 } }
+    case "setOrigin":
+      return { key, command: { type: key, x: 0, y: 0 } }
     case "goTo":
       return { key, command: { type: key, target: "clearance" } }
     case "spindleStart":

@@ -1,5 +1,5 @@
 import { useEffect, useId, useState } from "react"
-import { Crosshair, Move3D } from "lucide-react"
+import { Crosshair, LayoutDashboard, Move3D } from "lucide-react"
 import { cn } from "cn"
 import { Button } from "@/components/ui/button"
 import {
@@ -24,6 +24,8 @@ import { AXIS_COLORS } from "@/components/workspace/axis-label"
 import { Hint } from "@/components/workspace/hint"
 import { MeasurementInput } from "@/components/workspace/measurement-input"
 import { ReasonButton } from "@/components/workspace/reason-button"
+import { useWorkspace } from "@/app/workspace/workspace-context"
+import { openDialog } from "@/features/shell/dialogs"
 import { axisKey, numberText } from "./device-format"
 import { ControlCard } from "./device-control-card"
 
@@ -186,22 +188,36 @@ export function DeviceCoordinatesCard({
     setConfirmXyz(false)
   }, [device?.host, device?.port])
   const xyz: MachineCommand = { type: "zero", axes: ["X", "Y", "Z"] }
+  const hasPlates = useWorkspace((state) => state.plates.length > 0)
   return (
     <ControlCard
       title="Coordinates"
       icon={<Move3D size={16} />}
       action={
-        <ReasonButton
-          label="Zero XYZ"
-          variant="ghost"
-          size="sm"
-          reason={reason("zero")}
-          disabled={pending}
-          onClick={() => setConfirmXyz(true)}
-        >
-          <Crosshair />
-          Zero XYZ
-        </ReasonButton>
+        <div className="flex gap-1">
+          <ReasonButton
+            label="Set origin from plate"
+            variant="ghost"
+            size="sm"
+            reason={hasPlates ? reason("setOrigin") : "Add a plate first."}
+            disabled={pending}
+            onClick={() => openDialog({ kind: "set-origin" })}
+          >
+            <LayoutDashboard />
+            From plate…
+          </ReasonButton>
+          <ReasonButton
+            label="Zero XYZ"
+            variant="ghost"
+            size="sm"
+            reason={reason("zero")}
+            disabled={pending}
+            onClick={() => setConfirmXyz(true)}
+          >
+            <Crosshair />
+            Zero XYZ
+          </ReasonButton>
+        </div>
       }
     >
       <div className="grid grid-cols-3 gap-2">

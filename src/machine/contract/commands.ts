@@ -78,6 +78,15 @@ export const MachineCommandSchema = z.discriminatedUnion("type", [
     position: z.number().min(-10000).max(10000),
   }),
   /**
+   * Keeps work X0 Y0 at machine `x` and `y`, mm, as Run sets a plate's work origin from its
+   * anchor: wherever the tool is. Work Z stays as it is.
+   */
+  z.strictObject({
+    type: z.literal("setOrigin"),
+    x: z.number().min(-10000).max(10000),
+    y: z.number().min(-10000).max(10000),
+  }),
+  /**
    * Up to the clearance height, then over to `target` in X and Y: the clearance position, work
    * X0 Y0, or one of the anchors, where the machine keeps them.
    */
@@ -182,6 +191,7 @@ export const COMMAND_KINDS = [
   "unlock",
   "zero",
   "setWork",
+  "setOrigin",
   "goTo",
   "spindleStart",
   "spindleStop",
@@ -218,6 +228,7 @@ export const COMMAND_LABELS: Record<CommandKind, string> = {
   unlock: "Unlock",
   zero: "Set work zero",
   setWork: "Set work position",
+  setOrigin: "Set work origin",
   goTo: "Go to",
   spindleStart: "Start spindle",
   spindleStop: "Stop spindle",
