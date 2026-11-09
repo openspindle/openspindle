@@ -506,7 +506,7 @@ export class SimulatedZ1 {
     const air = this.spindleOn && this.blowing
     this.send(
       FRAME_TYPES.diagnostics,
-      `{S:${flag(this.spindleOn)},${this.targetRpm}|F:${flag(air)},${air ? SPINDLE_AIR_POWER : 0}|G:${flag(this.light)},${flag(this.beep)},0,${flag(this.vacuum)},${this.vacuumPower}|I:${flag(this.estop)}}`
+      `{S:${flag(this.spindleOn)},${this.targetRpm}|F:${flag(air)},${air ? SPINDLE_AIR_POWER : 0}|G:${flag(this.light)},${flag(this.beep)},0,${flag(this.vacuum)},${this.vacuumPower}|P:0,0|I:${flag(this.estop)}}`
     )
   }
 

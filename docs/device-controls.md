@@ -122,6 +122,8 @@ The Z1 simulator provides a representative configuration file independent of rea
 
 ## Protocol trace and console
 
+**Device › Tool** shows a red indicator when the fixed tool setter reports **Triggered**. It shows **Released** when the input is clear and **Unknown** when recent diagnostics are unavailable. On the Z1, the fixed setter is the second value in the diagnostic reply's `P` field.
+
 The controller keeps the recent exchange with the device in a bounded ring (about 20,000 entries across connections): every frame sent, every status report and reply line with its classification, file transfer blocks summarised by size only (received short text payloads, such as a cancel's reason, also shown), and notes for connecting, disconnecting, Stop and job phase changes. **Help › Export Protocol Trace…** has the main process ask the machine process for it and save it as text, so it works even when the window is unresponsive. It is the evidence to attach when a job's completion, a pause or a verification behaves differently on a real machine than described here.
 
 The part people read is the **console**, under the G-code on the Job tab: the commands the app sent (the halt byte reads `^X`), the machine's replies and the app's notes, without status polling, transfer blocks or the upload's checksum. The controller keeps its last 1,000 entries across connections and pushes new ones to the app renderer (`machine.console`: the backlog on subscribing, then batches). Reported failures (errors, alarms, halts, refusals) show in red and acknowledgements muted. **Clear** empties the view of what it shows so far; the controller keeps the entries, and the protocol trace has them.
