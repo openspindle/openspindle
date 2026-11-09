@@ -179,6 +179,8 @@ export interface TransferProtocol {
   readonly uploadedBytes: number
   readonly verifiedBytes: number
   readonly stage: "upload" | "readback" | "done"
+  /** Delay between upload acknowledgement and opening the readback, when needed by the device. */
+  readonly readbackDelayMs?: number
   /** Done, and the device acknowledged the end: its file is closed and another may follow. */
   readonly finished: boolean
   start: () => OutboundFrame[]

@@ -8,6 +8,7 @@ import {
 } from "electron"
 import type { BrowserWindowConstructorOptions, IpcMainEvent } from "electron"
 import { APP_ORIGIN } from "../../src/platform/contract/channels"
+import { isSpaceMouse } from "../../src/platform/contract/spacemouse"
 import { log } from "./diagnostics/log"
 
 /** Node's URL reports a "null" origin for custom schemes such as app://, so compare scheme and host. */
@@ -40,18 +41,34 @@ const APP_PERMISSIONS: ReadonlySet<string> = new Set([
 ])
 
 /**
- * Session-wide defaults: only the main frame may use fullscreen and clipboard writes;
- * no webviews or new windows.
+ * Session-wide defaults: only the main frame may use fullscreen and clipboard writes.
+ * The app origin can discover SpaceMouse interfaces. No webviews or new windows.
  */
-export function hardenSessions() {
-  session.defaultSession.setPermissionRequestHandler(
-    (_contents, permission, callback, details) =>
-      callback(details.isMainFrame && APP_PERMISSIONS.has(permission))
+export function hardenSessions(rendererOrigin: string) {
+  const ses = session.defaultSession
+  ses.setPermissionRequestHandler((_contents, permission, callback, details) =>
+    callback(details.isMainFrame && APP_PERMISSIONS.has(permission))
   )
-  session.defaultSession.setPermissionCheckHandler(
+  ses.setPermissionCheckHandler(
     (_contents, permission, _origin, details) =>
-      details.isMainFrame && APP_PERMISSIONS.has(permission)
+      details.isMainFrame &&
+      (APP_PERMISSIONS.has(permission) ||
+        (permission === "hid" &&
+          originOf(details.securityOrigin ?? "") === rendererOrigin))
   )
+  ses.setDevicePermissionHandler(
+    ({ deviceType, origin, device }) =>
+      deviceType === "hid" &&
+      originOf(origin) === rendererOrigin &&
+      "collections" in device &&
+      isSpaceMouse(device)
+  )
+  // This integration enumerates the pre-authorized interfaces. A chooser request must
+  // never extend the origin's access to a different HID device.
+  ses.on("select-hid-device", (event, _details, callback) => {
+    event.preventDefault()
+    callback()
+  })
   app.on("web-contents-created", (_event, contents) => {
     contents.setWebRTCIPHandlingPolicy("disable_non_proxied_udp")
     contents.setWebRTCUDPPortRange({ min: 1, max: 1 })

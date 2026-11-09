@@ -9,6 +9,12 @@ import { kitForSetup } from "@/domain/fixtures/catalog"
 import { pictureFov } from "@/domain/fixtures/fixture-kit"
 import type { MachineCamera } from "@/domain/fixtures/fixture-kit"
 import type { Point3 } from "@/domain/nc/gcode"
+import { spaceMouseZoomAxis } from "@/lib/spacemouse-preferences"
+import {
+  nearSpaceMouseForeAftMotion,
+  observeSpaceMouse,
+  spaceMouseMotion,
+} from "@/platform/spacemouse"
 import type {
   ViewerGhost,
   ViewerPlate,
@@ -161,6 +167,8 @@ export class BedScene {
     3000
   )
   private readonly controls: OrbitControls
+  private readonly stopSpaceMouse: () => void
+  private spaceMouseFrame: number | null = null
   private view: ViewMode = "perspective"
   /** The plates' machine's camera, while the view is through it. */
   private machineCamera: MachineCamera | null = null
@@ -321,7 +329,12 @@ export class BedScene {
     canvas.addEventListener("pointercancel", this.pointerCancel)
     canvas.addEventListener("pointermove", this.pointerMove)
     canvas.addEventListener("pointerleave", this.pointerLeave)
+    canvas.addEventListener("wheel", this.guardSpaceMouseWheel, {
+      capture: true,
+      passive: false,
+    })
     if (this.arranger) window.addEventListener("keydown", this.keyDown)
+    this.stopSpaceMouse = observeSpaceMouse(this.stage.invalidate)
   }
 
   /** Keeps the views of plates that render identically; builds, updates or disposes the rest. */
@@ -495,6 +508,7 @@ export class BedScene {
   }
 
   dispose() {
+    this.stopSpaceMouse()
     cancelAnimationFrame(this.hoverAnchorFrame)
     this.arranger?.dispose()
     const canvas = this.stage.canvas
@@ -505,6 +519,7 @@ export class BedScene {
     canvas.removeEventListener("pointercancel", this.pointerCancel)
     canvas.removeEventListener("pointermove", this.pointerMove)
     canvas.removeEventListener("pointerleave", this.pointerLeave)
+    canvas.removeEventListener("wheel", this.guardSpaceMouseWheel, true)
     window.removeEventListener("keydown", this.keyDown)
     this.controls.dispose()
     for (const view of this.views.values()) view.dispose()
@@ -578,7 +593,63 @@ export class BedScene {
     return this.machineCamera ? this.lens : this.camera
   }
 
+  /** Keep the wheel from reaching OrbitControls when the SpaceMouse driver echoes motion. */
+  private readonly guardSpaceMouseWheel = (event: WheelEvent) => {
+    if (
+      !this.controls.enabled ||
+      this.machineCamera ||
+      event.ctrlKey ||
+      !event.deltaY ||
+      !nearSpaceMouseForeAftMotion(performance.now())
+    )
+      return
+    event.preventDefault()
+    event.stopImmediatePropagation()
+  }
+
+  /** Move the work view, using the same orbit, pan and zoom limits as mouse navigation. */
+  private moveSpaceMouse(): boolean {
+    const now = performance.now()
+    const { x, y, z, pitch, yaw } = spaceMouseMotion(now)
+    if (
+      !(x || y || z || pitch || yaw) ||
+      !this.controls.enabled ||
+      this.machineCamera ||
+      !document.hasFocus() ||
+      !this.container.checkVisibility()
+    ) {
+      this.spaceMouseFrame = null
+      return false
+    }
+    const seconds =
+      this.spaceMouseFrame === null
+        ? 1 / 60
+        : Math.min(1 / 30, (now - this.spaceMouseFrame) / 1000)
+    this.spaceMouseFrame = now
+    if (pitch) this.controls.rotateUp(pitch * 1.8 * seconds)
+    if (yaw) this.controls.rotateLeft(yaw * 1.8 * seconds)
+    const verticalZoom = spaceMouseZoomAxis() === "vertical"
+    const panY = verticalZoom ? y : z
+    const zoomAxis = verticalZoom ? z : y
+    const pan = this.stage.canvas.clientHeight * 0.75 * seconds
+    if (x || panY) this.controls.pan(x * pan, panY * pan)
+    if (zoomAxis) {
+      const zoom = THREE.MathUtils.clamp(
+        this.camera.zoom * Math.exp(-zoomAxis * 2 * seconds),
+        this.controls.minZoom,
+        this.controls.maxZoom
+      )
+      if (zoom !== this.camera.zoom) {
+        this.camera.zoom = zoom
+        this.camera.updateProjectionMatrix()
+        this.events.zoomChange(zoom)
+      }
+    }
+    return true
+  }
+
   private readonly frame = () => {
+    const moving = this.moveSpaceMouse()
     const settling = this.controls.update()
     this.scenePass.camera = this.eye
     // Edges as wide on the solids where the view looks, within what reads on screen.
@@ -595,7 +666,7 @@ export class BedScene {
     )
     this.pipeline.render()
     this.positionLabels()
-    return settling
+    return moving || settling
   }
 
   private positionLabels() {

@@ -11,6 +11,7 @@ import { Hint } from "@/components/workspace/hint"
 import { isAppearance } from "@/lib/appearance"
 import { FONTS, FONT_CHOICES, isFontFor } from "@/lib/fonts"
 import type { FontRole } from "@/lib/fonts"
+import { useSpaceMouseZoomAxis } from "@/lib/spacemouse-preferences"
 import { useSimulatorStatus, useUpdateSimulator } from "@/platform/simulator"
 
 const APPEARANCE_OPTIONS = [
@@ -20,6 +21,10 @@ const APPEARANCE_OPTIONS = [
 ]
 
 const APPEARANCE_HINT = "System follows your Mac’s light or dark appearance."
+const SPACEMOUSE_ZOOM_OPTIONS = [
+  { value: "forward", label: "Forward / backward" },
+  { value: "vertical", label: "Up / down" },
+] as const
 
 const FONT_FIELDS: ReadonlyArray<{
   role: FontRole
@@ -47,12 +52,13 @@ const fontOptions = (role: FontRole) =>
 const simulatorHint = (host: string, port: number) =>
   `A simulated Makera Z1 that OpenSpindle runs at ${host}:${port}, to try jobs without a machine. Connect to it as to a machine.`
 
-/** Settings › General: how the app looks, and its simulated Z1. Changes apply at once. */
+/** Settings › General: appearance, navigation and the simulated Z1. Changes apply at once. */
 export function GeneralSettings() {
   const { appearance, setAppearance, fonts, setFont, saveError } =
     useAppearance()
   const simulator = useSimulatorStatus().data
   const updateSimulator = useUpdateSimulator()
+  const [zoomAxis, setZoomAxis] = useSpaceMouseZoomAxis()
   const simulatorError = updateSimulator.error
     ? `This setting could not be saved: ${updateSimulator.error.message}`
     : simulator?.error && `The simulator is not running. ${simulator.error}`
@@ -91,6 +97,18 @@ export function GeneralSettings() {
         </Field>
       ))}
       {saveError && <FieldError>{saveError}</FieldError>}
+      <Field orientation="horizontal">
+        <FieldLabel htmlFor="spacemouse-zoom">
+          SpaceMouse zoom direction
+        </FieldLabel>
+        <OptionSelect
+          id="spacemouse-zoom"
+          className="w-48"
+          options={SPACEMOUSE_ZOOM_OPTIONS}
+          value={zoomAxis}
+          onValueChange={setZoomAxis}
+        />
+      </Field>
       {simulator && (
         <Field orientation="horizontal">
           <FieldLabel htmlFor="z1-simulator">

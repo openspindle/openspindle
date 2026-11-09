@@ -67,6 +67,8 @@ const READBACK_REQUESTS = 2
  * the device leaves unanswered is asked again (`stalled`).
  */
 export class MakeraTransfer implements TransferProtocol {
+  // The Z1 can acknowledge B4 before its storage process finishes the upload.
+  readonly readbackDelayMs = 250
   private step: Stage = "upload-md5"
   uploadedBytes = 0
   verifiedBytes = 0
@@ -143,8 +145,15 @@ export class MakeraTransfer implements TransferProtocol {
   }
 
   receive(frame: InboundFrame): OutboundFrame[] {
-    if (frame.type === FRAME_TYPES.fileCancel)
-      throw new TransferError("The device cancelled the file transfer.")
+    if (frame.type === FRAME_TYPES.fileCancel) {
+      let phase = "uploading the program"
+      if (this.stage === "readback") phase = "reading back the uploaded program"
+      if (this.stage === "done") phase = "closing the readback"
+      const reason =
+        frame.payload.length <= 64 ? decoder.decode(frame.payload).trim() : ""
+      const detail = /^[ -~]+$/.test(reason) ? ` (${reason})` : ""
+      throw new TransferError(`The device cancelled while ${phase}${detail}.`)
+    }
     if (frame.type === FRAME_TYPES.fileRetry)
       throw new TransferError(
         "The device requested a file retry. Run stopped without retrying."

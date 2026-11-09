@@ -95,6 +95,30 @@ To make them with the GitHub CLI:
 
 Until the app and the secrets are set, the release workflow stops with an error naming this page. For private repositories, GitHub bills macOS and Windows runner minutes at higher rates than Linux ones.
 
+
+## Packages on a fork
+
+The **Windows and Linux packages** workflow builds an unsigned Windows x64 NSIS
+installer and a Linux x64 AppImage. It uses the fork's own GitHub Releases for
+update metadata. The workflow needs no GitHub App or macOS signing secrets.
+
+- After merging the workflow into the default branch, use **Actions → Windows and
+  Linux packages → Run workflow** to build from a selected ref. Download the
+  platform archive under **Artifacts** when the job finishes. Packaging changes
+  also build on pull requests.
+- On the fork, push a new `v<version>` tag at the intended release commit. The tag
+  must match `package.json`. The workflow builds both packages and creates a
+  draft GitHub Release with their update metadata. Review the draft before
+  publishing it. Each release uses a new version and tag.
+- For a local Linux package, use Node 24, run `npm ci`, then run
+  `npm run dist:linux -- --publish never`. The output goes to `release/`.
+  If building for a fork locally, pass
+  `-c.publish.owner=OWNER -c.publish.repo=REPOSITORY` to select its update feed.
+
+On GitHub forks, enable Actions if the Actions tab prompts you to do so. A
+packaging run confirms artifact creation. Verify app launch and NC import with
+the simulator before using a new platform build with a machine.
+
 ## Updates
 
 Packaged apps update themselves from this repository's GitHub releases ([updates.ts](../electron/main/updates.ts), with electron-updater), so the repository has to be public: installed apps read its releases without credentials. When it builds the DMG and zip, or the Windows installer, electron-builder writes the feed, `latest-mac.yml` or `latest.yml`, beside them, and `app-update.yml`, which names the repository in package.json, into the app. `npm run package:mac` builds have no DMG or zip and so neither file: their apps cannot update and, like a dev run, say so under **Check for Updates…**.

@@ -61,7 +61,7 @@ export const TelemetrySchema = z.object({
   spindleTemperature: reading,
   controllerTemperature: reading,
   spindleOn: flag,
-  /** Whether the fixed tool setter's input is triggered. */
+  /** The fixed tool-length setter input, separate from the workpiece probe. */
   toolSetterTriggered: flag,
   tool: reading,
   /** The tool's length offset from the tool work Z was set with, in millimetres. */

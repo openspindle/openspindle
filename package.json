@@ -32,6 +32,8 @@
     "package:win": "electron-vite build && electron-builder --win",
     "predist:win": "install-electron",
     "dist:win": "node --env-file-if-exists=.env node_modules/electron-vite/bin/electron-vite.js build && node --env-file-if-exists=.env node_modules/electron-builder/cli.js --win",
+    "predist:linux": "install-electron",
+    "dist:linux": "node --env-file-if-exists=.env node_modules/electron-vite/bin/electron-vite.js build && node --env-file-if-exists=.env node_modules/electron-builder/cli.js --linux",
     "typecheck": "tsc -p tsconfig.json && tsc -p electron/tsconfig.json && tsc -p tools/z1-simulator/tsconfig.json",
     "lint": "eslint src electron packages vite.config.ts electron.vite.config.ts tools",
     "format": "prettier --write src electron packages tools vite.config.ts electron.vite.config.ts",

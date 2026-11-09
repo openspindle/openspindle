@@ -16,7 +16,7 @@ import type {
 } from "../../firmware/adapter.ts"
 import { MachineError, abortError } from "../errors.ts"
 import { PartedCompletion } from "../parted-completion.ts"
-import { freshStatus, requireAdmission } from "./context.ts"
+import { freshDiagnosticStatus, requireAdmission } from "./context.ts"
 import type { OperationContext } from "./context.ts"
 
 const STEP_MS = 10_000
@@ -274,7 +274,7 @@ async function preflight(context: OperationContext): Promise<Telemetry> {
   )
   if (!(await report))
     throw new MachineError("refused", "Home all reported axes before Run.")
-  const telemetry = await freshStatus(
+  const telemetry = await freshDiagnosticStatus(
     context,
     "Timed out waiting for fresh device status. No play command was sent."
   )
@@ -349,6 +349,7 @@ async function transferProgram(
   const release = session.suspendPolling()
   const { clock } = context
   let stall: ReturnType<typeof clock.setTimeout> | null = null
+  let readback: ReturnType<typeof clock.setTimeout> | null = null
   const watch = () => {
     clock.clearTimeout(stall)
     stall = clock.setTimeout(() => {
@@ -372,6 +373,7 @@ async function transferProgram(
             : "ignored"
         if (event.kind !== "transfer") return "ignored"
         watch()
+        const stage = protocol.stage
         let frames
         try {
           frames = protocol.receive(event.frame)
@@ -383,7 +385,15 @@ async function transferProgram(
             ),
           }
         }
-        for (const frame of frames) session.send(frame)
+        const delay = protocol.readbackDelayMs ?? 0
+        if (stage === "upload" && protocol.stage === "readback" && delay > 0) {
+          readback = clock.setTimeout(() => {
+            if (context.signal.aborted || session.closed) return
+            for (const frame of frames) session.send(frame)
+          }, delay)
+        } else {
+          for (const frame of frames) session.send(frame)
+        }
         progress()
         // A part sent next must not meet this transfer's last acknowledgement.
         return protocol.finished ? { done: undefined } : "consumed"
@@ -401,6 +411,7 @@ async function transferProgram(
     throw error
   } finally {
     clock.clearTimeout(stall)
+    clock.clearTimeout(readback)
     hooks.transferring(null)
     release()
   }

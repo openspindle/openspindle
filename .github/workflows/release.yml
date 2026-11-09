@@ -20,6 +20,7 @@ concurrency:
 
 jobs:
   release-please:
+    if: github.repository == 'openspindle/openspindle' || vars.RELEASE_APP_CLIENT_ID != ''
     runs-on: ubuntu-latest
     timeout-minutes: 10
     outputs:

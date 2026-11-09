@@ -612,6 +612,15 @@ function FinishItem({ view, status }: { view: JobView; status: StageStatus }) {
   )
 }
 
+/** The transfer counters belong to the current part, even if the run ends early. */
+function incompleteTransferText(job: JobState): string {
+  const { uploadedBytes, verifiedBytes, totalBytes } = job.transfer
+  if (!totalBytes) return "The file transfer did not begin."
+  const part =
+    programParts(job.program).length > 1 ? `Part ${job.part + 1}: ` : ""
+  return `${part}${uploadedBytes.toLocaleString()} of ${totalBytes.toLocaleString()} bytes written. ${verifiedBytes.toLocaleString()} bytes verified.`
+}
+
 /** What the upload sent: every file, and how many when the program went as parts. */
 function uploadedText(job: JobState): string {
   const parts = programParts(job.program)
@@ -647,6 +656,13 @@ export function RunStageList({
   const stages = runStages(view, subject)
   const settings = useOperationSettings(subject)
   const readAnchors = useReadAnchorsFix(subject?.plate.id ?? null)
+  let transferDescription =
+    "The program is written to the machine's storage and read back before it starts."
+  if (view.kind !== "idle")
+    transferDescription =
+      stages.transfer === "done"
+        ? uploadedText(view.job)
+        : incompleteTransferText(view.job)
   const operations = stages.operations
   const current =
     operations?.findIndex(
@@ -694,11 +710,7 @@ export function RunStageList({
           <StageItem
             title="Upload"
             status={stages.transfer}
-            description={
-              view.kind === "idle"
-                ? "The program is written to the machine's storage and read back before it starts."
-                : uploadedText(view.job)
-            }
+            description={transferDescription}
           />
         )}
       </li>

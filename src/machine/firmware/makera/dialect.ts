@@ -34,6 +34,15 @@ const changesTool = (block: NcBlock) =>
 const startsSpindle = (word: NcWord) =>
   word.letter === "M" && (word.value === 3 || word.value === 4)
 
+/** Tool changes can measure length in firmware, as can an explicit M491. */
+const changesToolOrProbes = ({ letter, value }: NcWord): boolean =>
+  (letter === "G" && (value === 32 || Math.trunc(value) === 38)) ||
+  (letter === "M" &&
+    (value === 6 ||
+      value === 491 ||
+      Math.trunc(value) === 495 ||
+      (value > 480 && value < 481)))
+
 /**
  * M codes an S word may share a line with and still be the spindle speed, as the preview reads
  * it (`parseGCode`); beside any other M code the S is that code's own, such as M223's override.
@@ -189,6 +198,7 @@ export function prepareMakeraProgram(source: string): PreparedProgram {
   // The line that set the spindle speed last, for an M3 or M4 without one.
   let speedCode: string | null = null
   let afterToolChange = false
+  let spindleRunning = false
   const output = lines.map((line, index) => {
     const lineNumber = index + 1
     // The shared lexer: comments stripped, and M117 text kept verbatim, as data.
@@ -233,6 +243,19 @@ export function prepareMakeraProgram(source: string): PreparedProgram {
         `Line ${lineNumber} is not a supported plain NC block.`,
         lineNumber
       )
+    const starts = block.words.some(startsSpindle)
+    // The player waits for calibration between lines. The dispatcher can still run a
+    // spindle start in the same block as the command that queued the calibration.
+    if (block.words.some(changesToolOrProbes) && (starts || spindleRunning))
+      throw new ProgramError(
+        `Line ${lineNumber} changes tools or probes with a spindle start or a running spindle. Stop with M5 before this line and start the spindle on a later line.`,
+        lineNumber
+      )
+    if (starts) spindleRunning = true
+    else if (
+      block.words.some((word) => word.letter === "M" && word.value === 5)
+    )
+      spindleRunning = false
     // The Z1 stops for a tool change by hand itself, and the firmware ignores M0: a stop
     // written right after the change would be a second one.
     const stopsForToolChange = afterToolChange
@@ -263,11 +286,7 @@ export function prepareMakeraProgram(source: string): PreparedProgram {
       afterToolChange = true
     }
     if (setsSpindleSpeed(block)) speedCode = code
-    if (
-      speedCode !== null &&
-      block.words.some(startsSpindle) &&
-      !spindleGetsSpeed(code)
-    ) {
+    if (speedCode !== null && starts && !spindleGetsSpeed(code)) {
       const after = withSpindleSpeed(code, speedCode)
       if (after === null)
         throw new ProgramError(

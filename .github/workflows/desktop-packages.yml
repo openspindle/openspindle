@@ -1,0 +1,96 @@
+name: Windows and Linux packages
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/desktop-packages.yml
+      - electron-builder.yml
+      - package.json
+      - package-lock.json
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-packages-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  package:
+    name: Package (${{ matrix.platform }} x64)
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows
+            runner: windows-2025
+            script: dist:win
+          - platform: linux
+            runner: ubuntu-24.04
+            script: dist:linux
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+      - name: Check release version
+        if: github.ref_type == 'tag'
+        run: |
+          version=$(node -p "require('./package.json').version")
+          if [[ "$GITHUB_REF_NAME" != "v$version" ]]; then
+            echo "::error::Tag $GITHUB_REF_NAME must match package.json version v$version"
+            exit 1
+          fi
+      - run: npm ci
+      - name: Build package for this repository
+        env:
+          BUILD_SCRIPT: ${{ matrix.script }}
+        run: |
+          npm run "$BUILD_SCRIPT" -- --publish never \
+            -c.publish.owner="$GITHUB_REPOSITORY_OWNER" \
+            -c.publish.repo="${GITHUB_REPOSITORY#*/}"
+      - name: Collect package and update metadata
+        run: |
+          mkdir -p packages-out
+          if [[ "$RUNNER_OS" == Windows ]]; then
+            cp release/OpenSpindle-Setup-*.exe release/OpenSpindle-Setup-*.exe.blockmap release/latest.yml packages-out/
+          else
+            cp release/*.AppImage release/latest-linux.yml packages-out/
+          fi
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: OpenSpindle-${{ matrix.platform }}-x64
+          path: packages-out/*
+          if-no-files-found: error
+
+  draft-release:
+    # Upstream already has a separate signed release pipeline.
+    if: github.event_name == 'push' && github.ref_type == 'tag' && github.repository != 'openspindle/openspindle'
+    needs: package
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          pattern: OpenSpindle-*-x64
+          path: release-assets
+          merge-multiple: true
+      - name: Create draft with both packages
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" --verify-tag --draft \
+            --title "OpenSpindle $GITHUB_REF_NAME" --generate-notes release-assets/*

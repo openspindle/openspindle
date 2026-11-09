@@ -80,6 +80,12 @@ win:
   target:
     - target: nsis
       arch: x64
+linux:
+  category: Utility
+  icon: build/icon.png
+  target:
+    - target: AppImage
+      arch: x64
 nsis:
   # Without spaces: GitHub stores an uploaded file's spaces as dots, and latest.yml names the
   # installer with dashes.

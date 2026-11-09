@@ -29,6 +29,8 @@ export async function executeCommand(
   const brightness = command.type === "lightBrightness"
   const automaticOff = command.type === "lightOffWhenIdle"
   const guardedLight = brightness || automaticOff
+  const checksToolSetter =
+    command.type === "changeTool" || command.type === "confirmToolChange"
   // A renderer may invalidate its idle cycle while preflight waits. Once sent, only
   // the controller's original signal may stop acknowledgement and state verification.
   const preflight =
@@ -42,7 +44,9 @@ export async function executeCommand(
     throw abortError(preflight.signal)
   if (automaticOff || (brightness && command.onlyIfOn))
     await waitForAutomaticCommandReady(preflight, label)
-  let before = await (guardedLight ? freshDiagnosticStatus : freshStatus)(
+  let before = await (
+    guardedLight || checksToolSetter ? freshDiagnosticStatus : freshStatus
+  )(
     preflight,
     "Timed out waiting for fresh device status. No command was sent."
   )

@@ -122,7 +122,8 @@ function startDiagnostics(): Diagnostics {
 }
 
 function start(diagnostics: Diagnostics, openedFiles: OpenedFileBus) {
-  hardenSessions()
+  const entry = rendererEntry()
+  hardenSessions(entry.origin)
   handleAppProtocol(RENDERER_ROOT)
   if (DEV_ICON) app.dock?.setIcon(DEV_ICON)
   void configureAboutPanel()
@@ -159,7 +160,6 @@ function start(diagnostics: Diagnostics, openedFiles: OpenedFileBus) {
   // machine process tries as it starts: once the app's simulator, which it may be, listens.
   // That takes milliseconds; the window asks for its port to the machine process much later.
   void simulator.start().finally(() => machine.start())
-  const entry = rendererEntry()
   const pcb = new PcbService(app.getPath("userData"), currentWindow)
   serveHostConnections({
     handlers: createHostHandlers({

@@ -39,6 +39,12 @@ OpenSpindle is a desktop app for preparing, checking and running jobs on a Maker
 
 **Windows:** download `OpenSpindle-Setup-<version>.exe` from the [latest release](../../releases/latest) and run it: it installs OpenSpindle for your user, without administrator rights, and starts it. The installer is for x64 PCs and runs on Windows on Arm too. It is not signed yet, so Windows warns before running it: choose **More info**, then **Run anyway**. Allow OpenSpindle through the firewall when Windows asks, or it does not find machines on the network; entering a machine's IP address works either way.
 
+
+**Linux (x64):** download the AppImage from the repository's release or a
+[Windows and Linux packages build](docs/releasing.md#packages-on-a-fork).
+Mark it executable and open it. For FreeCAD handoff, select that executable
+AppImage as the OpenSpindle program.
+
 ## Quick start
 
 1. **Connect:** click the device card in **Prepare** and choose your Z1, or enter its IP address.
@@ -46,6 +52,14 @@ OpenSpindle is a desktop app for preparing, checking and running jobs on a Maker
 3. **Set up:** place the stock, set the work origin and assign the tools that were not matched from your library.
 4. **Check:** play the program back on the **Job** tab.
 5. **Run:** once the run checklist passes. **Machine › Stop** (⌘. on macOS, Ctrl+. on Windows) stops at any time.
+
+### SpaceMouse navigation
+
+OpenSpindle detects compatible 3Dconnexion SpaceMouse and SpaceNavigator controllers in **Prepare** and **Job**. Set **Settings › General › SpaceMouse zoom direction** to **Forward / backward** (the default) or **Up / down**. The other direction pans vertically. Tilt or twist the cap to orbit the bed. The 3D view keeps Z pointing up and responds while the app is in focus.
+
+The mouse wheel zooms the work view. Wheel events that arrive during or shortly after a forward or backward SpaceMouse push or tilt are ignored in the work view to reduce driver-emulated scrolling. This also affects wheel input from a regular mouse if both devices are used at the same time.
+
+The controller must be available to the app as a multi-axis HID device over USB or a receiver. On Linux, the logged-in user needs access to its `hidraw` device. The app reads the motion reports directly, without loading a 3DxWare profile.
 
 ## Status and safety
 
