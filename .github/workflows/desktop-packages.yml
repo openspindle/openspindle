@@ -1,22 +1,10 @@
 name: Windows and Linux packages
 
 on:
-  workflow_dispatch:
-  pull_request:
-    paths:
-      - .github/workflows/desktop-packages.yml
-      - electron-builder.yml
-      - package.json
-      - package-lock.json
-  push:
-    tags: ["v*"]
+  workflow_call:
 
 permissions:
   contents: read
-
-concurrency:
-  group: desktop-packages-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   package:
@@ -60,6 +48,7 @@ jobs:
             -c.publish.owner="$GITHUB_REPOSITORY_OWNER" \
             -c.publish.repo="${GITHUB_REPOSITORY#*/}"
       - name: Collect package and update metadata
+        id: files
         run: |
           mkdir -p packages-out
           if [[ "$RUNNER_OS" == Windows ]]; then
@@ -67,30 +56,18 @@ jobs:
           else
             cp release/*.AppImage release/latest-linux.yml packages-out/
           fi
+          echo "short-sha=${GITHUB_SHA:0:7}" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        id: upload
         with:
-          name: OpenSpindle-${{ matrix.platform }}-x64
+          name: OpenSpindle-${{ matrix.platform }}-x64-${{ steps.files.outputs.short-sha }}
           path: packages-out/*
+          retention-days: 14
           if-no-files-found: error
-
-  draft-release:
-    # Upstream already has a separate signed release pipeline.
-    if: github.event_name == 'push' && github.ref_type == 'tag' && github.repository != 'openspindle/openspindle'
-    needs: package
-    runs-on: ubuntu-24.04
-    timeout-minutes: 5
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
-        with:
-          pattern: OpenSpindle-*-x64
-          path: release-assets
-          merge-multiple: true
-      - name: Create draft with both packages
+      - name: Link the installer from the run summary
         env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
+          PLATFORM: ${{ matrix.platform }}
+          URL: ${{ steps.upload.outputs.artifact-url }}
         run: |
-          gh release create "$GITHUB_REF_NAME" --verify-tag --draft \
-            --title "OpenSpindle $GITHUB_REF_NAME" --generate-notes release-assets/*
+          printf '### Download OpenSpindle\n\n[Download the %s x64 package](%s)\n' \
+            "$PLATFORM" "$URL" >> "$GITHUB_STEP_SUMMARY"
