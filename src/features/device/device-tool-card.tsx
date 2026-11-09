@@ -1,5 +1,5 @@
 import { useEffect, useId, useState } from "react"
-import { ArrowLeftRight, Check, Play, Wrench } from "lucide-react"
+import { ArrowLeftRight, Check, Circle, Play, Wrench } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Field, FieldLabel } from "@/components/ui/field"
 import type {
@@ -83,6 +83,10 @@ export function DeviceToolCard({
   const plate = useSelectedPlate()
   const library = useWorkspace((state) => state.tools)
   const held = telemetry?.tool ?? null
+  const setterTriggered = telemetry?.toolSetterTriggered
+  let setterState = "Unknown"
+  if (setterTriggered === true) setterState = "Triggered"
+  if (setterTriggered === false) setterState = "Released"
   const options = toolOptions(plate, library, held)
   const label = (tool: number) =>
     options.find(({ value }) => value === tool)?.label ?? toolText(tool)
@@ -151,6 +155,17 @@ export function DeviceToolCard({
           Change
         </ReasonButton>
       </form>
+      <Badge
+        variant={setterTriggered ? "destructive" : "secondary"}
+        role="status"
+      >
+        <Circle
+          aria-hidden="true"
+          data-icon="inline-start"
+          fill={setterTriggered ? "currentColor" : "none"}
+        />
+        Tool setter · {setterState}
+      </Badge>
       {telemetry?.state === "Tool" && !features?.atc && (
         <ReasonButton
           label="Tool installed"
