@@ -55,7 +55,7 @@ AppImage as the OpenSpindle program.
 
 ### SpaceMouse navigation
 
-OpenSpindle detects compatible 3Dconnexion SpaceMouse and SpaceNavigator controllers in **Prepare** and **Job**. Set **Settings › General › SpaceMouse zoom direction** to **Forward / backward** (the default) or **Up / down**. The other direction pans vertically. Tilt or twist the cap to orbit the bed. The 3D view keeps Z pointing up and responds while the app is in focus.
+OpenSpindle detects compatible 3Dconnexion SpaceMouse and SpaceNavigator controllers in **Prepare** and **Job**. In **Settings › SpaceMouse**, choose which direction zooms, turn pan/zoom or rotation on or off, and set sensitivity and direction per axis. The other zoom direction pans vertically. **Dominant axis** uses only the strongest enabled input at a time. The six live meters show the input before navigation settings are applied. The 3D view keeps Z pointing up, so roll is shown on the meter only. **Center input** takes the cap's resting position as neutral for the current connection. Navigation preferences are saved automatically.
 
 The mouse wheel zooms the work view. Wheel events that arrive during or shortly after a forward or backward SpaceMouse push or tilt are ignored in the work view to reduce driver-emulated scrolling. This also affects wheel input from a regular mouse if both devices are used at the same time.
 

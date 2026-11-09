@@ -9,7 +9,6 @@ import { kitForSetup } from "@/domain/fixtures/catalog"
 import { pictureFov } from "@/domain/fixtures/fixture-kit"
 import type { MachineCamera } from "@/domain/fixtures/fixture-kit"
 import type { Point3 } from "@/domain/nc/gcode"
-import { spaceMouseZoomAxis } from "@/lib/spacemouse-preferences"
 import {
   nearSpaceMouseForeAftMotion,
   observeSpaceMouse,
@@ -610,9 +609,9 @@ export class BedScene {
   /** Move the work view, using the same orbit, pan and zoom limits as mouse navigation. */
   private moveSpaceMouse(): boolean {
     const now = performance.now()
-    const { x, y, z, pitch, yaw } = spaceMouseMotion(now)
+    const { panX, panY, zoom: zoomInput, pitch, yaw } = spaceMouseMotion(now)
     if (
-      !(x || y || z || pitch || yaw) ||
+      !(panX || panY || zoomInput || pitch || yaw) ||
       !this.controls.enabled ||
       this.machineCamera ||
       !document.hasFocus() ||
@@ -628,14 +627,11 @@ export class BedScene {
     this.spaceMouseFrame = now
     if (pitch) this.controls.rotateUp(pitch * 1.8 * seconds)
     if (yaw) this.controls.rotateLeft(yaw * 1.8 * seconds)
-    const verticalZoom = spaceMouseZoomAxis() === "vertical"
-    const panY = verticalZoom ? y : z
-    const zoomAxis = verticalZoom ? z : y
     const pan = this.stage.canvas.clientHeight * 0.75 * seconds
-    if (x || panY) this.controls.pan(x * pan, panY * pan)
-    if (zoomAxis) {
+    if (panX || panY) this.controls.pan(panX * pan, panY * pan)
+    if (zoomInput) {
       const zoom = THREE.MathUtils.clamp(
-        this.camera.zoom * Math.exp(-zoomAxis * 2 * seconds),
+        this.camera.zoom * Math.exp(-zoomInput * 2 * seconds),
         this.controls.minZoom,
         this.controls.maxZoom
       )
