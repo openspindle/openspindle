@@ -106,6 +106,8 @@ The Z1's alarms (`Z1_ALARMS`, `src/domain/fixtures/makera-z1/alarms.ts`) are its
 
 ## Camera
 
+On **Device** and **Job**, the camera's fullscreen button also returns it to its previous size. **Esc** leaves fullscreen too. During Run setup, upload and readback verification, OpenSpindle closes the live stream and keeps the last frame visible with a pause label. An open feed reconnects after verification and setup, or if setup fails or is stopped. A feed stopped by the user stays off.
+
 The machine process opens `ws://<host>:82/ws_video`, sends `start_stream` and forwards binary JPEG frames (at most 4 MiB, SOI/EOI checked, 8 s connect and 15 s frame timeouts) to subscribers, over the page's own port to it. The renderer opens no sockets of its own.
 
 Each frame is shown at its own size. The machine's configuration sets the stream's size: `*mainboard.video_stream_framesize` numbers an ESP32 camera frame size as Espressif's camera driver does, 10 being 640 × 480 and 13 being 1280 × 720. A size of another shape than 4:3 is the middle of the camera's whole picture, as the driver crops it: a wider one loses the top and bottom, a narrower one the sides. Reading the configuration gives the size (`FirmwareConfiguration.cameraPicture`), which the simulated camera follows (below).

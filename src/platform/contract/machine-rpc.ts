@@ -24,7 +24,7 @@ import {
 export const CameraEventSchema = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("status"),
-    status: z.enum(["connecting", "live", "error"]),
+    status: z.enum(["connecting", "live", "paused", "error"]),
   }),
   z.object({
     kind: z.literal("frame"),

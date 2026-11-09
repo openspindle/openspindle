@@ -633,6 +633,7 @@ export class MachineController {
   private jobHooks(): JobRunnerHooks {
     return {
       md5: this.ports.md5,
+      pauseCamera: () => this.camera.pause(),
       update: (patch) => this.patchJob(patch),
       attach: (tracker) => {
         this.tracker = tracker
@@ -891,6 +892,7 @@ export class MachineController {
   private onClosed(session: MachineSession, error: string | null) {
     if (session !== this.session) return
     this.session = null
+    this.camera.dispose()
     this.lastError = error
     this.lockout = null
     this.transfer = null

@@ -37,6 +37,8 @@ const START_MS = 8_000
 
 export type JobRunnerHooks = {
   readonly md5: (bytes: Uint8Array) => string
+  /** Suspends camera traffic and returns an idempotent resume callback. */
+  readonly pauseCamera: () => () => void
   readonly update: (patch: Partial<JobState>) => void
   /** From here on the controller feeds statuses and unclaimed lines to the tracker. */
   readonly attach: (tracker: PartedCompletion) => void
@@ -133,6 +135,7 @@ export async function prepareAndStart(
     context,
     parts.reduce((total, part) => total + preparationMs(part.bytes), 0)
   )
+  const resumeCamera = hooks.pauseCamera()
   try {
     let telemetry = await preflight(scoped)
     hooks.bedCleanBefore(job.bedClean(telemetry))
@@ -183,6 +186,7 @@ export async function prepareAndStart(
     const tracker = new PartedCompletion(program, (part, bedClean) =>
       job.createCompletion(part, bedClean, () => clock.now())
     )
+    resumeCamera()
     await play(
       scoped,
       tracker,
@@ -192,6 +196,7 @@ export async function prepareAndStart(
       hooks
     )
   } finally {
+    resumeCamera()
     release()
   }
 }

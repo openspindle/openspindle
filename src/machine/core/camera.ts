@@ -9,10 +9,12 @@ const MAX_FRAME_BYTES = 4 * 1024 * 1024
 const CONNECT_TIMEOUT_MS = 8000
 const FRAME_TIMEOUT_MS = 15000
 
+type CameraStatus = "connecting" | "live" | "paused" | "error"
+
 export type CameraEvent =
   | {
       readonly kind: "status"
-      readonly status: "connecting" | "live" | "error"
+      readonly status: CameraStatus
     }
   | {
       readonly kind: "frame"
@@ -25,7 +27,8 @@ type Feed = {
   readonly listeners: Set<(event: CameraEvent) => void>
   connection: CameraConnection | null
   timer: TimerHandle | null
-  status: "connecting" | "live" | "error"
+  status: CameraStatus
+  generation: number
 }
 
 const isJpeg = (bytes: Uint8Array) =>
@@ -43,6 +46,7 @@ export class CameraFeed {
   private readonly feeds = new Map<string, Feed>()
   private readonly connector: CameraConnector
   private readonly clock: Clock
+  private pauses = 0
 
   constructor(connector: CameraConnector, clock: Clock) {
     this.connector = connector
@@ -57,10 +61,11 @@ export class CameraFeed {
         listeners: new Set(),
         connection: null,
         timer: null,
-        status: "connecting",
+        status: this.pauses ? "paused" : "connecting",
+        generation: 0,
       }
       this.feeds.set(url, feed)
-      this.open(feed)
+      if (!this.pauses) this.open(feed)
     }
     feed.listeners.add(listener)
     listener({ kind: "status", status: feed.status })
@@ -68,6 +73,32 @@ export class CameraFeed {
     return () => {
       current.listeners.delete(listener)
       if (!current.listeners.size) this.close(current)
+    }
+  }
+
+  /** Free the device's bandwidth without losing the viewers' subscriptions. */
+  pause(): () => void {
+    this.pauses++
+    if (this.pauses === 1) {
+      for (const feed of this.feeds.values()) {
+        if (feed.status === "error") continue
+        this.disconnect(feed)
+        feed.status = "paused"
+        this.emit(feed, { kind: "status", status: "paused" })
+      }
+    }
+    let released = false
+    return () => {
+      if (released) return
+      released = true
+      this.pauses--
+      if (this.pauses) return
+      for (const feed of this.feeds.values()) {
+        if (feed.status !== "paused") continue
+        feed.status = "connecting"
+        this.emit(feed, { kind: "status", status: "connecting" })
+        this.open(feed)
+      }
     }
   }
 
@@ -85,12 +116,17 @@ export class CameraFeed {
   }
 
   private open(feed: Feed) {
+    const generation = ++feed.generation
+    const current = () =>
+      this.feeds.get(feed.url) === feed && feed.generation === generation
     this.arm(feed, CONNECT_TIMEOUT_MS)
     try {
       feed.connection = this.connector.open(feed.url, {
-        open: () => feed.connection?.send("start_stream"),
+        open: () => {
+          if (current()) feed.connection?.send("start_stream")
+        },
         binary: (data) => {
-          if (this.feeds.get(feed.url) !== feed) return
+          if (!current()) return
           if (data.length > MAX_FRAME_BYTES || !isJpeg(data)) {
             this.fail(feed)
             return
@@ -106,7 +142,9 @@ export class CameraFeed {
             receivedAt: this.clock.now(),
           })
         },
-        closed: () => this.fail(feed),
+        closed: () => {
+          if (current()) this.fail(feed)
+        },
       })
     } catch {
       this.fail(feed)
@@ -116,17 +154,20 @@ export class CameraFeed {
   /** The feed stays failed until every subscriber leaves; a new subscription retries. */
   private fail(feed: Feed) {
     if (this.feeds.get(feed.url) !== feed || feed.status === "error") return
-    this.clock.clearTimeout(feed.timer)
     feed.status = "error"
-    const connection = feed.connection
-    feed.connection = null
-    connection?.close()
+    this.disconnect(feed)
     this.emit(feed, { kind: "status", status: "error" })
   }
 
   private close(feed: Feed) {
-    this.clock.clearTimeout(feed.timer)
     if (this.feeds.get(feed.url) === feed) this.feeds.delete(feed.url)
+    this.disconnect(feed)
+  }
+
+  private disconnect(feed: Feed) {
+    this.clock.clearTimeout(feed.timer)
+    feed.timer = null
+    feed.generation++
     const connection = feed.connection
     feed.connection = null
     connection?.close()
