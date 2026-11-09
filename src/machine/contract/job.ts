@@ -6,7 +6,7 @@ import {
   DisplayNameSchema,
   utf8ByteLength,
 } from "./primitives.ts"
-import { JobProgressSchema } from "./telemetry.ts"
+import { JobProgressSchema, PositionSchema } from "./telemetry.ts"
 
 const MiB = 1024 * 1024
 
@@ -21,6 +21,15 @@ export const RUN_LIMITS = {
   fileBytes: 4 * MiB,
   fileLines: 250_000,
 } as const
+
+const LinearPositionSchema = PositionSchema.pick({ x: true, y: true, z: true })
+const CheckedStartSchema = z.strictObject({
+  machine: LinearPositionSchema,
+  work: LinearPositionSchema,
+  units: z.enum(["mm", "in"]),
+  keptTool: z.number().nullable(),
+})
+export type CheckedStart = z.infer<typeof CheckedStartSchema>
 
 export const RunRequestSchema = z.strictObject({
   /** A fresh UUID per Run; a used ID is never replayed. */
@@ -39,6 +48,8 @@ export const RunRequestSchema = z.strictObject({
    * first tool change to that tool changes nothing and the job starts without stopping for it.
    */
   keepTool: z.boolean().optional(),
+  /** The position and units used for the app’s tool setter clearance check. */
+  checkedStart: CheckedStartSchema.optional(),
 })
 export type RunRequest = z.infer<typeof RunRequestSchema>
 

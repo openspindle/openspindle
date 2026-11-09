@@ -1,5 +1,6 @@
 import { DEVICE_ASSISTS, partText, programParts } from "../../contract/index.ts"
 import type {
+  CheckedStart,
   JobState,
   PlateAssists,
   PreparedProgram,
@@ -138,6 +139,7 @@ export async function prepareAndStart(
   const resumeCamera = hooks.pauseCamera()
   try {
     let telemetry = await preflight(scoped)
+    verifyCheckedStart(request.checkedStart, telemetry)
     hooks.bedCleanBefore(job.bedClean(telemetry))
     const assists = partAssists(
       request.assists,
@@ -164,6 +166,7 @@ export async function prepareAndStart(
       )
     }
     telemetry = await preflight(scoped)
+    verifyCheckedStart(request.checkedStart, telemetry)
     if (job.assistPlan(assists, telemetry).length)
       throw new MachineError(
         "refused",
@@ -280,6 +283,34 @@ async function preflight(context: OperationContext): Promise<Telemetry> {
   )
   requireAdmission(context, { key: "run" }, telemetry)
   return telemetry
+}
+
+/** The geometry checked before Run must still be current after transfer. */
+function verifyCheckedStart(
+  checked: CheckedStart | undefined,
+  telemetry: Telemetry
+) {
+  if (!checked) return
+  const near = (
+    expected: CheckedStart["machine"],
+    actual: Telemetry["machine"]
+  ) =>
+    actual &&
+    Math.hypot(
+      actual.x - expected.x,
+      actual.y - expected.y,
+      actual.z - expected.z
+    ) <= 0.05
+  if (
+    !near(checked.machine, telemetry.machine) ||
+    !near(checked.work, telemetry.work) ||
+    checked.units !== telemetry.units ||
+    (checked.keptTool !== null && checked.keptTool !== telemetry.tool)
+  )
+    throw new MachineError(
+      "refused",
+      "The machine position, work offset, units or kept tool changed after the clearance check. Review the setup and run again. The program was not started."
+    )
 }
 
 /** Sends a setting, then awaits its acknowledgement and a newer status showing it applied. */

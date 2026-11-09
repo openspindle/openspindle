@@ -1,4 +1,5 @@
 import { useMemo } from "react"
+import { useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { limitsFor, planFor } from "@/app/job/plan-store"
 import {
@@ -18,17 +19,23 @@ import { rulesOf } from "@/domain/rules/rules"
 import { runSubjects } from "@/domain/rules/stages"
 import { usePlateDesignRuleCheck } from "@/features/design-rules/design-rule-check"
 import {
+  isFresh,
   isSimulator,
   machineId,
   runRules,
   toDisplayName,
 } from "@/machine/contract"
-import type { Availability, Telemetry } from "@/machine/contract"
+import type {
+  Availability,
+  MachineSnapshot,
+  PreparedProgram,
+  Telemetry,
+} from "@/machine/contract"
 import type { Tool } from "@/domain/tools/tool"
 import {
+  machineKeys,
   useCachedConfiguration,
   useDismissJob,
-  useFreshTelemetry,
   useMachineCommand,
   useMachineSnapshot,
   useRunProgram,
@@ -36,15 +43,19 @@ import {
   useStopMachine,
 } from "@/platform/machine"
 import { createJobSession, jobSessionStore } from "./job-session"
+import { preparedProgram } from "./program-check"
 import type { ProgramCheck } from "./program-check"
 import { evaluateRunChecklist } from "./run-checklist"
 import type { RunChecklist } from "./run-checklist"
+import { checkToolSetter } from "./tool-setter-check"
 
 /** The Run checklist of a plate, against the connected machine. */
 export function useRunChecklist(
   plate: Plate | null,
   compiled: CompiledPlate | null,
-  check: ProgramCheck
+  check: ProgramCheck,
+  library: readonly Tool[],
+  keptTool: number | null
 ): RunChecklist {
   const snapshot = useMachineSnapshot()
   const diagnostics = usePlateDiagnostics(plate)
@@ -69,6 +80,45 @@ export function useRunChecklist(
       ),
     [plate, connectedDeviceId, anchors, compensation, originX, originY]
   )
+  const prepared = preparedProgram(check)
+  const fresh = isFresh(snapshot.telemetry, Date.now())
+    ? snapshot.telemetry
+    : null
+  const { machine, work, units } = fresh ?? {}
+  const runAllowed = snapshot.availability.run.allowed
+  const toolSetter = useMemo(
+    () =>
+      runAllowed
+        ? checkToolSetter({
+            plate,
+            compiled,
+            prepared,
+            library,
+            device,
+            anchors,
+            machine: machine ?? null,
+            work: work ?? null,
+            units,
+            keptTool,
+          })
+        : {
+            status: "pending" as const,
+            reason: "Waits for the machine to be ready.",
+          },
+    [
+      runAllowed,
+      plate,
+      compiled,
+      prepared,
+      library,
+      device,
+      anchors,
+      machine,
+      work,
+      units,
+      keptTool,
+    ]
+  )
   return evaluateRunChecklist({
     plate,
     compiled,
@@ -77,6 +127,7 @@ export function useRunChecklist(
     designRules,
     snapshot,
     check,
+    toolSetter,
   })
 }
 
@@ -162,8 +213,8 @@ function tipInProgram(plate: Plate, telemetry: Telemetry | null) {
 
 export function useRunJob() {
   const workspace = useWorkspaceStore()
+  const client = useQueryClient()
   const { connection } = useMachineSnapshot()
-  const telemetry = useFreshTelemetry()
   const { device } = connection
   const configuration = useCachedConfiguration(connection.id)
   const run = useRunProgram()
@@ -173,15 +224,42 @@ export function useRunJob() {
     plate: Plate,
     compiled: CompiledPlate,
     library: readonly Tool[],
-    keptTool: number | null = null
+    prepared: PreparedProgram | null,
+    keptTool: number | null
   ) => {
+    const live = client.getQueryData<MachineSnapshot>(machineKeys.snapshot)
+    if (
+      !live ||
+      live.connection.id !== connection.id ||
+      !live.availability.run.allowed
+    ) {
+      toast.error("The machine is no longer ready to run this program.")
+      return
+    }
+    const fresh = isFresh(live.telemetry, Date.now()) ? live.telemetry : null
+    const clearance = checkToolSetter({
+      plate,
+      compiled,
+      prepared,
+      library,
+      device: live.connection.device,
+      anchors: live.anchors.value,
+      machine: fresh?.machine ?? null,
+      work: fresh?.work ?? null,
+      units: fresh?.units,
+      keptTool,
+    })
+    if (clearance.status !== "pass") {
+      toast.error(clearance.reason)
+      return
+    }
     const label = plateLabel(plate, plateIndex(workspace.state, plate.id))
     // Planned from where the machine is, as it starts the program there with what it holds.
     const plan = planFor(
       plate,
       compiled.program,
       limitsFor(kitForPlate(plate), configuration),
-      tipInProgram(plate, telemetry),
+      tipInProgram(plate, fresh),
       keptTool
     )
     const runPlate = () => {
@@ -194,6 +272,9 @@ export function useRunJob() {
           source: compiled.program.source,
           assists: plate.setup.assists,
           ...(keptTool !== null && { keepTool: true }),
+          ...(clearance.checkedStart && {
+            checkedStart: clearance.checkedStart,
+          }),
         },
         { onError: report }
       )

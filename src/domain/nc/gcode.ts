@@ -35,6 +35,8 @@ export interface GCodeSegment {
   spindle: number
   /** A probing move: it ends where the probe, or a tool on a tool setter, touches. */
   probing?: true
+  /** An intentional touch using the fixed tool setter input. */
+  toolSetterTouch?: true
   /** The sample of a probe grid the move belongs to, from 0 in the order they are probed. */
   probePoint?: number
   /**
@@ -81,6 +83,7 @@ export type FirmwareMove = {
   /** For a rapid without a feed, its share of the seek rate, as an override sets it. */
   readonly seekScale?: number
   readonly probing?: true
+  readonly toolSetterTouch?: true
   readonly probePoint?: number
   /** The tool in the spindle; the active tool when absent. */
   readonly tool?: number
@@ -165,6 +168,8 @@ export interface GCodeFirmware {
    * machine was at Run; absent, at the work origin.
    */
   readonly initialPosition?: Point3
+  /** The machine’s unit mode when the player starts. Absent, millimetres. */
+  readonly initialUnits?: "mm" | "in"
 }
 
 /** The lines a program holds that cannot run as written: the first, and how many. */
@@ -193,6 +198,8 @@ export interface GCodeProgram {
   tools: number[]
   /** Lines the preview leaves out as they cannot run as written; null when every line can. */
   unreadable: UnreadableLines | null
+  /** The preview stopped at a line or segment limit. */
+  truncated?: true
   /**
    * The work offsets in effect, as G92 and a firmware's blocks set them (`FirmwareEffect.offset`),
    * in segment order: one from the first segment, [0, 0, 0] unless a block before it sets
@@ -354,6 +361,7 @@ export function parseGCode(
   firmware?: GCodeFirmware
 ): GCodeProgram {
   const lines = source.replace(/\r\n?/g, "\n").split("\n")
+  const sourceLineCount = lines.length - Number(lines.at(-1) === "")
   const segments: GCodeSegment[] = []
   const tools = new Set<number>()
   let firstUnreadable: Omit<UnreadableLines, "count"> | null = null
@@ -364,7 +372,7 @@ export function parseGCode(
   let offset: Point3 = [0, 0, 0]
   let absolute = true
   let incrementalArcCenters = true
-  let scale = 1
+  let scale = firmware?.initialUnits === "in" ? 25.4 : 1
   let plane: keyof typeof ARC_PLANES = 17
   let motion: number | null = null
   let feed: number | null = null
@@ -429,6 +437,7 @@ export function parseGCode(
       spindle: spindleRunning ? spindle : 0,
     }
     if (made?.probing) segment.probing = true
+    if (made?.toolSetterTouch) segment.toolSetterTouch = true
     if (made?.probePoint !== undefined) segment.probePoint = made.probePoint
     if (kind === "routine") segment.routine = true
     else if (kind === "machine") segment.machine = true
@@ -692,5 +701,8 @@ export function parseGCode(
       count: unreadableCount,
     },
     offsets,
+    ...((segmentLimit.reached || sourceLineCount > MAX_PROGRAM_LINES) && {
+      truncated: true,
+    }),
   }
 }

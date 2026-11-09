@@ -8,6 +8,9 @@
  * Nothing imported, so the Z1 simulator can use it as it is.
  */
 
+/** The fixed setter centre, in XY millimetres from Anchor 1. */
+export const SETTER_FROM_ANCHOR = [181, 181] as const
+
 /** The bed Z of the tool setter's top. */
 export const SETTER_TOP = 6.83
 /** The machine Z at which a tool meets the tool setter. */

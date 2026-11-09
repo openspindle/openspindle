@@ -60,11 +60,6 @@ function JobPanel({
   const actions = useJobActions()
   const runJob = useRunJob()
   const library = useWorkspace((state) => state.tools)
-  const checklist = useRunChecklist(
-    subject?.plate ?? null,
-    subject?.compiled ?? null,
-    check
-  )
   // The machine holds the program's first tool: Run may keep it rather than change to it.
   const held = useFreshTelemetry()?.tool ?? null
   const source = subject?.compiled.program.source ?? null
@@ -75,6 +70,14 @@ function JobPanel({
   const [keep, setKeep] = useState(false)
   const keepable =
     view.kind === "idle" && firstTool !== null && held === firstTool
+  const keptTool = keepable && keep ? firstTool : null
+  const checklist = useRunChecklist(
+    subject?.plate ?? null,
+    subject?.compiled ?? null,
+    check,
+    library,
+    keptTool
+  )
   const run: MachineAction = {
     reason: checklist.blocker,
     pending: runJob.pending,
@@ -84,7 +87,8 @@ function JobPanel({
           subject.plate,
           subject.compiled,
           library,
-          keepable && keep ? firstTool : null
+          preparedProgram(check),
+          keptTool
         )
     },
   }
