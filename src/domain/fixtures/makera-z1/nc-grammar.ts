@@ -14,6 +14,7 @@ import {
   PROBE_SETUP_CODES,
   probeFields,
 } from "./wired-probe/blocks"
+import { CLEARANCE_Z } from "./wired-probe/travel"
 
 /**
  * Path control: G61 exact path, G61.1 exact stop and G64 blending. The Z1 firmware has none (it
@@ -86,7 +87,7 @@ export const isZ1Park = (words: readonly Pick<NcWord, "letter" | "value">[]) =>
  * The Z1's own blocks beyond plain three-axis machining, as combining operations reads them: the
  * park its programs may end with, the wired probe's routines, which only its probing operations
  * may run with T0 active, the 3D probe's, which only 3D probing may run with its tool active,
- * path control, which its firmware ignores, waiting for moves to finish, and its switches. Null
+ * cutting retracts to clearance, path control, waiting for moves to finish, and its switches. Null
  * for any other block.
  */
 export function readZ1Block(
@@ -109,7 +110,9 @@ export function readZ1Block(
   if (mCodes.some((word) => PROBE_SETUP_CODES.includes(word.value)))
     return probeSetup(words, mCodes, state)
   if (gCodes.some((word) => word.value === 53))
-    return probeTravel(words, gCodes, state)
+    return state.policy.probing === "none"
+      ? cuttingRetract(words, gCodes, state)
+      : probeTravel(words, gCodes, state)
   if (gCodes.some((word) => PATH_CONTROL_CODES.includes(word.value)))
     return pathControl(words, gCodes)
   if (mCodes.some((word) => word.value === WAIT_FOR_MOVES))
@@ -419,6 +422,27 @@ function probeSetup(
       "Clearing height compensation is supported only for explicit anchored probe placement."
     )
   return ok({})
+}
+
+/** Cutting operations can retract to the kit's Z clearance before their first XY move. */
+function cuttingRetract(
+  words: readonly NcWord[],
+  gCodes: readonly NcWord[],
+  { metric, absolute }: NcUnitState
+): Reading {
+  const values = probeFields(words, ["N", "G", "Z"])
+  if (
+    !metric ||
+    !absolute ||
+    gCodes.length !== 2 ||
+    gCodes[0].value !== 53 ||
+    gCodes[1].value !== 0 ||
+    values?.get("Z") !== CLEARANCE_Z
+  )
+    return fail(
+      `Cutting operations support only G53 G0 Z${CLEARANCE_Z} for machine-coordinate travel, in G21 G90.`
+    )
+  return ok({ motion: 0 })
 }
 
 /**
