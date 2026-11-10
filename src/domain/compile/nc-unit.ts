@@ -42,6 +42,8 @@ export type NcUnitState = {
   readonly policy: NcPolicy
   readonly activeTool: number | null
   readonly spindleRunning: boolean
+  /** Whether the immediately preceding blocks established machine clearance. */
+  readonly clearance: "retracting" | "settled" | null
   /** Millimetres (G21) rather than inches, and absolute distances (G90) rather than relative. */
   readonly metric: boolean
   readonly absolute: boolean
@@ -55,6 +57,7 @@ export type NcBlockEffect = {
   /** The motion mode after it; null when later coordinates must select their own. */
   readonly motion?: number | null
   readonly absolute?: boolean
+  readonly clearance?: NonNullable<NcUnitState["clearance"]>
   /** It probes a grid, or touches the surface. */
   readonly grid?: true
   readonly touch?: true
@@ -202,6 +205,7 @@ export function readNcUnit(
   let metric = true
   let absolute = true
   let spindleRunning = false
+  let clearance: NcUnitState["clearance"] = null
   let grids = 0
   let touches = 0
   /** The program's first park, which nothing may move after. */
@@ -271,11 +275,13 @@ export function readNcUnit(
       policy,
       activeTool,
       spindleRunning,
+      clearance,
       metric,
       absolute,
       grids,
       touches,
     })
+    clearance = own?.ok ? (own.value.clearance ?? null) : null
     if (own) {
       if (!own.ok) throw new UnitError(own.error)
       const effect = own.value

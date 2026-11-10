@@ -111,12 +111,12 @@ export function readZ1Block(
     return probeSetup(words, mCodes, state)
   if (gCodes.some((word) => word.value === 53))
     return state.policy.probing === "none"
-      ? cuttingRetract(words, gCodes, state)
+      ? cuttingTravel(words, gCodes, state)
       : probeTravel(words, gCodes, state)
   if (gCodes.some((word) => PATH_CONTROL_CODES.includes(word.value)))
     return pathControl(words, gCodes)
   if (mCodes.some((word) => word.value === WAIT_FOR_MOVES))
-    return waitForMoves(words)
+    return waitForMoves(words, state)
   const switched = mCodes.find((word) => SWITCH_CODES.includes(word.value))
   if (switched) return switchBlock(words, mCodes, switched)
   return null
@@ -148,12 +148,15 @@ function switchBlock(
   return ok({})
 }
 
-/** M400 alone in its block: the moves before it finish, and nothing changes. */
-function waitForMoves(words: readonly NcWord[]): Reading {
+/** M400 alone in its block waits for the preceding moves. */
+function waitForMoves(
+  words: readonly NcWord[],
+  { clearance }: NcUnitState
+): Reading {
   const codes = words.filter((word) => word.letter !== "N")
   if (codes.length !== 1)
     return fail("M400 is supported only alone in its block.")
-  return ok({})
+  return ok(clearance === "retracting" ? { clearance: "settled" } : {})
 }
 
 /** G28 parks only alone in its block, after the program's last move. */
@@ -424,23 +427,44 @@ function probeSetup(
   return ok({})
 }
 
-/** Cutting operations can retract to the kit's Z clearance before their first XY move. */
-function cuttingRetract(
+/** Cutting operations can retract and traverse at the kit's machine clearance. */
+function cuttingTravel(
   words: readonly NcWord[],
   gCodes: readonly NcWord[],
-  { metric, absolute }: NcUnitState
+  { metric, absolute, activeTool, spindleRunning, clearance }: NcUnitState
 ): Reading {
-  const values = probeFields(words, ["N", "G", "Z"])
   if (
     !metric ||
     !absolute ||
     gCodes.length !== 2 ||
     gCodes[0].value !== 53 ||
-    gCodes[1].value !== 0 ||
-    values?.get("Z") !== CLEARANCE_Z
+    gCodes[1].value !== 0
   )
     return fail(
-      `Cutting operations support only G53 G0 Z${CLEARANCE_Z} for machine-coordinate travel, in G21 G90.`
+      "Machine-coordinate cutting travel requires an explicit G53 G0 in G21 G90."
+    )
+  const z = probeFields(words, ["N", "G", "Z"])
+  if (z?.get("Z") === CLEARANCE_Z)
+    return ok({ motion: 0, clearance: "retracting" })
+
+  const xy = probeFields(words, ["N", "G", "X", "Y"])
+  const x = xy?.get("X")
+  const y = xy?.get("Y")
+  if (
+    x === undefined ||
+    y === undefined ||
+    x < -200 ||
+    x > -1 ||
+    y < -200 ||
+    y > -1 ||
+    activeTool === null ||
+    activeTool < 1 ||
+    activeTool > 999 ||
+    spindleRunning ||
+    clearance !== "settled"
+  )
+    return fail(
+      `Use G53 G0 Z${CLEARANCE_Z} then M400 before a G53 G0 XY move with a cutting tool selected, spindle off and X and Y between -200 and -1 mm.`
     )
   return ok({ motion: 0 })
 }
