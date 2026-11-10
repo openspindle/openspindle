@@ -28,7 +28,6 @@ import {
 import type {
   Availability,
   MachineSnapshot,
-  PreparedProgram,
   Telemetry,
 } from "@/machine/contract"
 import type { Tool } from "@/domain/tools/tool"
@@ -43,19 +42,15 @@ import {
   useStopMachine,
 } from "@/platform/machine"
 import { createJobSession, jobSessionStore } from "./job-session"
-import { preparedProgram } from "./program-check"
 import type { ProgramCheck } from "./program-check"
 import { evaluateRunChecklist } from "./run-checklist"
 import type { RunChecklist } from "./run-checklist"
-import { checkToolSetter } from "./tool-setter-check"
 
 /** The Run checklist of a plate, against the connected machine. */
 export function useRunChecklist(
   plate: Plate | null,
   compiled: CompiledPlate | null,
-  check: ProgramCheck,
-  library: readonly Tool[],
-  keptTool: number | null
+  check: ProgramCheck
 ): RunChecklist {
   const snapshot = useMachineSnapshot()
   const diagnostics = usePlateDiagnostics(plate)
@@ -80,47 +75,6 @@ export function useRunChecklist(
       ),
     [plate, connectedDeviceId, anchors, compensation, originX, originY]
   )
-  const prepared = preparedProgram(check)
-  const fresh = isFresh(snapshot.telemetry, Date.now())
-    ? snapshot.telemetry
-    : null
-  const { machine, work, units, absolute } = fresh ?? {}
-  const runAllowed = snapshot.availability.run.allowed
-  const toolSetter = useMemo(
-    () =>
-      runAllowed
-        ? checkToolSetter({
-            plate,
-            compiled,
-            prepared,
-            library,
-            device,
-            anchors,
-            machine: machine ?? null,
-            work: work ?? null,
-            units,
-            absolute,
-            keptTool,
-          })
-        : {
-            status: "pending" as const,
-            reason: "Waits for the machine to be ready.",
-          },
-    [
-      runAllowed,
-      plate,
-      compiled,
-      prepared,
-      library,
-      device,
-      anchors,
-      machine,
-      work,
-      units,
-      absolute,
-      keptTool,
-    ]
-  )
   return evaluateRunChecklist({
     plate,
     compiled,
@@ -129,7 +83,6 @@ export function useRunChecklist(
     designRules,
     snapshot,
     check,
-    toolSetter,
   })
 }
 
@@ -226,7 +179,6 @@ export function useRunJob() {
     plate: Plate,
     compiled: CompiledPlate,
     library: readonly Tool[],
-    prepared: PreparedProgram | null,
     keptTool: number | null
   ) => {
     const live = client.getQueryData<MachineSnapshot>(machineKeys.snapshot)
@@ -239,23 +191,6 @@ export function useRunJob() {
       return
     }
     const fresh = isFresh(live.telemetry, Date.now()) ? live.telemetry : null
-    const clearance = checkToolSetter({
-      plate,
-      compiled,
-      prepared,
-      library,
-      device: live.connection.device,
-      anchors: live.anchors.value,
-      machine: fresh?.machine ?? null,
-      work: fresh?.work ?? null,
-      units: fresh?.units,
-      absolute: fresh?.absolute,
-      keptTool,
-    })
-    if (clearance.status !== "pass") {
-      toast.error(clearance.reason)
-      return
-    }
     const label = plateLabel(plate, plateIndex(workspace.state, plate.id))
     // Planned from where the machine is, as it starts the program there with what it holds.
     const plan = planFor(
@@ -275,9 +210,6 @@ export function useRunJob() {
           source: compiled.program.source,
           assists: plate.setup.assists,
           ...(keptTool !== null && { keepTool: true }),
-          ...(clearance.checkedStart && {
-            checkedStart: clearance.checkedStart,
-          }),
         },
         { onError: report }
       )

@@ -4,7 +4,7 @@ import { LineGeometry } from "three/addons/lines/LineGeometry.js"
 import { SeeThroughLineMaterial } from "./see-through-line"
 import { LineSegments2 } from "three/addons/lines/webgpu/LineSegments2.js"
 import { LineSegmentsGeometry } from "three/addons/lines/LineSegmentsGeometry.js"
-import type { Area, Path, Place, Point } from "@/domain/diagnostics"
+import type { Area, Cylinder, Path, Place, Point } from "@/domain/diagnostics"
 import { disposeObjects } from "@/lib/three-assets"
 import type { ViewerPalette } from "./palette"
 import { sameProblems } from "./plate-identity"
@@ -109,6 +109,45 @@ function areaObjects(
   return [object]
 }
 
+function cylinderObjects(
+  { center, radius, height }: Cylinder,
+  color: THREE.Color,
+  shown: boolean
+) {
+  const geometry = new THREE.CylinderGeometry(
+    radius,
+    radius,
+    Math.max(height, 0.01),
+    48,
+    1,
+    true
+  )
+  const mesh = new THREE.Mesh(
+    geometry,
+    new THREE.MeshBasicMaterial({
+      color,
+      opacity: shown ? FILL_OPACITY * 2 : FILL_OPACITY,
+      side: THREE.DoubleSide,
+      ...overlay,
+    })
+  )
+  mesh.position.set(center[0], center[1], center[2] + height / 2)
+  mesh.renderOrder = RENDER_ORDER
+  const edges = new THREE.EdgesGeometry(geometry)
+  const outline = new LineSegments2(
+    new LineSegmentsGeometry().fromEdgesGeometry(edges),
+    new SeeThroughLineMaterial({
+      color,
+      linewidth: shown ? SHOWN_LINE_WIDTH : LINE_WIDTH,
+      ...overlay,
+    })
+  )
+  edges.dispose()
+  outline.position.copy(mesh.position)
+  outline.renderOrder = RENDER_ORDER
+  return [mesh, outline]
+}
+
 function placeObjects(
   place: Place,
   color: THREE.Color,
@@ -122,6 +161,8 @@ function placeObjects(
       return pathObjects(place, color, width)
     case "area":
       return areaObjects(place, color, width, shown)
+    case "cylinder":
+      return cylinderObjects(place, color, shown)
   }
 }
 

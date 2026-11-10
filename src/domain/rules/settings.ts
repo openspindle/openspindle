@@ -33,6 +33,7 @@ export const RuleSettingsSchema = z
     z.strictObject({
       severity: RuleSeveritySchema,
       limit: z.number().optional(),
+      parameters: z.record(z.string(), z.number()).optional(),
     })
   )
   .superRefine((settings, context) => {
@@ -62,8 +63,48 @@ export const RuleSettingsSchema = z
           message: issue.message,
           path: [id, "limit"],
         })
+      const parameters = rule.parameters ?? []
+      const values = setting.parameters ?? {}
+      for (const parameter of parameters) {
+        const value = Object.hasOwn(values, parameter.id)
+          ? values[parameter.id]
+          : undefined
+        if (value === undefined) {
+          context.addIssue({
+            code: "custom",
+            message: `${parameter.label} is required.`,
+            path: [id, "parameters", parameter.id],
+          })
+        } else if (value < parameter.min || value > parameter.max) {
+          context.addIssue({
+            code: "custom",
+            message: `${parameter.label} must be from ${parameter.min} to ${parameter.max.toLocaleString("en-US")} ${parameter.unit}.`,
+            path: [id, "parameters", parameter.id],
+          })
+        }
+      }
+      for (const key of Object.keys(values))
+        if (!parameters.some((parameter) => parameter.id === key))
+          context.addIssue({
+            code: "custom",
+            message: `${key} is not a setting of ${rule.label}.`,
+            path: [id, "parameters", key],
+          })
     }
   })
+
+/** A configurable rule's numeric parameters, with defaults filled in. */
+export function ruleParameters(
+  rule: Pick<AnyRule, "parameters">,
+  setting: RuleSettings[string] | undefined
+): Readonly<Record<string, number>> {
+  return Object.fromEntries(
+    (rule.parameters ?? []).map((parameter) => [
+      parameter.id,
+      setting?.parameters?.[parameter.id] ?? parameter.default,
+    ])
+  )
+}
 
 /**
  * Settings as the settings form edits them: every configurable rule, in list order, as the
@@ -74,9 +115,27 @@ export function settingsForm(settings: RuleSettings): RuleSettings {
   return Object.fromEntries([
     ...RULES.filter((rule) => rule.configurable).map((rule) => {
       const { severity, limit } = ruleSetting(rule, settings)
-      return [rule.id, rule.limit ? { severity, limit } : { severity }]
+      const configured = Object.hasOwn(settings, rule.id)
+        ? settings[rule.id]
+        : undefined
+      const parameters = rule.parameters?.length
+        ? Object.fromEntries(
+            rule.parameters.map((parameter) => [
+              parameter.id,
+              configured?.parameters?.[parameter.id] ?? parameter.default,
+            ])
+          )
+        : undefined
+      return [
+        rule.id,
+        {
+          severity,
+          ...(rule.limit && { limit }),
+          ...(parameters && { parameters }),
+        },
+      ]
     }),
-    ...Object.entries(settings).filter(([id]) => !ruleById(id)),
+    ...Object.entries(settings).filter(([unknownId]) => !ruleById(unknownId)),
   ])
 }
 
@@ -91,7 +150,15 @@ export function savedRuleSettings(settings: RuleSettings): RuleSettings {
       return (
         !rule ||
         setting.severity !== rule.severity ||
-        setting.limit !== rule.limit?.default
+        setting.limit !== rule.limit?.default ||
+        rule.parameters?.some(
+          (parameter) =>
+            setting.parameters?.[parameter.id] !== parameter.default
+        ) ||
+        Object.keys(setting.parameters ?? {}).some(
+          (parameterId) =>
+            !rule.parameters?.some((parameter) => parameter.id === parameterId)
+        )
       )
     })
   )
@@ -108,7 +175,9 @@ export function sameRuleSettings(a: RuleSettings, b: RuleSettings) {
       (id) =>
         Object.hasOwn(savedB, id) &&
         savedA[id].severity === savedB[id].severity &&
-        savedA[id].limit === savedB[id].limit
+        savedA[id].limit === savedB[id].limit &&
+        JSON.stringify(savedA[id].parameters ?? {}) ===
+          JSON.stringify(savedB[id].parameters ?? {})
     )
   )
 }

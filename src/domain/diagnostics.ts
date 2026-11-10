@@ -76,8 +76,16 @@ export type Area = {
   readonly max: Point3
 }
 
+/** A vertical cylinder on the bed, such as a tool-clearance area. */
+export type Cylinder = {
+  readonly kind: "cylinder"
+  readonly center: Point3
+  readonly radius: number
+  readonly height: number
+}
+
 /** Where a diagnostic is on its plate's bed, in bed coordinates: what the 3D view marks. */
-export type Place = Point | Path | Area
+export type Place = Point | Path | Area | Cylinder
 
 /** Inclusive 1-based lines of the compiled program. */
 export type ProgramLines = { readonly start: number; readonly end: number }

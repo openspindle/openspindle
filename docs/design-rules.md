@@ -15,9 +15,15 @@ The design rules are the rules a project sets: the move rules and the program ru
 | Max cut depth                 | `max-cut-depth`                 | A cut reaching further below the stock top than the limit, in total (not per pass)                   | 3 mm, warning        |
 | Max depth under the stock     | `max-depth-under-stock`         | A cut reaching further below the stock bottom than the limit, into what the stock lies on            | 0.3 mm, warning      |
 | Spindle stopped while cutting | `spindle-stopped-while-cutting` | A cutting move while the spindle is stopped (`M5`, or no `M3`/`M4` yet), or turns without a speed    | warning              |
-| Rapid move into the stock     | `rapid-into-stock`              | A rapid move (`G0`) into the stock                                                                   | warning              |
+| Rapid move into the stock     | `rapid-into-stock`              | A rapid move (`G0`) into the stock                                                                   | warning        |
+| Fixed tool setter clearance   | `tool-setter-clearance`         | A tool entering the configured tool-setter cylinder                                                   | error          |
 
 Limits are from 1 to 100,000 mm/min for feeds and from 0 to 1,000 mm for depths. Feeds are the feeds the moves run at, `M220` overrides included.
+
+The fixed tool setter clearance is available for Makera Z1 plates. Its Design Rules settings
+configure the cylinder's X and Y from Anchor 1, bottom Z, radius and height. The default is an
+error; changing it to a warning allows Run to continue, and Ignore disables the check. When the
+rule finds a move, the cylinder is shown in the 3D view with the affected program line.
 
 ## Program rules
 

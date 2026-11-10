@@ -1,10 +1,17 @@
-import type { GCodeSegment, Point3 } from "../../nc/gcode"
-import { SETTER_RADIUS } from "./tool-setter"
+import type { GCodeSegment } from "../../nc/gcode"
+
+export type SetterCylinder = {
+  readonly x: number
+  readonly y: number
+  readonly bottom: number
+  readonly top: number
+  readonly radius: number
+}
 
 /** Whether a move other than a setter touch or a vertical retract enters the setter's clearance. */
 export function entersSetterClearance(
   { start, end, toolSetterTouch, probing, spindle }: GCodeSegment,
-  [x, y, top]: Point3,
+  { x, y, bottom, top, radius }: SetterCylinder,
   toolRadius: number
 ): boolean {
   const dx = end[0] - start[0]
@@ -17,21 +24,33 @@ export function entersSetterClearance(
     probing &&
     spindle === 0 &&
     xyLengthSquared === 0 &&
-    Math.hypot(start[0] - x, start[1] - y) <= SETTER_RADIUS
+    Math.hypot(start[0] - x, start[1] - y) <= radius
   )
     return false
-  if (Math.min(start[2], end[2]) > top) return false
+  if (Math.max(start[2], end[2]) < bottom || Math.min(start[2], end[2]) > top)
+    return false
 
-  // Only consider the portion of the move at or below the clearance height.
-  const lowStart = start[2] > top ? (top - start[2]) / dz : 0
-  const lowEnd = end[2] > top ? (top - start[2]) / dz : 1
+  // Only consider the portion of the move inside the cylinder's vertical range.
+  const [from, to] =
+    Math.abs(dz) < 1e-12
+      ? [0, 1]
+      : [
+          Math.max(
+            0,
+            Math.min((bottom - start[2]) / dz, (top - start[2]) / dz)
+          ),
+          Math.min(
+            1,
+            Math.max((bottom - start[2]) / dz, (top - start[2]) / dz)
+          ),
+        ]
   const projection =
     xyLengthSquared === 0
       ? 0
       : ((x - start[0]) * dx + (y - start[1]) * dy) / xyLengthSquared
-  const nearest = Math.max(lowStart, Math.min(lowEnd, projection))
+  const nearest = Math.max(from, Math.min(to, projection))
   return (
     Math.hypot(start[0] + nearest * dx - x, start[1] + nearest * dy - y) <=
-    SETTER_RADIUS + toolRadius
+    radius + toolRadius
   )
 }

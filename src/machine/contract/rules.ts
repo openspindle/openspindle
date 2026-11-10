@@ -15,6 +15,16 @@ export type RuleLimit = {
   readonly default: number
 }
 
+/** A numeric setting beyond a rule's single limit. */
+export type RuleParameter = {
+  readonly id: string
+  readonly label: string
+  readonly unit: "mm"
+  readonly min: number
+  readonly max: number
+  readonly default: number
+}
+
 /**
  * What one stage of checking hands its rules: the subject a test takes, the change a fix makes,
  * and what a failure's text adds for the stage's views.
@@ -86,6 +96,7 @@ export interface Rule<TName extends string, TStage extends RuleStage> {
   /** Whether a project sets how it is reported, and its limit; otherwise it is always reported at its own. */
   readonly configurable: boolean
   readonly limit?: RuleLimit
+  readonly parameters?: readonly RuleParameter[]
   /** The machines it holds for, by fixture kit id (`FixtureKit.id`); every machine without. */
   readonly machines?: readonly string[]
   /**
@@ -109,6 +120,7 @@ export interface Rule<TName extends string, TStage extends RuleStage> {
 export type RuleSetting = {
   readonly severity: RuleSeverity
   readonly limit?: number
+  readonly parameters?: Readonly<Record<string, number>>
 }
 
 /** A project's settings by rule id; a rule it does not set is reported at its own severity and limit. */

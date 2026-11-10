@@ -74,22 +74,14 @@ function JobPanel({
   const checklist = useRunChecklist(
     subject?.plate ?? null,
     subject?.compiled ?? null,
-    check,
-    library,
-    keptTool
+    check
   )
   const run: MachineAction = {
     reason: checklist.blocker,
     pending: runJob.pending,
     run: () => {
       if (subject && checklist.ready)
-        runJob.start(
-          subject.plate,
-          subject.compiled,
-          library,
-          preparedProgram(check),
-          keptTool
-        )
+        runJob.start(subject.plate, subject.compiled, library, keptTool)
     },
   }
   return (

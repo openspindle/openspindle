@@ -4,6 +4,7 @@ import { ALARM_RULES, DIAGNOSIS_RULES } from "../diagnosis/rules"
 import { PROGRAM_RULES } from "../design-rules/common-rules"
 import { MOVE_RULES } from "../design-rules/move-rules"
 import { Z1_DIAGNOSIS_RULES } from "../fixtures/makera-z1/diagnosis"
+import { Z1_DESIGN_RULES } from "../fixtures/makera-z1/design-rules"
 import { Z1_RULES } from "../fixtures/makera-z1/program-rules"
 import { PART_RULES } from "../operations/part-rules"
 import { PCB_RULES } from "../pcb/rules"
@@ -40,6 +41,7 @@ export const RULES: readonly AnyRule[] = [
   ...PART_RULES,
   ...MOVE_RULES,
   ...PROGRAM_RULES,
+  ...Z1_DESIGN_RULES,
   ...Z1_RULES,
   ...HEIGHT_MAP_RULES,
   ...DIAGNOSIS_RULES,
