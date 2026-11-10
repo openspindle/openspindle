@@ -84,6 +84,12 @@ function RunFixAction({
           {fix.label}
         </Link>
       )
+    case "program-line":
+      return (
+        <Link to="/job" search={{ line: fix.line }} className={className}>
+          Show line {fix.line}
+        </Link>
+      )
     case "device":
       return (
         <Link to="/device" className={className}>

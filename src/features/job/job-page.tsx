@@ -137,10 +137,12 @@ function ProgramPanel({
   subject,
   check,
   timeline,
+  requestedLine,
 }: {
   subject: JobSubject | null
   check: ProgramCheck
   timeline: JobTimeline
+  requestedLine: number | null
 }) {
   const layout = useDefaultLayout({
     id: "openspindle-job-program",
@@ -160,6 +162,7 @@ function ProgramPanel({
             operations={subject.plate.operations}
             check={check}
             line={timeline.line}
+            requestedLine={requestedLine}
             onSeekLine={timeline.seekLine}
           />
         ) : (
@@ -274,7 +277,12 @@ export function JobPage({
         maxSize={640}
         groupResizeBehavior="preserve-pixel-size"
       >
-        <ProgramPanel subject={subject} check={check} timeline={timeline} />
+        <ProgramPanel
+          subject={subject}
+          check={check}
+          timeline={timeline}
+          requestedLine={requestedLine}
+        />
       </ResizablePanel>
     </ResizablePanelGroup>
   )

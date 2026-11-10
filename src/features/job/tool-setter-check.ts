@@ -8,6 +8,7 @@ import {
   SETTER_FROM_ANCHOR,
   SETTER_TOP,
 } from "@/domain/fixtures/makera-z1/tool-setter"
+import { formatMillimetres } from "@/domain/geometry/millimetres"
 import { parseGCode } from "@/domain/nc/gcode"
 import type { Point3 } from "@/domain/nc/gcode"
 import type { Plate } from "@/domain/plate/plate"
@@ -30,7 +31,7 @@ export type ToolSetterCheck =
   | {
       readonly status: "collision"
       readonly reason: string
-      readonly operation?: string
+      readonly line: number
     }
   | { readonly status: "incomplete"; readonly reason: string }
 
@@ -122,15 +123,19 @@ export function checkToolSetter({
     )
   )
   if (hit) {
-    const operation = compiled.spans.find(
-      ({ startLine, endLine }) => hit.line >= startLine && hit.line <= endLine
-    )?.operationId
+    const dx = workOrigin[0] - setup.workOrigin[0]
+    const dy = workOrigin[1] - setup.workOrigin[1]
+    const mismatch = Math.hypot(dx, dy) > 0.05
+    const advice = mismatch
+      ? `The machine’s XY zero differs from the plate’s by X ${formatMillimetres(dx)}, Y ${formatMillimetres(dy)} mm. Check the work origin in Device.`
+      : "Raise Z before moving in X/Y and lower it only after clearing the setter."
     return {
       status: "collision",
-      reason: `Line ${hit.line} moves too low over the fixed tool setter. Raise Z before moving in X/Y and lower it only after clearing the setter.`,
-      operation,
+      line: hit.line,
+      reason: `Line ${hit.line} enters the fixed tool setter’s clearance area at low Z. ${advice}`,
     }
   }
+
   return path.truncated || path.unreadable
     ? {
         status: "incomplete",

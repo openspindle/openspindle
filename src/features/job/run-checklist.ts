@@ -27,6 +27,7 @@ export type RunFix =
       readonly search: PrepareSearch
     }
   | { readonly kind: "device"; readonly label: string }
+  | { readonly kind: "program-line"; readonly line: number }
   | { readonly kind: "read-anchors"; readonly label: string }
   /** Opens the height map the machine applies, with its work Z. */
   | { readonly kind: "height-map"; readonly label: string }
@@ -351,16 +352,10 @@ const toolSetterClearance: RunCheckRow = {
       case "incomplete":
         return fail(toolSetter.reason, OPEN_PREPARE)
       case "collision":
-        return fail(
-          toolSetter.reason,
-          toolSetter.operation
-            ? {
-                kind: "prepare",
-                label: "Open operation",
-                search: { operation: toolSetter.operation },
-              }
-            : OPEN_PREPARE
-        )
+        return fail(toolSetter.reason, {
+          kind: "program-line",
+          line: toolSetter.line,
+        })
     }
   },
 }
