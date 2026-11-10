@@ -170,6 +170,8 @@ export interface GCodeFirmware {
   readonly initialPosition?: Point3
   /** The machine’s unit mode when the player starts. Absent, millimetres. */
   readonly initialUnits?: "mm" | "in"
+  /** The machine's distance mode when the player starts. Absent, absolute distances. */
+  readonly initialAbsolute?: boolean
 }
 
 /** The lines a program holds that cannot run as written: the first, and how many. */
@@ -370,7 +372,7 @@ export function parseGCode(
     ? [...firmware.initialPosition]
     : [0, 0, 0]
   let offset: Point3 = [0, 0, 0]
-  let absolute = true
+  let absolute = firmware?.initialAbsolute ?? true
   let incrementalArcCenters = true
   let scale = firmware?.initialUnits === "in" ? 25.4 : 1
   let plane: keyof typeof ARC_PLANES = 17

@@ -231,6 +231,7 @@ class Z1Preview implements GCodeFirmware {
   }
   readonly initialPosition?: Point3
   readonly initialUnits?: "mm" | "in"
+  readonly initialAbsolute?: boolean
   private readonly frame: Z1Frame
   private active: number | null = null
 
@@ -238,6 +239,7 @@ class Z1Preview implements GCodeFirmware {
     this.frame = new Z1Frame(setup)
     if (setup.start) this.initialPosition = setup.start
     this.initialUnits = setup.units
+    this.initialAbsolute = setup.absolute
     this.active = setup.tool ?? null
   }
 

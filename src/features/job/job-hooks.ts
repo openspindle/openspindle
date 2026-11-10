@@ -84,7 +84,7 @@ export function useRunChecklist(
   const fresh = isFresh(snapshot.telemetry, Date.now())
     ? snapshot.telemetry
     : null
-  const { machine, work, units } = fresh ?? {}
+  const { machine, work, units, absolute } = fresh ?? {}
   const runAllowed = snapshot.availability.run.allowed
   const toolSetter = useMemo(
     () =>
@@ -99,6 +99,7 @@ export function useRunChecklist(
             machine: machine ?? null,
             work: work ?? null,
             units,
+            absolute,
             keptTool,
           })
         : {
@@ -116,6 +117,7 @@ export function useRunChecklist(
       machine,
       work,
       units,
+      absolute,
       keptTool,
     ]
   )
@@ -247,6 +249,7 @@ export function useRunJob() {
       machine: fresh?.machine ?? null,
       work: fresh?.work ?? null,
       units: fresh?.units,
+      absolute: fresh?.absolute,
       keptTool,
     })
     if (clearance.status !== "pass") {
