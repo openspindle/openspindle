@@ -284,6 +284,7 @@ export class FixtureModelScene {
     if (this.template) disposeObjects(this.template)
     this.material.dispose()
     this.faceMaterial.dispose()
+    disposeObjects(this.axes)
     this.stage.dispose()
   }
 

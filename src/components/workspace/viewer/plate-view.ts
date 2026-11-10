@@ -1,4 +1,6 @@
 import * as THREE from "three"
+import { billboarding } from "three/tsl"
+import { MeshBasicNodeMaterial } from "three/webgpu"
 import { Line2 } from "three/addons/lines/webgpu/Line2.js"
 import { LineGeometry } from "three/addons/lines/LineGeometry.js"
 import { SeeThroughLineMaterial } from "./see-through-line"
@@ -209,11 +211,53 @@ export function bedGrid(bed: MachineBed) {
   return grid
 }
 
+// Block-letter outlines centred in a 64-unit square. The unused space preserves the size
+// and visual spacing of the labels at the ends of the work axes.
+const WORK_AXIS_GLYPHS = [
+  [
+    [-16, 17],
+    [-8, 17],
+    [0, 5],
+    [8, 17],
+    [16, 17],
+    [4, 0],
+    [16, -17],
+    [8, -17],
+    [0, -5],
+    [-8, -17],
+    [-16, -17],
+    [-4, 0],
+  ],
+  [
+    [-16, 17],
+    [-8, 17],
+    [0, 3],
+    [8, 17],
+    [16, 17],
+    [3.5, -4],
+    [3.5, -17],
+    [-3.5, -17],
+    [-3.5, -4],
+  ],
+  [
+    [-15, 17],
+    [15, 17],
+    [15, 11],
+    [-6, -11],
+    [15, -11],
+    [15, -17],
+    [-15, -17],
+    [-15, -11],
+    [6, 11],
+    [-15, 11],
+  ],
+]
+
 /** Labels stay at the plate's physical work origin, independent of playback. */
 export function workOriginAxes() {
   const group = new THREE.Group()
   const colors = ["#b83832", "#287a36", "#285fc1"]
-  for (const [axis, letter] of ["X", "Y", "Z"].entries()) {
+  for (const [axis, glyph] of WORK_AXIS_GLYPHS.entries()) {
     const end: Point3 = [0, 0, 0]
     end[axis] = WORK_AXIS_LENGTH
     const line = new Line2(
@@ -231,30 +275,23 @@ export function workOriginAxes() {
     )
     line.renderOrder = 8
     group.add(line)
-    const canvas = document.createElement("canvas")
-    canvas.width = canvas.height = 64
-    const context = canvas.getContext("2d")
-    if (!context) continue
-    context.font = "600 44px system-ui, sans-serif"
-    context.textAlign = "center"
-    context.textBaseline = "middle"
-    context.fillStyle = colors[axis]
-    context.fillText(letter, 32, 34)
-    const texture = new THREE.CanvasTexture(canvas)
-    texture.colorSpace = THREE.SRGBColorSpace
-    const label = new THREE.Sprite(
-      new THREE.SpriteMaterial({
-        map: texture,
-        // Drawn over everything, so transparent: the translucent stock drawn after an opaque
-        // overlay would tint it.
-        transparent: true,
-        depthTest: false,
-        depthWrite: false,
-        toneMapped: false,
-      })
+    const shape = new THREE.Shape(
+      glyph.map(([x, y]) => new THREE.Vector2(x / 64, y / 64))
     )
+    const material = new MeshBasicNodeMaterial({
+      color: colors[axis],
+      // Keep the same overlay order as the axis lines and the translucent stock.
+      transparent: true,
+      depthTest: false,
+      depthWrite: false,
+      toneMapped: false,
+    })
+    material.vertexNode = billboarding({ horizontal: true, vertical: true })
+    const label = new THREE.Mesh(new THREE.ShapeGeometry(shape), material)
+    // The shader rotates the mesh towards the camera after CPU culling.
+    label.frustumCulled = false
     label.position.setComponent(axis, WORK_AXIS_LABEL_DISTANCE)
-    label.scale.set(WORK_AXIS_LABEL_SIZE, WORK_AXIS_LABEL_SIZE, 1)
+    label.scale.setScalar(WORK_AXIS_LABEL_SIZE)
     label.renderOrder = 9
     group.add(label)
   }
