@@ -48,6 +48,7 @@ export function checkToolSetter({
   machine,
   work,
   units,
+  absolute,
   keptTool,
 }: {
   plate: Plate | null
@@ -59,6 +60,7 @@ export function checkToolSetter({
   machine: Position | null
   work: Position | null
   units: Telemetry["units"] | undefined
+  absolute: Telemetry["absolute"] | undefined
   keptTool: number | null
 }): ToolSetterCheck {
   if (!device) return { status: "pass" }
@@ -67,7 +69,7 @@ export function checkToolSetter({
     return { status: "pass" }
   if (!plate || !compiled || !prepared)
     return { status: "pending", reason: "Waits for the prepared program." }
-  if (!machine || !work || !units)
+  if (!machine || !work || !units || absolute === undefined)
     return {
       status: "pending",
       reason: "Waits for the machine's current position.",
@@ -105,6 +107,7 @@ export function checkToolSetter({
       workOrigin,
       start: [work.x, work.y, work.z],
       units,
+      absolute,
       ...(keptTool !== null && { tool: keptTool }),
     })
   )

@@ -28,6 +28,8 @@ export type FirmwareSetup = {
   readonly start?: Point3
   /** The unit mode the machine is in when the program starts. */
   readonly units?: "mm" | "in"
+  /** The distance mode the machine is in when the program starts. */
+  readonly absolute?: boolean
   /**
    * The tool the machine holds as the program starts, which a tool change to changes nothing:
    * one kept at Run. Absent, it holds none the program knows.
