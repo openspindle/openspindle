@@ -1,6 +1,7 @@
 import { DEVICE_ASSISTS, partText, programParts } from "../../contract/index.ts"
 import type {
   CheckedStart,
+  Identity,
   JobState,
   PlateAssists,
   PreparedProgram,
@@ -11,6 +12,7 @@ import { FAILURE_LINES, excerpt } from "../../firmware/adapter.ts"
 import type {
   AssistStep,
   FirmwareAdapter,
+  JobProtocol,
   OutboundFrame,
   SettingStep,
   TransferProtocol,
@@ -93,6 +95,28 @@ function assistSteps(
   }
 }
 
+/**
+ * A manual tool change is not complete until the Z1 has actually measured the cutter.
+ * Keep tool skips M6 when the firmware believes that cutter is already mounted, so refuse
+ * this option whenever the first M6 needs a forced change and tool-setter measurement.
+ * Run this check before upload and again with fresh telemetry immediately before play.
+ */
+export function toolResetForRun(
+  job: JobProtocol,
+  program: PreparedProgram,
+  identity: Identity,
+  telemetry: Telemetry,
+  keepTool = false
+): SettingStep | null {
+  const reset = job.toolReset(program, identity, telemetry)
+  if (keepTool && reset)
+    throw new MachineError(
+      "refused",
+      "Keep tool would skip the first M6 and its tool-setter measurement. Run again without Keep tool so the cutter is calibrated before spindle start."
+    )
+  return reset
+}
+
 /** Aborts with the context, or when the preparation outlasts `milliseconds`. */
 function withDeadline(context: OperationContext, milliseconds: number) {
   const { clock } = context
@@ -139,6 +163,11 @@ export async function prepareAndStart(
   const resumeCamera = hooks.pauseCamera()
   try {
     let telemetry = await preflight(scoped)
+    const initialIdentity = session.identity
+    if (!initialIdentity)
+      throw new MachineError("connection-lost", "The device is disconnected.")
+    // Refuse a dangerous Keep tool request before any file is uploaded.
+    toolResetForRun(job, program, initialIdentity, telemetry, request.keepTool)
     verifyCheckedStart(request.checkedStart, telemetry)
     hooks.bedCleanBefore(job.bedClean(telemetry))
     const assists = partAssists(
@@ -175,10 +204,14 @@ export async function prepareAndStart(
     const identity = session.identity
     if (!identity)
       throw new MachineError("connection-lost", "The device is disconnected.")
-    // Kept, the tool the machine holds stays: a first change to it changes nothing.
-    const reset = request.keepTool
-      ? null
-      : job.toolReset(program, identity, telemetry)
+    // Re-check against the final machine state: no first M6 may be skipped.
+    const reset = toolResetForRun(
+      job,
+      program,
+      identity,
+      telemetry,
+      request.keepTool
+    )
     if (reset)
       await applySetting(
         scoped,

@@ -363,6 +363,10 @@ export const makeraRules: FirmwareRules = {
       case "spindleStart":
         if (telemetry.estop !== false)
           return "Waiting for the device to report a released emergency stop."
+        if (telemetry.toolSetterTriggered !== false)
+          return telemetry.toolSetterTriggered === true
+            ? "The tool setter is triggered. Release it and inspect the sensor before starting the spindle."
+            : "The tool-setter state is unknown. Wait for a fresh diagnostic report before starting the spindle."
         if (!validTool(telemetry.tool))
           return "The device must report a cutting tool before starting the spindle."
         // A running spindle without motion accepts a new target speed.
@@ -438,6 +442,10 @@ export const makeraRules: FirmwareRules = {
       return "Stop the spindle before starting a program."
     if (telemetry.laserMode !== false)
       return "Run requires the device to report milling mode."
+    if (telemetry.toolSetterTriggered !== false)
+      return telemetry.toolSetterTriggered === true
+        ? "The tool setter is triggered. Release it and inspect the sensor before Run."
+        : "The tool-setter state is unknown. Wait for a fresh diagnostic report before Run."
     if (telemetry.bedCleanAuto === null)
       return "The device does not report its bed-clean mode; job completion cannot be verified."
     return toolSetterReason(telemetry)

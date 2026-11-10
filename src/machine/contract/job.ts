@@ -44,8 +44,8 @@ export const RunRequestSchema = z.strictObject({
     ),
   assists: PlateAssistsSchema.nullable(),
   /**
-   * Keep the tool the machine holds: Run does not make it forget the tool before play, so a
-   * first tool change to that tool changes nothing and the job starts without stopping for it.
+   * Request keeping the current tool. Refused when a manual Z1 must forget its tool for the
+   * program's first M6 to stop and measure it: bypassing calibration is unsafe.
    */
   keepTool: z.boolean().optional(),
   /** The position and units used for the app’s tool setter clearance check. */

@@ -269,6 +269,13 @@ export function prepareMakeraProgram(source: string): PreparedProgram {
       })
       return ""
     }
+    // GcodeDispatch executes both M codes in a single block immediately: M3 can turn the
+    // spindle on while M6's asynchronous tool-setter script is still running.
+    if (changesTool(block) && block.words.some(startsSpindle))
+      throw new ProgramError(
+        `Line ${lineNumber} starts the spindle in the same block as M6. The Z1 can start it before tool calibration completes; put M3/M4 on a separate line.`,
+        lineNumber
+      )
     const tool = wordValue(block, "T")
     if (tool !== null) selectedTool = tool
     if (changesTool(block)) {
