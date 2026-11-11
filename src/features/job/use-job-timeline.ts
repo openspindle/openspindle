@@ -25,6 +25,9 @@ import { toViewerPlate } from "@/features/viewer/viewer-plate"
 import { buildPreviewTimeline, stepForLine } from "./preview-timeline"
 import type { PreviewTimeline } from "./preview-timeline"
 import type { FollowTarget, JobSubject } from "./job-view"
+import { settleFinishTime } from "./finish-time"
+import type { FinishTime } from "./finish-time"
+import { TELEMETRY_FRESH_MS } from "@/machine/contract"
 
 const EMPTY_TIMELINE: PreviewTimeline = { steps: [], ticks: [], probePoints: 0 }
 
@@ -49,6 +52,8 @@ export type JobEta = {
   readonly toolChanges: number
   /** From where the machine is, while a job is followed; else the whole plan. */
   readonly remaining: boolean
+  /** Smoothed local finish instant, absent during preview or an indefinite wait. */
+  readonly finishAt?: number | null
 }
 
 /** What the cursor shows while playback or the follow moves it, a few times a second. */
@@ -97,6 +102,7 @@ const sameShown = (a: Shown | null, b: Shown) =>
   a.tool?.number === b.tool?.number &&
   (a.tool === null) === (b.tool === null) &&
   a.eta?.seconds === b.eta?.seconds &&
+  a.eta?.finishAt === b.eta?.finishAt &&
   a.eta?.toolChanges === b.eta?.toolChanges
 
 /** The manual tool changes the machine waits at, from move `from` on. */
@@ -329,6 +335,7 @@ export function useJobTimeline(
     let steppedAt = -Infinity
     let last: Shown | null = null
     let settled: SettledEta | null = null
+    let finish: FinishTime | null = null
     let request = 0
     const tick = (stamp: number) => {
       const now = performance.timeOrigin + stamp
@@ -365,6 +372,13 @@ export function useJobTimeline(
         // A rate of 0 is the machine waiting, which the time left waits out too.
         if (eta)
           settled = settleEta(settled, eta.seconds, now, !!estimate?.rate)
+        finish =
+          eta &&
+          settled &&
+          estimate?.rate &&
+          now - estimate.at <= TELEMETRY_FRESH_MS
+            ? settleFinishTime(finish, now + settled.seconds * 1000, now)
+            : null
         const next: Shown = {
           by: liveJob,
           step: frame?.step ?? stepForLine(timeline, reported.current),
@@ -372,7 +386,11 @@ export function useJobTimeline(
           tool: toolShown(frame),
           eta:
             eta && settled
-              ? { ...eta, seconds: Math.round(settled.seconds) }
+              ? {
+                  ...eta,
+                  seconds: Math.round(settled.seconds),
+                  finishAt: finish?.shown ?? null,
+                }
               : null,
         }
         if (!sameShown(last, next)) {
