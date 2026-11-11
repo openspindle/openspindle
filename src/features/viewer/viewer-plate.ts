@@ -101,6 +101,14 @@ export function toViewerPlate(
   const toolpath = plateToolpathBounds(plate)
   const viewerPlate: ViewerPlate = {
     id: plate.id,
+    operationColors: compiled.spans.flatMap((span) => {
+      const color = plate.operations.find(
+        (operation) => operation.id === span.operationId
+      )?.displayColor
+      return color
+        ? [{ startLine: span.startLine, endLine: span.endLine, color }]
+        : []
+    }),
     name: plate.name,
     program: compiled.program,
     machineProgram: machineProgramOf,

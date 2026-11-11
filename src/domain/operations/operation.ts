@@ -197,6 +197,11 @@ export type SourceOf<TKind extends SourceKind> = Extract<
 export const OperationSchema = z.object({
   id: EntityIdSchema,
   name: TextSchema,
+  /** Optional path colour, saved with the operation; absent uses the viewer palette. */
+  displayColor: z
+    .string()
+    .regex(/^#[0-9a-f]{6}$/i)
+    .optional(),
   /** Increments on every change; editors save against the revision they read. */
   revision: z.int().nonnegative(),
   /** Pause the program before this operation (a program stop the dialect maps). */

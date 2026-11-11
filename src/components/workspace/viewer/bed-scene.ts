@@ -1,3 +1,4 @@
+import type { ViewerLayers } from "./viewer-input"
 import * as THREE from "three"
 import type { RemovalGrid } from "@/domain/tools/material-removal"
 import { OrbitControls } from "three/addons/controls/OrbitControls.js"
@@ -53,6 +54,7 @@ export type ViewMode = "perspective" | "top" | "front" | "camera"
 
 /** Viewer-wide display state; only the selected plate follows playback and selection. */
 export type ViewerPresentation = {
+  layers?: ViewerLayers
   removal?: { readonly plateId: string; readonly grid: RemovalGrid } | null
   selectedPlateId: string | null
   selectedLineRanges?: readonly LineRange[]
@@ -551,6 +553,7 @@ export class BedScene {
     const hiddenFixtures = this.presentation.hiddenFixtures?.[id] ?? NO_IDS
     const { machineOrigin, liveTool } = this.presentation
     const marked = {
+      layers: this.presentation.layers,
       removal:
         this.presentation.removal?.plateId === id
           ? this.presentation.removal.grid

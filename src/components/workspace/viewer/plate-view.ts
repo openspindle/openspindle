@@ -1,3 +1,4 @@
+import { DEFAULT_VIEWER_LAYERS } from "./viewer-input"
 import * as THREE from "three"
 import { billboarding } from "three/tsl"
 import { MeshBasicNodeMaterial } from "three/webgpu"
@@ -159,6 +160,7 @@ function boxOutline(
 
 const PRESENTATION_EQUALITY: FieldEquality<PlatePresentation> = {
   removal: Object.is,
+  layers: Object.is,
   active: Object.is,
   showStock: Object.is,
   showRapids: Object.is,
@@ -987,13 +989,19 @@ export class PlateView {
       else replaceChildren(this.stock, stockObjects(this.current, grid))
     }
     this.selection.visible = presentation.active
+    const layers = presentation.layers ?? DEFAULT_VIEWER_LAYERS
+    this.axes.visible = layers.axes
+    this.anchors.visible = layers.axes
+    this.toolSetter.visible = layers.toolSetter
+    this.bed.visible = layers.bed
+    this.fixtures.visible = layers.fixtures
     this.stock.visible = presentation.showStock
     for (const [id, group] of this.fixtureGroups)
       group.visible = !presentation.hiddenFixtures.includes(id)
     this.path.present(presentation)
     this.problems.show(presentation.problems, presentation.shownProblem)
     const { machineOrigin } = presentation
-    this.machineOrigin.visible = machineOrigin !== null
+    this.machineOrigin.visible = layers.axes && machineOrigin !== null
     if (machineOrigin) this.machineOrigin.position.set(...machineOrigin)
   }
 }

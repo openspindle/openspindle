@@ -37,6 +37,7 @@ export type ViewerToolRun = {
 
 export type ViewerPlate = {
   id: string
+  operationColors?: readonly OperationPathColor[]
   /** The plate's name; empty while it has none, and its label shows its number. */
   name: string
   program: GCodeProgram
@@ -93,3 +94,38 @@ export type ViewerProblem = {
 
 /** Which problem: its plate and its key there. */
 export type ViewerProblemRef = Pick<ViewerProblem, "plateId" | "key">
+
+export type OperationPathColor = {
+  readonly startLine: number
+  readonly endLine: number
+  readonly color: string
+}
+
+export type ViewerLayers = {
+  readonly past: boolean
+  readonly future: boolean
+  readonly cuts: boolean
+  readonly probes: boolean
+  readonly tool: boolean
+  readonly ahead: boolean
+  readonly stock: boolean
+  readonly rapids: boolean
+  readonly axes: boolean
+  readonly bed: boolean
+  readonly fixtures: boolean
+  readonly toolSetter: boolean
+}
+export const DEFAULT_VIEWER_LAYERS: ViewerLayers = {
+  past: true,
+  future: true,
+  cuts: true,
+  probes: true,
+  tool: true,
+  ahead: true,
+  stock: true,
+  rapids: false,
+  axes: true,
+  bed: true,
+  fixtures: true,
+  toolSetter: true,
+}

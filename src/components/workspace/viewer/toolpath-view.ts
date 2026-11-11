@@ -1,3 +1,5 @@
+import { DEFAULT_VIEWER_LAYERS } from "./viewer-input"
+import type { ViewerLayers, OperationPathColor } from "./viewer-input"
 import * as THREE from "three"
 import { implicitToolMoves } from "@/domain/tools/implicit-tool"
 import type { ToolShape } from "@/domain/tools/tool-shape"
@@ -124,6 +126,9 @@ export class ToolpathView {
   readonly group = new THREE.Group()
   /** Holds the path and tool in program coordinates, placed at the work origin. */
   private readonly path = new THREE.Group()
+  private colorRanges: readonly OperationPathColor[] = []
+  private readonly baseColors: Record<Motion, THREE.Color>
+  private displayLayers: ViewerLayers = DEFAULT_VIEWER_LAYERS
   private readonly program: GCodeProgram
   private readonly buffers: ToolpathBuffers
   private readonly materials: Record<Motion, THREE.LineBasicMaterial>
@@ -167,6 +172,7 @@ export class ToolpathView {
   private revealed: {
     readonly count: number
     readonly showRapids: boolean
+    readonly layers: ViewerLayers
     readonly selectionShown: boolean
   } | null = null
   private disposed = false
@@ -182,8 +188,14 @@ export class ToolpathView {
     palette: ViewerPalette,
     tools: readonly ViewerToolRun[],
     models: ToolModels,
-    collide: Collide | null = null
+    collide: Collide | null = null,
+    colors: readonly OperationPathColor[] = []
   ) {
+    this.baseColors = {
+      cut: palette.primary.clone(),
+      rapid: palette.rapid.clone(),
+      probe: palette.probePath.clone(),
+    }
     this.program = program
     this.tools = moveTools(program, tools)
     this.models = models
@@ -254,6 +266,61 @@ export class ToolpathView {
     if (this.touch) this.path.add(this.touch.object)
     this.group.add(this.path)
     this.place(origin)
+    this.setColors(colors)
+  }
+
+  setColors(colors: readonly OperationPathColor[]) {
+    this.colorRanges = colors
+    const data = Object.fromEntries(
+      MOTIONS.map((motion) => [
+        motion,
+        new Float32Array(this.buffers.vertices[motion].length),
+      ])
+    ) as Record<Motion, Float32Array>
+    const written: Record<Motion, number> = { cut: 0, rapid: 0, probe: 0 }
+    let range = 0
+    const color = new THREE.Color()
+    for (const segment of this.program.segments) {
+      const motion = motionOf(segment)
+      while (range < colors.length && segment.line > colors[range].endLine)
+        range++
+      const span = colors.at(range)
+      if (span && segment.line >= span.startLine) color.set(span.color)
+      else color.copy(this.baseColors[motion])
+      color.toArray(data[motion], written[motion])
+      color.toArray(data[motion], written[motion] + 3)
+      written[motion] += 6
+    }
+    for (const layer of this.layers) {
+      if (layer.base.geometry.hasAttribute("color")) {
+        const previous = layer.base.geometry.getAttribute("color")
+        const values = previous.array as Float32Array
+        values.set(data[layer.motion])
+        previous.needsUpdate = true
+      } else
+        layer.base.geometry.setAttribute(
+          "color",
+          new THREE.BufferAttribute(data[layer.motion], 3)
+        )
+      for (const material of [
+        this.materials[layer.motion],
+        this.coming[layer.motion],
+      ]) {
+        material.vertexColors = true
+        material.color.set(0xffffff)
+      }
+    }
+    if (!this.move.geometry.hasAttribute("color"))
+      this.move.geometry.setAttribute(
+        "color",
+        new THREE.Float32BufferAttribute(new Float32Array(6), 3)
+      )
+  }
+
+  private draws(motion: Motion, showRapids: boolean) {
+    if (motion === "rapid") return showRapids
+    if (motion === "probe") return this.displayLayers.probes
+    return this.displayLayers.cuts
   }
 
   /** New tools for the same program; models no run uses any more are released. */
@@ -358,20 +425,29 @@ export class ToolpathView {
    * another program's plan, shows the whole program and no tool. Rapids show only with
    * `showRapids`. Returns whether a selected segment shows.
    */
-  apply(frame: PlaybackFrame | null, showRapids: boolean) {
+  apply(
+    frame: PlaybackFrame | null,
+    showRapids: boolean,
+    layers: ViewerLayers = DEFAULT_VIEWER_LAYERS
+  ) {
+    this.displayLayers = layers
     const own = frame?.index.plan.program === this.program ? frame : null
-    const count = own ? own.revealed : this.program.segments.length
+    let count = 0
+    if (own) count = own.revealed
+    else if (layers.past) count = this.program.segments.length
     const { revealed } = this
     const selectionShown =
-      revealed?.count === count && revealed.showRapids === showRapids
+      revealed?.count === count &&
+      revealed.showRapids === showRapids &&
+      revealed.layers === layers
         ? revealed.selectionShown
         : this.reveal(count, showRapids)
-    this.revealed = { count, showRapids, selectionShown }
+    this.revealed = { count, showRapids, layers, selectionShown }
     this.showMove(own, showRapids)
     // The moves ahead and the next touch go from the tool as it is drawn.
     this.showTool(own)
-    this.showAhead(own)
-    this.showTouch(own)
+    this.showAhead(layers.ahead && layers.future ? own : null)
+    this.showTouch(layers.probes ? own : null)
     return selectionShown
   }
 
@@ -393,9 +469,11 @@ export class ToolpathView {
    * `showRapids`; reports whether a selected one shows.
    */
   private reveal(count: number, showRapids: boolean) {
-    const drawn = (motion: Motion) => motion !== "rapid" || showRapids
-    const shown = this.shownWindows(0, count)
-    const coming = this.shownWindows(count, this.program.segments.length)
+    const drawn = (motion: Motion) => this.draws(motion, showRapids)
+    const shown = this.displayLayers.past ? this.shownWindows(0, count) : []
+    const coming = this.displayLayers.future
+      ? this.shownWindows(count, this.program.segments.length)
+      : []
     for (const { motion, base, selected } of this.layers) {
       const revealed = this.vertexRange(motion, 0, count).count
       base.geometry.clearGroups()
@@ -413,7 +491,8 @@ export class ToolpathView {
       }
       base.visible = drawn(motion) && base.geometry.groups.length > 0
       const selectedShown = selected.show(revealed)
-      selected.object.visible = drawn(motion) && selectedShown
+      selected.object.visible =
+        this.displayLayers.past && drawn(motion) && selectedShown
     }
     return this.selection.some((part) =>
       MOTIONS.some(
@@ -448,7 +527,13 @@ export class ToolpathView {
         ? this.program.segments.at(frame.move)
         : undefined
     const motion = segment ? motionOf(segment) : null
-    if (!frame || !segment || (motion === "rapid" && !showRapids)) {
+    if (
+      !frame ||
+      !segment ||
+      !this.displayLayers.past ||
+      !this.draws(motion ?? "cut", showRapids) ||
+      this.shownWindows(frame.move, frame.move + 1).length === 0
+    ) {
       this.move.visible = false
       return
     }
@@ -457,6 +542,17 @@ export class ToolpathView {
     position.setXYZ(1, ...along(segment, frame.fraction))
     position.needsUpdate = true
     this.move.material = this.materials[motion ?? "cut"]
+    const span = this.colorRanges.find(
+      (range) =>
+        segment.line >= range.startLine && segment.line <= range.endLine
+    )
+    const color = span
+      ? new THREE.Color(span.color)
+      : this.baseColors[motion ?? "cut"]
+    const attribute = this.move.geometry.getAttribute("color")
+    attribute.setXYZ(0, color.r, color.g, color.b)
+    attribute.setXYZ(1, color.r, color.g, color.b)
+    attribute.needsUpdate = true
     this.move.visible = true
   }
 
@@ -549,7 +645,20 @@ export class ToolpathView {
       this.ahead.hide()
       return
     }
-    this.ahead.show(frame.index.plan, frame.move, frame.aheadEnd, tip.at)
+    this.ahead.show(
+      frame.index.plan,
+      frame.move,
+      frame.aheadEnd,
+      tip.at,
+      (index) => {
+        const segment = this.program.segments.at(index)
+        return (
+          !!segment &&
+          this.draws(motionOf(segment), this.revealed?.showRapids ?? false) &&
+          !this.hidden.some((part) => index >= part.first && index < part.last)
+        )
+      }
+    )
   }
 
   /**
@@ -577,7 +686,7 @@ export class ToolpathView {
       y,
       tool === this.marker ? z + TOOL_MARKER_LENGTH / 2 : z
     )
-    tool.visible = true
+    tool.visible = this.displayLayers.tool
     this.shownTool = tool
   }
 

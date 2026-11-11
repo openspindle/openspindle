@@ -176,3 +176,6 @@ The full-file limit applies after base64 expansion, Part 21 escaping, and the ex
 The entity signatures and relevant local constraints were reviewed against STEP Tools' published schema reference and the AP238 project/workplan examples; the exporter and importer additionally enforce the OpenSpindle profile and payload integrity. This is not full EXPRESS validation, a Protocol Implementation Conformance Statement, or certification of any AP238 conformance class.
 
 The [AP238 edition 2 overview](https://www.ap238.org/ap238e2/) identifies the published 2020 edition. The live [STEP Manufacturing repository](https://github.com/stepmfg/ap238) documents a 2026 edition 4 draft; its links above are cross-references for the longstanding structures, not a claim that the draft is the published 2020 standard.
+
+Operations may store an optional `displayColor` as `#RRGGBB`. It colours the viewer
+path and is saved in the project; it has no effect on generated NC.

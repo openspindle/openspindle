@@ -38,7 +38,7 @@ Save a named snapshot of the selected plate: stock, placement, fixtures, work ze
 
 ## Material removal
 
-On Job, toggle **Material removal** above the viewer. The stock becomes a sampled 2.5D height field following the playback cursor, including partial moves; backward seeks rebuild it from uncut stock. With no playback cursor it shows the end of the program. Calculation runs in a worker; while it catches up, the display says **Updating sampled stock**. Off-plan live tool positions withhold the result. Toggling off restores the original stock box.
+On Job, open **Viewer layers** at the top right and toggle **Show removal** at the top of the panel. The stock becomes a sampled 2.5D height field following the playback cursor, including partial moves; backward seeks rebuild it from uncut stock. With no playback cursor it shows the end of the program. Calculation runs in a worker; while it catches up, the display says **Updating sampled stock**. Off-plan live tool positions withhold the result. Toggling off restores the original stock box.
 
 If calculation stops with an error, that reason stays visible when the timeline moves. Toggle removal off and on, or change the program, to begin a fresh calculation.
 
@@ -59,3 +59,20 @@ Imported sources must pass the existing plain-NC capability reader with the kit�
 7. Choose Cleared pocket and use the modeled XY travel rectangle. For a simulation-only trial, select the recess at bed X15 Y-7.5, use its nominal Ø10 × 2 mm dimensions with a 6 mm cutter and a shallow skim, and acknowledge the synthetic clearance. Preview and inspect one vertical entry at that pocket per depth pass, alternating row directions, lateral cutting-feed links, and routing around the setter exclusion without leaving the rectangle. A rectangle split into disconnected regions by a protected band must block generation. Clear a pocket field, then switch back to Outside stock: hidden pocket drafts must not prevent valid outside-entry parameters. Save/reopen a valid pocket operation; change the work origin or anchors and verify generation blocks until entry is checked again. A physically installed recess must be measured and located before its confirmation; the nominal simulator trial is not evidence of real clearance.
 
 These trials require interaction with the desktop app and are pending user verification. Static checks and an independent code review are recorded separately.
+
+## Viewer layers and colours
+
+Job's **Viewer layers** button opens a compact non-modal panel beside the 3D view.
+Show removal sits at the top with calculation status and actual grid spacing.
+Completed paths and Upcoming paths toggle independently; turn Upcoming paths off
+to see only the path already executed during playback. Cutting, rapid, probing,
+path-ahead highlight and tool layers also toggle independently. Stock, fixtures,
+machine bed, tool setter and axes/origins have their own visibility controls.
+
+Each operation has a display-only visibility switch and path-colour picker.
+Colours are saved with operations in the project and support Undo/Redo; **Auto**
+restores the normal palette. Visibility changes leave the machining program and
+material-removal calculation unchanged. Completed paths retain full colour and
+upcoming paths use the same colour faintly. Selection keeps its highlight colour.
+Layer and operation visibility choices apply to the current Job view; operation
+colours also appear in Prepare and remain editable while the run's snapshot is shown.

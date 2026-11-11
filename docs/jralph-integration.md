@@ -28,10 +28,10 @@ temporary calibration runs. Existing spindle/tool-setter guards, fresh diagnosti
 checks, TCP lockout/Stop behavior, V-bit removal and resolution preferences are
 retained in the combined implementation.
 
-Physical probing follows the source branch's verified-input and bounded-contact
-execution policy. Native corner/center and height-map firmware searches are
-simulator-only. On a physical Z1, use the Anchor 1, diameter or Z probe guides;
-unknown or failed contact sequences request a halt and lock out new motion.
+The bounded guides require verified input and individually checked contacts.
+Supported native corner/center and height-map cycles also remain available through
+prepared Jobs, retaining spindle/tool checks. Raw console probing is restricted;
+failed bounded contact sequences request a halt and lock out new motion.
 
 ## Integration decisions
 

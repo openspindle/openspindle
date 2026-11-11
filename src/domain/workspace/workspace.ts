@@ -230,6 +230,10 @@ export type WorkspaceCommand =
       readonly index: number
     } & OperationTarget)
   | ({
+      readonly type: "operation.color"
+      readonly color: string | null
+    } & OperationTarget)
+  | ({
       readonly type: "operation.rename"
       readonly name: string
     } & OperationTarget)
@@ -774,6 +778,15 @@ function commandResult(
         if (to === from) return ok(plate)
         operations.splice(to, 0, plate.operations[from])
         return ok({ ...plate, operations, example: false })
+      })
+    case "operation.color":
+      return updateOperation(state, command, (operation) => {
+        if (command.color !== null && !/^#[0-9a-f]{6}$/i.test(command.color))
+          return fail("Choose a valid path colour.")
+        const color = command.color?.toLowerCase()
+        if (color === operation.displayColor) return ok(operation)
+        const { displayColor: _color, ...rest } = operation
+        return ok(revise(rest, color ? { displayColor: color } : {}))
       })
     case "operation.rename": {
       const name = normalizeText(command.name)

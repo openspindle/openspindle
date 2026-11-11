@@ -88,6 +88,12 @@ const sameToolRuns = sameList<ViewerToolRun>(
  * plate compare by identity; arrays and points derived per render compare by value.
  */
 const PLATE_EQUALITY: FieldEquality<ViewerPlate> = {
+  operationColors: sameList(
+    (a, b) =>
+      a.startLine === b.startLine &&
+      a.endLine === b.endLine &&
+      a.color === b.color
+  ),
   id: Object.is,
   name: Object.is,
   program: Object.is,

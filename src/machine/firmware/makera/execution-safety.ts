@@ -25,7 +25,8 @@ const READ_ONLY_CONFIG = /^config-get (?:sd|cached) [a-zA-Z0-9_.-]+$/
  */
 function textExecutionIssue(
   source: string,
-  allowProbeSetup = false
+  allowProbeSetup = false,
+  allowNativeCycles = false
 ): string | null {
   for (const [index, line] of source.split(/\r\n?|\n/).entries()) {
     const block = readNcBlock(line)
@@ -47,7 +48,21 @@ function textExecutionIssue(
             allowProbeSetup &&
             block.words.some((each) => each.letter === "M" && each.value === 6)
           ))
-      if (probe) return `Line ${index + 1}: ${UNBOUNDED_PROBE_REASON}`
+      // ATCHandler's corner/centre subcodes are 1..10. Read the written
+      // decimal digits: M480.10 and M480.1 are different firmware routines.
+      const originSubcode =
+        family === 480 ? Number(/\.(\d+)$/.exec(word[0])?.[1]) : 0
+      const nativeCycle =
+        allowNativeCycles &&
+        ((letter === "M" && number === 495) ||
+          (letter === "M" &&
+            number > 480 &&
+            family === 480 &&
+            originSubcode >= 1 &&
+            originSubcode <= 10) ||
+          (letter === "G" && number === 32))
+      if (probe && !nativeCycle)
+        return `Line ${index + 1}: ${UNBOUNDED_PROBE_REASON}`
       if (
         (letter === "M" && [23, 24, 32, 97, 98, 99, 601].includes(family)) ||
         (letter === "G" && [65, 66].includes(family))
@@ -82,11 +97,14 @@ export const assessMakeraPhysicalProgram: NonNullable<
     }
   }
   const issue =
-    textExecutionIssue(source, true) ?? textExecutionIssue(program.text, true)
+    textExecutionIssue(source, true, true) ??
+    textExecutionIssue(program.text, true, true)
   if (issue) return { issue }
   for (const part of programParts(program)) {
     const extraIssue = textExecutionIssue(
-      [...part.before, ...part.after].join("\n")
+      [...part.before, ...part.after].join("\n"),
+      true,
+      true
     )
     if (extraIssue) return { issue: extraIssue }
   }
