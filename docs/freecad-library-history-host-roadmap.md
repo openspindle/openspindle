@@ -70,3 +70,19 @@ Hvert repo følger egne påkrevde bygg-, type- og formateringskontroller. OpenSp
 Historikk og vert må i tillegg gjennomgå avbrutt jobb, kamerafeil, full disk, to nettlesere, samtidig opplasting, ugyldig nøkkel, nettbrudd og restart. Ingen sjekkliste eller forhåndsvisning erstatter verifisert fysisk arbeidsnull og oppspenning.
 
 Trinn 1 ferdigstilles før verktøysynkronisering kobles på. Historikk lagres som tjeneste før vertsutgaven tar den i bruk. Vertsutgaven kommer først opp mot simulator/TCP; USB følger den separate verifikasjonsporten over.
+
+## Status etter første implementeringsrunde
+
+Alle funksjonsendringer under er pushet på egne brancher som **PR-utkast**, ikke merget til main. Les og merge i tabellrekkefølge innen hvert repo.
+
+| Trinn | OpenSpindle | FreeCAD Makera Bridge | Status |
+|---|---|---|---|
+| Modell/materialer | [PR #15](https://github.com/passeride/openspindle/pull/15) | [PR #4](https://github.com/passeride/FreeCadMakeraBridge/pull/4) | Kode og byggkontroller; visuell kontroll og live CAM-plassering gjenstår |
+| Felles verktøy | [PR #16](https://github.com/passeride/openspindle/pull/16) | [PR #5](https://github.com/passeride/FreeCadMakeraBridge/pull/5) | Filutveksling, stabile ID-er og konfliktvalg implementert; live ToolBit-rundtur gjenstår |
+| Historikk | [PR #17](https://github.com/passeride/openspindle/pull/17) | – | Registrering i maskineieren, hele jobbgrunnlaget, kamerabilder, ZIP og historisk kopi implementert; fysisk kjøring/kamera/omstart gjenstår |
+| Vert og nettverksoverføring | [PR #18](https://github.com/passeride/openspindle/pull/18) | [PR #6](https://github.com/passeride/FreeCadMakeraBridge/pull/6) | Første TCP-vert med nettlesermonitor, autentisert innboks og bibliotek-API; lokalt mottak fra broen kontrollert |
+| USB / full nettleserstyring | Ikke implementert | – | Egne neste milepæler; krever transportarbeid, kontrolløkt og fysisk verifisering |
+
+Typekontroll, lint, Prettier, Electron-bygg og Node-/nettleserbygg passerer på den samlede implementeringsrekken. Python-modulene kompilerer. Lokal manuell API-kontroll bekreftet health, avvist anonym API-tilgang, autentisert frakoblet maskintilstand og faktisk `publish`/`send_package` fra broen med kontrollert mottakskvittering. Ingen CNC var tilkoblet og ingen jobb ble startet. Ingen automatisert testsuite er lagt til eller kjørt.
+
+Vertsutgaven er foreløpig for overvåking i nettleseren. Bevisste lokale terminalkommandoer bruker maskineieren; nettleseren tilbyr ennå ikke Run/jog. USB er ikke en ferdig funksjon i disse branchene.
