@@ -91,6 +91,24 @@ export class MachineGateway {
   }
 
   /** The app and the system menu may always stop the machine. */
+  beginSimulatedJog(input: unknown) {
+    this.requireApp()
+    return this.controller.beginSimulatedJog(input)
+  }
+  sampleSimulatedJog(input: unknown) {
+    this.requireApp()
+    return this.controller.sampleSimulatedJog(input)
+  }
+  actionSimulatedJog(input: unknown) {
+    this.requireApp()
+    return this.controller.actionSimulatedJog(input)
+  }
+  endSimulatedJog(input: unknown) {
+    this.requireApp()
+    return this.controller.endSimulatedJog(input)
+  }
+
+  /** The app and the system menu may always stop the machine. */
   stop(): Promise<MachineSnapshot> {
     return this.controller.stop()
   }

@@ -16,6 +16,7 @@ import {
 import type { ProbingTask } from "../probing/strategy"
 import type { Tool } from "../tools/tool"
 import { fileKind, pcbKind, unsupportedKind } from "./kept-nc"
+import { facingKind } from "./facing-kind"
 import type {
   Operation,
   Phase,
@@ -196,6 +197,7 @@ const probingKind: OperationKind<"probing"> = {
 export const OPERATION_KINDS: {
   readonly [TKind in SourceKind]: OperationKind<TKind>
 } = {
+  facing: facingKind,
   file: fileKind,
   pcb: pcbKind,
   unsupported: unsupportedKind,

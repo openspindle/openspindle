@@ -46,6 +46,25 @@ const STATUS: Record<RunCheckStatus, { icon: LucideIcon; label: string }> = {
 }
 const WARNING = { icon: TriangleAlert, label: "Passes with a warning" }
 
+const CHECK_HELP: Record<string, string> = {
+  device:
+    "Confirm the connection is to the intended device. A simulator exercises software behavior without confirming a physical setup.",
+  program:
+    "The operations must produce a supported program. Compilation checks syntax and composition; it does not prove every move is physically clear.",
+  tools:
+    "Tool numbers select entries in this plate's table. Match each entry to the actual installed cutter, probe and holder.",
+  operations:
+    "Generated and imported operations must be current. Review parameters and generated source after changing tools or setup.",
+  "design-rules":
+    "Checks the program against the rules enabled in this project, including feed, depth and stock travel. Disabled rules provide no check.",
+  setup:
+    "Work zero and stored anchors must agree with the connected machine. Confirm actual stock position, work Z and workholding separately.",
+  transfer:
+    "The machine must support how this program is transferred and split at tool changes.",
+  machine:
+    "The reported machine state must permit Run. Clear the reported cause before trying again; a ready state does not confirm cutter clearance.",
+}
+
 /** Checks the plate's design rules and opens Prepare, whose 3D view shows what they find. */
 function ShowDesignRules({
   fix,
@@ -171,6 +190,18 @@ function RunCheckItem({
       </ItemMedia>
       <ItemContent>
         <ItemTitle>{check.label}</ItemTitle>
+        {CHECK_HELP[check.id] && (
+          <Collapsible>
+            <CollapsibleTrigger render={<Button variant="ghost" size="sm" />}>
+              What this checks
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <ItemDescription className="line-clamp-none">
+                {CHECK_HELP[check.id]}
+              </ItemDescription>
+            </CollapsibleContent>
+          </Collapsible>
+        )}
         {/* What blocks or warns is read in full. */}
         {reason && (
           <ItemDescription className="line-clamp-none">
@@ -228,6 +259,12 @@ export function RunChecklistCard({
       title={checklist.ready ? "Preflight: ready to run" : "Preflight"}
       description={preflightDescription(checklist, parts)}
     >
+      <ItemDescription className="line-clamp-none">
+        Before Run, confirm secure workholding, the installed tool, physical
+        work Z, and clearance around clamps. Playback and material-removal
+        preview model the entered setup; they do not verify these physical
+        conditions.
+      </ItemDescription>
       {open.length > 0 && (
         <ItemGroup aria-label="Run checks to do">{open.map(item)}</ItemGroup>
       )}

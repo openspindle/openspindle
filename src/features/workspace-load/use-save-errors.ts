@@ -21,6 +21,11 @@ function useSaveErrorToast<TValue>(
 export function useSaveErrors() {
   const persistence = usePersistence()
   useSaveErrorToast(
+    persistence.processes,
+    "save-processes",
+    "Reusable processes are not being saved"
+  )
+  useSaveErrorToast(
     persistence.library,
     "save-library",
     "Tool and stock library changes are not being saved"

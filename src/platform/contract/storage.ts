@@ -1,7 +1,7 @@
 import { z } from "zod"
 
 /** Every persisted store. Each is one versioned JSON document. */
-export const STORAGE_KEYS = ["library", "fixtures"] as const
+export const STORAGE_KEYS = ["library", "fixtures", "processes"] as const
 export const StorageKeySchema = z.enum(STORAGE_KEYS)
 export type StorageKey = z.infer<typeof StorageKeySchema>
 

@@ -110,6 +110,7 @@ export class MachineSession {
     until: number
     accept: (event: ReplyEvent) => boolean
   } | null = null
+  private readonly drainWaiters = new Set<(error: Error) => void>()
   private pollTimer: TimerHandle | null = null
   private handshakeTimer: TimerHandle | null = null
   private suspensions = 0
@@ -341,7 +342,43 @@ export class MachineSession {
     milliseconds: number,
     accept: (event: ReplyEvent) => boolean = () => true
   ) {
-    this.drain = { until: this.clock.now() + milliseconds, accept }
+    const now = this.clock.now()
+    const previous = this.drain && now < this.drain.until ? this.drain : null
+    this.drain = {
+      until: Math.max(now + milliseconds, previous?.until ?? 0),
+      accept: previous
+        ? (event) => previous.accept(event) || accept(event)
+        : accept,
+    }
+  }
+
+  /** New operations wait before sending; Stop uses telemetry and never waits for this. */
+  async waitForDrain(signal: AbortSignal): Promise<void> {
+    while (this.drain && this.clock.now() < this.drain.until) {
+      if (signal.aborted) throw abortError(signal)
+      if (this.closed)
+        throw new MachineError("connection-lost", "The device is disconnected.")
+      await new Promise<void>((resolve, reject) => {
+        const finish = (error?: Error) => {
+          this.clock.clearTimeout(timer)
+          signal.removeEventListener("abort", onAbort)
+          this.drainWaiters.delete(fail)
+          if (error) reject(error)
+          else resolve()
+        }
+        const fail = (error: Error) => finish(error)
+        const onAbort = () => finish(abortError(signal))
+        const timer = this.clock.setTimeout(
+          () => finish(),
+          Math.max(1, (this.drain?.until ?? 0) - this.clock.now())
+        )
+        this.drainWaiters.add(fail)
+        signal.addEventListener("abort", onAbort, { once: true })
+      })
+    }
+    if (signal.aborted) throw abortError(signal)
+    if (this.closed)
+      throw new MachineError("connection-lost", "The device is disconnected.")
   }
 
   close(error: string | null = null) {
@@ -360,6 +397,7 @@ export class MachineSession {
     )
     this.lease?.fail(failure)
     this.lease = null
+    for (const fail of [...this.drainWaiters]) fail(failure)
     this.store.fail(failure)
     this.events.closed(error)
   }

@@ -1,4 +1,5 @@
 import * as THREE from "three"
+import type { RemovalGrid } from "@/domain/tools/material-removal"
 import { OrbitControls } from "three/addons/controls/OrbitControls.js"
 import { bloom } from "three/addons/tsl/display/BloomNode.js"
 import { max as largest, mrt, output, pass, vec4 } from "three/tsl"
@@ -52,6 +53,7 @@ export type ViewMode = "perspective" | "top" | "front" | "camera"
 
 /** Viewer-wide display state; only the selected plate follows playback and selection. */
 export type ViewerPresentation = {
+  removal?: { readonly plateId: string; readonly grid: RemovalGrid } | null
   selectedPlateId: string | null
   selectedLineRanges?: readonly LineRange[]
   /** Program lines each plate leaves out of the view, by plate id. */
@@ -549,6 +551,10 @@ export class BedScene {
     const hiddenFixtures = this.presentation.hiddenFixtures?.[id] ?? NO_IDS
     const { machineOrigin, liveTool } = this.presentation
     const marked = {
+      removal:
+        this.presentation.removal?.plateId === id
+          ? this.presentation.removal.grid
+          : null,
       hiddenFixtures,
       ghosts: this.presentation.ghosts?.[id],
       problems: problems.filter((problem) => problem.plateId === id),

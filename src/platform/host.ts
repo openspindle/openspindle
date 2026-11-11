@@ -14,6 +14,11 @@ import type {
   PrepareResult,
   RunRequest,
   SimulatedBed,
+  BeginSimulatedJogRequest,
+  SimulatedJogSession,
+  SimulatedJogSample,
+  SimulatedJogReceipt,
+  SimulatedJogAction,
   WriteAnchorsRequest,
   WriteAnchorsResult,
 } from "@/machine/contract"
@@ -51,6 +56,16 @@ import type {
 
 /** Machine access through the machine process's controller. */
 export interface MachineHost {
+  beginSimulatedJog: (
+    input: BeginSimulatedJogRequest
+  ) => Promise<SimulatedJogSession>
+  sampleSimulatedJog: (
+    input: SimulatedJogSample
+  ) => Promise<SimulatedJogReceipt>
+  actionSimulatedJog: (
+    input: SimulatedJogAction
+  ) => Promise<SimulatedJogReceipt>
+  endSimulatedJog: (input: SimulatedJogSession) => Promise<MachineSnapshot>
   snapshot: () => Promise<MachineSnapshot>
   subscribe: (listener: (snapshot: MachineSnapshot) => void) => () => void
   discover: () => Promise<NetworkDevice[]>

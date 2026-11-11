@@ -4,6 +4,21 @@ import {
 } from "../../src/domain/fixtures/makera-z1/motion.ts"
 import { SETTER_RADIUS } from "../../src/domain/fixtures/makera-z1/tool-setter.ts"
 import type { MachineLimits } from "../../src/domain/motion/limits.ts"
+import {
+  z1WorkBounds,
+  MACHINE_Z,
+} from "../../src/domain/fixtures/makera-z1/work-envelope.ts"
+import {
+  DIRECT_INPUT_TTL_MS,
+  DIRECT_SAMPLE_MS,
+  DIRECT_CLOCK_SKEW_MS,
+} from "../../src/machine/contract/simulator-jog.ts"
+import {
+  readSimulatorJogCommand,
+  SIMULATOR_SPINDLE_LIMITS,
+  simulatorJogReplyLine,
+} from "../../src/machine/firmware/makera/simulator-jog.ts"
+import { DirectMotion } from "./direct-motion.ts"
 import { readSimulatedBedLine } from "../../src/machine/contract/simulator.ts"
 import type { SimulatedBed } from "../../src/machine/contract/simulator.ts"
 import { FRAME_TYPES } from "../../src/machine/firmware/makera/codec.ts"
@@ -181,6 +196,21 @@ export class SimulatedZ1 {
   private offset: Xyz = [-100, -100, -20]
   /** The limits the firmware loaded from its configuration when it started. */
   private limits: MachineLimits = Z1_DEFAULT_LIMITS
+  private direct: {
+    id: string
+    connectionId: string | null
+    sequence: number
+    actionSequence: number
+    mode: "step" | "direct"
+    suppressed: boolean
+    deadline: number
+    ending: boolean
+    motion: DirectMotion
+  } | null = null
+  private directFeed = 0
+  private directMoving = false
+  private directStatusAt = 0
+  private readonly retiredDirect = new Set<string>()
   /** The moves under way and queued, which the player and scripts wait for. */
   private queue = new MotionQueue(Z1_DEFAULT_LIMITS, () => this.speed)
   /** What waits for the moves queued to end (Conveyor::wait_for_idle), in order. */
@@ -332,8 +362,218 @@ export class SimulatedZ1 {
   }
 
   dispose() {
+    this.disconnectDirect()
     clearInterval(this.timer)
     this.cancelPending()
+  }
+
+  /** TCP loss cancels only the input-driven simulator extension, never a normal job. */
+  disconnectDirect() {
+    if (!this.direct) return
+    this.mpos.splice(0, 3, ...this.direct.motion.halt(Date.now()))
+    this.machineCode("M5")
+    this.retireDirect(this.direct.id)
+    this.direct = null
+    this.directFeed = 0
+    this.directMoving = false
+  }
+
+  private retireDirect(id: string) {
+    this.retiredDirect.add(id)
+    if (this.retiredDirect.size > 128)
+      this.retiredDirect.delete(this.retiredDirect.values().next().value!)
+  }
+
+  private advanceDirect(now: number) {
+    const direct = this.direct
+    if (!direct) return
+    const result = direct.motion.advance(now, this.speed)
+    this.mpos.splice(0, 3, ...result.position)
+    this.directFeed = result.feed
+    this.directMoving = result.moving
+    if (!direct.ending && (result.expired || now >= direct.deadline)) {
+      direct.ending = true
+      this.machineCode("M5")
+      this.retireDirect(direct.id)
+      direct.motion.zero(now)
+      this.log(`Direct simulator input expired: ${direct.id}`)
+    }
+    if (direct.ending && !result.moving) {
+      this.log(
+        `Direct simulator stopped: ${direct.id} at ${this.mpos.join(",")}`
+      )
+      this.direct = null
+      this.directFeed = 0
+      this.reportStatus()
+    } else if (now - this.directStatusAt >= DIRECT_SAMPLE_MS) {
+      this.directStatusAt = now
+      this.reportStatus()
+    }
+  }
+
+  private directCommand(text: string) {
+    const command = readSimulatorJogCommand(text)
+    if (!command) {
+      this.lines("error: malformed sim-jog command")
+      return
+    }
+    const now = Date.now()
+    this.advanceDirect(now)
+    const input = command.kind === "sample" ? command.sample : null
+    const action = command.kind === "action" ? command.input : null
+    const id =
+      input?.sessionId ??
+      action?.sessionId ??
+      (command.kind === "begin" || command.kind === "end"
+        ? command.sessionId
+        : "")
+    const sequence = input?.sequence ?? action?.sequence ?? 0
+    const reply = (reason: string | null = null) =>
+      this.lines(
+        simulatorJogReplyLine({
+          sessionId: id,
+          sequence,
+          kind: command.kind,
+          ok: reason === null,
+          reason,
+        })
+      )
+    if (command.kind === "begin") {
+      if (
+        this.direct ||
+        this.state(now) !== "Idle" ||
+        this.spindleOn ||
+        this.estop ||
+        this.retiredDirect.has(id)
+      )
+        return reply("Simulator is unavailable for controller arming")
+      const xy = z1WorkBounds(this.anchor1)
+      const bounds = {
+        min: [xy.min[0], xy.min[1], MACHINE_Z.min] as Xyz,
+        max: [xy.max[0], xy.max[1], MACHINE_Z.max] as Xyz,
+      }
+      if (
+        [0, 1, 2].some(
+          (axis) =>
+            this.mpos[axis] < bounds.min[axis] ||
+            this.mpos[axis] > bounds.max[axis]
+        )
+      )
+        return reply("Jog into the simulator XYZ travel envelope before arming")
+      this.direct = {
+        id,
+        connectionId: null,
+        sequence: 0,
+        actionSequence: 0,
+        mode: command.mode,
+        suppressed: false,
+        deadline: now + DIRECT_INPUT_TTL_MS,
+        ending: false,
+        motion: new DirectMotion(
+          [...this.mpos],
+          this.limits.axisRate,
+          Math.min(
+            this.limits.acceleration,
+            ...this.limits.axisAcceleration.map(
+              (value) => value ?? this.limits.acceleration
+            )
+          ),
+          bounds,
+          now
+        ),
+      }
+      this.log(`Controller simulator started: ${id} ${command.mode}`)
+      reply()
+      this.diagnose()
+      this.reportStatus()
+      return
+    }
+    const direct = this.direct
+    if (command.kind === "end") {
+      if (direct?.id === id) {
+        direct.ending = true
+        this.retireDirect(id)
+        direct.motion.zero(now)
+        this.machineCode("M5")
+      }
+      reply()
+      this.advanceDirect(now)
+      this.diagnose()
+      this.reportStatus()
+      return
+    }
+    if (!direct || direct.id !== id || direct.ending)
+      return reply("Controller session has ended")
+    const captured = input ?? action!
+    if (
+      captured.capturedAt > now + DIRECT_CLOCK_SKEW_MS ||
+      now >= captured.capturedAt + DIRECT_INPUT_TTL_MS ||
+      (direct.connectionId !== null &&
+        direct.connectionId !== captured.connectionId)
+    )
+      return reply("Stale or mismatched controller input")
+    if (input) {
+      if (input.sequence <= direct.sequence)
+        return reply("Controller input sequence did not advance")
+      direct.connectionId = input.connectionId
+      direct.sequence = input.sequence
+      direct.deadline = Math.min(input.capturedAt, now) + DIRECT_INPUT_TTL_MS
+      direct.suppressed = input.suppress
+      if (input.suppress) direct.motion.zero(now)
+      else if (direct.mode === "direct")
+        direct.motion.target(
+          [input.x, input.y, input.z],
+          input.speedScale,
+          direct.deadline,
+          now
+        )
+      else direct.motion.heartbeat(direct.deadline)
+      reply()
+      return
+    }
+    if (!action || action.sequence <= direct.actionSequence)
+      return reply("Controller action sequence did not advance")
+    // Consume a refused action too: it must never become a delayed successful retry.
+    direct.actionSequence = action.sequence
+    const requested = action.action
+    if (this.estop || this.halted || this.directMoving)
+      return reply("Stop controller motion before this action")
+    if (requested.kind === "step") {
+      if (direct.mode !== "step" || direct.suppressed)
+        return reply("Step is unavailable in this controller state")
+      const axis = ({ X: 0, Y: 1, Z: 2 } as const)[requested.axis]
+      const refusal = direct.motion.step(
+        axis,
+        requested.distance,
+        requested.speedScale,
+        now
+      )
+      if (refusal) return reply(refusal)
+      this.directMoving = true
+    } else {
+      if (!direct.suppressed)
+        return reply(
+          "Hold X and stop controller motion before spindle controls"
+        )
+      if (
+        requested.kind !== "stop" &&
+        (requested.rpm < SIMULATOR_SPINDLE_LIMITS.min ||
+          requested.rpm > SIMULATOR_SPINDLE_LIMITS.max)
+      )
+        return reply("RPM is outside the simulator control range")
+      if (requested.kind === "start") {
+        if (this.tool < 1 || this.tool >= 1000)
+          return reply("Select a cutting tool before spindle start")
+        this.machineCode(`M3 S${requested.rpm}`)
+      } else if (requested.kind === "stop") this.machineCode("M5")
+      else this.targetRpm = requested.rpm
+    }
+    this.log(
+      `Controller simulator action: ${id} ${action.sequence} ${JSON.stringify(requested)}`
+    )
+    reply()
+    this.diagnose()
+    this.reportStatus()
   }
 
   /** Runs `done` later, unless a halt or a reboot comes first. */
@@ -395,6 +635,7 @@ export class SimulatedZ1 {
 
   private state(now = Date.now()): string {
     if (this.halted) return "Alarm"
+    if (this.directMoving) return "Run"
     const player = this.player
     if (player?.suspended) return "Pause"
     if (player?.suspending) return "Wait"
@@ -451,7 +692,8 @@ export class SimulatedZ1 {
       : `|T:${this.tool},${f3(this.lengths.offset)},${this.requestedTool}`
     const progress = this.progress(now)
     // Conveyor's feed under way is its block's planned speed; then the modal rate and the override.
-    const feed = live && running ? running.block.nominal * 60 : 0
+    let feed = live && running ? running.block.nominal * 60 : 0
+    if (this.direct) feed = this.directFeed
     const modal = this.motionMode === 0 ? this.seekRate : this.feedRate
     return [
       `<${state}`,
@@ -513,6 +755,10 @@ export class SimulatedZ1 {
   // ── Commands ───────────────────────────────────────────────────────────
 
   private command(text: string) {
+    if (text.startsWith("sim-jog ")) {
+      this.directCommand(text)
+      return
+    }
     if (text === "model") {
       this.lines(
         `model = Z1, ${this.options.model}, ${this.options.atc ? 4 : 0}, 0, ${this.state()}`
@@ -521,6 +767,10 @@ export class SimulatedZ1 {
     }
     if (text === "diagnose") {
       this.diagnose()
+      return
+    }
+    if (this.direct) {
+      this.lines("error: Direct simulator jogging owns motion")
       return
     }
     const [head = "", ...rest] = text.split(/\s+/)
@@ -722,7 +972,11 @@ export class SimulatedZ1 {
         this.mpos[index] = Number(
           (this.mpos[index] + Number(axis[2])).toFixed(4)
         )
-        this.queueMove(from, word(code, "F") ?? this.seekRate, 0, false)
+        // SimpleShell::jog takes F as a fraction of the moving axis's maximum,
+        // unlike a G-code feed in mm/min, and starts without the queue-fill delay.
+        const speedScale = word(code, "F") ?? 1
+        this.queueMove(from, this.limits.axisRate[index] * speedScale, 0, false)
+        this.queue.flush(this.time())
       }
       this.ok(text)
       return
@@ -935,6 +1189,7 @@ export class SimulatedZ1 {
 
   /** The machine stops where it is: the moves under way and queued are dropped, and nothing waits for them. */
   private stopMotion() {
+    this.disconnectDirect()
     const now = Date.now()
     const [x, y, z] = this.position(now)
     this.queue.stop(now)
@@ -1077,6 +1332,10 @@ export class SimulatedZ1 {
     const now = Date.now()
     const since = this.lastTick
     this.lastTick = now
+    if (this.direct) {
+      this.advanceDirect(now)
+      return
+    }
     if (this.halted) return
     this.queue.advance(now)
     this.drained(now)

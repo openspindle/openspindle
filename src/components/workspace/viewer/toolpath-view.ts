@@ -1,4 +1,5 @@
 import * as THREE from "three"
+import { implicitToolMoves } from "@/domain/tools/implicit-tool"
 import type { ToolShape } from "@/domain/tools/tool-shape"
 import type { PlaybackFrame } from "@/app/job/frame"
 import type { GCodeProgram, GCodeSegment, Point3 } from "@/domain/nc/gcode"
@@ -109,20 +110,7 @@ export function moveTools(
 ): MoveTools {
   const looks = new Map<number | null, ToolLook>()
   for (const { tool, shape, model } of runs) looks.set(tool, { shape, model })
-  const change = runs.find((run) => run.tool !== null)
-  const parsed = program.segments.at(0)?.tool
-  let implicitMoves = 0
-  for (const { line, tool } of program.segments) {
-    // A change to the number the parse starts with leaves its moves alike: its line is the new
-    // tool's.
-    const changed =
-      !!change &&
-      (line > change.lineStart ||
-        (line === change.lineStart && change.tool === parsed))
-    if (tool !== parsed || changed) break
-    implicitMoves++
-  }
-  return { looks, implicitMoves }
+  return { looks, implicitMoves: implicitToolMoves(program, runs) }
 }
 
 /**

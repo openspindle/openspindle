@@ -54,6 +54,7 @@ export function DeviceCamera({
   className,
   actions,
   simulated,
+  title = "Camera",
 }: {
   device: ConnectedDevice | null
   available: boolean
@@ -65,6 +66,7 @@ export function DeviceCamera({
   actions?: ReactNode
   /** What the camera would see, drawn here when the device is the simulator. */
   simulated?: ReactNode
+  title?: string
 }) {
   const machine = useMachineHost()
   const [attempt, setAttempt] = useState(0)
@@ -76,6 +78,7 @@ export function DeviceCamera({
   const urls = useRef(new Set<string>())
   const watching = attempt > 0 && available && !!device && !hidden
   const simulator = !!device && isSimulator(device) && simulated !== undefined
+  const subject = simulator ? "preview" : "camera"
   const active =
     phase === "connecting" || phase === "live" || phase === "paused"
   const fullscreenSupported =
@@ -145,7 +148,7 @@ export function DeviceCamera({
   let cameraAction = "Start"
   if (phase === "error") cameraAction = "Retry"
   if (active) cameraAction = "Stop"
-  let cameraStatus = "Camera stopped"
+  let cameraStatus = simulator ? "Preview stopped" : "Camera stopped"
   if (phase === "connecting") cameraStatus = "Connecting to camera…"
   if (phase === "paused") cameraStatus = "Camera paused for job setup"
   if (phase === "error" || !available) cameraStatus = "Camera unavailable"
@@ -199,7 +202,7 @@ export function DeviceCamera({
           "group/camera relative flex aspect-video items-center justify-center overflow-hidden rounded-lg bg-neutral-950 ring-1 ring-foreground/10",
           className
         )}
-        aria-label="Machine camera"
+        aria-label={title}
       >
         {picture}
         <div
@@ -213,7 +216,7 @@ export function DeviceCamera({
             className="size-10 rounded-full [&_svg:not([class*='size-'])]:size-5"
             disabled={!available || !device}
             onClick={toggleCamera}
-            aria-label={`${cameraAction} camera`}
+            aria-label={`${cameraAction} ${subject}`}
             title={cameraAction}
           >
             {phase === "connecting" && (
@@ -259,12 +262,12 @@ export function DeviceCamera({
         "fullscreen:flex fullscreen:h-screen fullscreen:flex-col fullscreen:rounded-none pb-0",
         className
       )}
-      aria-label="Machine camera"
+      aria-label={title}
     >
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Camera size={16} />
-          <span>Camera</span>
+          <span>{title}</span>
           {active && (
             <Badge variant="secondary">
               {phase === "live" ? "Live" : cameraStatus}
@@ -278,7 +281,7 @@ export function DeviceCamera({
             type="button"
             disabled={!available || !device}
             onClick={toggleCamera}
-            aria-label={`${cameraAction} camera`}
+            aria-label={`${cameraAction} ${subject}`}
           >
             {active ? <Square /> : <Play />}
             {cameraAction}

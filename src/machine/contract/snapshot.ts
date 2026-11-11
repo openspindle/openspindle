@@ -117,6 +117,12 @@ export type DeferredOperation = z.infer<typeof DeferredOperationSchema>
 
 export const MachineSnapshotSchema = z.object({
   revision: z.int().nonnegative(),
+  simulatorController: z.object({
+    targetRpm: z.number().nullable().optional(),
+    arm: AvailabilitySchema,
+    step: AvailabilitySchema,
+    spindle: AvailabilitySchema,
+  }),
   connection: z.object({
     /** Changes on every connection, even to the same network address. */
     id: z.string().uuid().nullable(),
@@ -166,6 +172,11 @@ export function disconnectedSnapshot(
 ): MachineSnapshot {
   return {
     revision,
+    simulatorController: {
+      arm: { allowed: false, deferred: false, reason },
+      step: { allowed: false, deferred: false, reason },
+      spindle: { allowed: false, deferred: false, reason },
+    },
     connection: {
       id: null,
       status: "disconnected",

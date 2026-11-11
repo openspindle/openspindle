@@ -1,6 +1,9 @@
 import { createContext, useContext } from "react"
 import type { ReactNode } from "react"
-import { useSelector } from "@tanstack/react-store"
+import { Store, useSelector } from "@tanstack/react-store"
+import type { SavedProcess } from "@/domain/workspace/processes"
+import { processRepository } from "./process-document"
+import { bindDocument } from "./bind-document"
 import type { StoragePort } from "@/platform/host"
 import { PersistedDocument } from "./document"
 import type { DocumentState } from "./document"
@@ -18,14 +21,32 @@ export function createPersistence(storage: StoragePort) {
   const documents = {
     library: new PersistedDocument(libraryRepository(storage)),
     fixtures: new PersistedDocument(fixtureRepository(storage)),
+    processes: new PersistedDocument(processRepository(storage)),
   }
+  const processStore = new Store<SavedProcess[]>([])
+  bindDocument(
+    documents.processes,
+    {
+      get state() {
+        return processStore.state
+      },
+      hydrate: (value) => processStore.setState(() => value),
+      subscribe: (listener) => {
+        const subscription = processStore.subscribe(() =>
+          listener(processStore.state)
+        )
+        return () => subscription.unsubscribe()
+      },
+    },
+    () => []
+  )
   const all = Object.values(documents)
   for (const document of all) void document.load()
   // Pending debounced saves are written before the page goes away.
   window.addEventListener("pagehide", () => {
     for (const document of all) void document.flush()
   })
-  return { ...documents, all }
+  return { ...documents, processStore, all }
 }
 
 const PersistenceContext = createContext<Persistence | null>(null)

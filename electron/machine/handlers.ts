@@ -10,6 +10,14 @@ export function createMachineHandlers(
 ): Handlers<MachineContract> {
   return {
     methods: {
+      "machine.beginSimulatedJog": (input) =>
+        machine(() => gateway.beginSimulatedJog(input)),
+      "machine.sampleSimulatedJog": (input) =>
+        machine(() => gateway.sampleSimulatedJog(input)),
+      "machine.actionSimulatedJog": (input) =>
+        machine(() => gateway.actionSimulatedJog(input)),
+      "machine.endSimulatedJog": (input) =>
+        machine(() => gateway.endSimulatedJog(input)),
       "machine.snapshot": () => machine(() => gateway.snapshot()),
       "machine.discover": () => machine(() => gateway.discover()),
       "machine.connect": (request) => machine(() => gateway.connect(request)),

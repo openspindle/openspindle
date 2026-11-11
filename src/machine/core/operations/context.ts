@@ -18,6 +18,8 @@ export type OperationContext = {
   readonly signal: AbortSignal
   /** A program stream exists (acknowledgements are not ours). */
   readonly streaming: () => boolean
+  /** An owning manual controller can halt before unverified motion is isolated. */
+  readonly onUnverifiedMotion?: () => void
   /** Admission against fresh telemetry, ignoring the operation's own activity. */
   readonly admit: (request: AdmissionRequest, telemetry: Telemetry) => Admission
 }

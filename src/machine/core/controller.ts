@@ -1,5 +1,21 @@
 import { z } from "zod"
 import {
+  BeginSimulatedJogRequestSchema,
+  SimulatedJogSampleSchema,
+  SimulatedJogActionSchema,
+  SimulatedJogSessionSchema,
+} from "../contract/simulator-jog.ts"
+import type {
+  SimulatedJogSession,
+  SimulatedJogReceipt,
+} from "../contract/simulator-jog.ts"
+import { SimulatedJogOwner } from "./simulated-jog.ts"
+import { ControllerStepJogOwner } from "./controller-step-jog.ts"
+import {
+  freshDiagnosticStatus,
+  requireAdmission,
+} from "./operations/context.ts"
+import {
   COMMAND_LABELS,
   ConnectRequestSchema,
   ConsoleLineSchema,
@@ -9,6 +25,7 @@ import {
   RUN_LIMITS,
   RunRequestSchema,
   WriteAnchorsRequestSchema,
+  AnchorConfigurationSchema,
   WriteConfigurationRequestSchema,
   disconnectedSnapshot,
   isJobActive,
@@ -55,7 +72,7 @@ import type {
 import { CameraFeed } from "./camera.ts"
 import type { CameraEvent } from "./camera.ts"
 import { DiscoveryService } from "./discovery.ts"
-import { MachineError, cancelled } from "./errors.ts"
+import { MachineError, abortError, cancelled } from "./errors.ts"
 import type { PartedCompletion } from "./parted-completion.ts"
 import { syncClock } from "./operations/clock.ts"
 import { executeCommand } from "./operations/command.ts"
@@ -84,6 +101,8 @@ import { MachineSession } from "./session.ts"
 import { validSnapshot } from "./valid-snapshot.ts"
 
 const STOP_CONFIRM_MS = 8000
+/** Canceled commands and transfers can still answer after Stop confirms. */
+const STOP_REPLY_DRAIN_MS = 2000
 const MAX_REMEMBERED_RUNS = 128
 /** Reset: the frame leaves before the session closes; the firmware reboots 3 s after it. */
 const RESET_SEND_MS = 300
@@ -175,6 +194,13 @@ export class MachineController {
   private resumeCameraAfterStale: (() => void) | null = null
   private lastError: string | null = null
   private activity: Foreground | null = null
+  private direct: {
+    owner: SimulatedJogOwner | ControllerStepJogOwner
+    token: SimulatedJogSession
+    activity: Foreground
+    session: MachineSession
+    ending: Promise<MachineSnapshot> | null
+  } | null = null
   private deferred: Deferred[] = []
   /** Each kind's read while it is deferred or running; callers asking meanwhile join it. */
   private readonly reads: {
@@ -300,6 +326,11 @@ export class MachineController {
   ): Promise<MachineSnapshot> {
     const existing = this.session
     if (this.connectedTo(target)) return Promise.resolve(this.snapshot())
+    if (this.direct)
+      throw new MachineError(
+        "refused",
+        "Disarm the controller before changing the device connection."
+      )
     if (existing && !existing.ready)
       throw new MachineError(
         "busy",
@@ -354,6 +385,11 @@ export class MachineController {
    */
   disconnect(input: unknown): MachineSnapshot {
     const { confirmed = false } = parse(DisconnectRequestSchema, input)
+    if (this.direct)
+      throw new MachineError(
+        "refused",
+        "Disarm the controller before disconnecting."
+      )
     this.confirmLeavingJob(confirmed, "disconnect")
     this.disconnects++
     this.endRestart()
@@ -392,17 +428,20 @@ export class MachineController {
     if (!session || !device)
       throw new MachineError("not-connected", "Connect a device first.")
     this.admitNow({ key: "reset" })
-    this.trace.record("note", "Reset requested")
-    session.send(this.adapter.restart)
-    const restart = { cancelled: false }
-    this.restart = restart
-    this.publish()
-    await this.delay(RESET_SEND_MS)
-    session.close("The machine is restarting.")
-    void this.reconnectAfterReset(
-      { host: device.host, port: device.port, name: device.name },
-      restart
-    )
+    await this.operate("command", "Reset", async () => {
+      this.trace.record("note", "Reset requested")
+      session.send(this.adapter.restart)
+      const restart = { cancelled: false }
+      this.restart = restart
+      this.publish()
+      await this.delay(RESET_SEND_MS)
+      session.close("The machine is restarting.")
+      if (!restart.cancelled)
+        void this.reconnectAfterReset(
+          { host: device.host, port: device.port, name: device.name },
+          restart
+        )
+    })
     return this.snapshot()
   }
 
@@ -441,6 +480,269 @@ export class MachineController {
   }
 
   // ── Commands ───────────────────────────────────────────────────────────
+
+  async beginSimulatedJog(input: unknown): Promise<SimulatedJogSession> {
+    const request = parse(BeginSimulatedJogRequestSchema, input)
+    const session = this.session
+    if (
+      !session?.ready ||
+      !session.device ||
+      (!this.adapter.simulatorJog && !this.adapter.controllerStepBounds) ||
+      request.connectionId !== this.connectionId(session)
+    )
+      throw new MachineError(
+        "refused",
+        "Connect a supported machine before arming the controller."
+      )
+    const simulator = isSimulator(session.device)
+    if (!simulator && request.mode !== "step")
+      throw new MachineError(
+        "refused",
+        "Stock Z1 firmware supports finite Step jogging. Direct release-to-stop steering requires a verified firmware cancellation mechanism."
+      )
+    const command = {
+      type: "jog",
+      axis: "X",
+      distance: Math.max(
+        this.adapter.limits.jogMinDistance,
+        Math.min(1, this.adapter.limits.jogMaxDistance)
+      ),
+      speedScale: 0.1,
+    } as const
+    this.admitNow({ key: "jog", command })
+    const activity = this.begin("command", "Gamepad controller")
+    const context: OperationContext = {
+      session,
+      adapter: this.adapter,
+      clock: this.ports.clock,
+      signal: activity.controller.signal,
+      streaming: () => this.streaming(session.store.telemetry),
+      admit: (admissionRequest, telemetry) =>
+        admit(admissionRequest, {
+          ...this.admissionContext(),
+          activity: null,
+          telemetry,
+          streaming: this.streaming(telemetry),
+        }),
+    }
+    const token = {
+      connectionId: request.connectionId,
+      sessionId: crypto.randomUUID(),
+    }
+    const owner = simulator
+      ? new SimulatedJogOwner(
+          context,
+          token,
+          request.mode,
+          (reason) => {
+            this.trace.record("note", reason)
+            this.ports.log?.warn(reason)
+            void this.endSimulatedJog(token).catch(() => {})
+          },
+          () => {
+            if (this.direct?.token.sessionId === token.sessionId) this.publish()
+          }
+        )
+      : new ControllerStepJogOwner(
+          context,
+          token,
+          (reason) => {
+            this.trace.record("note", reason)
+            void this.endSimulatedJog(token).catch(() => {})
+          },
+          () => {
+            if (this.direct?.token.sessionId === token.sessionId) this.publish()
+          }
+        )
+    const direct = {
+      owner,
+      token,
+      activity,
+      session,
+      ending: null as Promise<MachineSnapshot> | null,
+    }
+    this.direct = direct
+    let beginSent = false
+    try {
+      await session.waitForDrain(activity.controller.signal)
+      const telemetry = await freshDiagnosticStatus(
+        context,
+        "Machine status was not received before controller arming."
+      )
+      requireAdmission(context, { key: "jog", command }, telemetry)
+      if (
+        telemetry.state !== "Idle" ||
+        telemetry.feed !== 0 ||
+        telemetry.spindleOn !== false
+      )
+        throw new MachineError(
+          "refused",
+          "Controller arming requires Idle with the spindle off."
+        )
+      beginSent = true
+      await owner.start()
+      if (this.direct !== direct || activity.controller.signal.aborted)
+        throw cancelled()
+      this.trace.record(
+        "note",
+        `Controller session started: ${token.sessionId}`
+      )
+      return token
+    } catch (error) {
+      if (this.direct === direct) {
+        owner.invalidate()
+        this.direct = null
+        // Once begin might have reached the simulator, closing prevents a late start from owning it.
+        if (
+          beginSent &&
+          simulator &&
+          !(error instanceof MachineError && error.code === "rejected")
+        )
+          session.close(message(error, "Direct simulator arming failed."))
+        this.end(activity)
+      }
+      throw error
+    }
+  }
+
+  async sampleSimulatedJog(input: unknown): Promise<SimulatedJogReceipt> {
+    const sample = parse(SimulatedJogSampleSchema, input)
+    const direct = this.direct
+    if (
+      !direct ||
+      sample.sessionId !== direct.token.sessionId ||
+      sample.connectionId !== direct.token.connectionId ||
+      direct.ending
+    )
+      throw new MachineError("refused", "Direct session has ended. Arm again.")
+    try {
+      return await direct.owner.sample(sample)
+    } catch (error) {
+      const receivedAt = this.ports.clock.now()
+      this.ports.log?.warn("Controller sample rejected", {
+        reason: message(error, "Direct sample failed"),
+        sessionId: sample.sessionId,
+        sequence: sample.sequence,
+        capturedAt: sample.capturedAt,
+        receivedAt,
+        ageMs: receivedAt - sample.capturedAt,
+      })
+      if (
+        this.direct === direct &&
+        !direct.owner.ending &&
+        !(error instanceof MachineError && error.code === "busy")
+      )
+        this.failDirect(direct, error)
+      throw error
+    }
+  }
+
+  async actionSimulatedJog(input: unknown): Promise<SimulatedJogReceipt> {
+    const request = parse(SimulatedJogActionSchema, input)
+    const direct = this.direct
+    if (
+      !direct ||
+      request.sessionId !== direct.token.sessionId ||
+      request.connectionId !== direct.token.connectionId ||
+      direct.ending
+    )
+      throw new MachineError(
+        "refused",
+        "Controller session has ended. Arm again."
+      )
+    this.trace.record(
+      "note",
+      `Controller action requested: ${JSON.stringify(request)}`
+    )
+    try {
+      const receipt = await direct.owner.action(request)
+      this.trace.record(
+        "note",
+        `Controller action confirmed: ${JSON.stringify({ receipt, telemetry: direct.session.store.telemetry })}`
+      )
+      return receipt
+    } catch (error) {
+      this.ports.log?.warn("Controller action failed", {
+        reason: message(error, "Action failed"),
+        sequence: request.sequence,
+      })
+      if (
+        this.direct === direct &&
+        !direct.owner.ending &&
+        !(
+          error instanceof MachineError &&
+          ["busy", "refused", "rejected", "cancelled"].includes(error.code)
+        )
+      )
+        this.failDirect(direct, error)
+      throw error
+    }
+  }
+
+  endSimulatedJog(input: unknown): Promise<MachineSnapshot> {
+    const token = parse(SimulatedJogSessionSchema, input)
+    const direct = this.direct
+    if (
+      !direct ||
+      token.sessionId !== direct.token.sessionId ||
+      token.connectionId !== direct.token.connectionId
+    )
+      return Promise.resolve(this.snapshot())
+    if (direct.ending) return direct.ending
+    direct.ending = direct.owner
+      .end()
+      .then(() => {
+        this.trace.record("note", `Controller stopped: ${token.sessionId}`)
+        return this.snapshot()
+      })
+      .catch((error: unknown) => {
+        if (this.direct === direct) this.failDirect(direct, error)
+        throw error
+      })
+      .finally(() => {
+        if (this.direct === direct) {
+          this.direct = null
+          this.end(direct.activity)
+        }
+      })
+      .then(() => this.snapshot())
+    return direct.ending
+  }
+
+  private failDirect(
+    direct: NonNullable<MachineController["direct"]>,
+    error: unknown
+  ) {
+    this.trace.record(
+      "note",
+      "Controller outcome is unverified; no motion was retried."
+    )
+    const reason = `Controller outcome is unverified: ${message(error, "stop failed")}. No motion was retried.`
+    if (direct.owner instanceof ControllerStepJogOwner) {
+      // Preserve the physical connection so Stop can still be attempted and confirmed.
+      direct.session.lockout = reason
+      this.invalidateDirect()
+      this.publish()
+      return
+    }
+    this.invalidateDirect()
+    direct.session.close(reason)
+  }
+
+  private invalidateDirect(haltPhysical = true) {
+    const direct = this.direct
+    if (!direct) return
+    if (
+      haltPhysical &&
+      direct.owner instanceof ControllerStepJogOwner &&
+      direct.session.ready
+    )
+      direct.session.send(this.adapter.halt)
+    direct.owner.invalidate()
+    this.direct = null
+    direct.activity.controller.abort(cancelled())
+    this.end(direct.activity)
+  }
 
   async execute(
     input: unknown,
@@ -502,12 +804,14 @@ export class MachineController {
     const session = this.session
     if (!session?.ready)
       throw new MachineError("not-connected", "Connect a device first.")
+    this.invalidateDirect(false)
     for (const frame of this.transfer?.cancel() ?? []) session.send(frame)
     this.activity?.controller.abort(
       new MachineError("cancelled", "Interrupted by Stop.")
     )
     for (const entry of this.deferred.splice(0))
       entry.reject(new MachineError("cancelled", "Cancelled by Stop."))
+    session.drainFor(STOP_REPLY_DRAIN_MS)
     this.tracker?.stopRequested()
     this.trace.record("note", "Stop requested")
     const after = session.store.sequence
@@ -760,9 +1064,33 @@ export class MachineController {
    */
   async writeAnchors(input: unknown): Promise<WriteAnchorsResult> {
     const request = parse(WriteAnchorsRequestSchema, input)
+    const checkProposal = (session: MachineSession | null) => {
+      if (
+        request.expectedConnectionId !== undefined &&
+        (!session?.ready ||
+          session !== this.session ||
+          this.connectionId(session) !== request.expectedConnectionId)
+      )
+        throw new MachineError(
+          "connection-lost",
+          "The device connection changed. Read its anchors again before saving."
+        )
+      if (
+        request.expectedAnchors !== undefined &&
+        (!this.anchors.value ||
+          JSON.stringify(request.expectedAnchors) !==
+            JSON.stringify(AnchorConfigurationSchema.parse(this.anchors.value)))
+      )
+        throw new MachineError(
+          "refused",
+          "The stored anchors changed. Review them again before saving."
+        )
+    }
+    checkProposal(this.session)
     // The chain refuses the write outright while a program runs; it never waits.
     this.admitNow({ key: "writeAnchors" })
     return this.operate("anchors", "Writing anchors", async (context) => {
+      checkProposal(context.session)
       const progress = { sent: false }
       try {
         const value = await writeAnchorConfiguration(context, request, () => {
@@ -861,6 +1189,7 @@ export class MachineController {
   }
 
   dispose() {
+    this.invalidateDirect()
     this.session?.close(null)
     this.discovery.dispose()
     this.camera.dispose()
@@ -902,6 +1231,7 @@ export class MachineController {
 
   private onClosed(session: MachineSession, error: string | null) {
     if (session !== this.session) return
+    this.invalidateDirect()
     this.session = null
     this.camera.dispose()
     this.resumeCameraAfterStale?.()
@@ -1137,6 +1467,9 @@ export class MachineController {
       throw new MachineError("not-connected", "Connect a device first.")
     const activity = this.begin(kind, label)
     try {
+      await session.waitForDrain(activity.controller.signal)
+      if (activity.controller.signal.aborted)
+        throw abortError(activity.controller.signal)
       return await work({
         session,
         adapter: this.adapter,
@@ -1362,8 +1695,32 @@ export class MachineController {
       connectionError =
         "Device status is not responding. The machine may still be running. Stop can be attempted, but its effect must be confirmed."
     if (this.restart) connectionError = null
+    const available = availability(context)
+    const arm =
+      ready?.device &&
+      (isSimulator(ready.device) || this.adapter.controllerStepBounds)
+        ? available.jog
+        : {
+            allowed: false,
+            deferred: false,
+            reason: "Connect a supported machine first.",
+          }
+    const inactive = {
+      allowed: false,
+      deferred: false,
+      reason: "Arm the controller first.",
+    }
     return {
       revision,
+      simulatorController: {
+        arm,
+        targetRpm:
+          this.direct?.owner instanceof ControllerStepJogOwner
+            ? this.direct.owner.targetRpm
+            : null,
+        step: this.direct?.owner.availability("step") ?? inactive,
+        spindle: this.direct?.owner.availability("spindle") ?? inactive,
+      },
       connection: {
         id: ready ? this.connectionId(ready) : null,
         status,
@@ -1382,7 +1739,7 @@ export class MachineController {
           }
         : null,
       telemetry,
-      availability: availability(context),
+      availability: available,
       activity: this.activity
         ? {
             kind: this.activity.kind,

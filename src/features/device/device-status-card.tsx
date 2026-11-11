@@ -1,4 +1,11 @@
+import { useMemo, useState } from "react"
 import { Pause, Play } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { useFixtureLibrary } from "@/app/fixtures/fixture-context"
+import { projectPlacement } from "@/app/fixtures/plate-profile"
+import { emptyPlate } from "@/app/workspace/defaults"
+import { isSimulator } from "@/machine/contract"
+import type { ViewMode } from "@/components/workspace/bed-viewer"
 import {
   Card,
   CardAction,
@@ -18,6 +25,7 @@ import type {
 import {
   useCompiledPlate,
   useSelectedPlate,
+  useWorkspace,
 } from "@/app/workspace/workspace-context"
 import { DeviceCamera } from "@/components/workspace/device-camera"
 import { SimulatedCamera } from "@/features/viewer/simulated-camera"
@@ -44,15 +52,44 @@ export function DeviceStatusCard({
   reason: (key: AvailabilityKey, action?: MachineCommand) => string | null
   execute: (action: MachineCommand) => void
 }) {
-  const plate = useSelectedPlate()
+  const workspace = useWorkspace((state) => state)
+  const fixtures = useFixtureLibrary((state) => state)
+  // A display-only plate provides the bed and live tool in an empty project.
+  const fallback = useMemo(
+    () => emptyPlate(projectPlacement(workspace, fixtures)),
+    [workspace, fixtures]
+  )
+  const selected = useSelectedPlate()
+  const plate = selected ?? fallback
   const compiled = useCompiledPlate(plate)
-  const shown = plate && compiled ? { plate, compiled } : null
+  const shown = useMemo(
+    () => (compiled ? { plate, compiled } : null),
+    [plate, compiled]
+  )
+  const simulator = device !== null && isSimulator(device)
+  const [view, setView] = useState<ViewMode>("perspective")
   return (
     <>
       <DeviceCamera
         device={device}
         available={features?.camera === true}
-        simulated={<SimulatedCamera shown={shown} />}
+        title={simulator ? "Simulator preview" : "Camera"}
+        simulated={<SimulatedCamera shown={shown} view={view} />}
+        actions={
+          simulator && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() =>
+                setView((current) =>
+                  current === "perspective" ? "camera" : "perspective"
+                )
+              }
+            >
+              {view === "perspective" ? "Camera angle" : "3D view"}
+            </Button>
+          )
+        }
       />
       <Card size="sm" role="region" aria-label="Live machine status">
         <CardContent>

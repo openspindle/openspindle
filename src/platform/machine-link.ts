@@ -13,6 +13,12 @@ const STOPPED =
 /** The machine process over one port: the requests go to it as they are. */
 function machineOver(peer: Peer<MachineContract>): MachineHost {
   return {
+    beginSimulatedJog: (input) => peer.call("machine.beginSimulatedJog", input),
+    sampleSimulatedJog: (input) =>
+      peer.call("machine.sampleSimulatedJog", input),
+    actionSimulatedJog: (input) =>
+      peer.call("machine.actionSimulatedJog", input),
+    endSimulatedJog: (input) => peer.call("machine.endSimulatedJog", input),
     snapshot: () => peer.call("machine.snapshot", undefined),
     subscribe: (listener) =>
       peer.subscribe("machine.changed", undefined, listener),
@@ -74,6 +80,10 @@ function unreachableMachine(error: string | null): MachineHost {
     disconnect: refuse,
     execute: refuse,
     simulateBed: refuse,
+    beginSimulatedJog: refuse,
+    sampleSimulatedJog: refuse,
+    actionSimulatedJog: refuse,
+    endSimulatedJog: refuse,
     sendConsoleLine: refuse,
     stop: refuse,
     reset: refuse,

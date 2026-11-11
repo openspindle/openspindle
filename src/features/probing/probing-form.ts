@@ -42,7 +42,8 @@ export const visibleErrors = (meta: FieldMeta): FieldErrors =>
 export function useProbingForm<TParams extends Record<string, unknown>>(
   value: TParams,
   schema: z.ZodType<TParams, TParams>,
-  onChange: (value: TParams) => void
+  onChange: (value: TParams) => void,
+  onValidityChange?: (valid: boolean) => void
 ) {
   return useForm({
     defaultValues: value,
@@ -50,6 +51,7 @@ export function useProbingForm<TParams extends Record<string, unknown>>(
     listeners: {
       onChange: ({ formApi }) => {
         const parsed = schema.safeParse(formApi.state.values)
+        onValidityChange?.(parsed.success)
         if (parsed.success && !evaluate(parsed.data, value))
           onChange(parsed.data)
       },

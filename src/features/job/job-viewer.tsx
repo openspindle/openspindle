@@ -1,4 +1,8 @@
 import type { FrameSource } from "@/app/job/frame"
+import { useState } from "react"
+import { Button } from "@/components/ui/button"
+import { Card } from "@/components/ui/card"
+import { useMaterialRemoval } from "@/features/workshop/use-material-removal"
 import { useDispatch } from "@/app/workspace/workspace-context"
 import { BedViewer } from "@/components/workspace/bed-viewer"
 import {
@@ -26,6 +30,8 @@ export function JobViewer({
   frames: FrameSource
 }) {
   const plates = useWorkspaceViewerPlates(shown)
+  const [showRemoval, setShowRemoval] = useState(false)
+  const removal = useMaterialRemoval(shown, frames, showRemoval)
   const dispatch = useDispatch()
   const camera = useViewerCamera()
   const [style] = useVisualStyle()
@@ -34,6 +40,11 @@ export function JobViewer({
   return (
     <div className="relative min-h-0 flex-1 overflow-hidden">
       <BedViewer
+        removal={
+          shown && removal.grid
+            ? { plateId: shown.plate.id, grid: removal.grid }
+            : null
+        }
         plates={plates}
         selectedPlateId={shown?.plate.id ?? null}
         onSelectPlate={(plateId) => dispatch({ type: "plate.select", plateId })}
@@ -48,6 +59,35 @@ export function JobViewer({
         machineOrigin={machineOrigin}
       />
       <ViewerToolbar camera={camera} />
+      <Card
+        size="sm"
+        className="absolute top-4 right-4 z-10 max-w-72 gap-2 p-3"
+      >
+        <Button
+          variant={showRemoval ? "secondary" : "outline"}
+          size="sm"
+          aria-pressed={showRemoval}
+          onClick={() => setShowRemoval((value) => !value)}
+        >
+          Material removal · {showRemoval ? "On" : "Off"}
+        </Button>
+        {showRemoval && (
+          <>
+            <p className="text-muted-foreground">
+              Sampled stock model at the playback cursor. No undercuts, fixture
+              collisions or physical verification.
+            </p>
+            {removal.pending && <p>Updating sampled stock…</p>}
+            {removal.problem && <p>{removal.problem}</p>}
+            {removal.grid && (
+              <p className="font-numeric">
+                Grid spacing up to {removal.grid.resolution.toFixed(2)} mm.
+                Narrow details may disappear.
+              </p>
+            )}
+          </>
+        )}
+      </Card>
       <TrackerOverlay />
       <div className="absolute right-4 bottom-4 z-10 flex flex-col gap-2">
         <MachineStatusCard telemetry={telemetry} />

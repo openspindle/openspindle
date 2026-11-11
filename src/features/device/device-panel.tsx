@@ -56,6 +56,19 @@ export function DevicePanel({
     ? snapshot.telemetry
     : null
   const [notice, setNotice] = useState("")
+  const [spindleTargetInput, setSpindleTargetInput] = useState("")
+  const reportedTarget =
+    snapshot.simulatorController.targetRpm ?? telemetry?.spindleTargetRpm
+  useEffect(
+    () => setSpindleTargetInput(""),
+    [snapshot.connection.id, reportedTarget]
+  )
+  const suggestedRpm =
+    reportedTarget && limits && reportedTarget >= limits.spindleRpmMin
+      ? reportedTarget
+      : limits?.spindleRpmMax
+  const spindleRpm =
+    spindleTargetInput === "" ? (suggestedRpm ?? 0) : Number(spindleTargetInput)
   const pending = command.isPending || stop.isPending || reset.isPending
 
   useEffect(() => {
@@ -268,12 +281,17 @@ export function DevicePanel({
             execute={execute}
           />
           <DeviceJogCard
+            spindleRpm={spindleRpm}
             limits={limits}
             reason={reason}
             allowed={allowed}
             execute={execute}
+            stop={() => stop.mutateAsync(undefined)}
           />
           <DeviceSpindleCard
+            rpmInput={spindleTargetInput}
+            setRpmInput={setSpindleTargetInput}
+            suggestedRpm={suggestedRpm}
             device={device}
             telemetry={telemetry}
             limits={limits}

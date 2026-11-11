@@ -5,6 +5,13 @@ import type { SettingsSection } from "@/features/settings/settings-dialog"
 
 /** Every dialog of the workspace. One is open at a time; the dialog host renders it. */
 export type WorkspaceDialog =
+  | { readonly kind: "guided-setup" }
+  | { readonly kind: "processes" }
+  | {
+      readonly kind: "facing"
+      readonly plateId?: string
+      readonly operationId?: string
+    }
   | { readonly kind: "device" }
   | { readonly kind: "device-configuration" }
   /** The Models library; closing it goes back to the dialog it opened from. */
@@ -63,6 +70,12 @@ export type WorkspaceDialog =
   | { readonly kind: "import"; readonly plan: ImportPlan }
 
 const dialogAtom = createAtom<WorkspaceDialog | null>(null)
+
+/** Guides share a docked workspace panel; confirmations and editors retain their modal guards. */
+export function isGuideDialog(dialog: WorkspaceDialog | null): boolean {
+  if (!dialog) return false
+  return ["guided-setup", "facing", "processes"].includes(dialog.kind)
+}
 
 export const openDialog = (dialog: WorkspaceDialog) =>
   dialogAtom.set(() => dialog)

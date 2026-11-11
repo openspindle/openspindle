@@ -10,15 +10,17 @@ import type {
   ControlLimits,
   GoToTarget,
   MachineCommand,
+  MachineSnapshot,
 } from "@/machine/contract"
 import { OptionSelect } from "@/components/option-select"
 import { AXIS_COLORS } from "@/components/workspace/axis-label"
 import { ReasonButton } from "@/components/workspace/reason-button"
 import { ControlCard } from "./device-control-card"
+import { GamepadStepControls } from "./gamepad-step-controls"
 
 /** The jog steps offered, in millimetres, and speeds, in percent of the machine's maximum. */
 const JOG_STEPS = [0.01, 0.1, 1, 5, 10]
-const JOG_SPEEDS = [5, 10, 25]
+const JOG_SPEEDS = [5, 10, 25, 50, 75, 100]
 
 /**
  * [axis, direction, button text, grid position, accessible label]. Y+ at the bottom: the Z1
@@ -72,14 +74,18 @@ function GoToButton({
 /** Jog steps and speed, and the XY and Z jog pads, each axis in its colour, with homing and go-to moves. */
 export function DeviceJogCard({
   limits,
+  spindleRpm,
   reason,
   allowed,
   execute,
+  stop,
 }: {
   limits: ControlLimits | null
+  spindleRpm: number
   reason: (key: AvailabilityKey, action?: MachineCommand) => string | null
   allowed: (action: MachineCommand) => boolean
   execute: (action: MachineCommand) => void
+  stop: () => Promise<MachineSnapshot>
 }) {
   const fieldId = useId()
   const [step, setStep] = useState(1)
@@ -209,6 +215,28 @@ export function DeviceJogCard({
           </Field>
         </FieldGroup>
       </div>
+      <GamepadStepControls
+        step={step}
+        speed={speed}
+        spindleRpm={spindleRpm}
+        cycleSpeed={() =>
+          setSpeed((current) => {
+            const index = jogSpeeds.indexOf(current)
+            return jogSpeeds[(index + 1) % jogSpeeds.length] ?? current
+          })
+        }
+        adjustStep={(delta) =>
+          setStep((current) => {
+            const index = jogSteps.indexOf(current)
+            return (
+              jogSteps[
+                Math.max(0, Math.min(jogSteps.length - 1, index + delta))
+              ] ?? current
+            )
+          })
+        }
+        stop={stop}
+      />
     </ControlCard>
   )
 }

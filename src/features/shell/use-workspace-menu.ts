@@ -14,7 +14,7 @@ import {
   hasUnsavedChanges,
 } from "@/app/workspace/project-session"
 import { useWorkspaceStore } from "@/app/workspace/workspace-context"
-import { currentDialog, openDialog } from "./dialogs"
+import { currentDialog, isGuideDialog, openDialog } from "./dialogs"
 import { useNativeImport } from "./use-native-import"
 
 /** Input types that take typing, which Undo and Redo step through as in any text field. */
@@ -100,7 +100,8 @@ export function useWorkspaceMenu() {
     const settled = persistence.all.every(
       (document) => document.state.state.phase === "ready"
     )
-    if (!settled || currentDialog() !== null) return
+    const dialog = currentDialog()
+    if (!settled || (dialog !== null && !isGuideDialog(dialog))) return
     switch (command) {
       case "settings.open":
         openDialog({ kind: "settings" })

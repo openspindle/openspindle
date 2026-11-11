@@ -20,6 +20,7 @@ import { useHost } from "@/platform/host-context"
 const TITLES = {
   library: "Tool and stock libraries",
   fixtures: "Fixture library",
+  processes: "Reusable processes",
 } as const
 
 function dialogTitle(newer: boolean, unreadable: boolean) {
@@ -38,6 +39,7 @@ export function LoadIssuesDialog() {
   const states = {
     library: useDocumentState(persistence.library),
     fixtures: useDocumentState(persistence.fixtures),
+    processes: useDocumentState(persistence.processes),
   }
   const blocked = (Object.keys(states) as (keyof typeof states)[])
     .filter((key) => states[key].phase === "blocked")

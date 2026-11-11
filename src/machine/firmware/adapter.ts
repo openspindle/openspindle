@@ -1,3 +1,4 @@
+import type { SimulatorJogProtocol } from "./makera/simulator-jog.ts"
 import type {
   AddedAnchor,
   AnchorConfiguration,
@@ -279,6 +280,13 @@ export interface JobProtocol {
 }
 
 export interface FirmwareAdapter {
+  /** Physical finite controller jogging; bounds use freshly read machine anchors. */
+  readonly controllerStepBounds?: (anchors: AnchorConfiguration) => {
+    min: readonly [number, number, number]
+    max: readonly [number, number, number]
+  } | null
+  /** Local simulator extension; never sent to a physical device. */
+  readonly simulatorJog?: SimulatorJogProtocol
   readonly id: string
   readonly defaultPort: number
   readonly discovery: {

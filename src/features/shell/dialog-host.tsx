@@ -1,4 +1,7 @@
 import { DevicePicker } from "@/features/device/device-picker"
+import { GuidedSetup } from "@/features/workshop/guided-setup"
+import { FacingDialog } from "@/features/workshop/facing-dialog"
+import { ProcessDialog } from "@/features/workshop/process-dialog"
 import { DeviceConfigurationDialog } from "@/features/device/device-configuration"
 import { FusionSource } from "@/features/fusion360/fusion-source"
 import { FusionPairingDialog } from "@/features/fusion360/fusion-pairing-dialog"
@@ -22,14 +25,32 @@ import { AddFixtureDialog } from "@/features/prepare/fixtures/add-fixture-dialog
 import { SettingsDialog } from "@/features/settings/settings-dialog"
 import { WorkspaceToolLibrary } from "@/features/tool-library"
 import { WorkspaceSettingsDialog } from "@/features/workspace-settings/workspace-settings-dialog"
-import { AppDialog } from "./app-dialog"
-import { closeDialog, openDialog, useOpenDialog } from "./dialogs"
+import { AppDialog, GuidePanelContext } from "./app-dialog"
+import {
+  closeDialog,
+  isGuideDialog,
+  openDialog,
+  useOpenDialog,
+} from "./dialogs"
 import { ImportDialog } from "./import-dialog"
 import type { WorkspaceDialog } from "./dialogs"
 
 /** The open workspace dialog; opening another replaces it. */
 function OpenDialog({ dialog }: { dialog: WorkspaceDialog }) {
   switch (dialog.kind) {
+    case "processes":
+      return <ProcessDialog onClose={closeDialog} />
+    case "facing":
+      return (
+        <FacingDialog
+          key={`${dialog.plateId}-${dialog.operationId}`}
+          plateId={dialog.plateId}
+          operationId={dialog.operationId}
+          onClose={closeDialog}
+        />
+      )
+    case "guided-setup":
+      return <GuidedSetup onClose={closeDialog} />
     case "fusion":
       return (
         <AppDialog title="Fusion 360" width="wide" onClose={closeDialog}>
@@ -114,5 +135,16 @@ export function DialogHost() {
   useFusionSync()
   useFusionPairing()
   const dialog = useOpenDialog()
-  return dialog && <OpenDialog dialog={dialog} />
+  return dialog && !isGuideDialog(dialog) && <OpenDialog dialog={dialog} />
+}
+
+/** A guide is part of the workspace layout, with no overlay or focus trap. */
+export function GuideHost() {
+  const dialog = useOpenDialog()
+  if (!dialog || !isGuideDialog(dialog)) return null
+  return (
+    <GuidePanelContext.Provider value>
+      <OpenDialog dialog={dialog} />
+    </GuidePanelContext.Provider>
+  )
 }

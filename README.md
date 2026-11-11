@@ -20,7 +20,9 @@ OpenSpindle is a desktop app for preparing, checking and running jobs on a Maker
 - Playback of the program as the firmware runs it, timed as the Z1's planner would move it by the machine's own limits, with how long it takes and the depth and width of cut
 - The G-code exactly as the machine receives it, and a glossary of the Z1's codes (**Help › G-code Glossary**)
 - A run checklist, upload read-back and large programs sent in parts
+- Guided stock/workholding/origin/tool setup, editable facing with a feeds and speeds assistant, reusable local processes and sampled stock-removal playback
 - The job followed live in the 3D view, with the moves ahead, where the probe touches next and the time left
+- Xbox-style gamepad Step jogging and spindle controls, with continuous Direct steering on the simulator ([controls](docs/gamepad-prototype.md))
 - Machine controls, a console to send the machine one line at a time, the machine's camera, its height map and its stored anchors
 - Machine alarms by name, with what clears them; a pressed E-stop and failed homing diagnosed, with a read of the home switches
 - A simulated Z1 to try jobs on without a machine, moving as the Z1's planner moves it, its camera picture drawn as the Z1's camera sees the bed (**Settings › General › Z1 Simulator device**)
@@ -77,6 +79,7 @@ If something behaves differently, **Help › Export Protocol Trace…** saves th
 
 ## Documentation
 
+- [Guided workshop](docs/guided-workshop.md): setup, facing, cutting presets, measurement proposals, reusable processes, material removal and simulator trials
 - [Probing](docs/probing.md): [Z surface](docs/touch-off.md), [height map](docs/height-map.md), [outline trace](docs/outline-trace.md), and [corners and centres](docs/3d-probing.md) with the 3D probe
 - [PCB operations](docs/pcb.md) from KiCad Gerber and Excellon files, and setting up pcb2gcode
 - [Fusion 360](docs/fusion360.md): install the add-in, connect, and import and update NC programs

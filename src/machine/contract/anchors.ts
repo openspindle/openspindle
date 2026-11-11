@@ -78,6 +78,10 @@ export type AnchorPosition = z.infer<typeof AnchorPositionSchema>
  */
 export const WriteAnchorsRequestSchema = z
   .strictObject({
+    /** Bind a reviewed proposal to the connection whose anchors it used. */
+    expectedConnectionId: z.uuid().optional(),
+    /** Refuse a proposal if another read or write changed its reviewed anchors. */
+    expectedAnchors: AnchorConfigurationSchema.optional(),
     anchors: z
       .array(AnchorPositionSchema)
       .min(1)
