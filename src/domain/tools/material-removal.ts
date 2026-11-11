@@ -1,6 +1,10 @@
 import { z } from "zod"
 import { RemovalCutterSchema } from "./removal-cutter"
 import type { RemovalCutter } from "./removal-cutter"
+import {
+  DEFAULT_REMOVAL_RESOLUTION,
+  RemovalResolutionSchema,
+} from "./removal-resolution"
 
 const Point = z.tuple([
   z.number().finite(),
@@ -8,6 +12,7 @@ const Point = z.tuple([
   z.number().finite(),
 ])
 export const RemovalInputSchema = z.object({
+  resolution: RemovalResolutionSchema.default(DEFAULT_REMOVAL_RESOLUTION),
   min: Point,
   max: Point,
   segments: z
@@ -29,9 +34,7 @@ export type RemovalGrid = {
 }
 export type RemovalCursor = { move: number; fraction: number }
 
-const MAX_AXIS = 128
-const MIN_AXIS = 16
-const MAX_VISITS = 8_000_000
+const MAX_VISITS = 128_000_000
 
 /** Only the part of a V-bit that reaches below stock top needs sampling. */
 function engagedRadius(cutter: RemovalCutter, lowest: number, top: number) {
@@ -90,49 +93,48 @@ export class MaterialRemoval {
     const { min, max, segments } = this.input
     if (max.some((high, axis) => high <= min[axis]))
       throw new Error("Stock dimensions must be positive.")
-    let cells = MAX_AXIS
+    const cells = this.input.resolution
     const width = max[0] - min[0]
     const depth = max[1] - min[1]
-    let visits = Infinity
-    let columns = cells
-    let rows = cells
-    while (cells >= MIN_AXIS) {
-      columns = Math.max(2, Math.ceil((cells * width) / Math.max(width, depth)))
-      rows = Math.max(2, Math.ceil((cells * depth) / Math.max(width, depth)))
-      const dx = width / columns
-      const dy = depth / rows
-      visits = 0
-      for (const segment of segments) {
-        const lowest = Math.min(segment.start[2], segment.end[2])
-        if (segment.cutter === null || lowest >= max[2]) continue
-        const radius = engagedRadius(segment.cutter, lowest, max[2])
-        const left = Math.max(
-          min[0],
-          Math.min(segment.start[0], segment.end[0]) - radius
-        )
-        const right = Math.min(
-          max[0],
-          Math.max(segment.start[0], segment.end[0]) + radius
-        )
-        const front = Math.max(
-          min[1],
-          Math.min(segment.start[1], segment.end[1]) - radius
-        )
-        const back = Math.min(
-          max[1],
-          Math.max(segment.start[1], segment.end[1]) + radius
-        )
-        if (right < left || back < front) continue
-        visits +=
-          (Math.ceil((right - left) / dx) + 2) *
-          (Math.ceil((back - front) / dy) + 2)
-      }
-      if (visits <= MAX_VISITS) break
-      cells /= 2
+    const columns = Math.max(
+      2,
+      Math.ceil((cells * width) / Math.max(width, depth))
+    )
+    const rows = Math.max(
+      2,
+      Math.ceil((cells * depth) / Math.max(width, depth))
+    )
+    const dx = width / columns
+    const dy = depth / rows
+    let visits = 0
+    for (const segment of segments) {
+      const lowest = Math.min(segment.start[2], segment.end[2])
+      if (segment.cutter === null || lowest >= max[2]) continue
+      const radius = engagedRadius(segment.cutter, lowest, max[2])
+      const left = Math.max(
+        min[0],
+        Math.min(segment.start[0], segment.end[0]) - radius
+      )
+      const right = Math.min(
+        max[0],
+        Math.max(segment.start[0], segment.end[0]) + radius
+      )
+      const front = Math.max(
+        min[1],
+        Math.min(segment.start[1], segment.end[1]) - radius
+      )
+      const back = Math.min(
+        max[1],
+        Math.max(segment.start[1], segment.end[1]) + radius
+      )
+      if (right < left || back < front) continue
+      visits +=
+        (Math.ceil((right - left) / dx) + 2) *
+        (Math.ceil((back - front) / dy) + 2)
     }
     if (visits > MAX_VISITS)
       throw new Error(
-        "This program exceeds the sampled removal budget. Preview a smaller plate or operation set."
+        "This program exceeds the removal calculation budget at the selected resolution. Lower Material removal resolution in Settings > General, or preview a smaller plate or operation set."
       )
     this.columns = columns
     this.rows = rows

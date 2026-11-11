@@ -81,8 +81,9 @@ export function JobViewer({
             {removal.problem && <p>{removal.problem}</p>}
             {removal.grid && (
               <p className="font-numeric">
-                Grid spacing up to {removal.grid.resolution.toFixed(2)} mm.
-                Narrow details may disappear.
+                {removal.grid.columns} × {removal.grid.rows} · grid spacing up
+                to {removal.grid.resolution.toFixed(3)} mm. Narrow details may
+                disappear.
               </p>
             )}
           </>

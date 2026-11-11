@@ -2,7 +2,7 @@ import * as THREE from "three"
 import { billboarding } from "three/tsl"
 import { MeshBasicNodeMaterial } from "three/webgpu"
 import type { RemovalGrid } from "@/domain/tools/material-removal"
-import { removalStock } from "./removal-stock"
+import { RemovalStockGeometry } from "./removal-stock"
 import { Line2 } from "three/addons/lines/webgpu/Line2.js"
 import { LineGeometry } from "three/addons/lines/LineGeometry.js"
 import { SeeThroughLineMaterial } from "./see-through-line"
@@ -396,7 +396,7 @@ function stockObjects(
   if (removal)
     return [
       new THREE.Mesh(
-        removalStock(plate, removal),
+        new RemovalStockGeometry(plate, removal),
         new THREE.MeshStandardMaterial({
           color: top.color,
           metalness: top.metalness,
@@ -975,10 +975,16 @@ export class PlateView {
     const { presentation } = this
     if (presentation.removal !== this.drawnRemoval) {
       this.drawnRemoval = presentation.removal
-      replaceChildren(
-        this.stock,
-        stockObjects(this.current, presentation.removal)
+      const mesh = this.stock.children[0]
+      const grid = presentation.removal
+      if (
+        grid &&
+        mesh instanceof THREE.Mesh &&
+        mesh.geometry instanceof RemovalStockGeometry &&
+        mesh.geometry.matches(grid)
       )
+        mesh.geometry.update(this.current, grid)
+      else replaceChildren(this.stock, stockObjects(this.current, grid))
     }
     this.selection.visible = presentation.active
     this.stock.visible = presentation.showStock

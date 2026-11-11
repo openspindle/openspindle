@@ -17,11 +17,14 @@ import { PLAIN_NC, readNcUnit } from "@/domain/compile/nc-unit"
 import { kitForPlate } from "@/domain/fixtures/catalog"
 import { implicitToolMoves } from "@/domain/tools/implicit-tool"
 import { toViewerPlate } from "@/features/viewer/viewer-plate"
+import { useRemovalResolution } from "@/app/job/removal-preferences"
+import type { RemovalResolution } from "@/domain/tools/removal-resolution"
 
 function removalInput(
   shown: JobSubject | null,
   program: GCodeProgram | undefined,
-  tools: readonly Tool[]
+  tools: readonly Tool[],
+  resolution: RemovalResolution
 ): { input: RemovalInput | null; problem: string | null } {
   if (!shown || !program)
     return {
@@ -151,7 +154,7 @@ function removalInput(
     }
     segments.push({ start: segment.start, end: segment.end, cutter })
   }
-  return { input: { min, max, segments }, problem: null }
+  return { input: { min, max, segments, resolution }, problem: null }
 }
 
 type State = {
@@ -168,12 +171,18 @@ export function useMaterialRemoval(
 ) {
   const index = usePlanIndex(shown)
   const library = useWorkspace((state) => state.tools)
+  const { resolution } = useRemovalResolution()
   const prepared = useMemo(
     () =>
       enabled
-        ? removalInput(shown, index?.plan.program, shown?.tools ?? library)
+        ? removalInput(
+            shown,
+            index?.plan.program,
+            shown?.tools ?? library,
+            resolution
+          )
         : { input: null, problem: null },
-    [enabled, shown, index, library]
+    [enabled, shown, index, library, resolution]
   )
   const [state, setState] = useState<State>({
     input: null,

@@ -4,6 +4,7 @@ import {
   FieldError,
   FieldGroup,
   FieldLabel,
+  FieldDescription,
 } from "@/components/ui/field"
 import { Switch } from "@/components/ui/switch"
 import { OptionSelect } from "@/components/option-select"
@@ -12,6 +13,7 @@ import { isAppearance } from "@/lib/appearance"
 import { FONTS, FONT_CHOICES, isFontFor } from "@/lib/fonts"
 import type { FontRole } from "@/lib/fonts"
 import { useSimulatorStatus, useUpdateSimulator } from "@/platform/simulator"
+import { useRemovalResolution } from "@/app/job/removal-preferences"
 
 const APPEARANCE_OPTIONS = [
   { value: "system", label: "System" },
@@ -49,6 +51,7 @@ const simulatorHint = (host: string, port: number) =>
 
 /** Settings › General: appearance and the simulated Z1. Changes apply at once. */
 export function GeneralSettings() {
+  const removal = useRemovalResolution()
   const { appearance, setAppearance, fonts, setFont, saveError } =
     useAppearance()
   const simulator = useSimulatorStatus().data
@@ -91,6 +94,28 @@ export function GeneralSettings() {
         </Field>
       ))}
       {saveError && <FieldError>{saveError}</FieldError>}
+      <Field>
+        <FieldLabel htmlFor="removal-resolution">
+          Material removal resolution
+        </FieldLabel>
+        <OptionSelect
+          id="removal-resolution"
+          value={removal.resolution}
+          onValueChange={removal.update}
+          options={[
+            { value: 128, label: "128 · Fast" },
+            { value: 256, label: "256 · Balanced" },
+            { value: 512, label: "512 · Fine (default)" },
+            { value: 1024, label: "1024 · Very fine" },
+          ]}
+        />
+        <FieldDescription>
+          Samples along the longest stock side. Higher values preserve finer
+          cuts and use more memory and calculation time. Changes rebuild the
+          preview.
+        </FieldDescription>
+        {removal.saveError && <FieldError>{removal.saveError}</FieldError>}
+      </Field>
       {simulator && (
         <Field orientation="horizontal">
           <FieldLabel htmlFor="z1-simulator">
