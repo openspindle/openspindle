@@ -17,6 +17,7 @@
     { "catalog": "makera", "tool": "08b65e1e-bedb-4b1c-8e6f-a3129392cb16" },
     { "catalog": "makera", "tool": "makera-wired-probe-2" },
     { "catalog": "makera", "tool": "makera-3d-probe" },
+    { "catalog": "makera", "tool": "makera-3d-probe-rod" },
     { "catalog": "foxalien", "tool": "foxalien-crb-vs-3e30db" }
   ]
 }

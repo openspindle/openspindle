@@ -1,5 +1,12 @@
 import { z } from "zod"
 
+/** Optional scope for a hands-free input test. A new test discards earlier proof. */
+export const ReadSwitchesRequestSchema = z.strictObject({
+  expectedConnectionId: z.uuid(),
+  startProbeCheck: z.boolean().optional(),
+})
+export type ReadSwitchesRequest = z.infer<typeof ReadSwitchesRequestSchema>
+
 /** One of the machine's home switches as it reads: the axis it homes, the end it sits at. */
 export const HomeSwitchSchema = z.object({
   axis: z.enum(["X", "Y", "Z", "A", "B", "C"]),

@@ -22,10 +22,15 @@ import type {
   PlateAssists,
   PrepareResult,
   PreparedProgram,
+  ProbeCheckBinding,
   Telemetry,
 } from "../contract/index.ts"
 
 export type { FirmwareRules, Identity } from "../contract/index.ts"
+
+export type ExecutionContent =
+  | { kind: "console"; source: string }
+  | { kind: "program" | "resume"; program: PreparedProgram | null }
 
 export type InboundFrame = {
   readonly type: number
@@ -143,7 +148,19 @@ export function prepareResult(
   source: string
 ): PrepareResult {
   try {
-    return { ok: true, program: adapter.prepareProgram(source) }
+    const program = adapter.prepareProgram(source)
+    const assessment = adapter.assessPhysicalProgram?.(source, program)
+    return {
+      ok: true,
+      program: {
+        ...program,
+        physicalExecutionIssue: assessment?.issue ?? null,
+        ...(assessment?.probeCheck
+          ? { probeCheck: assessment.probeCheck }
+          : {}),
+        ...(assessment?.probeDownToLimit ? { probeDownToLimit: true } : {}),
+      },
+    }
   } catch (error) {
     if (!(error instanceof ProgramError)) throw error
     return { ok: false, error: error.message, line: error.line }
@@ -316,6 +333,34 @@ export interface FirmwareAdapter {
   /** The ranges its manual controls accept; commands outside them are refused. */
   readonly limits: ControlLimits
   prepareProgram: (source: string) => PreparedProgram
+  /** Content assessment runs once alongside normalization in the program-preparer worker. */
+  assessPhysicalProgram?: (
+    source: string,
+    program: PreparedProgram
+  ) => {
+    issue: string | null
+    probeCheck?: ProbeCheckBinding
+    probeDownToLimit?: boolean
+  }
+  /** Tools whose contact input is checked at rest; separate from tool-setter calibration. */
+  probeCheckTools?: readonly number[]
+  /** Actual enabled, homed soft limits; probing may bypass the firmware's ordinary limit guard. */
+  probeTravelBounds?: {
+    readonly query: string
+    parse: (text: string) => {
+      min: readonly [number, number, number]
+      max: readonly [number, number, number]
+    } | null
+  }
+  probeContact?: (
+    text: string
+  ) => { position: [number, number, number]; success: boolean } | null
+  /** Constant-time admission for prepared programs; console text is bounded by its contract. */
+  executionIssue?: (
+    input: ExecutionContent & {
+      device: ConnectedDevice | null
+    }
+  ) => string | null
   readonly job: JobProtocol
   /** A fixed firmware configuration file, downloaded and fully verified after a save. */
   readonly configuration?: {

@@ -3,12 +3,17 @@ import { useIsMutating } from "@tanstack/react-query"
 import { Crosshair } from "lucide-react"
 import { toast } from "sonner"
 import { ReasonButton } from "@/components/workspace/reason-button"
+import { Button } from "@/components/ui/button"
+import { kitForSetup } from "@/domain/fixtures/catalog"
 import {
   useFixtureLibrary,
   useFixtureLibraryStore,
 } from "@/app/fixtures/fixture-context"
 import { profileAnchors } from "@/app/fixtures/fixture-library-store"
-import { selectProjectProfile } from "@/app/fixtures/plate-profile"
+import {
+  projectPlacement,
+  selectProjectProfile,
+} from "@/app/fixtures/plate-profile"
 import {
   retryStoredAnchors,
   useStoredAnchorsFailure,
@@ -42,6 +47,7 @@ import { DevicePanel } from "./device-panel"
 import { HeightMapCard } from "./height-map"
 import { useDeviceHeightMap } from "./height-map-dialog"
 import { ReadAnchorsButton } from "./read-anchors-button"
+import { DeviceUsefulTools } from "./device-useful-tools"
 
 /**
  * The machine: connection, controls, camera, anchors, fixtures and the measured height map.
@@ -62,6 +68,8 @@ export function DevicePage() {
     ? profile.anchors
     : (projectProfile.anchors ?? undefined)
   const workspace = useWorkspaceStore()
+  const kit = kitForSetup(projectPlacement(workspace.state, fixtures.state))
+  const calibration = kit.anchorCalibration
   const { map } = useDeviceHeightMap()
   const probeAnchor = useProbeAnchor()
   const storedAnchorsFailure = useStoredAnchorsFailure()
@@ -141,6 +149,12 @@ export function DevicePage() {
     <div className="flex min-h-0 min-w-0 flex-1">
       <DevicePanel
         openPicker={() => openDialog({ kind: "device" })}
+        usefulTools={
+          <DeviceUsefulTools
+            calibrationName={calibration?.name ?? null}
+            probing={!!kit.probing}
+          />
+        }
         fixturePanel={
           <>
             <DeviceConfigurationCard />
@@ -179,6 +193,28 @@ export function DevicePage() {
                 </>
               }
               writing={storesAnchors ? writing : undefined}
+              calibration={
+                <div className="flex flex-wrap gap-2">
+                  {calibration && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => openDialog({ kind: "anchor-calibration" })}
+                    >
+                      Auto calibrate {calibration.name}
+                    </Button>
+                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      openDialog({ kind: "probe-diameter-calibration" })
+                    }
+                  >
+                    Calibrate 3D probe diameter
+                  </Button>
+                </div>
+              }
               storing={
                 available && storesAnchors && deviceId
                   ? {

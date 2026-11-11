@@ -16,7 +16,7 @@ import { useMachineSnapshot } from "@/platform/machine"
 import type { MachineAction } from "./job-hooks"
 import { pauseKey } from "./job-view"
 import type { JobViewOf, ToolRequest } from "./job-view"
-import { MachineActionButton, StageCard } from "./stage-card"
+import { MachineActionButton, StageCard, StopButton } from "./stage-card"
 
 /** Product details worth checking against the tool in hand. */
 function ToolDetails({ tool }: { tool: Tool }) {
@@ -70,12 +70,14 @@ function ToolChangeDialog({
   note,
   operation,
   confirm,
+  stop,
 }: {
   view: JobViewOf<"waiting-tool">
   slot: string | null
   note: string | null
   operation: Operation | null
   confirm: MachineAction
+  stop?: MachineAction
 }) {
   const key = pauseKey(view.job, view.wait)
   const dismissed = useSelector(dismissedAtom) === key
@@ -104,6 +106,7 @@ function ToolChangeDialog({
         </AlertDialogDescription>
         <AlertDialogFooter>
           <AlertDialogCancel>Dismiss</AlertDialogCancel>
+          {stop && <StopButton action={stop} />}
           <MachineActionButton
             action={confirm}
             label="Confirm"
@@ -125,11 +128,13 @@ export function ToolChangePrompt({
   view,
   operation,
   confirm,
+  stop,
 }: {
   view: JobViewOf<"waiting-tool">
   /** The operation the job goes on with after the change; null when unknown. */
   operation: Operation | null
   confirm: MachineAction
+  stop?: MachineAction
 }) {
   const { features } = useMachineSnapshot()
   const atc = features?.atc === true
@@ -166,6 +171,7 @@ export function ToolChangePrompt({
           note={note}
           operation={operation}
           confirm={confirm}
+          stop={stop}
         />
       )}
     </>

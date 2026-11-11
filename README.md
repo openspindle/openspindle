@@ -20,6 +20,7 @@ OpenSpindle is a desktop app for preparing, checking and running jobs on a Maker
 - Playback of the program as the firmware runs it, timed as the Z1's planner would move it by the machine's own limits, with how long it takes and the depth and width of cut
 - The G-code exactly as the machine receives it, and a glossary of the Z1's codes (**Help › G-code Glossary**)
 - A run checklist, upload read-back and large programs sent in parts
+- Guided probing, inspection reports with JSON/CSV export, repeatability measurements, reviewed measurement-to-setup proposals and bounded physical probe positioning/calibration
 - Guided stock/workholding/origin/tool setup, editable facing with a feeds and speeds assistant, reusable local processes and sampled stock-removal playback
 - The job followed live in the 3D view, with the moves ahead, where the probe touches next and the time left
 - Xbox-style gamepad Step jogging and spindle controls, with continuous Direct steering on the simulator ([controls](docs/gamepad-prototype.md))
@@ -28,7 +29,7 @@ OpenSpindle is a desktop app for preparing, checking and running jobs on a Maker
 - A simulated Z1 to try jobs on without a machine, moving as the Z1's planner moves it, its camera picture drawn as the Z1's camera sees the bed (**Settings › General › Z1 Simulator device**)
 - A firmware configuration editor with verified saves, a saved vacuum-power default, and work-light brightness for each appearance with an inactivity timer; the machine's own light timer, which darkens a dimmed light as a job starts, turned off from the Device page
 - A tool library with Fusion 360 import and Makera, Genmitsu, SpeTool, Dreanique and FoxAlien catalogs
-- STEP-NC project files, and NC export with the plate's setup
+- STEP-NC project files with Save/Save As, a centered filename and unsaved-change marker, and NC export with the plate's setup
 - Built-in PCB preparation from KiCad Gerber and Excellon files, using your local pcb2gcode installation
 - Error reports and logs under your control; no account or cloud service
 - An app for Windows, and a signed and notarized app for Apple silicon and Intel Macs, that update themselves
@@ -73,7 +74,7 @@ Machine behaviour follows the source of [Makera's Z1 firmware](https://github.co
 - Stop ending in Alarm
 - programs sent in parts
 
-Importing, previewing and saving projects never send anything to the machine, and Run lives only on the Job tab. The Device tab explicitly saves firmware configuration and vacuum defaults; startup settings take effect after a separate restart. Work-light preferences can adjust brightness while idle and turn the light off after the configured inactivity period. Controls the machine's state does not allow are refused, and a command whose outcome is unknown is never retried. Stop does not replace the machine's emergency stop.
+Importing, previewing and saving projects never send anything to the machine. Machining Run lives on the Job tab; the Anchor 1 calibration guide offers explicit temporary tool-setter and bounded-contact runs with progress, tool-change prompts and Stop, without adding project plates. The Device tab explicitly saves firmware configuration and vacuum defaults; startup settings take effect after a separate restart. Work-light preferences can adjust brightness while idle and turn the light off after the configured inactivity period. Controls the machine's state does not allow are refused, and a command whose outcome is unknown is never retried. Stop does not replace the machine's emergency stop.
 
 If something behaves differently, **Help › Export Protocol Trace…** saves the recent exchange with the machine. Please open an issue with what you saw and the trace.
 

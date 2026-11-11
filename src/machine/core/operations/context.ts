@@ -1,6 +1,13 @@
-import type { Telemetry } from "../../contract/index.ts"
+import type {
+  Telemetry,
+  PreparedProgram,
+  ProbeCheckBinding,
+} from "../../contract/index.ts"
 import { FAILURE_LINES, excerpt } from "../../firmware/adapter.ts"
-import type { FirmwareAdapter } from "../../firmware/adapter.ts"
+import type {
+  FirmwareAdapter,
+  ExecutionContent,
+} from "../../firmware/adapter.ts"
 import type { Admission, AdmissionRequest } from "../admission.ts"
 import { MachineError, abortError } from "../errors.ts"
 import type { Clock } from "../ports.ts"
@@ -18,10 +25,28 @@ export type OperationContext = {
   readonly signal: AbortSignal
   /** A program stream exists (acknowledgements are not ours). */
   readonly streaming: () => boolean
-  /** An owning manual controller can halt before unverified motion is isolated. */
+  /** Currently owned uploaded program, including part additions; null for external playback. */
+  readonly resumeProgram?: () => PreparedProgram | null
+  /** Consumes this connection's one-use verified released/triggered/released input proof. */
+  readonly authorizeProbeCheck?: (binding: ProbeCheckBinding) => void
+  /** Retained tool of a protected contact sequence, fixed at authorization. */
+  readonly probeTool?: number
+  /** An owning manual controller can request a halt before unverified motion is isolated. */
   readonly onUnverifiedMotion?: () => void
   /** Admission against fresh telemetry, ignoring the operation's own activity. */
   readonly admit: (request: AdmissionRequest, telemetry: Telemetry) => Admission
+}
+
+/** Rechecked at execution, independent of renderer checks or cached program preparation. */
+export function requireExecution(
+  context: OperationContext,
+  content: ExecutionContent
+) {
+  const issue = context.adapter.executionIssue?.({
+    ...content,
+    device: context.session.device,
+  })
+  if (issue) throw new MachineError("refused", issue)
 }
 
 /** A status newer than now; nothing is sent to the machine before it arrives. */

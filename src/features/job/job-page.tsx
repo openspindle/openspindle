@@ -24,10 +24,18 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { DeviceCard } from "@/features/prepare/sidebar-header"
 import { MachineDiagnosis } from "@/features/device/machine-diagnosis"
+import {
+  useCalibrationRunRecord,
+  calibrationRunDialog,
+  calibrationRunLabel,
+} from "@/features/device/use-calibration-run"
+import { Button } from "@/components/ui/button"
+import { openDialog, useOpenDialog } from "@/features/shell/dialogs"
 import { MachineConsole } from "./machine-console"
 import { CutFacts } from "./cut-facts"
 import { GCodeListing } from "./gcode-listing"
 import { JobCamera } from "./job-camera"
+import { InspectionReportCard } from "./inspection-report-card"
 import { useJobActions, useRunChecklist, useRunJob } from "./job-hooks"
 import type { MachineAction } from "./job-hooks"
 import { JobSummary } from "./job-stages"
@@ -43,6 +51,9 @@ import { useCutPrediction } from "./use-cut-prediction"
 import { useJobTimeline } from "./use-job-timeline"
 import type { JobTimeline } from "./use-job-timeline"
 import { useJobView } from "./use-job-view"
+import { JobZProbeOption } from "./job-z-probe-option"
+import { zJobIssue } from "./z-probe-job"
+import { kitForPlate } from "@/domain/fixtures/catalog"
 
 /**
  * The job panel: the connected device and the job's controls on top, then its stages from the
@@ -58,6 +69,12 @@ function JobPanel({
   check: ProgramCheck
 }) {
   const actions = useJobActions()
+  const calibrationRun = useCalibrationRunRecord()
+  const dialog = useOpenDialog()
+  const calibrationOpen =
+    !!calibrationRun &&
+    subject?.plate.id === calibrationRun.session.plate.id &&
+    dialog?.kind === calibrationRunDialog(calibrationRun).kind
   const runJob = useRunJob()
   const library = useWorkspace((state) => state.tools)
   // The machine holds the program's first tool: Run may keep it rather than change to it.
@@ -77,7 +94,14 @@ function JobPanel({
     check
   )
   const run: MachineAction = {
-    reason: checklist.blocker,
+    reason:
+      checklist.blocker ??
+      (subject?.plate.setup.probeBeforeRun
+        ? zJobIssue(
+            subject.compiled,
+            kitForPlate(subject.plate).zProbing?.tools ?? []
+          )
+        : null),
     pending: runJob.pending,
     run: () => {
       if (subject && checklist.ready)
@@ -105,19 +129,33 @@ function JobPanel({
       <ScrollArea className="min-h-0 flex-1">
         <div className="flex flex-col gap-3 p-3">
           <JobSummary view={view} subject={subject} />
+          {view.kind === "idle" && subject && (
+            <JobZProbeOption plate={subject.plate} />
+          )}
+          {calibrationRun && (
+            <Button
+              variant="outline"
+              onClick={() => openDialog(calibrationRunDialog(calibrationRun))}
+            >
+              {calibrationRunLabel(calibrationRun)}
+            </Button>
+          )}
           <MachineDiagnosis />
-          <RunStageList
-            view={view}
-            subject={subject}
-            tools={
-              view.kind !== "idle" && view.session
-                ? view.session.tools
-                : library
-            }
-            actions={actions}
-            checklist={checklist}
-            parts={Math.max(1, preparedProgram(check)?.parts.length ?? 1)}
-          />
+          <InspectionReportCard view={view} subject={subject} />
+          {!calibrationOpen && (
+            <RunStageList
+              view={view}
+              subject={subject}
+              tools={
+                view.kind !== "idle" && view.session
+                  ? view.session.tools
+                  : library
+              }
+              actions={actions}
+              checklist={checklist}
+              parts={Math.max(1, preparedProgram(check)?.parts.length ?? 1)}
+            />
+          )}
         </div>
       </ScrollArea>
     </aside>

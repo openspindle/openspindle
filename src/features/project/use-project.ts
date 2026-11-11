@@ -5,6 +5,7 @@ import { useFixtureLibraryStore } from "@/app/fixtures/fixture-context"
 import { profilePlacement } from "@/app/fixtures/fixture-library-store"
 import { useWorkspaceStore } from "@/app/workspace/workspace-context"
 import type { WorkspaceStore } from "@/app/workspace/store"
+import type { WorkspaceState } from "@/domain/workspace/workspace"
 import { libraryOf, openInLibrary } from "@/domain/workspace/library"
 import { plural } from "@/domain/primitives"
 import { projectWorkspace } from "@/formats/project/document"
@@ -24,12 +25,14 @@ import { addProjectModels } from "./project-models"
 import {
   hasUnsavedChanges,
   markProjectSaved,
+  sameProjectContents,
   startNewProject,
 } from "@/app/workspace/project-session"
 
 /** A decoded project, the file it came from and what opening it could not do. */
 export type ProjectCandidate = OpenedProject & {
   readonly fileName: string
+  readonly destinationId?: string
   /**
    * The project's models that the Models library did not take. Empty until `applyProject` adds
    * them: opening one is not final until then, so nothing is added to the library before that.
@@ -51,15 +54,30 @@ export async function applyProject(
   workspace: WorkspaceStore,
   models: ModelStore,
   queryClient: QueryClient,
-  candidate: ProjectCandidate
+  candidate: ProjectCandidate,
+  expected: WorkspaceState = workspace.state
 ) {
+  const ensureUnchanged = () => {
+    if (!sameProjectContents(workspace.state, expected))
+      throw new Error(
+        "The project changed while opening. Open the file again to review replacing those changes."
+      )
+  }
+  ensureUnchanged()
   const notices = await addProjectModels(candidate.document.models, models)
   await queryClient.invalidateQueries({ queryKey: modelKeys.library })
+  ensureUnchanged()
   const opened = openInLibrary(
     projectWorkspace(candidate.document, projectFileName(candidate.fileName)),
     libraryOf(workspace.state)
   )
   workspace.dispatch({ type: "workspace.replace", state: opened.state })
+  if (/\.stpnc$/i.test(candidate.fileName))
+    workspace.dispatch({
+      type: "project.saved",
+      fileName: candidate.fileName,
+      destinationId: candidate.destinationId,
+    })
   markProjectSaved(workspace.state)
   const added = opened.added
     ? `Added ${plural(opened.added, "tool")} its plates use to your tool library.`
@@ -89,12 +107,15 @@ export function useSaveProject() {
   return useMutation({
     mutationKey: [...WORKSPACE_MUTATION, "save-project"],
     scope: workspaceScope,
-    mutationFn: async () => {
+    mutationFn: async (options?: { saveAs?: boolean }) => {
       const state = workspace.state
       const { contents, missing } = await encodeWorkspace(state, host)
       const result = await host.files.save({
         kind: "project",
         suggestedName: suggestedProjectName(state.project.fileName),
+        destinationId: options?.saveAs
+          ? undefined
+          : state.project.fileDestination?.id,
         contents,
       })
       return { result, state, missing }
@@ -104,6 +125,7 @@ export function useSaveProject() {
       workspace.dispatch({
         type: "project.saved",
         fileName: result.fileName,
+        destinationId: result.destinationId,
       })
       markProjectSaved(state)
       const note = missingModelsNote(missing)
@@ -132,7 +154,7 @@ export function useOpenProject() {
     }: {
       file?: File
     }): Promise<ProjectCandidate | null> => {
-      let opened: { fileName: string; contents: string }
+      let opened: { fileName: string; contents: string; destinationId?: string }
       if (file) opened = await readProjectFile(file)
       else {
         const result = await host.files.open("project")
@@ -142,13 +164,18 @@ export function useOpenProject() {
       const decoded = decodeProject(opened.contents)
       if (!decoded.ok) throw new Error(decoded.error)
       // Models are added to the library only once opening is confirmed (applyProject), not here.
-      return { ...decoded.value, notices: [], fileName: opened.fileName }
+      return {
+        ...decoded.value,
+        notices: [],
+        fileName: opened.fileName,
+        destinationId: opened.destinationId,
+      }
     },
     onSuccess: (candidate) => {
       if (!candidate) return
       if (hasUnsavedChanges(workspace.state))
         openDialog({ kind: "open-project", candidate })
-      else apply.mutate(candidate)
+      else apply.mutate({ candidate, expected: workspace.state })
     },
     onError: (error) => toast.error(error.message),
   })
@@ -165,8 +192,14 @@ export function useApplyProject() {
   return useMutation({
     mutationKey: [...WORKSPACE_MUTATION, "apply-project"],
     scope: workspaceScope,
-    mutationFn: (candidate: ProjectCandidate) =>
-      applyProject(workspace, host.models, queryClient, candidate),
+    mutationFn: ({
+      candidate,
+      expected,
+    }: {
+      candidate: ProjectCandidate
+      expected: WorkspaceState
+    }) =>
+      applyProject(workspace, host.models, queryClient, candidate, expected),
     onError: (error) => toast.error(error.message),
   })
 }
@@ -182,11 +215,17 @@ export function useStartNewProject() {
   return useMutation({
     mutationKey: [...WORKSPACE_MUTATION, "new-project"],
     scope: workspaceScope,
-    mutationFn: async () =>
-      startNewProject(workspace, profilePlacement(fixtures.state)),
+    mutationFn: async (expected: WorkspaceState) => {
+      if (!sameProjectContents(workspace.state, expected))
+        throw new Error(
+          "The project changed while waiting. Choose New Project again to review replacing those changes."
+        )
+      return startNewProject(workspace, profilePlacement(fixtures.state))
+    },
     onSuccess: (result) => {
       if (!result.ok) toast.error(result.error)
     },
+    onError: (error) => toast.error(error.message),
   })
 }
 
@@ -196,6 +235,6 @@ export function useNewProject() {
   const start = useStartNewProject()
   return () => {
     if (hasUnsavedChanges(workspace.state)) openDialog({ kind: "new-project" })
-    else start.mutate()
+    else start.mutate(workspace.state)
   }
 }

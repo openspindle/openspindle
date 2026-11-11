@@ -33,7 +33,8 @@ function machineOver(peer: Peer<MachineContract>): MachineHost {
     reset: () => peer.call("machine.reset", undefined),
     prepare: (source) => peer.call("machine.prepare", { source }),
     run: (request) => peer.call("machine.run", request),
-    dismissJob: () => peer.call("machine.dismissJob", undefined),
+    dismissJob: (expectedJobId) =>
+      peer.call("machine.dismissJob", expectedJobId),
     readAnchors: (signal) =>
       peer.call("machine.readAnchors", undefined, signal ? { signal } : {}),
     writeAnchors: (request) => peer.call("machine.writeAnchors", request),
@@ -47,7 +48,7 @@ function machineOver(peer: Peer<MachineContract>): MachineHost {
       peer.call("machine.writeConfiguration", request),
     readHeightMap: (signal) =>
       peer.call("machine.readHeightMap", undefined, signal ? { signal } : {}),
-    readSwitches: () => peer.call("machine.readSwitches", undefined),
+    readSwitches: (request) => peer.call("machine.readSwitches", request),
     watchCamera: (listener) =>
       peer.subscribe("machine.camera", undefined, listener),
     watchConsole: (listener) =>

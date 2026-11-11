@@ -223,6 +223,12 @@ export function GuidedSetup({ onClose }: { onClose: () => void }) {
                 label: "Origin source",
                 value: plate.setup.anchors?.source ?? "Entered setup",
               },
+              {
+                label: "Last measured XY application",
+                value: plate.setup.lastMeasurement
+                  ? `${plate.setup.lastMeasurement.source} · ${plate.setup.lastMeasurement.mode} · ${new Date(plate.setup.lastMeasurement.appliedAt).toLocaleString()}`
+                  : "None",
+              },
             ]}
           />
         )}

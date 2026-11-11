@@ -92,6 +92,7 @@ export const Z_PROBE: ProbingMethod<
   description:
     "The machine's own Z probe touches at a stored anchor, sets work Z there and reports the touch.",
   accepts: ({ touch }) => touch === "z",
+  reportsMeasurements: () => true,
   // The plate decides whether an anchored start can have work coordinates at all, and the
   // operation's settings whether it starts at an anchor.
   blocked: (plate, _machine, params) => {

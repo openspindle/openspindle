@@ -11,6 +11,7 @@ import {
   plateIndex,
   useWorkspaceStore,
 } from "@/app/workspace/workspace-context"
+import { compilePlate } from "@/domain/compile/compile"
 import type { CompiledPlate } from "@/domain/compile/compile"
 import { kitForPlate } from "@/domain/fixtures/catalog"
 import { plateLabel } from "@/domain/plate/plate"
@@ -21,6 +22,7 @@ import { usePlateDesignRuleCheck } from "@/features/design-rules/design-rule-che
 import {
   isFresh,
   isSimulator,
+  isHeightCompensationOff,
   machineId,
   runRules,
   toDisplayName,
@@ -40,11 +42,15 @@ import {
   useRunProgram,
   useSimulateBed,
   useStopMachine,
+  useMachineHost,
 } from "@/platform/machine"
 import { createJobSession, jobSessionStore } from "./job-session"
 import type { ProgramCheck } from "./program-check"
 import { evaluateRunChecklist } from "./run-checklist"
 import type { RunChecklist } from "./run-checklist"
+import { openDialog } from "@/features/shell/dialogs"
+import { zJobIssue, zJobSignature } from "./z-probe-job"
+import type { ZProbeCompletion } from "./z-probe-job"
 
 /** The Run checklist of a plate, against the connected machine. */
 export function useRunChecklist(
@@ -167,6 +173,7 @@ function tipInProgram(plate: Plate, telemetry: Telemetry | null) {
 }
 
 export function useRunJob() {
+  const host = useMachineHost()
   const workspace = useWorkspaceStore()
   const client = useQueryClient()
   const { connection } = useMachineSnapshot()
@@ -174,12 +181,12 @@ export function useRunJob() {
   const configuration = useCachedConfiguration(connection.id)
   const run = useRunProgram()
   const simulateBed = useSimulateBed()
-  /** `keptTool`: the tool the machine holds, kept for the program's first tool change. */
-  const start = (
+  const startCut = (
     plate: Plate,
     compiled: CompiledPlate,
     library: readonly Tool[],
-    keptTool: number | null
+    keptTool: number | null,
+    completion?: ZProbeCompletion
   ) => {
     const live = client.getQueryData<MachineSnapshot>(machineKeys.snapshot)
     if (
@@ -201,12 +208,29 @@ export function useRunJob() {
       keptTool
     )
     const runPlate = () => {
-      const session = createJobSession(plate, label, compiled, library, plan)
+      const session = createJobSession(
+        plate,
+        label,
+        compiled,
+        library,
+        plan,
+        device
+      )
       jobSessionStore.actions.begin(session)
       run.mutate(
         {
           id: session.runId,
           name: toDisplayName(label, "Plate"),
+          expectedConnectionId: connection.id ?? undefined,
+          ...(completion
+            ? {
+                zReference: {
+                  tool: completion.tool,
+                  toolOffset: completion.offset,
+                  originZ: completion.originZ,
+                },
+              }
+            : {}),
           source: compiled.program.source,
           assists: plate.setup.assists,
           ...(keptTool !== null && { keepTool: true }),
@@ -221,6 +245,75 @@ export function useRunJob() {
       return
     }
     simulateBed.mutate(bed, { onSuccess: runPlate, onError: report })
+  }
+  const start = async (
+    plate: Plate,
+    compiled: CompiledPlate,
+    library: readonly Tool[],
+    keptTool: number | null = null,
+    completion?: ZProbeCompletion
+  ) => {
+    try {
+      if (plate.setup.probeBeforeRun) {
+        const issue = zJobIssue(
+          compiled,
+          kitForPlate(plate).zProbing?.tools ?? []
+        )
+        if (issue) throw new Error(issue)
+        const signature = zJobSignature(plate, compiled, library)
+        if (!completion) {
+          if (!connection.id)
+            throw new Error("Connect the job's machine first.")
+          openDialog({
+            kind: "z-probe",
+            job: { plateId: plate.id, signature, connectionId: connection.id },
+          })
+          return
+        }
+        const fresh = await host.snapshot()
+        const current = workspace.state.plates.find(
+          (entry) => entry.id === plate.id
+        )
+        const t = fresh.telemetry
+        if (
+          !current ||
+          zJobSignature(
+            current,
+            compilePlate(current, workspace.state.tools),
+            workspace.state.tools
+          ) !== signature ||
+          signature !== completion.signature ||
+          fresh.connection.id !== completion.connectionId ||
+          connection.id !== completion.connectionId ||
+          Date.now() - completion.at > 120000 ||
+          fresh.job ||
+          !fresh.availability.run.allowed ||
+          fresh.availability.run.deferred ||
+          !isFresh(t, Date.now()) ||
+          t.state !== "Idle" ||
+          t.job !== null ||
+          t.tool !== completion.tool ||
+          t.toolOffset !== completion.offset ||
+          !t.workOrigin ||
+          Math.abs(t.workOrigin.z - completion.originZ) > 0.001 ||
+          t.spindleRpm !== 0 ||
+          t.spindleOn === true ||
+          !isHeightCompensationOff(t)
+        )
+          throw new Error(
+            "The cutting job, connection or measured Z reference changed. Press Run and probe Z again; nothing was started."
+          )
+      }
+      startCut(
+        plate,
+        compiled,
+        library,
+        completion ? null : keptTool,
+        completion
+      )
+    } catch (error) {
+      report(error instanceof Error ? error : new Error(String(error)))
+    }
   }
   return { start, pending: run.isPending || simulateBed.isPending }
 }

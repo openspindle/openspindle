@@ -12,9 +12,15 @@ import type { ProbeProfile, Tool } from "@/domain/tools/tool"
 import { isProbeSlot } from "@/domain/tools/tool-table"
 
 /** What a probe senses and carries, in a few words: "Touches Z · laser pointer". */
-export function profileText({ touch, pointer }: ProbeProfile): string {
+export function profileText({ touch, pointer, contact }: ProbeProfile): string {
   const touches = touch === "xyz" ? "Touches X Y Z" : "Touches Z"
-  return pointer ? `${touches} · laser pointer` : touches
+  return [
+    touches,
+    pointer && "laser pointer",
+    contact === "conductive" && "conductive rod",
+  ]
+    .filter(Boolean)
+    .join(" · ")
 }
 
 /**

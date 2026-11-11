@@ -45,6 +45,40 @@ export function parseDroppedLine(text: string): number | null {
   return match ? Number(match[1]) + 1 : null
 }
 
+/** Robot's read-only M211 report; disabled, unhomed or incomplete bounds are not evidence. */
+export function parseProbeTravelBounds(
+  text: string
+): { min: [number, number, number]; max: [number, number, number] } | null {
+  if (
+    !/^Soft endstops are Enabled,/.test(text) ||
+    /disabled|not homed/i.test(text)
+  )
+    return null
+  const min = [0, 0, 0] as [number, number, number]
+  const max = [0, 0, 0] as [number, number, number]
+  for (const [index, axis] of ["X", "Y", "Z"].entries()) {
+    for (const [key, values] of [
+      ["min", min],
+      ["max", max],
+    ] as const) {
+      const found = [
+        ...text.matchAll(
+          new RegExp(
+            `,${axis} ${key} = ([+-]?(?:\\d+(?:\\.\\d*)?|\\.\\d+))(?=,|$)`,
+            "g"
+          )
+        ),
+      ]
+      if (found.length !== 1) return null
+      const value = Number(found[0][1])
+      if (!Number.isFinite(value) || Math.abs(value) > 10000) return null
+      values[index] = value
+    }
+    if (min[index] >= max[index]) return null
+  }
+  return { min, max }
+}
+
 /** Endstops G28.6: "X:1 Y:1 Z:1 ..." optionally followed by its acknowledgement. */
 export function parseHomedReport(
   text: string

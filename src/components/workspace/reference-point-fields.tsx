@@ -1,4 +1,4 @@
-import { useId } from "react"
+import { useId, useRef } from "react"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { OptionSelect } from "@/components/option-select"
 import { CoordinateInput } from "./coordinate-input"
@@ -31,6 +31,7 @@ export function ReferencePointFields({
   disabled,
   onReferenceChange,
   onPointChange,
+  onDraftValidityChange,
 }: {
   /** What the point is, as accessible names say it: "{label} relative to", "{label} X". */
   label: string
@@ -44,9 +45,11 @@ export function ReferencePointFields({
   disabled?: boolean
   onReferenceChange: (reference: string) => void
   onPointChange: (point: ReferencePoint) => void
+  onDraftValidityChange?: (ready: boolean) => void
 }) {
   const id = useId()
   const axes = references.find((item) => item.value === reference)?.axes ?? []
+  const drafts = useRef<Partial<Record<MeasurementAxis, boolean>>>({})
   const set = (axis: MeasurementAxis, value: number | undefined) => {
     const next = { ...point }
     if (value === undefined) delete next[axis]
@@ -69,7 +72,11 @@ export function ReferencePointFields({
             options={references}
             value={reference}
             disabled={disabled}
-            onValueChange={onReferenceChange}
+            onValueChange={(next) => {
+              drafts.current = {}
+              onDraftValidityChange?.(true)
+              onReferenceChange(next)
+            }}
           />
         </Field>
       )}
@@ -77,7 +84,7 @@ export function ReferencePointFields({
         <FieldGroup className="gap-3">
           {axes.map((axis) => (
             <CoordinateInput
-              key={axis}
+              key={onDraftValidityChange ? `${reference}:${axis}` : axis}
               axis={axis}
               unit="mm"
               label={`${label} ${axis}`}
@@ -85,6 +92,16 @@ export function ReferencePointFields({
               disabled={disabled || locks[axis] !== undefined}
               title={locks[axis]}
               onCommit={(value) => set(axis, value)}
+              onDraftValidityChange={
+                onDraftValidityChange
+                  ? (ready) => {
+                      drafts.current[axis] = ready
+                      onDraftValidityChange(
+                        axes.every((item) => drafts.current[item] !== false)
+                      )
+                    }
+                  : undefined
+              }
               onClear={
                 optional.includes(axis) ? () => set(axis, undefined) : undefined
               }

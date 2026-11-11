@@ -35,6 +35,12 @@ export type FirmwareSetup = {
    * one kept at Run. Absent, it holds none the program knows.
    */
   readonly tool?: number
+  /** A protected near-surface program must be previewed from its checked start, not home. */
+  readonly fixedStart?: boolean
+  /** A program that retains an already measured tool instead of changing it. */
+  readonly initialTool?: number
+  /** Radius used for explicit side searches by that probe; absent for ordinary raw G38. */
+  readonly probeRadius?: number
 }
 
 /**

@@ -1,5 +1,15 @@
 # Workspace model
 
+## Actions at a picked Prepare point
+
+Right-click a shown model surface in Prepare to capture its bed X/Y/Z, excluding the display spacing between plates. Nearby setup points snap only at the visible surface height, avoiding a hidden bottom corner replacing a top pick. These coordinates describe the model; they are not physical measurements.
+
+With **Move** enabled, right-click a stock corner and choose **Move stock point to → Anchor 1 / Anchor 2** (or another stored anchor). The picked stock point moves onto that anchor in X/Y; stock Z stays unchanged and the design follows the stock. The stock is then kept relative to that anchor. This is one undoable model edit and moves no machine axes.
+
+Outside Move mode, **Probe at point…** opens a right sidebar. **Probe part Z here…** opens the bounded Z guide with the picked XY target. Its explicit **Move to point and probe Z** action retracts, moves to that XY using probe-aware transits, then probes downward from the raised height. It requires a measured probe, live signal verification, registered anchors and a confirmed clear route. Model Z and manual XY positioning are not required; the contacts measure the actual top. Boss, pocket and corner choices create reviewed probing drafts using the existing settings and probe library. Compatible model targets infer the corner and approximate start; top searches suggest a start 5 mm above the model, and a recognized hole can suggest a below-rim pocket start. Review start height, reference size, full-tip clearance and probe diameter before adding a draft. Native corner/center drafts remain simulator-only under the physical bounded-probing policy; creation does not run them.
+
+**Jog to point** opens the separate, probe-only positioning guide for a retract-first XY move or a slow Z approach to model height plus 5 mm. Both require a measured probe, verified live signal and explicit physical setup/risk confirmation. See [Device controls](device-controls.md#positioning-from-a-picked-point).
+
 The workspace is what the user works on: plates, the tool and stock libraries, measured height maps, the project's device, rule settings and name. It is plain immutable data (`WorkspaceState`, `src/domain/workspace/workspace.ts`) changed only by commands. Code: `src/domain/**`.
 
 All plates share one project device (`WorkspaceProject.profile`). Device selection changes that project target in a workspace command, and every existing, new and imported plate follows it. Bed setups and placed fixtures can differ between plates. Saved projects and reload snapshots retain the project target; older projects infer it from their first plate. Applying commands enforces this invariant, including after Undo and import. Prepare has no per-plate device selector.

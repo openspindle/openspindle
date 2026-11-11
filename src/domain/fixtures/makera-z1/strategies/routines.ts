@@ -206,6 +206,7 @@ export const ROUTINES: ProbingMethod<"origin", OriginParams, OriginSpecs> = {
   description:
     "The machine's own probing cycle finds the corner or center with the 3D probe, sets the work origin there and reports each contact.",
   accepts: ({ touch }) => touch === "xyz",
+  reportsMeasurements: () => true,
   refuses: (tool, number) => {
     const ball = ballOf(tool, `${tool.name} in ${toolNumberText(number)}`)
     return ball.ok ? null : ball.error

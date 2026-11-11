@@ -12,7 +12,10 @@ import {
 } from "@/components/ui/empty"
 import { describeProblems } from "@/app/workspace/import-files"
 import { useOpenProject } from "@/features/project/use-project"
-import { isProjectFileName } from "@/features/project/project-file"
+import {
+  isProjectFileName,
+  rememberOpenedProject,
+} from "@/features/project/project-file"
 import type { OpenedFiles } from "@/platform/contract/files"
 import { useHost } from "@/platform/host-context"
 import { useOpenDialog } from "./dialogs"
@@ -57,7 +60,14 @@ function useOpenedFiles(take: (files: File[]) => void) {
     if (problems.length) toast.error(describeProblems(problems))
     if (!files.length) return
     void navigate({ to: "/prepare" })
-    take(files.map((file) => new File([file.contents], file.fileName)))
+    take(
+      files.map((file) =>
+        rememberOpenedProject(
+          new File([file.contents], file.fileName),
+          file.destinationId
+        )
+      )
+    )
   })
   useEffect(() => host.files.subscribeOpened((files) => opened(files)), [host])
 }

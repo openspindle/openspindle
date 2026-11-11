@@ -173,9 +173,14 @@ export function buildApplicationMenu(
         },
         { type: "separator" },
         {
-          label: "Save Project…",
+          label: "Save Project",
           accelerator: "CmdOrCtrl+S",
           click: () => bus.emit("project.save"),
+        },
+        {
+          label: "Save Project As…",
+          accelerator: "Shift+CmdOrCtrl+S",
+          click: () => bus.emit("project.saveAs"),
         },
         ...fileExtras,
       ],

@@ -132,6 +132,9 @@ export function useWorkspaceMenu() {
       case "project.save":
         saveProject.mutate()
         return
+      case "project.saveAs":
+        saveProject.mutate({ saveAs: true })
+        return
       case "edit.undo":
         stepHistory("undo")
         return

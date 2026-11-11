@@ -30,6 +30,9 @@ export class UnsavedChanges {
     if (edited) this.approved = false
     // macOS marks the close button of a window with unsaved changes.
     this.window()?.setDocumentEdited(edited)
+    this.window()?.setTitle(
+      `${!name || edited ? "*" : ""}${name || "Untitled"} — OpenSpindle`
+    )
   }
 
   /** Closes the window without asking about its changes again: they were saved. */
@@ -50,7 +53,7 @@ export class UnsavedChanges {
       buttons: ["Save…", "Don't Save", "Cancel"],
       defaultId: 0,
       cancelId: 2,
-      message: `Do you want to save the changes to “${this.name}”?`,
+      message: `Do you want to save the changes to “${this.name || "Untitled"}”?`,
       detail:
         "OpenSpindle starts with a new project next time, so changes you don't save are lost.",
     })

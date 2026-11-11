@@ -47,6 +47,8 @@ const Z1 = {
   search: -108,
   /** Where a manual tool change waits, from anchor 1: `toolrack_offset_x` + 132 and `_y`. */
   change: [48.78 + 132, 179.74],
+  /** The tool setter, from anchor 1 (`fill_cali_scripts` on the Z1 and Z1 Pro). */
+  setter: SETTER_FROM_ANCHOR,
   /**
    * `default_seek_rate` and `default_feed_rate`: G0, and G1 before any F. A machine's
    * configuration may set others, which its motion limits hold.
@@ -234,6 +236,7 @@ class Z1Preview implements GCodeFirmware {
   readonly initialAbsolute?: boolean
   private readonly frame: Z1Frame
   private active: number | null = null
+  private readonly probeRadius: number
 
   constructor(setup: FirmwareSetup) {
     this.frame = new Z1Frame(setup)
@@ -241,6 +244,11 @@ class Z1Preview implements GCodeFirmware {
     this.initialUnits = setup.units
     this.initialAbsolute = setup.absolute
     this.active = setup.tool ?? null
+    this.probeRadius = setup.probeRadius ?? 0
+    if (setup.initialTool !== undefined) {
+      this.initialStatus = holding(setup.initialTool)
+      this.active = setup.initialTool
+    }
   }
 
   handles(letter: "G" | "M", code: number) {
@@ -316,6 +324,24 @@ class Z1Preview implements GCodeFirmware {
       words.get("Z") ?? 0,
     ]
     if (delta.every((distance) => distance === 0)) return { moves: [] }
+    if (block.gCodes.some((code) => code === 38.4 || code === 38.5)) {
+      // Release stops on the input opening, not on a solid ahead. Show its
+      // maximum travel conservatively; physical release is verified by the host.
+      moves.to(moves.at.map((value, axis) => value + delta[axis]) as Point3, {
+        rapid: false,
+        feed: words.get("F") ?? Z1.grid.slow,
+        probing: true,
+      })
+      return { moves: moves.list }
+    }
+    if (this.probeRadius > 0 && !delta[2] && !!delta[0] !== !!delta[1]) {
+      const axis = delta[0] ? 0 : 1
+      this.sideSearch(moves, axis, delta[axis], null, this.probeRadius, {
+        rapid: false,
+        feed: words.get("F") ?? Z1.grid.slow,
+      })
+      return { moves: moves.list }
+    }
     this.search(moves, delta, {
       rapid: false,
       feed: words.get("F") ?? Z1.grid.slow,

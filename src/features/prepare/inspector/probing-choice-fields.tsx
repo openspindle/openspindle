@@ -43,6 +43,7 @@ import {
   strandedBy,
   strandedText,
 } from "@/features/probing/probe-tools"
+import { ProbeTipDiameterField } from "@/features/probing/probe-tip-diameter-field"
 
 const ROW = "grid grid-cols-2 items-center gap-3"
 
@@ -235,6 +236,7 @@ export function ProbingChoiceFields({
           </SelectContent>
         </Select>
       </Field>
+      {tool && <ProbeTipDiameterField tool={tool} />}
     </FieldGroup>
   )
 }

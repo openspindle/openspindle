@@ -298,6 +298,7 @@ export function PlacementFields({
   height = false,
   action,
   pick = null,
+  onDraftValidityChange,
 }: {
   placement: ProbingField<ProbePlacement>
   anchors: readonly ProbingAnchorOption[]
@@ -314,6 +315,7 @@ export function PlacementFields({
     placement: ProbePlacement,
     setPlacement: (next: ProbePlacement) => void
   ) => ReactNode
+  onDraftValidityChange?: (ready: boolean) => void
 }) {
   const anchorAxes = height ? AXES : PLANAR_AXES
   return placement(({ value, onChange: setPlacement }) => {
@@ -369,6 +371,7 @@ export function PlacementFields({
             }
             optional={HEIGHT_AXES}
             disabled={disabled}
+            onDraftValidityChange={onDraftValidityChange}
             onReferenceChange={(reference) => {
               if (reference === PROBE_POSITION) {
                 if (value.kind === "anchor") setLastAnchor(value)

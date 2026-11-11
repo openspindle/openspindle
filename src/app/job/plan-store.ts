@@ -82,6 +82,8 @@ function placedOf(
   start: Point3 | null = null,
   tool: number | null = null
 ): Placed {
+  const initial = firmwareSetup(plate, kit)
+  if (initial.fixedStart) start = null
   const setup = setupOf(plate, kit, start, tool)
   const key = `${kit.id}\n${setup}`
   const placed = placements.get(program) ?? new Map<string, Placed>()
@@ -97,7 +99,7 @@ function placedOf(
       program.source,
       program.name,
       firmware.preview({
-        ...firmwareSetup(plate, kit),
+        ...initial,
         ...(start && { start }),
         ...(tool !== null && { tool }),
       })

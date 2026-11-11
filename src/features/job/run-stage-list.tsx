@@ -35,6 +35,8 @@ import { placementHeight } from "@/domain/probing/placement"
 import { outlineTarget } from "@/domain/probing/tasks/outline/params"
 import { itemEdges, sameEdge } from "@/domain/plate/item-edges"
 import { kitForPlate } from "@/domain/fixtures/catalog"
+import { bossDiameterReading } from "@/domain/probing/probe-calibration"
+import { anchorCalibrationIssue } from "@/domain/anchors/calibration"
 import { methodFor } from "@/domain/probing/strategies"
 import {
   PROBE_3D_TOOL,
@@ -49,6 +51,7 @@ import type {
   JobState,
 } from "@/machine/contract"
 import type { Tool } from "@/domain/tools/tool"
+import type { InspectionReport } from "@/formats/inspection"
 import { cn } from "@/lib/utils"
 import {
   HeightMapFacts,
@@ -68,6 +71,7 @@ import type { JobSubject, JobView } from "./job-view"
 import { PausePrompt } from "./pause-prompt"
 import { RunChecklistCard } from "./run-checklist-card"
 import { SaveAsAnchor } from "./save-as-anchor"
+import { inspectionReport } from "./inspection-report"
 import type { RunChecklist } from "./run-checklist"
 import { useReadAnchorsFix } from "@/features/prepare/quick-fix"
 import { runStages } from "./run-stages"
@@ -197,6 +201,8 @@ function operationSummary(
       return `Traces ${names.join(", ")} with the probe's pointer.`
     }
     case "origin": {
+      if (probing.diameterCalibration)
+        return "Measures the known-width boss with six bounded contacts, using the checked manually positioned start. Sets work Z0 on its top and keeps work X0 at the manual center."
       const { placement } = probing.params
       const height = placementHeight(placement)
       const z = height !== undefined && (
@@ -402,7 +408,8 @@ function operationResults(
   stage: OperationStage,
   subject: JobSubject,
   tools: readonly Tool[],
-  settings: OperationSettings | undefined
+  settings: OperationSettings | undefined,
+  report: InspectionReport | null
 ): { description: ReactNode; details: ReactNode } {
   const { operation, surface, grid, contacts, status } = stage
   const facts: Fact[] = []
@@ -421,10 +428,62 @@ function operationResults(
     source.task === "origin" &&
     ball !== null
   ) {
-    const probed = probe3dFacts(source.params, ball, contacts, status)
-    description = probed.description
-    facts.push(...probed.facts)
-    found = probed.found
+    const feature = report?.features.find(
+      (item) => item.operationId === operation.id
+    )
+    const missing = report?.missing.find(
+      (item) => item.operationId === operation.id
+    )
+    if (feature?.status === "complete") {
+      const probed = probe3dFacts(source.params, ball, contacts, status)
+      if (source.diameterCalibration) {
+        found = null
+        facts.push(...probed.facts.filter((fact) => fact.label !== "Boss"))
+        try {
+          const reading = bossDiameterReading(
+            contacts.contacts,
+            source.diameterCalibration.width
+          )
+          description =
+            "Completed bounded known-width calibration contacts. Work X0 remains at the manually positioned center; work Z0 is on the touched top. Collect this reading in the diameter guide."
+          facts.push(
+            {
+              label: "Known reference width",
+              value: `${mm(source.diameterCalibration.width)} mm`,
+            },
+            { label: "Contact span", value: `${mm(reading.span)} mm` },
+            {
+              label: "Effective X diameter",
+              value: `${mm(reading.diameter)} mm`,
+            }
+          )
+        } catch (error) {
+          description =
+            error instanceof Error
+              ? error.message
+              : "Calibration contacts could not be verified."
+        }
+      } else {
+        description = probed.description
+        facts.push(...probed.facts)
+        found = probed.found
+      }
+      if (
+        source.anchorCalibration &&
+        anchorCalibrationIssue(
+          source,
+          subject.plate.setup,
+          kitForPlate(subject.plate)
+        )
+      )
+        found = null
+    } else {
+      description =
+        missing?.reason ??
+        feature?.problem ??
+        "Measurement attribution is unconfirmed."
+      facts.push({ label: "Contacts", value: String(contacts.contacts.length) })
+    }
   }
   if (surface) {
     const [x, y, z] = surface.machine
@@ -484,7 +543,15 @@ function operationResults(
         {settings && <OperationSettingsRow settings={settings} />}
         {facts.length > 0 && <HeightMapFacts facts={facts} />}
         {grid && <HeightMapGrid map={gridMap(grid)} compact />}
-        {found && <SaveAsAnchor position={found} plate={subject.plate} />}
+        {found && source.kind === "probing" && source.task === "origin" && (
+          <SaveAsAnchor
+            position={found}
+            plate={subject.plate}
+            deviceId={subject.device?.id ?? null}
+            calibration={source.anchorCalibration}
+            measurementRunId={report?.jobId}
+          />
+        )}
       </>
     ),
   }
@@ -495,17 +562,20 @@ function OperationItem({
   subject,
   tools,
   settings,
+  report,
 }: {
   stage: OperationStage
   subject: JobSubject
   tools: readonly Tool[]
   settings: OperationSettings | undefined
+  report: InspectionReport | null
 }) {
   const { description, details } = operationResults(
     stage,
     subject,
     tools,
-    settings
+    settings,
+    report
   )
   return (
     <StageItem
@@ -525,15 +595,19 @@ function RunningOperation({
   subject,
   tools,
   settings,
+  report,
 }: {
   view: Extract<JobView, { kind: "running" }>
   stage: OperationStage | null
   subject: JobSubject | null
   tools: readonly Tool[]
   settings: OperationSettings | undefined
+  report: InspectionReport | null
 }) {
   const results =
-    stage && subject ? operationResults(stage, subject, tools, settings) : null
+    stage && subject
+      ? operationResults(stage, subject, tools, settings, report)
+      : null
   return (
     <StageCard
       title={stage?.operation.name ?? "Running"}
@@ -561,6 +635,7 @@ function CurrentStage({
   tools,
   settings,
   actions,
+  report,
 }: {
   view: JobView
   stage: OperationStage | null
@@ -568,6 +643,7 @@ function CurrentStage({
   tools: readonly Tool[]
   settings: OperationSettings | undefined
   actions: JobActions
+  report: InspectionReport | null
 }) {
   switch (view.kind) {
     case "running":
@@ -578,6 +654,7 @@ function CurrentStage({
           subject={subject}
           tools={tools}
           settings={settings}
+          report={report}
         />
       )
     case "waiting-tool":
@@ -654,6 +731,7 @@ export function RunStageList({
   parts: number
 }) {
   const stages = runStages(view, subject)
+  const report = inspectionReport(view)
   const settings = useOperationSettings(subject)
   const readAnchors = useReadAnchorsFix(subject?.plate.id ?? null)
   let transferDescription =
@@ -684,6 +762,7 @@ export function RunStageList({
         currentStage ? settings?.get(currentStage.operation.id) : undefined
       }
       actions={actions}
+      report={report}
     />
   ) : null
   return (
@@ -727,6 +806,7 @@ export function RunStageList({
                 subject={subject}
                 tools={tools}
                 settings={settings?.get(stage.operation.id)}
+                report={report}
               />
             )}
           </li>

@@ -253,6 +253,8 @@ export const ProbeProfileSchema = z.object(
     touch: z.enum(["z", "xyz"], "must be z or xyz."),
     /** Whether it carries a laser pointer, which traces without touching. */
     pointer: z.boolean("must be true or false."),
+    /** Conductive rods close a circuit through the reference instead of deflecting a switch. */
+    contact: z.enum(["mechanical", "conductive"]).nullable().optional(),
   },
   "must be an object or unknown."
 )

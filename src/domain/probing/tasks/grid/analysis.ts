@@ -233,6 +233,13 @@ function surfaceFit(samples: readonly HeightSample[]): SurfaceFit | null {
   }
 }
 
+/** Inspection estimate using every measured sample, without removing outliers. */
+export function sampledSurfaceFit(
+  heights: HeightMap["heights"]
+): SurfaceFit | null {
+  return surfaceFit(measuredSamples(heights))
+}
+
 /** One-based, as the review panel labels rows and columns. */
 const positionText = ({ row, column }: GridPosition) =>
   `row ${row + 1}, column ${column + 1}`

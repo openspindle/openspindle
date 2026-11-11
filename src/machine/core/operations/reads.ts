@@ -3,6 +3,7 @@ import type {
   AnchorConfiguration,
   HeightMap,
   SwitchReport,
+  Telemetry,
 } from "../../contract/index.ts"
 import { FAILURE_LINES, excerpt } from "../../firmware/adapter.ts"
 import type { AddedSlot } from "../../firmware/adapter.ts"
@@ -272,8 +273,9 @@ export async function readHeightMap(
 
 /** The machine's switches as it reads them now (`FirmwareAdapter.switches`): it changes nothing. */
 export async function readSwitches(
-  context: OperationContext
-): Promise<SwitchReport> {
+  context: OperationContext,
+  onStart?: (before: Telemetry) => void
+): Promise<{ report: SwitchReport; before: Telemetry; after: Telemetry }> {
   const { session, adapter, clock, signal } = context
   const switches = adapter.switches
   if (!switches)
@@ -286,6 +288,7 @@ export async function readSwitches(
     "Timed out waiting for fresh device status. The switches were not read."
   )
   requireAdmission(context, { key: "readSwitches" }, before)
+  onStart?.(before)
   let report: Omit<SwitchReport, "at"> | null = null
   const response = session.request<Omit<SwitchReport, "at">>(
     [switches.query],
@@ -294,10 +297,25 @@ export async function readSwitches(
       const { kind, text } = event.line
       const parsed = switches.parse(text)
       if (parsed) {
+        if (report)
+          return {
+            fail: new MachineError(
+              "unverified",
+              "Duplicate or ambiguous switch reports. The probe signal check was not accepted."
+            ),
+          }
         report = parsed
         return "consumed"
       }
-      if (kind === "ack" && report) return { done: report }
+      if (kind === "ack") {
+        if (report) return { done: report }
+        return {
+          fail: new MachineError(
+            "unverified",
+            "The switch read was acknowledged without a switch report."
+          ),
+        }
+      }
       if (FAILURE_LINES.has(kind))
         return {
           fail: new MachineError(
@@ -314,6 +332,10 @@ export async function readSwitches(
     }
   )
   const read = await response
+  const after = await freshStatus(
+    context,
+    "No fresh device status after the switch read. The probe signal check was not accepted."
+  )
   session.drainFor(DRAIN_MS)
-  return { ...read, at: clock.now() }
+  return { report: { ...read, at: clock.now() }, before, after }
 }

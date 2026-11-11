@@ -32,7 +32,8 @@ export function createMachineHandlers(
       "machine.reset": () => machine(() => gateway.reset()),
       "machine.prepare": (input) => machine(() => gateway.prepare(input)),
       "machine.run": (request) => machine(() => gateway.run(request)),
-      "machine.dismissJob": () => machine(() => gateway.dismissJob()),
+      "machine.dismissJob": (expectedJobId) =>
+        machine(() => gateway.dismissJob(expectedJobId)),
       "machine.readAnchors": (_params, { signal }) =>
         machine(() => gateway.readAnchors(signal)),
       "machine.writeAnchors": (request) =>
@@ -43,7 +44,8 @@ export function createMachineHandlers(
         machine(() => gateway.writeConfiguration(request)),
       "machine.readHeightMap": (_params, { signal }) =>
         machine(() => gateway.readHeightMap(signal)),
-      "machine.readSwitches": () => machine(() => gateway.readSwitches()),
+      "machine.readSwitches": (request) =>
+        machine(() => gateway.readSwitches(request)),
       "machine.protocolTrace": () => formatTrace(gateway.protocolTrace()),
     },
     events: {

@@ -935,6 +935,17 @@ export class SimulatedZ1 {
       this.ok(text)
       return
     }
+    if (code === "M211") {
+      const bounds = z1WorkBounds(this.anchor1)
+      const unhomed = this.homed
+        ? ""
+        : ",X axis is not homed,Y axis is not homed,Z axis is not homed"
+      this.lines(
+        `Soft endstops are Enabled,X min = ${bounds.min[0].toFixed(3)},X max = ${bounds.max[0].toFixed(3)},Y min = ${bounds.min[1].toFixed(3)},Y max = ${bounds.max[1].toFixed(3)},Z min = ${MACHINE_Z.min.toFixed(3)},Z max = ${MACHINE_Z.max.toFixed(3)}${unhomed}`
+      )
+      this.ok(text)
+      return
+    }
     if (this.halted && !/^\$H\b|^\$X\b/.test(code)) {
       this.lines("error:Alarm lock")
       return

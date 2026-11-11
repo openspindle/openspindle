@@ -3,6 +3,7 @@ import {
   expectAcknowledgement,
   freshStatus,
   requireAdmission,
+  requireExecution,
 } from "./context.ts"
 import type { OperationContext } from "./context.ts"
 
@@ -21,11 +22,13 @@ export async function sendConsoleLine(
   line: string
 ): Promise<void> {
   const { session, adapter } = context
+  requireExecution(context, { kind: "console", source: line })
   const before = await freshStatus(
     context,
     "Timed out waiting for fresh device status. The line was not sent."
   )
   requireAdmission(context, { key: "console" }, before)
+  requireExecution(context, { kind: "console", source: line })
   const reply = expectAcknowledgement(context, "the line", CONSOLE_REPLY_MS)
   session.send(adapter.consoleLine(line))
   session.requestStatus(true)

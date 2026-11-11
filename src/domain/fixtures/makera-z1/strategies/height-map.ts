@@ -154,6 +154,10 @@ export const HEIGHT_MAP: ProbingMethod<"grid", GridParams, GridSpecs> = {
   description:
     "The machine probes the grid itself, reports the height map and compensates later cuts for it.",
   accepts: ({ touch }) => touch === "z",
+  reportsMeasurements: (params, plate) => {
+    const plan = planGrid(params, placementContext(plate), GRID_PARAMETERS)
+    return plan.ok && plan.start.kind === "anchor" && plan.start.work !== null
+  },
   parameters: () => GRID_PARAMETERS,
   defaults: plateGridParams,
   generate: ({ params, plate, probe, machine }) => {

@@ -18,6 +18,7 @@ import { LoadIssuesDialog } from "@/features/workspace-load/load-issues-dialog"
 import { useSaveErrors } from "@/features/workspace-load/use-save-errors"
 import type { Host } from "@/platform/host"
 import { useMachineSync } from "@/platform/machine"
+import { useCalibrationRunRecovery } from "@/features/device/use-calibration-run"
 
 export type RouterContext = {
   readonly host: Host
@@ -33,6 +34,7 @@ function RootLayout() {
   useMachineSync()
   // Where this window's Run is, followed whichever page is open.
   useJobTrackingSync()
+  useCalibrationRunRecovery()
   useUnsavedChanges()
   // Menu commands and their dialogs work on every page.
   useWorkspaceMenu()

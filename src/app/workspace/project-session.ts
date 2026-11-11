@@ -38,6 +38,19 @@ const baselineOf = (state: WorkspaceState): Baseline => ({
   profile: state.project.profile,
 })
 
+const sameBaseline = (a: Baseline, b: Baseline): boolean =>
+  a.plates === b.plates &&
+  a.heightMaps === b.heightMaps &&
+  a.ruleSettings === b.ruleSettings &&
+  a.profile === b.profile &&
+  a.name === b.name
+
+/** Project contents are unchanged; selection and the separately persisted libraries may differ. */
+export const sameProjectContents = (
+  a: WorkspaceState,
+  b: WorkspaceState
+): boolean => sameBaseline(baselineOf(a), baselineOf(b))
+
 /** The workspace now matches its project: saved, opened, or the new one the app starts with. */
 export function markProjectSaved(state: WorkspaceState) {
   baselineAtom.set(() => baselineOf(state))
@@ -79,14 +92,7 @@ export function hasUnsavedChanges(state: WorkspaceState): boolean {
   const baseline = baselineAtom.get()
   if (!baseline) return false
   if (baseline === "edited") return true
-  const current = baselineOf(state)
-  return (
-    current.plates !== baseline.plates ||
-    current.heightMaps !== baseline.heightMaps ||
-    current.ruleSettings !== baseline.ruleSettings ||
-    current.profile !== baseline.profile ||
-    current.name !== baseline.name
-  )
+  return !sameBaseline(baselineOf(state), baseline)
 }
 
 /**

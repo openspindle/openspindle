@@ -17,7 +17,10 @@ function openedKind(fileName: string): "program" | "project" | null {
 }
 
 /** Reads files the system asked the app to open; one that cannot be read says why. */
-async function readOpenedFiles(paths: readonly string[]): Promise<OpenedFiles> {
+async function readOpenedFiles(
+  paths: readonly string[],
+  rememberProject: (path: string) => string | undefined
+): Promise<OpenedFiles> {
   const opened: OpenedFiles = { files: [], problems: [] }
   for (const filePath of paths.slice(0, MAX_OPENED_FILES)) {
     const fileName = path.basename(filePath) || filePath
@@ -30,7 +33,12 @@ async function readOpenedFiles(paths: readonly string[]): Promise<OpenedFiles> {
       continue
     }
     try {
-      opened.files.push({ kind, ...(await readKindFile(kind, filePath)) })
+      opened.files.push({
+        kind,
+        ...(await readKindFile(kind, filePath)),
+        destinationId:
+          kind === "project" ? rememberProject(filePath) : undefined,
+      })
     } catch (error) {
       opened.problems.push({
         fileName,
@@ -53,6 +61,10 @@ export class OpenedFileBus {
   private paths: string[] = []
   private timer: ReturnType<typeof setTimeout> | null = null
 
+  constructor(
+    private readonly rememberProject: (path: string) => string | undefined
+  ) {}
+
   open(filePath: string) {
     this.paths.push(filePath)
     this.timer ??= setTimeout(() => void this.flush(), BATCH_MS)
@@ -70,7 +82,7 @@ export class OpenedFileBus {
     this.timer = null
     const paths = this.paths
     this.paths = []
-    const files = await readOpenedFiles(paths)
+    const files = await readOpenedFiles(paths, this.rememberProject)
     if (!this.listeners.size) {
       this.pending.push(files)
       return

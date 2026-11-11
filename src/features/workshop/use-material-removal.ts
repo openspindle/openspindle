@@ -48,12 +48,14 @@ function removalInput(
       problem: "Removal supports at most 50,000 preview segments per plate.",
     }
   for (const operation of plate.operations) {
+    if (operation.suppressed) continue
     const source = operation.source
-    if (source.kind === "probing" || source.kind === "unsupported")
+    if (source.kind === "probing") continue
+    if (source.kind === "unsupported")
       return {
         input: null,
         problem:
-          "Probing, compensation and unavailable operations are outside this removal model. Preview a machining-only plate.",
+          "An operation has no supported preview. Generate or remove it before previewing material removal.",
       }
     if (source.kind === "facing") continue
     const nc = source.nc
@@ -105,22 +107,42 @@ function removalInput(
     min[2] + stock.height,
   ]
   const segments: RemovalInput["segments"] = []
+  const probeOperations = new Set(
+    plate.operations
+      .filter((operation) => operation.source.kind === "probing")
+      .map((operation) => operation.id)
+  )
+  const probeSpans = shown.compiled.spans.filter((span) =>
+    probeOperations.has(span.operationId)
+  )
+  let probeSpanIndex = 0
   const implicitMoves = implicitToolMoves(
     program,
     toViewerPlate(plate, shown.compiled, tools).tools
   )
   for (const [move, segment] of program.segments.entries()) {
+    while (
+      probeSpanIndex < probeSpans.length &&
+      segment.line > probeSpans[probeSpanIndex].endLine
+    )
+      probeSpanIndex++
+    const probeSpan = probeSpans.at(probeSpanIndex)
+    const probingOperation =
+      probeSpan !== undefined && segment.line >= probeSpan.startLine
     let cutter: RemovalCutter | null = null
     if (
+      !probingOperation &&
       !segment.rapid &&
       !segment.routine &&
+      !segment.probing &&
+      !segment.toolSetterTouch &&
       Math.min(segment.start[2], segment.end[2]) < max[2]
     ) {
-      if (segment.probing || segment.machine)
+      if (segment.machine)
         return {
           input: null,
           problem:
-            "A probing or machine-coordinate feed enters the modeled stock.",
+            "A machine-coordinate cutting feed enters the modeled stock.",
         }
       const number =
         move < implicitMoves || segment.tool < 0 ? null : segment.tool

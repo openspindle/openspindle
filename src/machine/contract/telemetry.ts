@@ -85,10 +85,16 @@ export const TelemetrySchema = z.object({
   /** Halt reason while the controller is halted. */
   alarm: reading,
   estop: flag,
-  /** Maximum height-map deviation while compensation is active. */
+  /** Zero when disabled, maximum height-map deviation while active, null if malformed. */
   compensation: reading,
+  /** Separate from deviation: an enabled, flat height map can also report zero. */
+  compensationActive: flag,
 })
 export type Telemetry = z.infer<typeof TelemetrySchema>
+
+export const isHeightCompensationOff = (
+  telemetry: Pick<Telemetry, "compensation" | "compensationActive">
+) => telemetry.compensationActive === false && telemetry.compensation === 0
 
 /** Status older than this is not trusted for any decision. */
 export const TELEMETRY_FRESH_MS = 5000

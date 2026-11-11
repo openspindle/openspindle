@@ -67,6 +67,8 @@ import {
 export type WorkspaceProject = {
   readonly name: string
   readonly fileName: string
+  /** Native destination is retained across page reloads, never exported inside project files. */
+  readonly fileDestination?: { readonly id?: string }
   readonly profile: ProjectProfile
 }
 
@@ -284,6 +286,7 @@ export type WorkspaceCommand =
       /** Saved as a project file. */
       readonly type: "project.saved"
       readonly fileName: string
+      readonly destinationId?: string
     }
   | { readonly type: "heightMap.store"; readonly map: HeightMap }
   /**
@@ -887,6 +890,7 @@ function commandResult(
         project: {
           ...state.project,
           fileName: command.fileName,
+          fileDestination: { id: command.destinationId },
         },
       })
     case "heightMap.store":

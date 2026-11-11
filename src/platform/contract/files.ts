@@ -56,6 +56,21 @@ export const FILE_KINDS = {
     maxBytes: 512 * MiB,
     mime: "application/json",
   },
+  /** A read-only report of a probing run, never an executable program. */
+  inspectionJson: {
+    title: "Inspection report JSON",
+    extensions: ["json"],
+    saveExtensions: ["json"],
+    maxBytes: 32 * MiB,
+    mime: "application/json",
+  },
+  inspectionCsv: {
+    title: "Inspection report CSV",
+    extensions: ["csv"],
+    saveExtensions: ["csv"],
+    maxBytes: 32 * MiB,
+    mime: "text/csv",
+  },
   /** The recent protocol exchange with the machine (Help › Export Protocol Trace). */
   trace: {
     title: "Protocol trace",
@@ -99,6 +114,8 @@ export const FileKindSchema = z.enum([
   "program",
   "toolLibrary",
   "recovery",
+  "inspectionJson",
+  "inspectionCsv",
   "trace",
   "log",
   "pcb",
@@ -173,6 +190,7 @@ export const OpenFileResultSchema = z.discriminatedUnion("status", [
   z.strictObject({
     status: z.literal("opened"),
     fileName: z.string().min(1).max(1024),
+    destinationId: z.uuid().optional(),
     contents: z.string(),
   }),
   z.strictObject({ status: z.literal("canceled") }),
@@ -230,6 +248,7 @@ export const OpenedFilesSchema = z.strictObject({
       z.strictObject({
         kind: z.enum(["program", "project"]),
         fileName: z.string().min(1).max(1024),
+        destinationId: z.uuid().optional(),
         contents: z.string(),
       })
     )
@@ -273,6 +292,8 @@ export const SaveFileRequestSchema = z
   .strictObject({
     kind: FileKindSchema,
     suggestedName: z.string().min(1).max(200),
+    /** Opaque native capability from opening/saving this project; never a renderer path. */
+    destinationId: z.uuid().optional(),
     /** Text, or bytes for a binary kind. */
     contents: z.union([z.string(), FileBytesSchema]),
   })
@@ -288,6 +309,7 @@ export type SaveFileRequest = z.infer<typeof SaveFileRequestSchema>
 export const SaveFileResultSchema = z.strictObject({
   status: z.enum(["saved", "canceled"]),
   fileName: z.string(),
+  destinationId: z.uuid().optional(),
 })
 export type SaveFileResult = z.infer<typeof SaveFileResultSchema>
 

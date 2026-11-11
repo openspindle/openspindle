@@ -7,6 +7,7 @@ import {
   freshStatus,
   remaining,
   requireAdmission,
+  requireExecution,
   waitForAutomaticCommandReady,
 } from "./context.ts"
 import type { OperationContext } from "./context.ts"
@@ -63,6 +64,11 @@ export async function executeCommand(
     }
   }
   requireAdmission(context, { key: command.type, command }, before)
+  if (command.type === "resume")
+    requireExecution(context, {
+      kind: "resume",
+      program: context.resumeProgram?.() ?? null,
+    })
   const plan = adapter.plan(command, before)
   const streaming = context.streaming()
   const deadline = clock.now() + plan.timeoutMs

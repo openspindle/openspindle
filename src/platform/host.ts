@@ -8,6 +8,7 @@ import type {
   DisconnectRequest,
   HeightMap,
   SwitchReport,
+  ReadSwitchesRequest,
   MachineCommand,
   MachineSnapshot,
   NetworkDevice,
@@ -85,7 +86,7 @@ export interface MachineHost {
   reset: () => Promise<MachineSnapshot>
   prepare: (source: string) => Promise<PrepareResult>
   run: (request: RunRequest) => Promise<MachineSnapshot>
-  dismissJob: () => Promise<MachineSnapshot>
+  dismissJob: (expectedJobId?: string) => Promise<MachineSnapshot>
   readAnchors: (signal?: AbortSignal) => Promise<AnchorConfiguration>
   /** Stores the anchors in the machine's configuration; what it reads back afterwards. */
   writeAnchors: (request: WriteAnchorsRequest) => Promise<WriteAnchorsResult>
@@ -95,7 +96,7 @@ export interface MachineHost {
   ) => Promise<WriteConfigurationResult>
   readHeightMap: (signal?: AbortSignal) => Promise<HeightMap>
   /** The machine's switches as it reads them now. */
-  readSwitches: () => Promise<SwitchReport>
+  readSwitches: (request?: ReadSwitchesRequest) => Promise<SwitchReport>
   watchCamera: (listener: (event: CameraEvent) => void) => () => void
   /** The machine console: its backlog at once, then new entries in batches. */
   watchConsole: (listener: (entries: ConsoleEntry[]) => void) => () => void

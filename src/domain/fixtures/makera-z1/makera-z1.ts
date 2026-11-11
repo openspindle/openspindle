@@ -38,6 +38,10 @@ import {
   SETTER_TOP,
   SETTER_FROM_ANCHOR,
 } from "./tool-setter"
+import { boundedDiameterNc } from "./bounded-diameter"
+import { boundedPointZNc, boundedZNc, zProbeMeasurementNc } from "./bounded-z"
+import { boundedMoveNc } from "./bounded-move"
+import { boundedAnchorNc, anchorMeasurementNc } from "./bounded-anchor"
 import {
   Z1_WORK_AREA,
   Z1_WORK_AREA_ORIGIN,
@@ -66,6 +70,35 @@ export const LEGACY_BED_FRAME = { anchor1: [12, 12], z: 6 } as const
  * the fixtures Makera makes for it and its anchors.
  */
 export class MakeraZ1 extends FixtureKit {
+  override readonly probePositioning = {
+    clearance: CLEARANCE_Z,
+    boundedNc: boundedMoveNc,
+  }
+  override readonly zProbing = {
+    tools: [PROBE_TOOL, PROBE_3D_TOOL],
+    pointNc: boundedPointZNc,
+    boundedNc: boundedZNc,
+    measurementNc: zProbeMeasurementNc,
+  }
+  override readonly anchorCalibration = {
+    boundedNc: boundedAnchorNc,
+    measurementNc: anchorMeasurementNc,
+    startTolerance: 1,
+    anchorId: "anchor-1",
+    name: "Anchor 1",
+    reference:
+      "The supplied L-bracket, pinned and secured in its normal Anchor 1 position",
+    fixtureIds: [new Z1LBracketThick().id, new Z1LBracketThin().id],
+    params: {
+      corner: "front-left",
+      distance: [10, 10] as [number, number],
+      depth: 2,
+    },
+  } as const
+  override readonly diameterCalibration = {
+    boundedNc: boundedDiameterNc,
+    measurementNc: anchorMeasurementNc,
+  }
   override readonly facingEntryPockets = Z1_MDF_ENTRY_POCKETS
   /** A conservative square around the modeled setter opening, with 2 mm minimum clearance. */
   override readonly facingKeepOuts: readonly FacingKeepOut[] = [

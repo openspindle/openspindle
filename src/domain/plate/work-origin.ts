@@ -22,7 +22,12 @@ import type { Plate, PlateSetup } from "./plate"
 const toNanometre = (value: number) => Number(value.toFixed(6)) + 0
 
 /** Whether a plate sets its work Z by touching off the stock top (a touch-off). */
-export const touchesOffWorkZ = (plate: Pick<Plate, "operations">) =>
+export const touchesOffWorkZ = (
+  plate: Pick<Plate, "operations"> & {
+    setup?: Pick<PlateSetup, "probeBeforeRun">
+  }
+) =>
+  !!plate.setup?.probeBeforeRun ||
   plate.operations.some(
     ({ source }) => source.kind === "probing" && source.task === "touch-off"
   )

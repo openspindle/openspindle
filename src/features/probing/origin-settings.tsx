@@ -1,4 +1,4 @@
-import { useId, useState } from "react"
+import { useEffect, useId, useRef, useState } from "react"
 import {
   Field,
   FieldGroup,
@@ -49,6 +49,7 @@ export type OriginSettingsProps = {
   /** Picking its start in the 3D view; null where it cannot be picked. */
   pick?: ProbingPick | null
   disabled?: boolean
+  onValidityChange?: (valid: boolean) => void
 }
 
 const CORNER_OPTIONS = PROBE_3D_CORNERS.map((value) => ({
@@ -75,6 +76,7 @@ export function OriginSettings({
   onChange,
   pick = null,
   disabled = false,
+  onValidityChange,
 }: OriginSettingsProps) {
   const draft = useProbingDraft(value, onChange)
   return (
@@ -86,6 +88,7 @@ export function OriginSettings({
       pick={pick}
       disabled={disabled}
       onChange={draft.onChange}
+      onValidityChange={onValidityChange}
     />
   )
 }
@@ -97,12 +100,24 @@ function OriginForm({
   onChange,
   pick,
   disabled,
-}: Required<OriginSettingsProps>) {
+  onValidityChange,
+}: Required<Omit<OriginSettingsProps, "onValidityChange">> &
+  Pick<OriginSettingsProps, "onValidityChange">) {
   const id = useId()
   const schema = originParamsSchema(parameters)
   // Switching back from the probe position restores the anchor settings.
   const [lastAnchor, setLastAnchor] = useState<AnchorPlacement | null>(null)
-  const form = useProbingForm(value, schema, onChange)
+  const [parametersValid, setParametersValid] = useState(true)
+  const [placementReady, setPlacementReady] = useState(true)
+  const validityListener = useRef(onValidityChange)
+  validityListener.current = onValidityChange
+  useEffect(() => {
+    validityListener.current?.(parametersValid && placementReady)
+  }, [parametersValid, placementReady])
+  const form = useProbingForm(value, schema, onChange, (valid) => {
+    setParametersValid(valid)
+    onValidityChange?.(valid && placementReady)
+  })
   // A field the axes hide takes back its last valid value, as the form passes on only valid
   // parameters: a hidden error would hold back every later edit. Another strategy, and so
   // another routine, comes from outside the form, which starts over with it.
@@ -217,6 +232,14 @@ function OriginForm({
         pick={pick}
         disabled={disabled}
         height
+        onDraftValidityChange={
+          onValidityChange
+            ? (ready) => {
+                setPlacementReady(ready)
+                onValidityChange(ready && parametersValid)
+              }
+            : undefined
+        }
       />
     </FieldGroup>
   )

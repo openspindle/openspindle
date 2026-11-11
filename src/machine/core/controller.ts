@@ -11,6 +11,7 @@ import type {
 } from "../contract/simulator-jog.ts"
 import { SimulatedJogOwner } from "./simulated-jog.ts"
 import { ControllerStepJogOwner } from "./controller-step-jog.ts"
+import { ProbeSignalCheck } from "./probe-check.ts"
 import {
   freshDiagnosticStatus,
   requireAdmission,
@@ -24,6 +25,7 @@ import {
   MachineCommandSchema,
   RUN_LIMITS,
   RunRequestSchema,
+  ReadSwitchesRequestSchema,
   WriteAnchorsRequestSchema,
   AnchorConfigurationSchema,
   WriteConfigurationRequestSchema,
@@ -58,6 +60,7 @@ import type {
 import { prepareResult } from "../firmware/adapter.ts"
 import type {
   CompletionUpdate,
+  ExecutionContent,
   FirmwareAdapter,
   Line,
   TransferProtocol,
@@ -210,6 +213,8 @@ export class MachineController {
     readHeightMap: { deferred: null, running: false, callers: new Set() },
   }
   private job: JobState | null = null
+  private readonly probeSignal = new ProbeSignalCheck()
+  private probeRead: { before: Telemetry; changed: boolean } | null = null
   private tracker: PartedCompletion | null = null
   /** What the job's later parts play with, until it ends. */
   private running: {
@@ -500,6 +505,7 @@ export class MachineController {
         "refused",
         "Stock Z1 firmware supports finite Step jogging. Direct release-to-stop steering requires a verified firmware cancellation mechanism."
       )
+    this.probeSignal.moved()
     const command = {
       type: "jog",
       axis: "X",
@@ -749,6 +755,16 @@ export class MachineController {
     signal?: AbortSignal
   ): Promise<MachineSnapshot> {
     const command = parse(MachineCommandSchema, input)
+    if (
+      this.running?.program.probeCheck &&
+      (command.type === "pause" || command.type === "resume")
+    )
+      throw new MachineError(
+        "refused",
+        "Bounded probing cannot pause or resume between contacts. Stop remains available."
+      )
+    if (command.type === "jog") this.probeSignal.moved()
+    else this.probeSignal.invalidate()
     this.admitNow({ key: command.type, command })
     if (
       (command.type === "lightBrightness" ||
@@ -776,6 +792,9 @@ export class MachineController {
   /** Sends a line typed in the console, admitted like any command; the console shows the reply. */
   async sendConsoleLine(input: unknown): Promise<MachineSnapshot> {
     const line = parse(ConsoleLineSchema, input)
+    this.probeSignal.invalidate()
+    const issue = this.executionIssue({ kind: "console", source: line })
+    if (issue) throw new MachineError("refused", issue)
     this.admitNow({ key: "console" })
     await this.operate("command", "Console command", (context) =>
       sendConsoleLine(context, line)
@@ -801,6 +820,7 @@ export class MachineController {
 
   /** Preempts everything: transfer cancel, operations, deferred reads, then the halt. */
   async stop(): Promise<MachineSnapshot> {
+    this.probeSignal.invalidate()
     const session = this.session
     if (!session?.ready)
       throw new MachineError("not-connected", "Connect a device first.")
@@ -843,9 +863,27 @@ export class MachineController {
   // ── Jobs ───────────────────────────────────────────────────────────────
 
   /** The normalized program this firmware would execute, or why it cannot. */
-  prepare(input: unknown): Promise<PrepareResult> {
+  async prepare(input: unknown): Promise<PrepareResult> {
     const { source } = parse(PrepareInputSchema, input)
-    return this.preparedFor(source)
+    const result = await this.preparedFor(source)
+    if (!result.ok) return result
+    // Preparation caches are connection-independent; quarantine decisions are not.
+    const currentIssue = this.executionIssue({
+      kind: "program",
+      program: result.program,
+    })
+    return currentIssue
+      ? { ok: false, error: currentIssue, line: null }
+      : result
+  }
+
+  private executionIssue(content: ExecutionContent) {
+    return (
+      this.adapter.executionIssue?.({
+        ...content,
+        device: this.session?.device ?? null,
+      }) ?? null
+    )
   }
 
   /**
@@ -875,26 +913,57 @@ export class MachineController {
 
   private async prepareProgram(source: string): Promise<PrepareResult> {
     const { programs } = this.ports
-    if (programs) return programs.prepare(this.adapter.id, source)
-    return prepareResult(this.adapter, source)
+    const result = programs
+      ? await programs.prepare(this.adapter.id, source)
+      : prepareResult(this.adapter, source)
+    if (result.ok) {
+      // Structured cloning from the worker removes freezing. Keep the assessment
+      // bound to the exact immutable text and part additions it inspected.
+      for (const part of result.program.parts) {
+        Object.freeze(part.before)
+        Object.freeze(part.after)
+        Object.freeze(part)
+      }
+      Object.freeze(result.program.parts)
+      if (result.program.probeCheck) {
+        Object.freeze(result.program.probeCheck.position)
+        Object.freeze(result.program.probeCheck)
+      }
+      Object.freeze(result.program)
+    }
+    return result
   }
 
   async run(input: unknown): Promise<MachineSnapshot> {
     const request = parse(RunRequestSchema, input)
+    const checkConnection = () => {
+      if (
+        request.expectedConnectionId !== undefined &&
+        (!this.session?.ready ||
+          this.connectionId(this.session) !== request.expectedConnectionId)
+      )
+        throw new MachineError(
+          "connection-lost",
+          "The device connection changed. Review the run again before starting."
+        )
+    }
+    checkConnection()
     this.refuseUsedRun(request.id)
     // Refused at once when the machine would not take it, before the program is prepared.
     this.admitNow({ key: "run" })
     let prepared: PrepareResult
     try {
-      prepared = await this.preparedFor(request.source)
+      prepared = await this.prepare({ source: request.source })
     } catch (error) {
       throw new MachineError("invalid", message(error, "Invalid NC program."))
     }
     if (!prepared.ok) throw new MachineError("invalid", prepared.error)
     // Asked again: other requests, and the machine, went on while the program was prepared.
+    checkConnection()
     this.refuseUsedRun(request.id)
     this.admitNow({ key: "run" })
     const program = prepared.program
+    if (!program.probeCheck) this.probeSignal.invalidate()
     this.rememberRun(request.id)
     const now = this.ports.clock.now()
     const parts = programParts(program)
@@ -923,11 +992,21 @@ export class MachineController {
     }
     this.running = { request, program, bedCleanBefore: null }
     this.publish()
+    const runSession = this.session
     try {
       await this.operate("run", `Starting ${request.name}`, (context) =>
         prepareAndStart(context, request, program, this.jobHooks())
       )
+      if (program.probeCheck) this.running = null
     } catch (error) {
+      if (
+        program.probeCheck &&
+        runSession &&
+        runSession === this.session &&
+        !(error instanceof MachineError && error.code === "cancelled")
+      )
+        runSession.lockout =
+          "Bounded probing did not complete. Stop and inspect the machine before any new motion. No step was retried."
       this.failJob(error)
       throw error
     }
@@ -979,6 +1058,7 @@ export class MachineController {
           await playNextPart(
             context,
             running.request,
+            running.program,
             running.bedCleanBefore,
             tracker,
             index,
@@ -1001,8 +1081,12 @@ export class MachineController {
   }
 
   /** Clears a finished job from the snapshot. */
-  dismissJob(): MachineSnapshot {
-    if (this.job && isTerminalJobPhase(this.job.phase)) {
+  dismissJob(expectedJobId?: string): MachineSnapshot {
+    if (
+      this.job &&
+      (!expectedJobId || this.job.id === expectedJobId) &&
+      isTerminalJobPhase(this.job.phase)
+    ) {
       this.job = null
       this.publish()
     }
@@ -1048,9 +1132,54 @@ export class MachineController {
    * Reads the machine's switches, as diagnosis inspects them: in the states the firmware takes
    * it in, an alarm among them, never while a program runs.
    */
-  async readSwitches(): Promise<SwitchReport> {
+  async readSwitches(input?: unknown): Promise<SwitchReport> {
+    const request = parse(ReadSwitchesRequestSchema.optional(), input)
+    const checkConnection = () => {
+      if (
+        request &&
+        (!this.session?.ready ||
+          this.connectionId(this.session) !== request.expectedConnectionId)
+      )
+        throw new MachineError(
+          "connection-lost",
+          "The probe test's device connection changed."
+        )
+    }
+    checkConnection()
     this.admitNow({ key: "readSwitches" })
-    return this.operate("inspection", "Reading switches", readSwitches)
+    if (request?.startProbeCheck) this.probeSignal.invalidate()
+    return this.operate("inspection", "Reading switches", async (context) => {
+      try {
+        const { report, before, after } = await readSwitches(
+          context,
+          (initial) => {
+            this.probeRead = { before: initial, changed: false }
+          }
+        )
+        checkConnection()
+        if (report.probe === null) this.probeSignal.invalidate()
+        else if (this.probeRead?.changed) this.probeSignal.moved()
+        else if (
+          before.tool !== null &&
+          this.adapter.probeCheckTools?.includes(before.tool)
+        )
+          this.probeSignal.read(
+            report.probe,
+            before,
+            after,
+            this.connectionId(context.session),
+            this.ports.clock.now(),
+            before.tool
+          )
+        this.publish()
+        return report
+      } catch (error) {
+        this.probeSignal.invalidate()
+        throw error
+      } finally {
+        this.probeRead = null
+      }
+    })
   }
 
   // ── Settings ───────────────────────────────────────────────────────────
@@ -1063,6 +1192,7 @@ export class MachineController {
    * own moves use its own anchors after it restarts.
    */
   async writeAnchors(input: unknown): Promise<WriteAnchorsResult> {
+    this.probeSignal.invalidate()
     const request = parse(WriteAnchorsRequestSchema, input)
     const checkProposal = (session: MachineSession | null) => {
       if (
@@ -1149,6 +1279,7 @@ export class MachineController {
   }
 
   async writeConfiguration(input: unknown): Promise<WriteConfigurationResult> {
+    this.probeSignal.invalidate()
     const request = parse(WriteConfigurationRequestSchema, input)
     this.admitNow({ key: "writeConfiguration" })
     if (
@@ -1200,6 +1331,23 @@ export class MachineController {
 
   private onStatus(session: MachineSession, telemetry: Telemetry) {
     if (session !== this.session) return
+    if (
+      this.probeRead &&
+      this.probeRead.before.tool !== null &&
+      !!this.adapter.probeCheckTools?.includes(this.probeRead.before.tool) &&
+      !this.probeSignal.stationaryRead(
+        this.probeRead.before,
+        telemetry,
+        this.ports.clock.now(),
+        this.probeRead.before.tool
+      )
+    )
+      this.probeRead.changed = true
+    this.probeSignal.observe(
+      telemetry,
+      this.connectionId(session),
+      this.ports.clock.now()
+    )
     if (this.tracker) this.applyTracker(this.tracker.status(telemetry))
     this.maybeReadAnchorsOnConnect()
     this.scheduleDeferred()
@@ -1214,7 +1362,12 @@ export class MachineController {
   }
 
   private onTick(session: MachineSession, now: number) {
-    if (session !== this.session || !session.healthy || !this.tracker) return
+    if (session !== this.session) return
+    if (this.probeSignal.value && now > this.probeSignal.value.expiresAt) {
+      this.probeSignal.invalidate()
+      this.publish()
+    }
+    if (!session.healthy || !this.tracker) return
     this.applyTracker(this.tracker.tick(now))
   }
 
@@ -1231,6 +1384,7 @@ export class MachineController {
 
   private onClosed(session: MachineSession, error: string | null) {
     if (session !== this.session) return
+    this.probeSignal.invalidate()
     this.invalidateDirect()
     this.session = null
     this.camera.dispose()
@@ -1476,6 +1630,28 @@ export class MachineController {
         clock: this.ports.clock,
         signal: activity.controller.signal,
         streaming: () => this.streaming(session.store.telemetry),
+        authorizeProbeCheck: (binding) => {
+          if (session.device && isSimulator(session.device)) return
+          this.probeSignal.consume(
+            binding,
+            session.store.telemetry,
+            this.connectionId(session),
+            this.ports.clock.now()
+          )
+          this.publish()
+        },
+        resumeProgram: () => {
+          const running = this.running
+          if (
+            this.session !== session ||
+            !running ||
+            this.job?.id !== running.request.id ||
+            !isJobActive(this.job) ||
+            !this.tracker?.streaming
+          )
+            return null
+          return running.program
+        },
         admit: (request, telemetry) =>
           admit(request, {
             ...this.admissionContext(),
@@ -1696,6 +1872,16 @@ export class MachineController {
         "Device status is not responding. The machine may still be running. Stop can be attempted, but its effect must be confirmed."
     if (this.restart) connectionError = null
     const available = availability(context)
+    if (this.running?.program.probeCheck && isJobActive(this.job)) {
+      const blocked = {
+        allowed: false,
+        deferred: false,
+        reason:
+          "Bounded probing cannot pause or resume between contacts. Stop remains available.",
+      }
+      available.pause = blocked
+      available.resume = blocked
+    }
     const arm =
       ready?.device &&
       (isSimulator(ready.device) || this.adapter.controllerStepBounds)
@@ -1712,6 +1898,7 @@ export class MachineController {
     }
     return {
       revision,
+      probeCheck: this.probeSignal.value,
       simulatorController: {
         arm,
         targetRpm:

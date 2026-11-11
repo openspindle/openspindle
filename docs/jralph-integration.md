@@ -19,13 +19,19 @@ The source changes primarily come from commits `1c1645c`–`170c594`,
 `15058b0`, `7699a69`, the facing changes in `dd0c931`, the sidebar changes in
 `7c794b5`, and the gamepad changes in `340b77d`.
 
-## Deferred
+## Probing and metrology
 
-Inspection reports, repeatability experiments, measurement-to-setup proposals,
-probe-tip calibration, Anchor 1 calibration, bounded probe positioning and
-temporary calibration runs remain outside this integration. Existing probing
-behavior is retained. The shared form helper only gains an optional validity
-callback needed by the facing calculator.
+The remaining source branch is now integrated: inspection reports and raw JSON/CSV
+exports, repeatability experiments, measurement-to-setup proposals, probe-tip
+calibration, Anchor 1 calibration, bounded probe positioning, part-Z setup and
+temporary calibration runs. Existing spindle/tool-setter guards, fresh diagnostic
+checks, TCP lockout/Stop behavior, V-bit removal and resolution preferences are
+retained in the combined implementation.
+
+Physical probing follows the source branch's verified-input and bounded-contact
+execution policy. Native corner/center and height-map firmware searches are
+simulator-only. On a physical Z1, use the Anchor 1, diameter or Z probe guides;
+unknown or failed contact sequences request a halt and lock out new motion.
 
 ## Integration decisions
 
@@ -44,8 +50,8 @@ our model, and modeled entry recesses follow the configured bed offset.
 ## Limits and manual review
 
 Material removal supports known straight, flat-ended cutters and dimensioned
-V-bits on three-axis machining-only plates. Probing/compensation, rotary machining
-and undercuts are unsupported. It is a sampled preview, not a collision check or
+V-bits on three-axis plates. Generated probing can share a preview with cutting without removing stock. Actual
+height compensation, rotary machining and undercuts remain unsupported. It is a sampled preview, not a collision check or
 proof of a safe program. Physical gamepad stopping behavior and generated facing paths
 require hands-on verification before this branch is merged for normal use.
 

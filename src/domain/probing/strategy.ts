@@ -128,6 +128,12 @@ export interface ProbingMethod<
     machine: MachineProbing,
     params?: TParams
   ) => string | null
+  /** Whether the generated route reports this task's measurements from a played program. */
+  reportsMeasurements?: (
+    params: TParams,
+    plate: Plate,
+    machine: MachineProbing
+  ) => boolean
   /** The task's parameters with it on the machine: their ranges and defaults. */
   parameters: (machine: MachineProbing) => TSpecs
   /**

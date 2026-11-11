@@ -17,6 +17,8 @@ export const SETTER_TOP = 6.83
 export const SETTER_Z = -76.54
 /** A tool on the setter touches it within this distance of its centre. */
 export const SETTER_RADIUS = 5
+/** Shared alias for bounded probing and facing geometry. */
+export const SETTER_XY = SETTER_FROM_ANCHOR
 /** The bundled MDF bed model's hole radius, including the surrounding opening. */
 export const SETTER_CUTOUT_RADIUS = 5.25
 

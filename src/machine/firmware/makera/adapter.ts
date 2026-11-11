@@ -46,8 +46,13 @@ import {
   parseFileSize,
   parseHomedReport,
   parseSwitchReport,
+  parseProbeTravelBounds,
 } from "./lines.ts"
 import { MakeraTransfer } from "./transfer.ts"
+import {
+  makeraExecutionIssue,
+  assessMakeraPhysicalProgram,
+} from "./execution-safety.ts"
 import {
   MACHINE_Z,
   z1WorkBounds,
@@ -283,6 +288,29 @@ export const makeraAdapter: FirmwareAdapter = {
     overrideMax: 150,
   },
   prepareProgram: prepareMakeraProgram,
+  executionIssue: makeraExecutionIssue,
+  assessPhysicalProgram: assessMakeraPhysicalProgram,
+  probeCheckTools: [0, 9999],
+  probeTravelBounds: { query: "M211", parse: parseProbeTravelBounds },
+  probeContact: (text) => {
+    const match =
+      /^\[PRB:([+-]?[\d.]+),([+-]?[\d.]+),([+-]?[\d.]+):([01])\]$/.exec(
+        text.trim()
+      )
+    if (!match) return null
+    const position = [Number(match[1]), Number(match[2]), Number(match[3])] as [
+      number,
+      number,
+      number,
+    ]
+    if (
+      !position.every(
+        (value) => Number.isFinite(value) && Math.abs(value) <= COORDINATE_LIMIT
+      )
+    )
+      return null
+    return { position, success: match[4] === "1" }
+  },
   job: makeraJob,
   configuration: {
     path: MAKERA_CONFIGURATION_PATH,

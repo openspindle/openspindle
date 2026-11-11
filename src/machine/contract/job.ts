@@ -1,4 +1,5 @@
 import { z } from "zod"
+import { ProbeCheckBindingSchema } from "./probe-check.ts"
 import { PlateAssistsSchema } from "./assists.ts"
 import { HEIGHT_MAP_LIMITS } from "./height-map.ts"
 import {
@@ -35,6 +36,16 @@ export const RunRequestSchema = z.strictObject({
   /** A fresh UUID per Run; a used ID is never replayed. */
   id: z.uuid(),
   name: DisplayNameSchema,
+  /** A reviewed run cannot migrate to another connection while preparation is in flight. */
+  expectedConnectionId: z.uuid().optional(),
+  /** A pre-job surface reference must survive preparation unchanged. Checked in the machine host. */
+  zReference: z
+    .strictObject({
+      tool: z.int().nonnegative(),
+      toolOffset: z.number().finite().min(-10000).max(10000),
+      originZ: z.number().finite().min(-10000).max(10000),
+    })
+    .optional(),
   source: z
     .string()
     .min(1, "The NC program is empty.")
@@ -95,6 +106,12 @@ export const PreparedProgramSchema = z.object({
   changes: z.array(ProgramChangeSchema),
   /** Total changes; `changes` is capped. */
   changeCount: z.int().nonnegative(),
+  /** Computed by the trusted preparer, never accepted in a Run request. Undefined is unassessed. */
+  physicalExecutionIssue: z.string().nullable().optional(),
+  /** Trusted preparer requirement for an inline, contact-by-contact verified routine. */
+  probeCheck: ProbeCheckBindingSchema.optional(),
+  /** Trusted permission to shorten the first downward Z search to the live machine limit. */
+  probeDownToLimit: z.boolean().optional(),
   /**
    * The files the program is sent as, in order: one with every line, or parts when it exceeds
    * a file's limits. None from a main process before parts, which sent every line as one.

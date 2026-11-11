@@ -225,7 +225,11 @@ export function parseStatus(
       job,
       alarm: integer(f.H?.[0]),
       estop: diagnostic?.estop ?? null,
-      compensation: n("O"),
+      // Kernel::get_query_string emits O only while compensationTransform exists.
+      // Its absence in a complete, validated status means off; O:0 means active
+      // with zero deviation. A present malformed field never becomes disabled.
+      compensation: Object.hasOwn(f, "O") ? n("O") : 0,
+      compensationActive: Object.hasOwn(f, "O"),
     },
   }
 }

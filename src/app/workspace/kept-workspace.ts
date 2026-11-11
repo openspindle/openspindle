@@ -107,6 +107,7 @@ const KeptSchema = z.preprocess(
     project: z.object({
       name: TextSchema,
       fileName: z.string().min(1).max(1000),
+      fileDestination: z.object({ id: z.uuid().optional() }).optional(),
       profile: ProjectProfileSchema.optional(),
     }),
     unsaved: z.boolean(),

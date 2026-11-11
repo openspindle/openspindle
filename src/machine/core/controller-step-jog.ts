@@ -2,6 +2,7 @@ import {
   DIRECT_CLOCK_SKEW_MS,
   DIRECT_INPUT_TTL_MS,
   isFresh,
+  isHeightCompensationOff,
 } from "../contract/index.ts"
 import type {
   Availability,
@@ -110,7 +111,7 @@ export class ControllerStepJogOwner {
       t.estop !== false ||
       t.job !== null ||
       t.units !== "mm" ||
-      t.compensation !== 0
+      !isHeightCompensationOff(t)
     )
       throw new MachineError(
         "refused",
@@ -132,7 +133,7 @@ export class ControllerStepJogOwner {
       t.tool !== this.tool ||
       !["Idle", "Run"].includes(t.state) ||
       t.units !== "mm" ||
-      t.compensation !== 0
+      !isHeightCompensationOff(t)
     )
       return "Machine status, tool, unit mode or compensation changed. Arm again."
     if (

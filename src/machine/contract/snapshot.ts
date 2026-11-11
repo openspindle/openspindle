@@ -1,4 +1,5 @@
 import { z } from "zod"
+import { ProbeCheckSchema } from "./probe-check.ts"
 import { AnchorConfigurationSchema } from "./anchors.ts"
 import { COMMAND_KINDS, ControlLimitsSchema } from "./commands.ts"
 import { JobStateSchema } from "./job.ts"
@@ -117,6 +118,7 @@ export type DeferredOperation = z.infer<typeof DeferredOperationSchema>
 
 export const MachineSnapshotSchema = z.object({
   revision: z.int().nonnegative(),
+  probeCheck: ProbeCheckSchema.nullable().optional(),
   simulatorController: z.object({
     targetRpm: z.number().nullable().optional(),
     arm: AvailabilitySchema,
@@ -172,6 +174,7 @@ export function disconnectedSnapshot(
 ): MachineSnapshot {
   return {
     revision,
+    probeCheck: null,
     simulatorController: {
       arm: { allowed: false, deferred: false, reason },
       step: { allowed: false, deferred: false, reason },

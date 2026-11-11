@@ -1,4 +1,9 @@
-import { DEVICE_ASSISTS, partText, programParts } from "../../contract/index.ts"
+import {
+  DEVICE_ASSISTS,
+  isHeightCompensationOff,
+  partText,
+  programParts,
+} from "../../contract/index.ts"
 import type {
   CheckedStart,
   Identity,
@@ -19,8 +24,13 @@ import type {
 } from "../../firmware/adapter.ts"
 import { MachineError, abortError } from "../errors.ts"
 import { PartedCompletion } from "../parted-completion.ts"
-import { freshDiagnosticStatus, requireAdmission } from "./context.ts"
+import {
+  freshDiagnosticStatus,
+  requireAdmission,
+  requireExecution,
+} from "./context.ts"
 import type { OperationContext } from "./context.ts"
+import { runInlineProbe } from "./inline-probe.ts"
 
 const STEP_MS = 10_000
 /** Silence in a transfer after which it asks the device again (`TransferProtocol.stalled`). */
@@ -117,6 +127,24 @@ export function toolResetForRun(
   return reset
 }
 
+function requireZReference(request: RunRequest, telemetry: Telemetry) {
+  const reference = request.zReference
+  if (!reference) return
+  if (
+    telemetry.tool !== reference.tool ||
+    telemetry.toolOffset !== reference.toolOffset ||
+    !telemetry.workOrigin ||
+    Math.abs(telemetry.workOrigin.z - reference.originZ) > 0.001 ||
+    !isHeightCompensationOff(telemetry) ||
+    telemetry.spindleRpm !== 0 ||
+    telemetry.spindleOn === true
+  )
+    throw new MachineError(
+      "unverified",
+      "The measured part Z reference changed before cutting. The program was not started; probe Z again."
+    )
+}
+
 /** Aborts with the context, or when the preparation outlasts `milliseconds`. */
 function withDeadline(context: OperationContext, milliseconds: number) {
   const { clock } = context
@@ -153,6 +181,17 @@ export async function prepareAndStart(
   program: PreparedProgram,
   hooks: JobRunnerHooks
 ): Promise<void> {
+  requireExecution(context, { kind: "program", program })
+  if (program.probeCheck) {
+    const resumeCamera = hooks.pauseCamera()
+    try {
+      await preflight(context)
+      await runInlineProbe(context, program, hooks)
+    } finally {
+      resumeCamera()
+    }
+    return
+  }
   const { session, adapter, clock } = context
   const job = adapter.job
   const parts = programParts(program)
@@ -169,6 +208,7 @@ export async function prepareAndStart(
     // Refuse a dangerous Keep tool request before any file is uploaded.
     toolResetForRun(job, program, initialIdentity, telemetry, request.keepTool)
     verifyCheckedStart(request.checkedStart, telemetry)
+    requireZReference(request, telemetry)
     hooks.bedCleanBefore(job.bedClean(telemetry))
     const assists = partAssists(
       request.assists,
@@ -196,6 +236,7 @@ export async function prepareAndStart(
     }
     telemetry = await preflight(scoped)
     verifyCheckedStart(request.checkedStart, telemetry)
+    requireZReference(request, telemetry)
     if (job.assistPlan(assists, telemetry).length)
       throw new MachineError(
         "refused",
@@ -245,11 +286,13 @@ export async function prepareAndStart(
 export async function playNextPart(
   context: OperationContext,
   request: RunRequest,
+  program: PreparedProgram,
   bedCleanBefore: boolean | null,
   tracker: PartedCompletion,
   index: number,
   hooks: JobRunnerHooks
 ): Promise<void> {
+  requireExecution(context, { kind: "program", program })
   const { adapter } = context
   const count = tracker.parts.length
   const { scoped, release } = withDeadline(context, PREPARATION_MS)

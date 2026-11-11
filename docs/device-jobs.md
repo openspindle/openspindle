@@ -52,6 +52,8 @@ The live timeline appends a muted **Est. finish** clock time to the remaining du
 
 ## Transaction
 
+An origin operation's card presents a confirmed result and **Save as anchor** only when the inspection report can attribute its contacts to that operation and validates a finished routine. Missing or extra measurements remain unconfirmed. Saving an anchor requires the device that made the measurement: both device writes and bed setup offsets are checked against that frozen device, with a fresh connection and anchor check before saving. A device write is bound to the connection and anchor snapshot reviewed; a read or write that changes that snapshot before admission refuses the proposal.
+
 The unique file `/sd/gcodes/openspindle-<uuid>.nc` (`openspindle-<uuid>-<n>.nc` for each part of a program sent in parts) is uploaded, read back and played once, from the folder where Makera Studio keeps the programs it runs. Data and motion are never retried.
 
 1. **Preflight** — `G28.6` with its acknowledgement (every reported axis homed: unhomed, `play` answers `ERROR:Machine has not been homed` and halts the machine), then a fresh diagnostic and status passing the run rules: Idle, no program, released emergency stop, spindle stopped, fixed tool setter released, milling mode and bed-clean mode reported.

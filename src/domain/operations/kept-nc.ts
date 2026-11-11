@@ -5,6 +5,7 @@
  * registry of every kind (`OPERATION_KINDS`) holds their methods.
  */
 
+import { isAnchorMeasurementNc } from "../anchors/calibration"
 import { PLAIN_NC, withoutClosingPark } from "../compile/nc-unit"
 import { error, operationSubject } from "../diagnostics"
 import type { FixtureKit } from "../fixtures/fixture-kit"
@@ -41,8 +42,23 @@ export const fileKind: OperationKind<"file"> = {
   verbatim: true,
   generated: false,
   phase: ({ source }) => source.phase ?? "machining",
-  resolve: ({ source }, _plate, { kit }) =>
-    ok(plain(source.park ? source.nc : withoutClosingPark(source.nc, kit))),
+  resolve: ({ source }, plate, { kit }) => {
+    const nc = source.park ? source.nc : withoutClosingPark(source.nc, kit)
+    return ok({
+      ...plain(nc),
+      standalone:
+        plate.operations.length === 1 &&
+        (isAnchorMeasurementNc(nc, kit) ||
+          (!!kit.zProbing &&
+            (/^;@OPENSPINDLE_(Z|MOVE|POINT_Z)_PLAN /m.test(nc) ||
+              plate.tools.some(
+                (tool) =>
+                  tool.number !== null &&
+                  kit.zProbing!.tools.includes(tool.number) &&
+                  nc === kit.zProbing!.measurementNc(tool.number)
+              )))),
+    })
+  },
 }
 
 /** A line's words without its comments, in capitals. */

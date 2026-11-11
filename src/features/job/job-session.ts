@@ -4,6 +4,8 @@ import type { CompiledPlate } from "@/domain/compile/compile"
 import type { MotionPlan } from "@/domain/motion/types"
 import type { Plate } from "@/domain/plate/plate"
 import type { Tool } from "@/domain/tools/tool"
+import { isSimulator, machineId } from "@/machine/contract"
+import type { ConnectedDevice } from "@/machine/contract"
 
 /**
  * One Run, frozen when it is sent: the plate as it was (plates are immutable values, so the
@@ -24,6 +26,12 @@ export type JobSession = {
    */
   readonly plan: MotionPlan | null
   readonly tools: readonly Tool[]
+  /** Measurement provenance frozen at Run, independent of subsequent connections. */
+  readonly device: {
+    id: string
+    name: string
+    source: "simulator" | "physical"
+  } | null
   /** Pauses (by `pauseKey`) whose one automatic height-map read has started. */
   readonly reviewedPauses: readonly string[]
 }
@@ -33,7 +41,8 @@ export function createJobSession(
   label: string,
   compiled: CompiledPlate,
   library: readonly Tool[],
-  plan: MotionPlan | null
+  plan: MotionPlan | null,
+  device: ConnectedDevice | null
 ): JobSession {
   const referenced = new Set(plate.tools.map((entry) => entry.toolId))
   return {
@@ -43,6 +52,13 @@ export function createJobSession(
     compiled,
     plan,
     tools: library.filter((tool) => referenced.has(tool.id)),
+    device: device
+      ? {
+          id: machineId(device),
+          name: device.name,
+          source: isSimulator(device) ? "simulator" : "physical",
+        }
+      : null,
     reviewedPauses: [],
   }
 }
