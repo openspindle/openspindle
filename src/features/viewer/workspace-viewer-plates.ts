@@ -27,16 +27,29 @@ export function useWorkspaceViewerPlates(
 ): ViewerPlate[] {
   const plates = useWorkspace((state) => state.plates)
   const library = useWorkspace((state) => state.tools)
+  const settings = useWorkspace((state) => state.ruleSettings)
   return useMemo(() => {
     const drawShown = ({ plate, compiled, tools, plan }: ShownPlate) =>
-      toViewerPlate(plate, compiled, tools ?? library, plan?.program ?? null)
+      toViewerPlate(
+        plate,
+        compiled,
+        tools ?? library,
+        plan?.program ?? null,
+        settings
+      )
     const drawn = plates.map((plate) =>
       shown && plate.id === shown.plate.id
         ? drawShown(shown)
-        : toViewerPlate(plate, compilePlate(plate, library), library)
+        : toViewerPlate(
+            plate,
+            compilePlate(plate, library),
+            library,
+            null,
+            settings
+          )
     )
     if (shown && !plates.some((plate) => plate.id === shown.plate.id))
       drawn.push(drawShown(shown))
     return drawn
-  }, [plates, library, shown])
+  }, [plates, library, shown, settings])
 }

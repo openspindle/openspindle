@@ -108,6 +108,13 @@ const PLATE_EQUALITY: FieldEquality<ViewerPlate> = {
   anchorSetup: Object.is,
   fixtures: Object.is,
   deviceId: Object.is,
+  toolSetter: (a, b) =>
+    a === b ||
+    (!!a &&
+      !!b &&
+      samePoint(a.center, b.center) &&
+      a.radius === b.radius &&
+      a.height === b.height),
 }
 
 /** Whether two versions of a plate render identically, optionally for some fields only. */

@@ -10,6 +10,8 @@ import { toolShape } from "@/domain/tools/tool-shape"
 import type { Tool } from "@/domain/tools/tool"
 import { anchorDisplayName, bedAnchors } from "@/domain/anchors/stored-anchors"
 import { machineProgram } from "@/app/workspace/machine-program"
+import type { RuleSettings } from "@/machine/contract"
+import { toolSetterPlacement } from "@/domain/fixtures/makera-z1/tool-setter-placement"
 
 /** How a run's tool is drawn: its 3D model, or else its shape. */
 type ToolLook = Pick<ViewerToolRun, "shape" | "model">
@@ -17,8 +19,9 @@ const NO_TOOL: ToolLook = { shape: null, model: null }
 
 const viewerPlates = new WeakMap<
   Plate,
-  { viewerPlate: ViewerPlate; library: readonly Tool[] }
+  { viewerPlate: ViewerPlate; library: readonly Tool[]; settings: RuleSettings }
 >()
+const DEFAULT_RULE_SETTINGS: RuleSettings = {}
 
 /**
  * The tools in the spindle through the program: each section's active tool, looked up in the
@@ -82,14 +85,16 @@ export function toViewerPlate(
   plate: Plate,
   compiled: CompiledPlate,
   library: readonly Tool[],
-  machine: GCodeProgram | null = null
+  machine: GCodeProgram | null = null,
+  settings: RuleSettings = DEFAULT_RULE_SETTINGS
 ): ViewerPlate {
   const cached = viewerPlates.get(plate)
   const machineProgramOf = machine ?? machineProgram(plate, compiled.program)
   if (
     cached?.viewerPlate.program === compiled.program &&
     cached.viewerPlate.machineProgram === machineProgramOf &&
-    cached.library === library
+    cached.library === library &&
+    cached.settings === settings
   )
     return cached.viewerPlate
   const anchors = plate.setup.anchors
@@ -111,7 +116,8 @@ export function toViewerPlate(
     ...(anchors ? { anchorSetup: anchors } : {}),
     fixtures: plate.setup.fixtures,
     deviceId: plate.setup.deviceId,
+    toolSetter: toolSetterPlacement(plate, settings),
   }
-  viewerPlates.set(plate, { viewerPlate, library })
+  viewerPlates.set(plate, { viewerPlate, library, settings })
   return viewerPlate
 }

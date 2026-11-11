@@ -62,6 +62,7 @@ import type { Marker } from "./setup-markers"
 import type { Collide } from "./touch-marker"
 import { GRID_COLORS } from "./viewer-stage"
 import type { ViewerAssets } from "./viewer-assets"
+import { toolSetterModel } from "./tool-setter-model"
 
 export type PlatePresentation = PathPresentation & {
   showStock: boolean
@@ -538,6 +539,7 @@ export class PlateView {
   private presentation: PlatePresentation
   private readonly context: PlateViewContext
   private readonly bed = new THREE.Group()
+  private readonly toolSetter = new THREE.Group()
   private readonly fixtures = new THREE.Group()
   private fixtureMaterials: THREE.Material[] = []
   /** Placeholder boxes are this view's own; model clones share their templates' geometry. */
@@ -613,6 +615,7 @@ export class PlateView {
     this.pick.userData.plateId = plate.id
     this.root.add(
       this.bed,
+      this.toolSetter,
       this.fixtures,
       this.stock,
       this.path.group,
@@ -733,7 +736,7 @@ export class PlateView {
     caster.set(origin, direction)
     caster.far = PROBE_REACH
     const hits = caster.intersectObjects(
-      [this.bed, this.fixtures, this.stock],
+      [this.bed, this.toolSetter, this.fixtures, this.stock],
       true
     )
     for (const { object, face, point } of hits) {
@@ -763,6 +766,7 @@ export class PlateView {
     // Bed and fixture clones share their templates' geometry; release only owned resources.
     disposeObjects(
       this.stock,
+      this.toolSetter,
       this.decoration,
       this.outline,
       this.machineOrigin,
@@ -784,6 +788,10 @@ export class PlateView {
 
   /** Inexpensive setup objects, rebuilt whenever the plate changes. */
   private buildSetup(plate: ViewerPlate) {
+    replaceChildren(
+      this.toolSetter,
+      plate.toolSetter ? [toolSetterModel(plate.toolSetter)] : []
+    )
     this.axes.position.set(...plate.workOrigin)
     this.stock.position.set(0, 0, 0)
     replaceChildren(this.stock, stockObjects(plate))

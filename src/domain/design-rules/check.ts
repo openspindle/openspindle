@@ -17,14 +17,13 @@ import { kitForPlate } from "../fixtures/catalog"
 import type { FixtureKit } from "../fixtures/fixture-kit"
 import { entersSetterClearance } from "../fixtures/makera-z1/setter-clearance"
 import { toolSetterClearance } from "../fixtures/makera-z1/design-rules"
+import { toolSetterPlacement } from "../fixtures/makera-z1/tool-setter-placement"
 import { keptNcContext, kindOf } from "../operations/kinds"
 import type { Operation } from "../operations/operation"
 import { ownLine } from "../operations/toolpath-parts"
 import type { Plate } from "../plate/plate"
 import { capitalize } from "../primitives"
-import { bedAnchors } from "../anchors/stored-anchors"
 import { rulesOf } from "../rules/rules"
-import { ruleParameters } from "../rules/settings"
 import { programSubject } from "../rules/stages"
 import type { MoveSubject, StageFailure } from "../rules/stages"
 import { isProbeSlot } from "../tools/tool-table"
@@ -130,27 +129,15 @@ function toolSetterViolation(
   settings: RuleSettings,
   library: readonly Tool[]
 ): DesignRuleViolation | null {
-  const kit = kitForPlate(plate)
-  if (!toolSetterClearance.machines?.includes(kit.id)) return null
   const setting = ruleSetting(toolSetterClearance, settings)
   if (setting.severity === "ignore") return null
-  const parameters = ruleParameters(
-    toolSetterClearance,
-    settings[toolSetterClearance.id]
-  )
-  const anchor = bedAnchors(plate.setup.anchors ?? undefined)[0]?.position ?? [
-    0, 0,
-  ]
-  const center: [number, number, number] = [
-    anchor[0] + parameters.x,
-    anchor[1] + parameters.y,
-    parameters.z,
-  ]
+  const setter = toolSetterPlacement(plate, settings)
+  if (!setter) return null
+  const { center, radius, height } = setter
   const x = center[0] - plate.setup.workOrigin[0]
   const y = center[1] - plate.setup.workOrigin[1]
-  const bottom = parameters.z - plate.setup.workOrigin[2]
-  const top = bottom + parameters.height
-  const radius = parameters.radius
+  const bottom = center[2] - plate.setup.workOrigin[2]
+  const top = bottom + height
   const radii = toolRadii(plate, library)
   const hits = compiled.program.segments.filter((segment) =>
     entersSetterClearance(
@@ -182,7 +169,7 @@ function toolSetterViolation(
             kind: "cylinder",
             center,
             radius,
-            height: parameters.height,
+            height,
           },
         ],
       }

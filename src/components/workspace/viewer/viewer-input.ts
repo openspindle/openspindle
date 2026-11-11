@@ -1,5 +1,5 @@
 import type { ToolpathBounds } from "@/domain/compile/toolpath-bounds"
-import type { Place, Severity } from "@/domain/diagnostics"
+import type { Cylinder, Place, Severity } from "@/domain/diagnostics"
 import type { FixtureInstance } from "@/domain/fixtures/definitions"
 import type { GCodeProgram, Point3 } from "@/domain/nc/gcode"
 import type { Stock } from "@/domain/stock/stock"
@@ -62,6 +62,8 @@ export type ViewerPlate = {
    * probe the plate is drawn with (`kitForSetup`).
    */
   deviceId: string | null
+  /** Fixed machine hardware, in bed coordinates, independent of the stock's placement. */
+  toolSetter?: Cylinder | null
 }
 
 /**
