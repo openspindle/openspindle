@@ -43,10 +43,10 @@ our model, and modeled entry recesses follow the configured bed offset.
 
 ## Limits and manual review
 
-Material removal supports known straight, flat-ended cutters and three-axis
-machining-only plates. V-bits, probing/compensation, rotary machining and undercuts
-are unsupported. It is a sampled preview, not a collision check or proof of a
-safe program. Physical gamepad stopping behavior and generated facing paths
+Material removal supports known straight, flat-ended cutters and dimensioned
+V-bits on three-axis machining-only plates. Probing/compensation, rotary machining
+and undercuts are unsupported. It is a sampled preview, not a collision check or
+proof of a safe program. Physical gamepad stopping behavior and generated facing paths
 require hands-on verification before this branch is merged for normal use.
 
 Review with the local simulator before using a machine:
@@ -60,8 +60,8 @@ Review with the local simulator before using a machine:
 3. Save and reload a reusable process, including a changed library tool. Confirm
    copied tools are preserved and a mismatched device/frame prevents loading.
 4. On a machining-only plate, toggle Material removal and seek forward/backward.
-   Check its resolution and confirm V-bit/probing programs explain why removal
-   is unavailable. Toggle off to restore the original stock.
+   Check its resolution, the tapered cuts from V-bits, and the unsupported-program
+   explanation for probing. Toggle off to restore the original stock.
 5. With a standard-mapped controller, verify explicit arming, single Step gestures,
    simulator Direct release-to-stop, focus/controller loss, B Stop and rearming.
    No physical-machine motion is part of this development verification.

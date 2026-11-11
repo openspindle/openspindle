@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from "react"
 import type { FrameSource } from "@/app/job/frame"
 import { usePlanIndex } from "@/app/job/use-plan"
 import { useWorkspace } from "@/app/workspace/workspace-context"
-import { facingToolIssue } from "@/domain/operations/facing"
+import { removalCutter } from "@/domain/tools/removal-cutter"
+import type { RemovalCutter } from "@/domain/tools/removal-cutter"
 import type {
   RemovalGrid,
   RemovalInput,
@@ -106,7 +107,7 @@ function removalInput(
     toViewerPlate(plate, shown.compiled, tools).tools
   )
   for (const [move, segment] of program.segments.entries()) {
-    let radius: number | null = null
+    let cutter: RemovalCutter | null = null
     if (
       !segment.rapid &&
       !segment.routine &&
@@ -124,11 +125,11 @@ function removalInput(
         (entry) => entry.number === number
       )?.toolId
       const tool = tools.find((item) => item.id === toolId)
-      const issue = facingToolIssue(tool)
-      if (issue)
+      const profile = removalCutter(tool)
+      if (!profile.ok)
         return {
           input: null,
-          problem: `Tool ${number ?? "implicit"}: ${issue} Removal needs known straight, flat-ended cutters.`,
+          problem: `Tool ${number ?? "implicit"}: ${profile.error}`,
         }
       if (segment.spindle <= 0)
         return {
@@ -146,9 +147,9 @@ function removalInput(
           problem:
             "A cut extends deeper than the known cutter length from stock top; removal cannot establish engagement there.",
         }
-      radius = (tool?.diameter ?? 0) / 2
+      cutter = profile.value
     }
-    segments.push({ start: segment.start, end: segment.end, radius })
+    segments.push({ start: segment.start, end: segment.end, cutter })
   }
   return { input: { min, max, segments }, problem: null }
 }

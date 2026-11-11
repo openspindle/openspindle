@@ -1,4 +1,6 @@
 import { z } from "zod"
+import { RemovalCutterSchema } from "./removal-cutter"
+import type { RemovalCutter } from "./removal-cutter"
 
 const Point = z.tuple([
   z.number().finite(),
@@ -13,7 +15,7 @@ export const RemovalInputSchema = z.object({
       z.object({
         start: Point,
         end: Point,
-        radius: z.number().positive().nullable(),
+        cutter: RemovalCutterSchema.nullable(),
       })
     )
     .max(50000),
@@ -30,6 +32,48 @@ export type RemovalCursor = { move: number; fraction: number }
 const MAX_AXIS = 128
 const MIN_AXIS = 16
 const MAX_VISITS = 8_000_000
+
+/** Only the part of a V-bit that reaches below stock top needs sampling. */
+function engagedRadius(cutter: RemovalCutter, lowest: number, top: number) {
+  if (cutter.kind === "flat") return cutter.radius
+  return Math.min(
+    cutter.radius,
+    cutter.tipRadius + Math.max(0, top - lowest) / cutter.slope
+  )
+}
+
+/** Lowest cone surface over a linear XYZ sweep, including the truncated flat tip. */
+function coneHeight(
+  cutter: Extract<RemovalCutter, { kind: "v-bit" }>,
+  tipZ: number,
+  dz: number,
+  length2: number,
+  projection: number,
+  cross2: number,
+  first: number,
+  last: number
+): number {
+  const height = (position: number) => {
+    const t = Math.max(first, Math.min(last, position))
+    const distance = Math.sqrt(cross2 + length2 * (t - projection) ** 2)
+    return (
+      tipZ + dz * t + cutter.slope * Math.max(0, distance - cutter.tipRadius)
+    )
+  }
+  let cut = Math.min(height(first), height(last))
+  const tipReach2 = cutter.tipRadius ** 2 - cross2
+  if (tipReach2 >= 0) {
+    const reach = Math.sqrt(tipReach2 / length2)
+    cut = Math.min(cut, height(projection - reach), height(projection + reach))
+  }
+  const denominator = length2 * (cutter.slope ** 2 * length2 - dz ** 2)
+  if (denominator > 0) {
+    // A sloping pass can touch lowest away from the closest XY point.
+    const offset = (-dz * Math.sqrt(cross2)) / Math.sqrt(denominator)
+    cut = Math.min(cut, height(projection + offset))
+  }
+  return cut
+}
 
 /** Bounded 2.5D sample model. No undercuts, holder contact, fixtures or physical machine state. */
 export class MaterialRemoval {
@@ -59,26 +103,24 @@ export class MaterialRemoval {
       const dy = depth / rows
       visits = 0
       for (const segment of segments) {
-        if (
-          segment.radius === null ||
-          Math.min(segment.start[2], segment.end[2]) >= max[2]
-        )
-          continue
+        const lowest = Math.min(segment.start[2], segment.end[2])
+        if (segment.cutter === null || lowest >= max[2]) continue
+        const radius = engagedRadius(segment.cutter, lowest, max[2])
         const left = Math.max(
           min[0],
-          Math.min(segment.start[0], segment.end[0]) - segment.radius
+          Math.min(segment.start[0], segment.end[0]) - radius
         )
         const right = Math.min(
           max[0],
-          Math.max(segment.start[0], segment.end[0]) + segment.radius
+          Math.max(segment.start[0], segment.end[0]) + radius
         )
         const front = Math.max(
           min[1],
-          Math.min(segment.start[1], segment.end[1]) - segment.radius
+          Math.min(segment.start[1], segment.end[1]) - radius
         )
         const back = Math.min(
           max[1],
-          Math.max(segment.start[1], segment.end[1]) + segment.radius
+          Math.max(segment.start[1], segment.end[1]) + radius
         )
         if (right < left || back < front) continue
         visits +=
@@ -132,13 +174,14 @@ export class MaterialRemoval {
   private sweep(move: number, fraction: number) {
     if (fraction <= 0) return
     const segment = this.input.segments[move]
-    const { radius, start } = segment
-    if (radius === null) return
+    const { cutter, start } = segment
+    if (cutter === null) return
     const end = start.map(
       (value, axis) => value + (segment.end[axis] - value) * fraction
     )
     const { min, max } = this.input
     if (Math.min(start[2], end[2]) >= max[2]) return
+    const radius = engagedRadius(cutter, Math.min(start[2], end[2]), max[2])
     const left = Math.max(
       0,
       Math.ceil((Math.min(start[0], end[0]) - radius - min[0]) / this.dx)
@@ -188,7 +231,20 @@ export class MaterialRemoval {
             start[2] + first * (end[2] - start[2]),
             start[2] + last * (end[2] - start[2])
           )
-        }
+          if (cutter.kind === "v-bit")
+            cut = coneHeight(
+              cutter,
+              start[2],
+              end[2] - start[2],
+              length2,
+              projection,
+              cross2,
+              first,
+              last
+            )
+        } else if (cutter.kind === "v-bit")
+          cut +=
+            cutter.slope * Math.max(0, Math.sqrt(distance2) - cutter.tipRadius)
         const at = row * (this.columns + 1) + column
         this.heights[at] = Math.min(this.heights[at], Math.max(0, cut - min[2]))
       }
