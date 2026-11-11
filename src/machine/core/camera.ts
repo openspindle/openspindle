@@ -8,6 +8,7 @@ import type {
 const MAX_FRAME_BYTES = 4 * 1024 * 1024
 const CONNECT_TIMEOUT_MS = 8000
 const FRAME_TIMEOUT_MS = 15000
+const MAX_RECONNECTS = 5
 
 type CameraStatus = "connecting" | "live" | "paused" | "error"
 
@@ -29,6 +30,7 @@ type Feed = {
   timer: TimerHandle | null
   status: CameraStatus
   generation: number
+  reconnects: number
 }
 
 const isJpeg = (bytes: Uint8Array) =>
@@ -55,6 +57,7 @@ export class CameraFeed {
 
   subscribe(url: string, listener: (event: CameraEvent) => void): () => void {
     let feed = this.feeds.get(url)
+    const created = !feed
     if (!feed) {
       feed = {
         url,
@@ -63,12 +66,13 @@ export class CameraFeed {
         timer: null,
         status: this.pauses ? "paused" : "connecting",
         generation: 0,
+        reconnects: 0,
       }
       this.feeds.set(url, feed)
-      if (!this.pauses) this.open(feed)
     }
     feed.listeners.add(listener)
     listener({ kind: "status", status: feed.status })
+    if (created && !this.pauses && this.feeds.get(url) === feed) this.open(feed)
     const current = feed
     return () => {
       current.listeners.delete(listener)
@@ -81,7 +85,7 @@ export class CameraFeed {
     this.pauses++
     if (this.pauses === 1) {
       for (const feed of this.feeds.values()) {
-        if (feed.status === "error") continue
+        if (feed.status === "error" && !feed.timer) continue
         this.disconnect(feed)
         feed.status = "paused"
         this.emit(feed, { kind: "status", status: "paused" })
@@ -132,6 +136,7 @@ export class CameraFeed {
             return
           }
           this.arm(feed, FRAME_TIMEOUT_MS)
+          feed.reconnects = 0
           if (feed.status !== "live") {
             feed.status = "live"
             this.emit(feed, { kind: "status", status: "live" })
@@ -151,12 +156,28 @@ export class CameraFeed {
     }
   }
 
-  /** The feed stays failed until every subscriber leaves; a new subscription retries. */
+  /** Retry only the picture stream, with a bounded backoff while someone is watching. */
   private fail(feed: Feed) {
     if (this.feeds.get(feed.url) !== feed || feed.status === "error") return
     feed.status = "error"
     this.disconnect(feed)
     this.emit(feed, { kind: "status", status: "error" })
+    if (
+      this.feeds.get(feed.url) !== feed ||
+      !feed.listeners.size ||
+      this.pauses ||
+      feed.reconnects >= MAX_RECONNECTS
+    )
+      return
+    const delay = Math.min(1000 * 2 ** feed.reconnects, 16000)
+    feed.reconnects++
+    feed.timer = this.clock.setTimeout(() => {
+      feed.timer = null
+      if (this.feeds.get(feed.url) !== feed || this.pauses) return
+      feed.status = "connecting"
+      this.emit(feed, { kind: "status", status: "connecting" })
+      if (this.feeds.get(feed.url) === feed && !this.pauses) this.open(feed)
+    }, delay)
   }
 
   private close(feed: Feed) {

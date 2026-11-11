@@ -255,14 +255,12 @@ export const COMMAND_RULES: readonly CommandRule[] = [
     stage: "command",
     label: "Fresh status",
     description:
-      "Status older than a few seconds is not trusted for any decision. Stop and Reset do not wait for it.",
+      "Status older than a few seconds is not trusted for any decision. Stop stays available while status is missing.",
     severity: "error",
     configurable: false,
     chain: ADMISSION,
     test: ({ request, context }) =>
-      request.key === "stop" ||
-      request.key === "reset" ||
-      isFresh(context.telemetry, context.now),
+      request.key === "stop" || isFresh(context.telemetry, context.now),
     explain: () => ({ problem: "Waiting for fresh device status." }),
   },
   {

@@ -4,7 +4,7 @@
 - **Date:** 2026-11-10
 - **Decision owners:** OpenSpindle maintainers
 - **Scope:** Device communications, connection lifecycle, file transfer, observability and run safety
-- **Implementation:** Not implemented by this ADR
+- **Implementation:** TCP telemetry health, bounded polling and write buffering, persistent motion lockout with Stop available, and camera reconnect are implemented in `src/machine/core/session.ts`, `src/machine/core/controller.ts`, `electron/machine/node-ports.ts` and `src/machine/core/camera.ts`. USB transport and automatic machine reconnection remain proposed. See [Device controls](../docs/device-controls.md).
 
 ## Context and problem
 

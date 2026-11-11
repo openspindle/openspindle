@@ -109,8 +109,8 @@ export async function executeCommand(
       )
     // Unverified motion leaves the machine in an unknown state: isolate it.
     if (plan.motion) {
-      const message = `${error.message} Its outcome is unknown; check the machine before reconnecting. No command was retried.`
-      session.close(message)
+      const message = `${error.message} Its outcome is unknown. Check the machine; Stop remains available. No command was retried.`
+      session.lockout = message
       throw new MachineError("unverified", message)
     }
     throw new MachineError("unverified", `${error.message} Check the machine.`)

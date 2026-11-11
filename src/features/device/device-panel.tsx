@@ -102,6 +102,8 @@ export function DevicePanel({
   let state = "Disconnected"
   if (snapshot.connection.restarting) state = "Restarting"
   if (device) state = telemetry ? telemetry.state : "Waiting for status"
+  if (device && snapshot.connection.health === "stale")
+    state = "Status unavailable"
   let actionStatus = notice
   if (activity) actionStatus = `${activity.label}…`
   const failure = stop.error ?? reset.error ?? command.error
@@ -222,11 +224,13 @@ export function DevicePanel({
           </AlertAction>
         </Alert>
       )}
-      {!failure && snapshot.connection.error && (
-        <Alert variant="destructive" role="alert">
-          <AlertDescription>{snapshot.connection.error}</AlertDescription>
-        </Alert>
-      )}
+      {!failure &&
+        snapshot.connection.error &&
+        snapshot.connection.health !== "stale" && (
+          <Alert variant="destructive" role="alert">
+            <AlertDescription>{snapshot.connection.error}</AlertDescription>
+          </Alert>
+        )}
       <MachineDiagnosis />
       <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(320px,1fr)]">
         <div className="flex min-w-0 flex-col gap-4">

@@ -121,6 +121,8 @@ export const MachineSnapshotSchema = z.object({
     /** Changes on every connection, even to the same network address. */
     id: z.string().uuid().nullable(),
     status: z.enum(["disconnected", "connecting", "connected"]),
+    /** TCP may stay open while firmware status is unavailable. */
+    health: z.enum(["waiting", "fresh", "stale"]),
     device: ConnectedDeviceSchema.nullable(),
     error: z.string().nullable(),
     /** Reset rebooted the machine; the same device is connected again once it answers. */
@@ -167,6 +169,7 @@ export function disconnectedSnapshot(
     connection: {
       id: null,
       status: "disconnected",
+      health: "waiting",
       device: null,
       error,
       restarting: false,

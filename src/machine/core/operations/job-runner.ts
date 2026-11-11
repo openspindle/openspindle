@@ -417,8 +417,15 @@ async function transferProgram(
   const watch = () => {
     clock.clearTimeout(stall)
     stall = clock.setTimeout(() => {
-      for (const frame of protocol.stalled?.() ?? []) session.send(frame)
-      watch()
+      if (context.signal.aborted || session.closed) return
+      try {
+        for (const frame of protocol.stalled?.() ?? []) session.send(frame)
+        watch()
+      } catch (error) {
+        session.close(
+          error instanceof Error ? error.message : "File transfer write failed."
+        )
+      }
     }, STALL_MS)
   }
   watch()
@@ -453,7 +460,15 @@ async function transferProgram(
         if (stage === "upload" && protocol.stage === "readback" && delay > 0) {
           readback = clock.setTimeout(() => {
             if (context.signal.aborted || session.closed) return
-            for (const frame of frames) session.send(frame)
+            try {
+              for (const frame of frames) session.send(frame)
+            } catch (error) {
+              session.close(
+                error instanceof Error
+                  ? error.message
+                  : "File readback request failed."
+              )
+            }
           }, delay)
         } else {
           for (const frame of frames) session.send(frame)

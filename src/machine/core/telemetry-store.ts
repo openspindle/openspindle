@@ -25,6 +25,7 @@ export class TelemetryStore {
   sequence = 0
   private readonly waiters = new Set<Waiter>()
   private readonly clock: Clock
+  private failure: Error | null = null
 
   constructor(clock: Clock) {
     this.clock = clock
@@ -51,6 +52,10 @@ export class TelemetryStore {
     options: StatusWait
   ): Promise<Telemetry> {
     return new Promise((resolve, reject) => {
+      if (this.failure) {
+        reject(this.failure)
+        return
+      }
       const signal = options.signal
       if (signal?.aborted) {
         reject(abortError(signal))
@@ -87,6 +92,7 @@ export class TelemetryStore {
 
   /** Rejects every waiter; used when the connection closes. */
   fail(error: Error) {
+    this.failure = error
     for (const waiter of [...this.waiters]) waiter.settle(error)
   }
 }

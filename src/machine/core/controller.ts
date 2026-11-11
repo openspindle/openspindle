@@ -172,6 +172,7 @@ export class MachineController {
   private readonly adapter: FirmwareAdapter
   private readonly ports: MachinePorts
   private session: MachineSession | null = null
+  private resumeCameraAfterStale: (() => void) | null = null
   private lastError: string | null = null
   private activity: Foreground | null = null
   private deferred: Deferred[] = []
@@ -201,7 +202,6 @@ export class MachineController {
   private readonly connectionIds = new WeakMap<MachineSession, string>()
   /** Connections over which settings were saved that the machine applies once it restarts. */
   private readonly restartNeeded = new WeakSet<MachineSession>()
-  private lockout: string | null = null
   /** A reset is waiting for the machine to come back; connecting or disconnecting ends it. */
   private restart: { cancelled: boolean } | null = null
   private anchors: MachineSnapshot["anchors"] = {
@@ -319,7 +319,6 @@ export class MachineController {
             if (this.session !== session) return
             identified = true
             this.lastError = null
-            this.lockout = null
             this.anchorsAttempted = false
             this.clockAttempted = false
             this.anchors = { value: null, reading: false, error: null }
@@ -329,6 +328,7 @@ export class MachineController {
           status: (telemetry) => this.onStatus(session, telemetry),
           line: (line) => this.onLine(session, line),
           tick: (now) => this.onTick(session, now),
+          health: () => this.onHealth(session),
           closed: (error) => {
             this.onClosed(session, error)
             if (!identified)
@@ -521,12 +521,12 @@ export class MachineController {
         timeoutMs: STOP_CONFIRM_MS,
         timeoutMessage: "The machine did not confirm Stop.",
       })
-      this.lockout = null
+      session.lockout = null
     } catch (error) {
       if (error instanceof MachineError && error.code === "timeout") {
-        this.lockout =
+        session.lockout =
           "The machine did not confirm Stop. Check the machine; Stop remains available."
-        throw new MachineError("unverified", this.lockout)
+        throw new MachineError("unverified", session.lockout)
       }
       throw error
     } finally {
@@ -657,7 +657,7 @@ export class MachineController {
     const tracker = this.tracker
     const running = this.running
     if (!tracker?.awaitingNext || !running || this.activity) return
-    if (!this.session?.ready) return
+    if (!this.session?.healthy || this.session.lockout) return
     const index = tracker.claimNext()
     if (index === null) return
     const count = tracker.parts.length
@@ -885,16 +885,28 @@ export class MachineController {
   }
 
   private onTick(session: MachineSession, now: number) {
-    if (session !== this.session || !this.tracker) return
+    if (session !== this.session || !session.healthy || !this.tracker) return
     this.applyTracker(this.tracker.tick(now))
+  }
+
+  private onHealth(session: MachineSession) {
+    if (session !== this.session) return
+    if (session.health === "stale" && !this.resumeCameraAfterStale)
+      this.resumeCameraAfterStale = this.camera.pause()
+    if (session.health === "fresh") {
+      this.resumeCameraAfterStale?.()
+      this.resumeCameraAfterStale = null
+    }
+    this.publish()
   }
 
   private onClosed(session: MachineSession, error: string | null) {
     if (session !== this.session) return
     this.session = null
     this.camera.dispose()
+    this.resumeCameraAfterStale?.()
+    this.resumeCameraAfterStale = null
     this.lastError = error
-    this.lockout = null
     this.transfer = null
     if (this.tracker) this.applyTracker(this.tracker.disconnected())
     const lost = new MachineError(
@@ -1058,14 +1070,14 @@ export class MachineController {
 
   private admissionContext(): AdmissionContext {
     const session = this.session?.ready ? this.session : null
-    const telemetry = session?.store.telemetry ?? null
+    const telemetry = session?.healthy ? session.store.telemetry : null
     return {
       connected: session !== null,
       identity: session?.identity ?? null,
       telemetry,
       now: this.ports.clock.now(),
       activity: this.activity,
-      lockout: this.lockout,
+      lockout: session?.lockout ?? null,
       streaming: this.streaming(telemetry),
       job: this.job,
       rules: this.adapter.rules,
@@ -1291,9 +1303,10 @@ export class MachineController {
     if (
       this.clockAttempted ||
       this.activity ||
-      this.lockout ||
       this.deferred.length ||
       !session?.ready ||
+      !session.healthy ||
+      session.lockout ||
       !telemetry ||
       !machineClock ||
       machineClock.admit(telemetry) !== null ||
@@ -1344,14 +1357,20 @@ export class MachineController {
     let status: MachineSnapshot["connection"]["status"] = "disconnected"
     if (ready) status = "connected"
     else if (session) status = "connecting"
+    let connectionError = this.lastError
+    if (session?.health === "stale")
+      connectionError =
+        "Device status is not responding. The machine may still be running. Stop can be attempted, but its effect must be confirmed."
+    if (this.restart) connectionError = null
     return {
       revision,
       connection: {
         id: ready ? this.connectionId(ready) : null,
         status,
+        health: session?.health ?? "waiting",
         device: ready?.device ?? null,
         // Failed attempts while the machine restarts are expected, not errors.
-        error: this.restart ? null : this.lastError,
+        error: connectionError,
         restarting: this.restart !== null,
         restartNeeded: ready !== null && this.restartNeeded.has(ready),
       },
@@ -1378,7 +1397,7 @@ export class MachineController {
       })),
       job: this.job,
       anchors: this.anchors,
-      lockout: this.lockout ? { reason: this.lockout } : null,
+      lockout: context.lockout ? { reason: context.lockout } : null,
       limits: ready ? this.adapter.limits : null,
     }
   }

@@ -29,10 +29,12 @@ import type {
   TimerHandle,
 } from "./ports.ts"
 import { TelemetryStore } from "./telemetry-store.ts"
+import { isFresh } from "../contract/telemetry.ts"
 
 const HANDSHAKE_MS = 8000
-/** Polling this long without a status reply closes the connection. */
+/** Missing status changes control trust, never the TCP connection's lifecycle. */
 const STALE_MS = 5000
+const STALE_POLL_MS = 5000
 const POLL_MS = 1000
 const FAST_POLL_MS = 250
 /** A query unanswered this long may be repeated. */
@@ -69,6 +71,7 @@ export type SessionEvents = {
   /** Lines no lease claimed: job evidence, unsolicited reports. */
   readonly line: (line: Line) => void
   readonly tick: (now: number) => void
+  readonly health: () => void
   readonly closed: (error: string | null) => void
 }
 
@@ -88,6 +91,10 @@ export class MachineSession {
   identityReplyState: MachineState | null = null
   device: ConnectedDevice | null = null
   closed = false
+  health: "waiting" | "fresh" | "stale" = "waiting"
+  lastFrameAt: number | null = null
+  /** An unverified command must be settled by Stop, even after status recovers. */
+  lockout: string | null = null
   /** The job monitor wants the fast rate (starting, finishing, cleaning). */
   fastPolling = false
   private boosts = 0
@@ -136,7 +143,12 @@ export class MachineSession {
     this.connection = ports.tcp.connect(target.host, target.port, {
       open: () => {
         if (this.closed) return
-        this.send(adapter.queries.identity)
+        // Handshake writes have no operation awaiting them yet.
+        try {
+          this.send(adapter.queries.identity)
+        } catch {
+          return
+        }
         this.requestStatus(true)
         this.schedulePoll()
       },
@@ -150,7 +162,26 @@ export class MachineSession {
     return !this.closed && this.device !== null
   }
 
+  get healthy() {
+    return (
+      this.ready &&
+      this.health === "fresh" &&
+      isFresh(this.store.telemetry, this.clock.now())
+    )
+  }
+
   send(frame: OutboundFrame) {
+    if (
+      this.suspensions === 0 &&
+      frame !== this.adapter.halt &&
+      frame !== this.adapter.queries.identity &&
+      frame !== this.adapter.job.homedQuery &&
+      (!this.healthy || this.lockout)
+    )
+      throw new MachineError(
+        "refused",
+        this.lockout ?? "Waiting for fresh device status. No command was sent."
+      )
     this.write(frame, true)
   }
 
@@ -158,15 +189,21 @@ export class MachineSession {
   requestStatus(force = false) {
     if (this.closed || this.suspensions > 0) return
     const now = this.clock.now()
+    let minimumInterval = force ? FAST_POLL_MS : OUTSTANDING_MS
+    if (this.health === "stale") minimumInterval = STALE_POLL_MS
     if (
-      !force &&
       this.outstandingSince !== null &&
-      now - this.outstandingSince < OUTSTANDING_MS
+      now - this.outstandingSince < minimumInterval
     )
       return
     this.outstandingSince = now
-    this.write(this.adapter.queries.diagnostics, false)
-    this.write(this.adapter.queries.status, false)
+    try {
+      this.write(this.adapter.queries.diagnostics, false)
+      this.write(this.adapter.queries.status, false)
+    } catch (error) {
+      // A failed write already closed the session and rejected its operations.
+      if (!this.isClosed()) throw error
+    }
   }
 
   /** Fast polling while an operation verifies its effect. */
@@ -188,9 +225,11 @@ export class MachineSession {
       if (released) return
       released = true
       this.suspensions--
+      if (this.suspensions > 0 || this.closed) return
       // The transfer had no status traffic; restart the stale window.
       this.silentMs = 0
       this.outstandingSince = null
+      this.setHealth("waiting")
     }
   }
 
@@ -257,7 +296,17 @@ export class MachineSession {
       }
       const lease: Lease = {
         handle: (event) => {
-          const verdict = handler(event)
+          let verdict: ReplyVerdict<TResult>
+          try {
+            verdict = handler(event)
+          } catch (error) {
+            finish(
+              error instanceof Error
+                ? error
+                : new Error("Invalid device reply.")
+            )
+            return true
+          }
           if (verdict === "ignored") return false
           if (verdict === "consumed") {
             if (options.rearm) arm()
@@ -298,7 +347,10 @@ export class MachineSession {
   close(error: string | null = null) {
     if (this.closed) return
     this.closed = true
-    this.trace.record("note", `Disconnected: ${error ?? "closed by the app"}`)
+    this.trace.record(
+      "note",
+      `Disconnected: ${error ?? "closed by the app"}; last status ${this.store.telemetry?.receivedAt ?? "none"}; last frame ${this.lastFrameAt ?? "none"}`
+    )
     this.clock.clearTimeout(this.pollTimer)
     this.clock.clearTimeout(this.handshakeTimer)
     this.connection.destroy()
@@ -325,7 +377,24 @@ export class MachineSession {
       describeOutbound(frame),
       command && typeof frame.payload === "string" ? COMMAND : undefined
     )
-    this.connection.write(this.adapter.encode(frame))
+    try {
+      this.connection.write(this.adapter.encode(frame))
+    } catch (error) {
+      const reason =
+        error instanceof Error ? error.message : "The device write failed."
+      this.close(reason)
+      throw new MachineError("connection-lost", reason)
+    }
+  }
+
+  private setHealth(health: MachineSession["health"]) {
+    if (this.health === health) return
+    this.health = health
+    this.trace.record(
+      "note",
+      `TCP telemetry ${health}; last status ${this.store.telemetry?.receivedAt ?? "none"}; last frame ${this.lastFrameAt ?? "none"}`
+    )
+    this.events.health()
   }
 
   private schedulePoll() {
@@ -337,12 +406,9 @@ export class MachineSession {
       if (this.ready && this.suspensions === 0) {
         // A poll that comes late, after the process was held up, counts one interval: its
         // query goes out now, and replies that arrived meanwhile are read next.
-        this.silentMs += interval
+        this.silentMs = Math.min(STALE_MS, this.silentMs + interval)
         if (this.silentMs >= STALE_MS) {
-          this.close(
-            "Device status stopped responding. The connection was closed."
-          )
-          return
+          this.setHealth("stale")
         }
       }
       this.requestStatus()
@@ -372,6 +438,7 @@ export class MachineSession {
   }
 
   private route(event: FirmwareEvent) {
+    this.lastFrameAt = this.clock.now()
     this.trace.record("received", describeInbound(event), consoleReply(event))
     switch (event.kind) {
       case "diagnostics":
@@ -385,6 +452,7 @@ export class MachineSession {
         this.outstandingSince = null
         if (!this.identify(event.identity)) return
         this.store.update(event.telemetry, () => {
+          this.setHealth("fresh")
           if (this.ready) this.events.status(event.telemetry)
         })
         return
