@@ -1,3 +1,4 @@
+import { endpointLabel } from "@/machine/contract"
 import { useEffect, useId, useState } from "react"
 import { ArrowLeftRight, Check, Circle, Play, Wrench } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
@@ -79,7 +80,7 @@ export function DeviceToolCard({
   const [choice, setChoice] = useState<number | null>(null)
   useEffect(() => {
     setChoice(null)
-  }, [device?.host, device?.port])
+  }, [device ? endpointLabel(device) : null])
   const plate = useSelectedPlate()
   const library = useWorkspace((state) => state.tools)
   const held = telemetry?.tool ?? null

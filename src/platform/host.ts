@@ -13,6 +13,7 @@ import type {
   MachineCommand,
   MachineSnapshot,
   NetworkDevice,
+  SerialDevice,
   PrepareResult,
   RunRequest,
   SimulatedBed,
@@ -70,6 +71,7 @@ export interface MachineHost {
   endSimulatedJog: (input: SimulatedJogSession) => Promise<MachineSnapshot>
   snapshot: () => Promise<MachineSnapshot>
   subscribe: (listener: (snapshot: MachineSnapshot) => void) => () => void
+  serialDevices: () => Promise<SerialDevice[]>
   discover: () => Promise<NetworkDevice[]>
   connect: (request: ConnectRequest) => Promise<MachineSnapshot>
   disconnect: (request: DisconnectRequest) => Promise<MachineSnapshot>

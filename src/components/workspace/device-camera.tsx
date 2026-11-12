@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { isSimulator } from "@/machine/contract"
+import { endpointLabel, isSimulator } from "@/machine/contract"
 import type { ConnectedDevice } from "@/machine/contract"
 import { useMachineHost } from "@/platform/machine"
 
@@ -85,7 +85,7 @@ export function DeviceCamera({
     typeof document.documentElement.requestFullscreen === "function"
 
   // A new device always starts stopped.
-  useEffect(() => setAttempt(0), [device?.host, device?.port])
+  useEffect(() => setAttempt(0), [device ? endpointLabel(device) : null])
 
   useEffect(() => {
     const syncFullscreen = () => {

@@ -37,15 +37,9 @@ const STEP_MS = 10_000
 const STALL_MS = 3000
 /** Upload, readback and both preflights together, for each file sent. */
 const PREPARATION_MS = 80_000
-/**
- * The slowest a program may go up and be read back, bytes per second: under half the slowest
- * seen over a Z1's network. A transfer that stalls fails sooner, at `STEP_MS` without progress.
- */
-const MIN_TRANSFER_RATE = 8 * 1024
-
-/** How long preparing a file of `bytes` may take: `PREPARATION_MS`, and its upload and readback at `MIN_TRANSFER_RATE`. */
-const preparationMs = (bytes: number) =>
-  PREPARATION_MS + ((2 * bytes) / MIN_TRANSFER_RATE) * 1000
+/** Overall upload/readback budget at the transport's conservative minimum throughput. */
+const preparationMs = (bytes: number, minimumRate: number) =>
+  PREPARATION_MS + ((2 * bytes) / minimumRate) * 1000
 const START_MS = 8_000
 
 export type JobRunnerHooks = {
@@ -197,7 +191,11 @@ export async function prepareAndStart(
   const parts = programParts(program)
   const { scoped, release } = withDeadline(
     context,
-    parts.reduce((total, part) => total + preparationMs(part.bytes), 0)
+    parts.reduce(
+      (total, part) =>
+        total + preparationMs(part.bytes, session.minimumTransferRate),
+      0
+    )
   )
   const resumeCamera = hooks.pauseCamera()
   try {
@@ -230,7 +228,12 @@ export async function prepareAndStart(
       hooks.update({ part: index, path })
       await transferProgram(
         scoped,
-        job.createTransfer(bytes, hooks.md5(bytes), path),
+        job.createTransfer(
+          bytes,
+          hooks.md5(bytes),
+          path,
+          session.transferBlockBytes
+        ),
         hooks
       )
     }

@@ -3,6 +3,8 @@ import type {
   RunRequest,
   PreparedProgram,
   PrepareResult,
+  SerialDevice,
+  SerialTarget,
 } from "../contract/index.ts"
 
 /**
@@ -18,11 +20,24 @@ export interface Clock {
   clearTimeout: (handle: TimerHandle | null | undefined) => void
 }
 
-export interface TcpConnection {
+export interface MachineByteConnection {
   write: (bytes: Uint8Array) => void
   destroy: () => void
 }
 
+export type TcpConnection = MachineByteConnection
+export interface ByteStreamEvents {
+  open: () => void
+  data: (bytes: Uint8Array) => void
+  closed: (error: string | null) => void
+}
+export interface SerialConnector {
+  list: () => Promise<SerialDevice[]>
+  connect: (
+    target: SerialTarget,
+    events: ByteStreamEvents
+  ) => MachineByteConnection
+}
 export interface TcpConnector {
   connect: (
     host: string,
@@ -91,6 +106,7 @@ export type MachinePorts = {
   readonly journal?: MachineJournal
   readonly clock: Clock
   readonly tcp: TcpConnector
+  readonly serial?: SerialConnector
   readonly udp: DatagramListener
   readonly camera: CameraConnector
   readonly md5: (bytes: Uint8Array) => string

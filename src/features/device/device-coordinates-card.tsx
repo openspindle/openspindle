@@ -1,3 +1,4 @@
+import { endpointLabel } from "@/machine/contract"
 import { useEffect, useId, useState } from "react"
 import { Crosshair, LayoutDashboard, Move3D } from "lucide-react"
 import { cn } from "cn"
@@ -186,7 +187,7 @@ export function DeviceCoordinatesCard({
   const [confirmXyz, setConfirmXyz] = useState(false)
   useEffect(() => {
     setConfirmXyz(false)
-  }, [device?.host, device?.port])
+  }, [device ? endpointLabel(device) : null])
   const xyz: MachineCommand = { type: "zero", axes: ["X", "Y", "Z"] }
   const hasPlates = useWorkspace((state) => state.plates.length > 0)
   return (

@@ -1,3 +1,4 @@
+import { endpointLabel } from "../contract/index.ts"
 import type {
   ConnectTarget,
   ConnectedDevice,
@@ -76,10 +77,12 @@ export type SessionEvents = {
 }
 
 /**
- * One TCP connection: handshake and identity, event routing, the reply lease,
+ * One framed byte-stream connection: handshake and identity, event routing, the reply lease,
  * status polling and the stale-status watchdog. It holds no policy.
  */
 export class MachineSession {
+  readonly transferBlockBytes: 128 | 8192
+  readonly minimumTransferRate: number
   readonly store: TelemetryStore
   /** Latest diagnostic reply and its order, independent of cached ordinary status. */
   diagnostics: {
@@ -129,19 +132,31 @@ export class MachineSession {
     events: SessionEvents,
     trace: ProtocolTrace
   ) {
+    if (target.transport === "serial" && !ports.serial)
+      throw new MachineError(
+        "refused",
+        "USB serial is not available in this host."
+      )
     this.adapter = adapter
     this.clock = ports.clock
     this.events = events
     this.target = target
     this.trace = trace
-    trace.record("note", `Connecting to ${target.host}:${target.port}`)
+    this.transferBlockBytes = target.transport === "serial" ? 128 : 8192
+    this.minimumTransferRate = target.transport === "serial" ? 1024 : 8192
+    trace.record(
+      "note",
+      target.transport === "serial"
+        ? "Connecting via USB serial (115200 8N1)"
+        : `Connecting to ${endpointLabel(target)}`
+    )
     this.store = new TelemetryStore(ports.clock)
     this.interpreter = adapter.createInterpreter()
     this.handshakeTimer = this.clock.setTimeout(
       () => this.close("Timed out verifying the device."),
       HANDSHAKE_MS
     )
-    this.connection = ports.tcp.connect(target.host, target.port, {
+    const streamEvents = {
       open: () => {
         if (this.closed) return
         // Handshake writes have no operation awaiting them yet.
@@ -153,10 +168,23 @@ export class MachineSession {
         this.requestStatus(true)
         this.schedulePoll()
       },
-      data: (bytes) => this.receive(bytes),
-      closed: (error) =>
+      data: (bytes: Uint8Array) => this.receive(bytes),
+      closed: (error: string | null) =>
         this.close(error ?? "The device closed the connection."),
-    })
+    }
+    if (target.transport === "serial") {
+      if (!ports.serial)
+        throw new MachineError(
+          "refused",
+          "USB serial is not available in this host."
+        )
+      this.connection = ports.serial.connect(target, streamEvents)
+    } else
+      this.connection = ports.tcp.connect(
+        target.host,
+        target.port,
+        streamEvents
+      )
   }
 
   get ready() {
@@ -525,12 +553,34 @@ export class MachineSession {
     this.identity = identity
     if (!this.device) {
       this.clock.clearTimeout(this.handshakeTimer)
-      this.device = {
-        name: this.target.name ?? this.target.host,
-        host: this.target.host,
-        port: this.target.port,
-        model: identity.model,
-      }
+      if (this.target.transport === "serial") {
+        const profile = this.target.profile
+        if (profile && profile.model !== identity.model) {
+          this.close(
+            "IDENTITY_MISMATCH: The USB-reported model differs from the explicitly associated profile."
+          )
+          return false
+        }
+        const target = {
+          transport: this.target.transport,
+          portId: this.target.portId,
+          pathHint: this.target.pathHint,
+          cameraHost: this.target.cameraHost,
+          name: this.target.name,
+        }
+        this.device = {
+          ...target,
+          name: profile?.name ?? target.name ?? `USB ${identity.model}`,
+          model: identity.model,
+          ...(profile ? { profileId: profile.id } : {}),
+        }
+      } else
+        this.device = {
+          name: this.target.name ?? this.target.host,
+          host: this.target.host,
+          port: this.target.port,
+          model: identity.model,
+        }
       this.trace.record(
         "note",
         `Connected: ${this.device.name} (${identity.model})`

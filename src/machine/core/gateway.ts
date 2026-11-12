@@ -53,6 +53,11 @@ export class MachineGateway {
     return this.controller.watchConsole(listener)
   }
 
+  serialDevices() {
+    this.requireApp()
+    return this.controller.serialDevices()
+  }
+
   discover(): Promise<NetworkDevice[]> {
     this.requireApp()
     return this.controller.discover()

@@ -19,6 +19,7 @@ export function createMachineHandlers(
       "machine.endSimulatedJog": (input) =>
         machine(() => gateway.endSimulatedJog(input)),
       "machine.snapshot": () => machine(() => gateway.snapshot()),
+      "machine.serialDevices": () => machine(() => gateway.serialDevices()),
       "machine.discover": () => machine(() => gateway.discover()),
       "machine.connect": (request) => machine(() => gateway.connect(request)),
       "machine.disconnect": (request) =>

@@ -275,7 +275,8 @@ export interface JobProtocol {
   createTransfer: (
     bytes: Uint8Array,
     md5: string,
-    path: string
+    path: string,
+    blockBytes?: 128 | 8192
   ) => TransferProtocol
   play: (path: string) => OutboundFrame
   /**
@@ -367,8 +368,12 @@ export interface FirmwareAdapter {
     readonly path: string
     readAdmit: (telemetry: Telemetry) => string | null
     writeAdmit: (telemetry: Telemetry) => string | null
-    createDownload: () => DownloadProtocol
-    createUpload: (bytes: Uint8Array, md5: string) => TransferProtocol
+    createDownload: (blockBytes?: 128 | 8192) => DownloadProtocol
+    createUpload: (
+      bytes: Uint8Array,
+      md5: string,
+      blockBytes?: 128 | 8192
+    ) => TransferProtocol
     vacuumDefaultPower: (content: string) => number | null
     withVacuumDefaultPower: (content: string, percent: number) => string
     /** The size of the camera's stream the file sets; null when it sets none. */

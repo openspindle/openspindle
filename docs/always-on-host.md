@@ -25,6 +25,8 @@ npm run start:host
 | `OPENSPINDLE_HOST_ORIGIN` | Public browser origin when served through a TLS proxy, e.g. `https://cnc.example` |
 | `OPENSPINDLE_MACHINE_HOST` | Optional explicitly configured IPv4 CNC/simulator address; connects once at startup |
 | `OPENSPINDLE_MACHINE_PORT` | CNC/simulator port; defaults to `2222` |
+| `OPENSPINDLE_USB_ID` | Explicit FTDI ID from the `usb` terminal command; one USB connection attempt at startup; mutually exclusive with the TCP address |
+| `OPENSPINDLE_CAMERA_HOST` | Optional local camera IPv4 when using USB |
 
 Open the host URL and enter the access key. The browser keeps the key in memory, not a URL, cookie, saved project or local storage. Use TLS through a same-origin reverse proxy for LAN access, or an SSH tunnel to the default loopback listener. There is no permissive CORS or password-in-query mode. All `/api/` routes require Bearer authentication. `/health` returns only `{status:"ok"}`. The host restricts cross-origin requests, upload size/concurrency and request rate. No API reads arbitrary host paths or executes shell commands.
 
@@ -41,7 +43,8 @@ Shared-tool import/publish commands can use the same host. `GET /api/tools` retu
 Interactive stdin commands are:
 
 - `status` and `discover` read machine state/discovery.
-- `connect <IPv4> <port>` explicitly chooses one connection.
+- `connect <IPv4> <port>` explicitly chooses one TCP connection.
+- `usb` lists FTDI serial candidates; `connect-usb <id> [camera-IPv4]` explicitly opens the selected USB endpoint; `disconnect` closes the idle connection. See [USB serial](usb-serial.md).
 - `run <inbox-id> <package-sha256>` starts that exact reviewed package through the machine gateway. Both the stored package hash and its embedded NC hash are rechecked. The expected connection ID is bound to Run. Review work zero, installed tools, clamps and the original program first; the browser overlay is not a physical setup check.
 - `pause`, `resume` and `stop` use existing verified commands and never retry motion automatically.
 
@@ -51,6 +54,6 @@ The inbox keeps at most 100 immutable packages/2 GiB. Back up `inbox`, `state.js
 
 ## Transport and validation limits
 
-This host currently uses the existing TCP transport. **USB is not implemented by this branch.** Follow ADR 0001 for the FTDI identity/driver, handshake, framing and 128-byte transfer work. USB control would still require a separate network camera source. No serial connection, unplug handling or physical Z1 run has been verified here.
+The host supports TCP and experimental [USB serial](usb-serial.md), using the same controller and verified job engine. USB uses 128-byte file blocks, explicit FTDI selection and optional network camera access. No physical Z1 USB connection, unplug behavior, Stop or run has been verified here.
 
 Desktop and host builds, typechecking, lint and formatting must pass before review. Live FreeCAD round trips, browser GPU visuals, service recovery during a real run, camera timing and physical control require operator verification. No automated tests were added or run under the repository's current testing rule.

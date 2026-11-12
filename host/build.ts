@@ -9,6 +9,7 @@ await build({
   configFile: false,
   publicDir: false,
   resolve: { alias },
+  ssr: { noExternal: true },
   build: {
     ssr: true,
     outDir: "dist-host",
@@ -19,7 +20,10 @@ await build({
         "machine-owner": resolve("host/machine-owner.ts"),
         "program-thread": resolve("electron/machine/program-thread.ts"),
       },
-      external: (id) => id.startsWith("node:") || builtinModules.includes(id),
+      external: (id) =>
+        id.startsWith("node:") ||
+        id.startsWith("@serialport/") ||
+        builtinModules.includes(id),
       output: {
         entryFileNames: "[name].js",
         chunkFileNames: "chunks/[name]-[hash].js",

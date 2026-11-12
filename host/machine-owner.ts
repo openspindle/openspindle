@@ -11,6 +11,8 @@ const settings = workerData as {
   data: string
   machineHost?: string
   machinePort?: number
+  usbId?: string
+  cameraHost?: string
 }
 const report = (message: string) =>
   port.postMessage({ kind: "warning", message })
@@ -48,6 +50,12 @@ port.on(
           break
         case "connect":
           result = await gateway.connect(input)
+          break
+        case "serialDevices":
+          result = await gateway.serialDevices()
+          break
+        case "disconnect":
+          result = gateway.disconnect(input)
           break
         case "discover":
           result = await gateway.discover()
@@ -92,9 +100,19 @@ port.on(
     }
   }
 )
-if (settings.machineHost)
+if (settings.usbId && settings.machineHost)
+  throw new Error("Configure either USB or TCP, never both.")
+if (settings.usbId || settings.machineHost)
   gateway
-    .connect({ host: settings.machineHost, port: settings.machinePort ?? 2222 })
+    .connect(
+      settings.usbId
+        ? {
+            transport: "serial",
+            portId: settings.usbId,
+            ...(settings.cameraHost ? { cameraHost: settings.cameraHost } : {}),
+          }
+        : { host: settings.machineHost!, port: settings.machinePort ?? 2222 }
+    )
     .catch((error) =>
       report(error instanceof Error ? error.message : "Connection failed.")
     )

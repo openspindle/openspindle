@@ -1,6 +1,7 @@
 import { JobHistory } from "../../host/services/job-history.ts"
 import type { MessagePortMain } from "electron"
 import { createEndpoint } from "@openspindle/rpc"
+import { endpointLabel } from "../../src/machine/contract/index.ts"
 import type { MachineSnapshot } from "../../src/machine/contract/index.ts"
 import { MachineController } from "../../src/machine/core/controller.ts"
 import { MachineGateway } from "../../src/machine/core/gateway.ts"
@@ -130,7 +131,7 @@ function changeLog(): (snapshot: MachineSnapshot) => void {
   return ({ connection, job }) => {
     const { status, device, error } = connection
     const place = device
-      ? ` ${device.name} (${device.model}) at ${device.host}:${device.port}`
+      ? ` ${device.name} (${device.model}) at ${endpointLabel(device)}`
       : ""
     const connectionLine = `Machine ${status}${place}${error ? `: ${error}` : ""}`
     if (connectionLine !== logged.connection) {

@@ -38,6 +38,8 @@ import {
   programLineOf,
   simulatedBedLine,
   programParts,
+  sameEndpoint,
+  endpointLabel,
 } from "../contract/index.ts"
 import type {
   Activity,
@@ -305,6 +307,10 @@ export class MachineController {
     return this.discovery.discover()
   }
 
+  serialDevices() {
+    return this.ports.serial?.list() ?? Promise.resolve([])
+  }
+
   /**
    * Connects to a device. A device's identity (fixture profile, height maps) is its model and
    * announced name, so a target given only by address takes the name the device announces
@@ -316,7 +322,8 @@ export class MachineController {
     const { confirmed = false, ...target } = parse(ConnectRequestSchema, input)
     if (!this.connectedTo(target)) this.confirmLeavingJob(confirmed, "connect")
     this.endRestart()
-    if (target.name !== undefined) return this.open(target, confirmed)
+    if (target.transport === "serial" || target.name !== undefined)
+      return this.open(target, confirmed)
     const disconnects = this.disconnects
     const name = await this.discovery.nameOf(target)
     if (disconnects !== this.disconnects)
@@ -373,7 +380,7 @@ export class MachineController {
               reject(
                 new MachineError(
                   "connection-lost",
-                  error ?? `Could not connect to ${target.host}:${target.port}.`
+                  error ?? `Could not connect to ${endpointLabel(target)}.`
                 )
               )
           },
@@ -409,7 +416,7 @@ export class MachineController {
   /** Whether the connection is with the device at this address. */
   private connectedTo(target: ConnectTarget): boolean {
     const device = this.session?.ready ? this.session.device : null
-    return device?.host === target.host && device.port === target.port
+    return device !== null && sameEndpoint(device, target)
   }
 
   /**
@@ -443,6 +450,11 @@ export class MachineController {
       this.publish()
       await this.delay(RESET_SEND_MS)
       session.close("The machine is restarting.")
+      if (device.transport === "serial") {
+        this.restart = null
+        this.publish()
+        return
+      }
       if (!restart.cancelled)
         void this.reconnectAfterReset(
           { host: device.host, port: device.port, name: device.name },
@@ -1813,6 +1825,7 @@ export class MachineController {
     const telemetry = session?.store.telemetry
     const machineClock = this.adapter.clock
     if (
+      session?.device?.transport === "serial" ||
       this.clockAttempted ||
       this.activity ||
       this.deferred.length ||
@@ -1926,6 +1939,8 @@ export class MachineController {
       features: ready?.identity
         ? {
             ...this.adapter.features(ready.identity, telemetry),
+            camera:
+              !!ready.device && this.adapter.cameraUrl(ready.device) !== null,
             anchors: this.adapter.anchors !== undefined,
             configuration: this.adapter.configuration !== undefined,
           }

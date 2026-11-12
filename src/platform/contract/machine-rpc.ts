@@ -21,6 +21,7 @@ import {
   MachineCommandSchema,
   MachineSnapshotSchema,
   NetworkDeviceSchema,
+  SerialDeviceSchema,
   PrepareResultSchema,
   RunRequestSchema,
   WriteAnchorsRequestSchema,
@@ -68,6 +69,11 @@ export const machineMethods = {
   "machine.snapshot": {
     params: none,
     result: MachineSnapshotSchema,
+    timeoutMs: 15_000,
+  },
+  "machine.serialDevices": {
+    params: none,
+    result: z.array(SerialDeviceSchema).max(128),
     timeoutMs: 15_000,
   },
   "machine.discover": {
@@ -119,11 +125,11 @@ export const machineMethods = {
     timeoutMs: 30_000,
   },
   // Returns once the first part plays: every part is sent before, each within the
-  // controller's own deadline.
+  // controller's own byte/transport-aware deadline (USB can take longer than TCP).
   "machine.run": {
     params: RunRequestSchema,
     result: MachineSnapshotSchema,
-    timeoutMs: 1_200_000,
+    timeoutMs: 0,
   },
   "machine.dismissJob": {
     params: z.uuid().optional(),
@@ -139,12 +145,12 @@ export const machineMethods = {
   "machine.readConfiguration": {
     params: none,
     result: FirmwareConfigurationSchema,
-    timeoutMs: 45_000,
+    timeoutMs: 0,
   },
   "machine.writeConfiguration": {
     params: WriteConfigurationRequestSchema,
     result: WriteConfigurationResultSchema,
-    timeoutMs: 90_000,
+    timeoutMs: 0,
   },
   "machine.readHeightMap": {
     params: none,

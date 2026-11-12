@@ -50,7 +50,7 @@ AppImage as the OpenSpindle program.
 
 ## Quick start
 
-1. **Connect:** click the device card in **Prepare** and choose your Z1, or enter its IP address.
+1. **Connect:** click the device card in **Prepare** and choose your Z1, enter its IP address, or use **Scan USB** for the experimental [USB serial transport](docs/usb-serial.md).
 2. **Import:** drop your CAM's NC files on the window, open them with OpenSpindle from Finder or Explorer, or choose **File › Import…** or **File › Import from Fusion 360**. When a program splits into operations, or holds what the Z1 would not run as written, OpenSpindle asks first: which plate it goes to, how to split it and how to fix it.
 3. **Set up:** place the stock, set the work origin and assign the tools that were not matched from your library.
 4. **Check:** play the program back on the **Job** tab.

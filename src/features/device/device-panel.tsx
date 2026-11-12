@@ -15,6 +15,7 @@ import { Alert, AlertAction, AlertDescription } from "@/components/ui/alert"
 import { FieldDescription } from "@/components/ui/field"
 import { Badge } from "@/components/ui/badge"
 import {
+  endpointLabel,
   MachineCommandSchema,
   isFresh,
   outsideLimits,
@@ -75,7 +76,7 @@ export function DevicePanel({
 
   useEffect(() => {
     setNotice("")
-  }, [device?.host, device?.port])
+  }, [device ? endpointLabel(device) : null])
   useEffect(() => {
     if (!notice) return
     const timer = setTimeout(() => setNotice(""), 2500)
@@ -132,7 +133,9 @@ export function DevicePanel({
         <div className="flex min-w-0 items-center gap-3">
           <div className="flex min-w-0 flex-col gap-1">
             <h2>{device?.name ?? "No device connected"}</h2>
-            {device && <FieldDescription>{device.host}</FieldDescription>}
+            {device && (
+              <FieldDescription>{endpointLabel(device)}</FieldDescription>
+            )}
           </div>
           <Badge variant={state === "Alarm" ? "destructive" : "secondary"}>
             {state}

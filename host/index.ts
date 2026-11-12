@@ -78,10 +78,20 @@ process.on("exit", () => {
     /* A lock is never removed on behalf of another owner. */
   }
 })
+if (process.env.OPENSPINDLE_USB_ID && process.env.OPENSPINDLE_MACHINE_HOST)
+  throw new Error(
+    "Configure either OPENSPINDLE_USB_ID or OPENSPINDLE_MACHINE_HOST, never both."
+  )
+if (process.env.OPENSPINDLE_USB_ID?.startsWith("usb-path:"))
+  throw new Error(
+    "Path-only USB identities require manual selection with connect-usb; startup requires a unique hardware ID."
+  )
 const owner = new OwnerClient(
   {
     data,
     machineHost: process.env.OPENSPINDLE_MACHINE_HOST,
+    usbId: process.env.OPENSPINDLE_USB_ID,
+    cameraHost: process.env.OPENSPINDLE_CAMERA_HOST,
     machinePort: process.env.OPENSPINDLE_MACHINE_PORT
       ? Number(process.env.OPENSPINDLE_MACHINE_PORT)
       : undefined,
@@ -430,7 +440,7 @@ server.requestTimeout = 120000
 server.headersTimeout = 10000
 server.listen(port, bind, () =>
   process.stdout.write(
-    `OpenSpindle monitor listening on ${bind}:${port}. Commands: status, discover, connect <IPv4> <port>, run <inbox-id> <package-sha256>, stop, pause, resume. Browser access is monitor-only.\n`
+    `OpenSpindle monitor listening on ${bind}:${port}. Commands: status, discover, usb, connect-usb <id> [camera-IPv4], disconnect, connect <IPv4> <port>, run <inbox-id> <package-sha256>, stop, pause, resume. Browser access is monitor-only.\n`
   )
 )
 const terminal = createInterface({
@@ -449,6 +459,21 @@ terminal.on("line", (line) => {
         process.stdout.write(
           JSON.stringify(await owner.call("discover")) + "\n"
         )
+        return
+      case "usb":
+        process.stdout.write(
+          JSON.stringify(await owner.call("serialDevices")) + "\n"
+        )
+        return
+      case "connect-usb":
+        await owner.call("connect", {
+          transport: "serial",
+          portId: args[0],
+          ...(args[1] ? { cameraHost: args[1] } : {}),
+        })
+        return
+      case "disconnect":
+        await owner.call("disconnect", {})
         return
       case "connect":
         await owner.call("connect", { host: args[0], port: Number(args[1]) })

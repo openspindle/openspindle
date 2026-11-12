@@ -22,7 +22,13 @@ export class OwnerClient {
   >()
   private ended = false
   constructor(
-    settings: { data: string; machineHost?: string; machinePort?: number },
+    settings: {
+      data: string
+      machineHost?: string
+      machinePort?: number
+      usbId?: string
+      cameraHost?: string
+    },
     privateWarning: (message: string) => void
   ) {
     this.worker = new Worker(new URL("./machine-owner.js", import.meta.url), {
@@ -77,14 +83,17 @@ export class OwnerClient {
       return Promise.reject(new Error("Machine owner is unavailable."))
     const id = ++this.sequence
     return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => {
-        this.pending.delete(id)
-        reject(
-          new Error(
-            "Machine request timed out; outcome unknown. Do not retry a motion automatically."
+      const timer = setTimeout(
+        () => {
+          this.pending.delete(id)
+          reject(
+            new Error(
+              "Machine request timed out; outcome unknown. Do not retry a motion automatically."
+            )
           )
-        )
-      }, 180000)
+        },
+        method === "run" ? 86_400_000 : 180000
+      )
       this.pending.set(id, { resolve, reject, timer })
       this.worker.postMessage({ id, method, input })
     })

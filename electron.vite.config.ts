@@ -67,12 +67,13 @@ export default defineConfig(({ command }) => {
       // one the app only logs errors.
       envPrefix: ["MAIN_VITE_", "VITE_", "SENTRY_DSN"],
       build: {
-        // Bundle everything so the packaged app ships only out/**.
+        // Keep serial modules external so their N-API prebuilds resolve at runtime.
         externalizeDeps: false,
         sourcemap,
         // The machine process and its program thread start from their own files beside the
         // main process's (electron/main/machine, electron/machine/program-worker.ts).
         rollupOptions: {
+          external: [/^@serialport\//],
           input: {
             index: path("./electron/main/index.ts"),
             machine: path("./electron/machine/index.ts"),

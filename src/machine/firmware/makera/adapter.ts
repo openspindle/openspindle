@@ -114,7 +114,8 @@ const makeraJob: JobProtocol = {
   homed: parseHomedReport,
   assistPlan,
   bedClean: (telemetry) => telemetry.bedCleanAuto,
-  createTransfer: (bytes, md5, path) => new MakeraTransfer(bytes, md5, path),
+  createTransfer: (bytes, md5, path, blockBytes) =>
+    new MakeraTransfer(bytes, md5, path, blockBytes),
   // ATCHandler skips M6 for the tool it believes is loaded, so on a manual-change machine the
   // program's first change would neither stop for the tool nor measure it at the tool sensor.
   // Never with an automatic changer: it tracks the clamped tool, and with none set it picks
@@ -326,9 +327,9 @@ export const makeraAdapter: FirmwareAdapter = {
         return "Stop the spindle before saving the device configuration."
       return null
     },
-    createDownload: () => new MakeraConfigurationDownload(),
-    createUpload: (bytes, md5) =>
-      new MakeraTransfer(bytes, md5, MAKERA_CONFIGURATION_PATH),
+    createDownload: (blockBytes) => new MakeraConfigurationDownload(blockBytes),
+    createUpload: (bytes, md5, blockBytes) =>
+      new MakeraTransfer(bytes, md5, MAKERA_CONFIGURATION_PATH, blockBytes),
     vacuumDefaultPower: readMakeraVacuumDefaultPower,
     withVacuumDefaultPower: withMakeraVacuumDefaultPower,
     cameraPicture: readMakeraCameraPicture,
@@ -465,5 +466,8 @@ export const makeraAdapter: FirmwareAdapter = {
     seconds: (now) =>
       Math.floor(now / 1000) - new Date(now).getTimezoneOffset() * 60,
   },
-  cameraUrl: (device) => `ws://${device.host}:82/ws_video`,
+  cameraUrl: (device) => {
+    const host = device.transport === "serial" ? device.cameraHost : device.host
+    return host ? `ws://${host}:82/ws_video` : null
+  },
 }

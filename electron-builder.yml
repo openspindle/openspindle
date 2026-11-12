@@ -1,10 +1,18 @@
-# Everything is bundled by electron-vite into out/; no runtime node_modules ship.
+# JavaScript is bundled except the serial runtime and its N-API prebuilds.
 appId: com.openspindle.desktop
 productName: OpenSpindle
 directories:
   output: release
 files:
   - out/**
+  - node_modules/@serialport/**
+  - node_modules/node-gyp-build/**
+  - node_modules/debug/**
+  - node_modules/ms/**
+asarUnpack:
+  - node_modules/@serialport/bindings-cpp/**
+  - node_modules/node-gyp-build/**
+npmRebuild: false
 # The About panel's credits, which production builds keep in build/third-party-notices.json, and the
 # licenses of Electron and of the Chromium, Node.js and other software it includes, which they refer to.
 extraResources:
@@ -63,7 +71,7 @@ mac:
   # The interface is English, so only Chromium's English resources ship: 50 MB less than its 220
   # translations. Chromium's locale is then en-US on every Mac, as are macOS's own dialogs.
   electronLanguages: [en]
-  # Nothing native ships, so one universal build covers Apple silicon and Intel: the DMG for
+  # N-API prebuilds include both Darwin architectures. The universal DMG is for
   # installing, the zip for updates (Squirrel.Mac installs from it).
   target:
     - target: dmg

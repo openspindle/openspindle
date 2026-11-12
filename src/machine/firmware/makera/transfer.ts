@@ -90,12 +90,20 @@ export class MakeraTransfer implements TransferProtocol {
   private readonly md5Frame: OutboundFrame
   private readonly path: string
 
-  constructor(bytes: Uint8Array, md5: string, path: string) {
+  private readonly blockBytes: 128 | 8192
+
+  constructor(
+    bytes: Uint8Array,
+    md5: string,
+    path: string,
+    blockBytes: 128 | 8192 = FILE_BLOCK_BYTES
+  ) {
+    this.blockBytes = blockBytes
     this.bytes = bytes
     this.md5 = md5
     this.md5Frame = { type: FRAME_TYPES.fileMd5, payload: encoder.encode(md5) }
     this.path = path
-    this.blocks = Math.ceil(bytes.length / FILE_BLOCK_BYTES)
+    this.blocks = Math.ceil(bytes.length / this.blockBytes)
   }
 
   get totalBytes() {
@@ -174,7 +182,7 @@ export class MakeraTransfer implements TransferProtocol {
           const view = new Uint8Array(6)
           const writer = new DataView(view.buffer)
           writer.setUint32(0, this.blocks)
-          writer.setUint16(4, FILE_BLOCK_BYTES)
+          writer.setUint16(4, this.blockBytes)
           return [{ type: FRAME_TYPES.fileView, payload: view }]
         }
         break
@@ -184,13 +192,13 @@ export class MakeraTransfer implements TransferProtocol {
           if (sequence !== this.lastUpload + 1 || sequence > this.blocks)
             throw new TransferError("Unexpected upload block sequence.")
           this.uploadedBytes = Math.min(
-            this.lastUpload * FILE_BLOCK_BYTES,
+            this.lastUpload * this.blockBytes,
             this.bytes.length
           )
           this.lastUpload = sequence
           const chunk = this.bytes.subarray(
-            (sequence - 1) * FILE_BLOCK_BYTES,
-            sequence * FILE_BLOCK_BYTES
+            (sequence - 1) * this.blockBytes,
+            sequence * this.blockBytes
           )
           const payload = new Uint8Array(4 + chunk.length)
           payload.set(data)
@@ -227,7 +235,7 @@ export class MakeraTransfer implements TransferProtocol {
             this.readbackBlocks < 1 ||
             this.readbackBlocks > this.bytes.length ||
             (data.length === 6 &&
-              (readU16(data, 4) < 1 || readU16(data, 4) > FILE_BLOCK_BYTES))
+              (readU16(data, 4) < 1 || readU16(data, 4) > this.blockBytes))
           )
             throw new TransferError("Invalid file verification size.")
           this.step = "readback-data"
@@ -240,7 +248,7 @@ export class MakeraTransfer implements TransferProtocol {
         if (
           frame.type === FRAME_TYPES.fileData &&
           data.length > 4 &&
-          data.length <= FILE_BLOCK_BYTES + 4
+          data.length <= this.blockBytes + 4
         ) {
           const content = data.subarray(4)
           const expected = this.bytes.subarray(

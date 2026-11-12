@@ -22,6 +22,7 @@ function machineOver(peer: Peer<MachineContract>): MachineHost {
     snapshot: () => peer.call("machine.snapshot", undefined),
     subscribe: (listener) =>
       peer.subscribe("machine.changed", undefined, listener),
+    serialDevices: () => peer.call("machine.serialDevices", undefined),
     discover: () => peer.call("machine.discover", undefined),
     connect: (request) => peer.call("machine.connect", request),
     disconnect: (request) => peer.call("machine.disconnect", request),
@@ -76,6 +77,7 @@ function unreachableMachine(error: string | null): MachineHost {
       listener(snapshot)
       return () => {}
     },
+    serialDevices: refuse,
     discover: refuse,
     connect: refuse,
     disconnect: refuse,

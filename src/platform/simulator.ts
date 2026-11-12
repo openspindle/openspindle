@@ -45,10 +45,11 @@ export function useUpdateSimulator() {
 
 /** Whether a device is the app's own simulator, while it runs. */
 export const isAppSimulator = (
-  device: Pick<ConnectedDevice, "host" | "port"> | null,
+  device: ConnectedDevice | null,
   status: SimulatorStatus | undefined
 ) =>
   !!device &&
+  device.transport !== "serial" &&
   !!status?.running &&
   device.host === status.host &&
   device.port === status.port

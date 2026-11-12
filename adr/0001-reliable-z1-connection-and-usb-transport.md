@@ -234,3 +234,9 @@ Open questions requiring **real hardware** before implementation is accepted:
 - [Carvera Community Controller: Makera framed protocol](https://github.com/Carvera-Community/Carvera_Controller/blob/main/carveracontroller/protocols/makera.py)
 - [Carvera Community Controller: XMODEM transfer modes](https://github.com/Carvera-Community/Carvera_Controller/blob/main/carveracontroller/XMODEM.py)
 - [Carvera Community Controller: releases](https://github.com/Carvera-Community/Carvera_Controller/releases)
+
+## Implementation checkpoint — 2026-11-11
+
+The `feat/usb-serial-transport` branch implements the byte-stream boundary, explicit FTDI enumeration/identity, read-only handshake, desktop picker/profile association, optional separate camera endpoint, bounded native writes, manual reconnect and 128-byte verified transfers. The Node host shares this transport and supports deliberate terminal selection or one explicitly configured startup attempt. Native modules are externalized and included in packaging. See [USB serial](../docs/usb-serial.md) for current behavior.
+
+This is a code checkpoint, not acceptance of phases 3/4: physical reset-line behavior, genuine Z1 reply ordering, idle/running Stop, unplug outcomes, real USB upload/readback and installed native builds across OSes remain release gates. No automatic USB failover, reconnect loop or job resume is implemented.

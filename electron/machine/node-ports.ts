@@ -1,3 +1,4 @@
+import { serialConnector } from "./serial-ports.ts"
 import { createHash } from "node:crypto"
 import { createSocket } from "node:dgram"
 import { Socket } from "node:net"
@@ -156,6 +157,7 @@ const camera: CameraConnector = {
 export const nodeMachinePorts: MachinePorts = {
   clock,
   tcp,
+  serial: serialConnector,
   udp,
   camera,
   md5: (bytes) => createHash("md5").update(bytes).digest("hex"),
