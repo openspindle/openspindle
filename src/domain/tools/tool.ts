@@ -285,6 +285,9 @@ export const ToolSourceSchema = z.object(
 export const ToolShapeSchema = z.object(
   {
     schemaVersion: z.literal(TOOL_SCHEMA_VERSION, UNSUPPORTED),
+    shared: z
+      .object({ id: z.uuid(), revision: z.string().regex(/^[a-f\d]{64}$/) })
+      .optional(),
     id: RequiredText,
     name: RequiredText,
     kind: RequiredText,
@@ -575,6 +578,7 @@ export function duplicateTool(
   existing: readonly Tool[] = []
 ): Tool {
   const duplicate = clone(tool)
+  delete duplicate.shared
   duplicate.id = uniqueId(
     tool.id,
     new Set([...existing.map((item) => item.id), tool.id])

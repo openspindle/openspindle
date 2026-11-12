@@ -29,6 +29,7 @@ export type WorkspaceDialog =
   | { readonly kind: "point-actions"; readonly intent: PointIntent }
   | { readonly kind: "device-configuration" }
   /** The Models library; closing it goes back to the dialog it opened from. */
+  | { readonly kind: "shared-tools" }
   | { readonly kind: "reference"; readonly plateId: string }
   | { readonly kind: "models"; readonly back?: WorkspaceDialog }
   | { readonly kind: "height-map" }

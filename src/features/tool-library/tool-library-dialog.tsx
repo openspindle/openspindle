@@ -1,3 +1,4 @@
+import { openDialog } from "@/features/shell/dialogs"
 import { useId } from "react"
 import { ArrowDownToLine, ArrowUpFromLine, Plus, X } from "lucide-react"
 import { Alert, AlertAction, AlertDescription } from "@/components/ui/alert"
@@ -47,6 +48,15 @@ function LibraryToolbar({ library }: { library: ToolLibrary }) {
         >
           <Plus />
           New tool
+        </Button>
+        <Button
+          variant="ghost"
+          disabled={busy}
+          onClick={() =>
+            library.guard(() => openDialog({ kind: "shared-tools" }))
+          }
+        >
+          FreeCAD library
         </Button>
         <FilePicker
           accept={LIBRARY_FILES}
