@@ -49,8 +49,14 @@ export class CameraFeed {
   private readonly connector: CameraConnector
   private readonly clock: Clock
   private pauses = 0
+  private readonly recordFrame?: (jpeg: Uint8Array, at: number) => void
 
-  constructor(connector: CameraConnector, clock: Clock) {
+  constructor(
+    connector: CameraConnector,
+    clock: Clock,
+    recordFrame?: (jpeg: Uint8Array, at: number) => void
+  ) {
+    this.recordFrame = recordFrame
     this.connector = connector
     this.clock = clock
   }
@@ -135,6 +141,7 @@ export class CameraFeed {
             this.fail(feed)
             return
           }
+          this.recordFrame?.(data, this.clock.now())
           this.arm(feed, FRAME_TIMEOUT_MS)
           feed.reconnects = 0
           if (feed.status !== "live") {

@@ -1,3 +1,4 @@
+import { JobHistory } from "../../host/services/job-history"
 import { Menu, app, dialog } from "electron"
 import type { BrowserWindow } from "electron"
 import path from "node:path"
@@ -138,6 +139,9 @@ function start(
   const menu = new MenuBus()
   const unsaved = new UnsavedChanges(currentWindow, menu)
   const keptWorkspace = new KeptWorkspace()
+  const history = new JobHistory(app.getPath("userData"), (message) =>
+    log.warn(message)
+  )
   const storage = new StorageService(app.getPath("userData"))
   const models = createModelLibrary(app.getPath("userData"))
   const fusion = new FusionService(
@@ -169,6 +173,7 @@ function start(
   const pcb = new PcbService(app.getPath("userData"), currentWindow)
   serveHostConnections({
     handlers: createHostHandlers({
+      history,
       files,
       fusion,
       menu,

@@ -49,6 +49,14 @@ export const FILE_KINDS = {
     mime: "application/zip",
   },
   /** A copy of stored app data that could not be restored. */
+  historyArchive: {
+    title: "Job history archive",
+    extensions: ["zip"],
+    saveExtensions: ["zip"],
+    binary: true,
+    maxBytes: 200 * MiB,
+    mime: "application/zip",
+  },
   sharedTools: {
     title: "Shared tool library",
     extensions: ["osptools"],
@@ -117,6 +125,7 @@ export const FILE_KINDS = {
 } as const satisfies Record<string, FileKindSpec>
 
 export const FileKindSchema = z.enum([
+  "historyArchive",
   "sharedTools",
   "project",
   "program",

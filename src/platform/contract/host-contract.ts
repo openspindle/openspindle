@@ -1,3 +1,4 @@
+import { historyMethods } from "./history"
 import { defineContract } from "@openspindle/rpc"
 import { z } from "zod"
 import {
@@ -40,6 +41,7 @@ export const hostContract = defineContract({
       params: LinkedFileRequestSchema,
       result: LinkedFileReadSchema,
     },
+    ...historyMethods,
     ...pcbMethods,
     ...storageMethods,
     ...modelMethods,

@@ -256,7 +256,9 @@ export class MachineController {
     this.adapter = adapter
     this.lastError = options.error ?? null
     this.discovery = new DiscoveryService(ports.udp, adapter, ports.clock)
-    this.camera = new CameraFeed(ports.camera, ports.clock)
+    this.camera = new CameraFeed(ports.camera, ports.clock, (jpeg, at) =>
+      ports.journal?.frame(jpeg, at)
+    )
     this.trace = new ProtocolTrace(ports.clock)
   }
 
@@ -991,6 +993,7 @@ export class MachineController {
       endedAt: null,
     }
     this.running = { request, program, bedCleanBefore: null }
+    this.ports.journal?.begin(request, program, this.snapshot())
     this.publish()
     const runSession = this.session
     try {
@@ -1833,11 +1836,13 @@ export class MachineController {
 
   private publish() {
     this.dirty = true
-    if (this.notifyQueued || !this.listeners.size) return
+    if (this.notifyQueued || (!this.listeners.size && !this.ports.journal))
+      return
     this.notifyQueued = true
     queueMicrotask(() => {
       this.notifyQueued = false
       const snapshot = this.snapshot()
+      this.ports.journal?.observe(snapshot)
       for (const listener of [...this.listeners]) listener(snapshot)
     })
   }

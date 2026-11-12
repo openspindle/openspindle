@@ -1,3 +1,4 @@
+import { JobHistory } from "../../host/services/job-history.ts"
 import type { MessagePortMain } from "electron"
 import { createEndpoint } from "@openspindle/rpc"
 import type { MachineSnapshot } from "../../src/machine/contract/index.ts"
@@ -71,9 +72,11 @@ function start({
   reconnect,
   error,
 }: Extract<ToMachine, { kind: "start" }>): Started {
+  const history = new JobHistory(userData, (message) => log.warn(message))
+  history.recover()
   const programs = new ProgramWorker()
   const controller = new MachineController(
-    { ...nodeMachinePorts, programs, log },
+    { ...nodeMachinePorts, programs, log, journal: history },
     { error }
   )
   const gateways = {

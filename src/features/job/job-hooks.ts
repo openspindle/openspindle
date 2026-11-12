@@ -231,6 +231,15 @@ export function useRunJob() {
                 },
               }
             : {}),
+          archive: JSON.stringify({
+            schema: "openspindle-run-context/1",
+            plate,
+            tools: library,
+            ruleSettings: workspace.state.ruleSettings,
+            project: workspace.state.project,
+            device,
+            configuration,
+          }),
           source: compiled.program.source,
           assists: plate.setup.assists,
           ...(keptTool !== null && { keepTool: true }),

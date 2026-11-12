@@ -1,3 +1,4 @@
+import { HistoryDialog } from "@/features/history/history-dialog"
 import { SharedToolsDialog } from "@/features/tool-library/shared-tools-dialog"
 import { ReferenceDialog } from "@/features/models/reference-dialog"
 import { DevicePicker } from "@/features/device/device-picker"
@@ -46,6 +47,8 @@ import type { WorkspaceDialog } from "./dialogs"
 /** The open workspace dialog; opening another replaces it. */
 function OpenDialog({ dialog }: { dialog: WorkspaceDialog }) {
   switch (dialog.kind) {
+    case "history":
+      return <HistoryDialog onClose={closeDialog} />
     case "shared-tools":
       return <SharedToolsDialog onClose={closeDialog} />
     case "reference":

@@ -1,3 +1,4 @@
+import type { HistoryStore } from "./contract/history"
 import type {
   AnchorConfiguration,
   FirmwareConfiguration,
@@ -214,6 +215,7 @@ export interface SimulatorHost {
  * typed RPC call.
  */
 export interface Host {
+  readonly history: HistoryStore
   readonly machine: MachineLink
   readonly files: FileHost
   readonly fusion: FusionHost

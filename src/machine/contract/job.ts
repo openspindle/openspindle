@@ -33,6 +33,11 @@ const CheckedStartSchema = z.strictObject({
 export type CheckedStart = z.infer<typeof CheckedStartSchema>
 
 export const RunRequestSchema = z.strictObject({
+  /** Immutable complete job context for local history; never transmitted to firmware. */
+  archive: z
+    .string()
+    .max(100 * 1024 * 1024)
+    .optional(),
   /** A fresh UUID per Run; a used ID is never replayed. */
   id: z.uuid(),
   name: DisplayNameSchema,

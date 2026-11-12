@@ -1,4 +1,9 @@
-import type { PrepareResult } from "../contract/index.ts"
+import type {
+  MachineSnapshot,
+  RunRequest,
+  PreparedProgram,
+  PrepareResult,
+} from "../contract/index.ts"
 
 /**
  * Everything the machine core needs from its host. The machine process supplies Node
@@ -73,7 +78,17 @@ export interface ProgramPreparer {
   prepare: (firmware: string, source: string) => Promise<PrepareResult>
 }
 
+export interface MachineJournal {
+  begin: (
+    request: RunRequest,
+    program: PreparedProgram,
+    snapshot: MachineSnapshot
+  ) => void
+  observe: (snapshot: MachineSnapshot) => void
+  frame: (jpeg: Uint8Array, at: number) => void
+}
 export type MachinePorts = {
+  readonly journal?: MachineJournal
   readonly clock: Clock
   readonly tcp: TcpConnector
   readonly udp: DatagramListener

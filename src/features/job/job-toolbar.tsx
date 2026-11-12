@@ -1,3 +1,5 @@
+import { Button } from "@/components/ui/button"
+import { openDialog } from "@/features/shell/dialogs"
 import { useId } from "react"
 import { Play, X } from "lucide-react"
 import { Field, FieldLabel } from "@/components/ui/field"
@@ -134,6 +136,9 @@ export function JobToolbar({
       className="flex shrink-0 flex-wrap items-center gap-2 border-b p-3"
     >
       <JobControls view={view} actions={actions} run={run} />
+      <Button variant="outline" onClick={() => openDialog({ kind: "history" })}>
+        History
+      </Button>
       {view.kind === "idle" && keepTool && (
         <KeepToolSwitch keepTool={keepTool} />
       )}
