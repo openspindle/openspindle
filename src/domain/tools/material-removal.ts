@@ -1,3 +1,5 @@
+import { ReferenceModelSchema } from "../models/reference"
+import { referenceHeights } from "../models/reference-height"
 import { z } from "zod"
 import { RemovalCutterSchema } from "./removal-cutter"
 import type { RemovalCutter } from "./removal-cutter"
@@ -12,6 +14,7 @@ const Point = z.tuple([
   z.number().finite(),
 ])
 export const RemovalInputSchema = z.object({
+  reference: ReferenceModelSchema.optional(),
   resolution: RemovalResolutionSchema.default(DEFAULT_REMOVAL_RESOLUTION),
   min: Point,
   max: Point,
@@ -27,6 +30,7 @@ export const RemovalInputSchema = z.object({
 })
 export type RemovalInput = z.infer<typeof RemovalInputSchema>
 export type RemovalGrid = {
+  deviation?: Float32Array
   columns: number
   rows: number
   heights: Float32Array
@@ -86,6 +90,7 @@ export class MaterialRemoval {
   private readonly dx: number
   private readonly dy: number
   private readonly heights: Float32Array
+  private readonly target: Float32Array | null
   private cursor: RemovalCursor = { move: 0, fraction: 0 }
 
   constructor(value: unknown) {
@@ -141,6 +146,15 @@ export class MaterialRemoval {
     this.dx = width / columns
     this.dy = depth / rows
     this.heights = new Float32Array((columns + 1) * (rows + 1))
+    this.target = this.input.reference
+      ? referenceHeights(
+          this.input.reference,
+          this.input.min,
+          this.input.max,
+          columns,
+          rows
+        )
+      : null
     this.reset()
   }
 
@@ -169,6 +183,13 @@ export class MaterialRemoval {
       columns: this.columns,
       rows: this.rows,
       heights: this.heights.slice(),
+      ...(this.target
+        ? {
+            deviation: this.heights.map(
+              (height, i) => height - this.target![i]
+            ),
+          }
+        : {}),
       resolution: Math.max(this.dx, this.dy),
     }
   }

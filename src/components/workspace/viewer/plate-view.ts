@@ -1,3 +1,5 @@
+import { referenceObjects } from "./reference-model"
+import { materialFinish } from "./material-finish"
 import { DEFAULT_VIEWER_LAYERS } from "./viewer-input"
 import * as THREE from "three"
 import { billboarding } from "three/tsl"
@@ -398,19 +400,25 @@ function stockObjects(
   const { top, body } = stockFaces(stock)
   if (removal) {
     const geometry = new RemovalStockGeometry(plate, removal)
-    return [
-      new THREE.Mesh(geometry, removalSurfaces(stock, geometry, top, body)),
-    ]
+    const mesh = new THREE.Mesh(
+      geometry,
+      removalSurfaces(stock, geometry, top, body, !!removal.deviation)
+    )
+    mesh.userData.deviation = !!removal.deviation
+    return [mesh]
   }
   const surface = ({ color, metalness, roughness }: StockFace) =>
-    new THREE.MeshStandardMaterial({
-      color,
-      metalness,
-      roughness,
-      transparent: true,
-      opacity: 0.76,
-      depthWrite: false,
-    })
+    Object.assign(
+      materialFinish(stock.material, color, stock.appearance, {
+        metalness,
+        roughness,
+      }),
+      {
+        transparent: true,
+        opacity: Math.min(stock.appearance?.opacity ?? 1, 0.76),
+        depthWrite: false,
+      }
+    )
   const sides = surface(body)
   const geometry = new THREE.BoxGeometry(stock.width, stock.depth, stock.height)
   // A box's faces are +X, −X, +Y, −Y, +Z and −Z: the stock's top is the fifth.
@@ -564,6 +572,7 @@ export class PlateView {
   /** Pending fixture loads apply only to the fixture list that started them. */
   private fixtureGeneration = 0
   private readonly stock = new THREE.Group()
+  private readonly reference = new THREE.Group()
   private readonly path: PlatePath
   private readonly decoration = new THREE.Group()
   private readonly axes = workOriginAxes()
@@ -635,6 +644,7 @@ export class PlateView {
       this.toolSetter,
       this.fixtures,
       this.stock,
+      this.reference,
       this.path.group,
       this.decoration,
       this.outline,
@@ -783,6 +793,7 @@ export class PlateView {
     // Bed and fixture clones share their templates' geometry; release only owned resources.
     disposeObjects(
       this.stock,
+      this.reference,
       this.toolSetter,
       this.decoration,
       this.outline,
@@ -810,6 +821,11 @@ export class PlateView {
       plate.toolSetter ? [toolSetterModel(plate.toolSetter)] : []
     )
     this.axes.position.set(...plate.workOrigin)
+    this.reference.position.set(...plate.workOrigin)
+    if (this.reference.userData.model !== plate.reference) {
+      replaceChildren(this.reference, referenceObjects(plate.reference))
+      this.reference.userData.model = plate.reference
+    }
     this.stock.position.set(0, 0, 0)
     replaceChildren(this.stock, stockObjects(plate))
     this.drawnRemoval = null
@@ -978,7 +994,8 @@ export class PlateView {
         grid &&
         mesh instanceof THREE.Mesh &&
         mesh.geometry instanceof RemovalStockGeometry &&
-        mesh.geometry.matches(grid)
+        mesh.geometry.matches(grid) &&
+        !!mesh.userData.deviation === !!grid.deviation
       )
         mesh.geometry.update(this.current, grid)
       else replaceChildren(this.stock, stockObjects(this.current, grid))
@@ -990,6 +1007,7 @@ export class PlateView {
     this.toolSetter.visible = layers.toolSetter
     this.bed.visible = layers.bed
     this.fixtures.visible = layers.fixtures
+    this.reference.visible = layers.reference
     this.stock.visible = presentation.showStock
     for (const [id, group] of this.fixtureGroups)
       group.visible = !presentation.hiddenFixtures.includes(id)

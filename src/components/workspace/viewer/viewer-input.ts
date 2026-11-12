@@ -1,3 +1,4 @@
+import type { ReferenceModel } from "@/domain/models/reference"
 import type { ToolpathBounds } from "@/domain/compile/toolpath-bounds"
 import type { Cylinder, Place, Severity } from "@/domain/diagnostics"
 import type { FixtureInstance } from "@/domain/fixtures/definitions"
@@ -51,6 +52,7 @@ export type ViewerPlate = {
   tools: readonly ViewerToolRun[]
   /** Where the plate's machining cuts, from its work origin; null when it cuts nothing. */
   toolpathBounds: ToolpathBounds | null
+  reference?: ReferenceModel | null
   stock: Stock | null
   /** Physical minimum stock corner and the plate's single NC zero, in millimeter bed coordinates. */
   stockAnchor: Point3
@@ -102,6 +104,8 @@ export type OperationPathColor = {
 }
 
 export type ViewerLayers = {
+  readonly reference: boolean
+  readonly deviation: boolean
   readonly past: boolean
   readonly future: boolean
   readonly cuts: boolean
@@ -116,6 +120,8 @@ export type ViewerLayers = {
   readonly toolSetter: boolean
 }
 export const DEFAULT_VIEWER_LAYERS: ViewerLayers = {
+  reference: true,
+  deviation: false,
   past: true,
   future: true,
   cuts: true,

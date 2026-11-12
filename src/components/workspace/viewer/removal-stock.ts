@@ -12,6 +12,7 @@ export class RemovalStockGeometry extends THREE.BufferGeometry {
   private readonly uvs: Float32Array
   /** Two object-space face normals per cell, shared by the surface material. */
   readonly normalMap: THREE.DataTexture
+  readonly deviationMap: THREE.DataTexture
 
   constructor(plate: ViewerPlate, grid: RemovalGrid) {
     super()
@@ -29,6 +30,14 @@ export class RemovalStockGeometry extends THREE.BufferGeometry {
       columns * 2,
       rows
     )
+    this.deviationMap = new THREE.DataTexture(
+      new Uint8Array((columns + 1) * (rows + 1) * 4),
+      columns + 1,
+      rows + 1
+    )
+    this.deviationMap.minFilter = THREE.NearestFilter
+    this.deviationMap.magFilter = THREE.NearestFilter
+    this.deviationMap.generateMipmaps = false
     this.normalMap.minFilter = THREE.NearestFilter
     this.normalMap.magFilter = THREE.NearestFilter
     this.normalMap.generateMipmaps = false
@@ -124,6 +133,20 @@ export class RemovalStockGeometry extends THREE.BufferGeometry {
 
     // Store each triangle's actual slope, without averaging across cut edges.
     // The shader selects the same diagonal as quad(), even inside a flat fan.
+    const deviationPixels = this.deviationMap.image.data as Uint8Array
+    for (let i = 0; i < heights.length; i++) {
+      const value = grid.deviation?.[i]
+      let color = [0.48, 0.52, 0.55] // No model coverage: unclassified.
+      if (value !== undefined && Number.isFinite(value)) {
+        color = [0.12, 0.65, 0.28]
+        if (value > 0.05) color = [0.08, 0.35, 0.95]
+        if (value < -0.05) color = [0.9, 0.08, 0.05]
+      }
+      for (let channel = 0; channel < 3; channel++)
+        deviationPixels[i * 4 + channel] = Math.round(color[channel] * 255)
+      deviationPixels[i * 4 + 3] = 255
+    }
+    this.deviationMap.needsUpdate = true
     const pixels = this.normalMap.image.data as Uint8Array
     const writeNormal = (at: number, nx: number, ny: number) => {
       const length = Math.hypot(nx, ny, 1)

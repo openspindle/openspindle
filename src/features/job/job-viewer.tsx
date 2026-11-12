@@ -64,7 +64,12 @@ export function JobViewer({
     [originalPlates, shown, editingPlate]
   )
   const [showRemoval, setShowRemoval] = useState(false)
-  const removal = useMaterialRemoval(shown, frames, showRemoval)
+  const removal = useMaterialRemoval(
+    shown,
+    frames,
+    showRemoval,
+    layers.deviation
+  )
   const dispatch = useDispatch()
   const camera = useViewerCamera()
   const [style] = useVisualStyle()

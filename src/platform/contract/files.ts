@@ -29,9 +29,9 @@ export const FILE_KINDS = {
   },
   program: {
     title: "NC program",
-    extensions: ["nc", "cnc", "gcode", "tap", "ngc"],
+    extensions: ["nc", "cnc", "gcode", "tap", "ngc", "ospjob"],
     saveExtensions: ["nc", "cnc"],
-    maxBytes: 20 * MiB,
+    maxBytes: 64 * MiB,
     mime: "text/plain",
   },
   /**
@@ -323,6 +323,12 @@ export function validateOpenedFile(
     throw new Error(
       `Choose a ${FILE_KINDS[kind].extensions.map((e) => `.${e}`).join(", ")} file.`
     )
+  if (
+    kind === "program" &&
+    !/\.ospjob$/i.test(fileName) &&
+    utf8ByteLength(contents) > 20 * MiB
+  )
+    throw new Error("The NC program exceeds the 20 MB limit.")
   const error = fileContentsError(kind, contents)
   if (error) throw new Error(error)
   return { fileName, contents }

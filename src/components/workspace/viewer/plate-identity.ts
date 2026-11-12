@@ -100,6 +100,7 @@ const PLATE_EQUALITY: FieldEquality<ViewerPlate> = {
   machineProgram: Object.is,
   tools: sameToolRuns,
   toolpathBounds: sameBounds,
+  reference: Object.is,
   stock: Object.is,
   stockAnchor: samePoint,
   workOrigin: samePoint,

@@ -189,23 +189,33 @@ type State = {
 export function useMaterialRemoval(
   shown: JobSubject | null,
   frames: FrameSource,
-  enabled: boolean
+  enabled: boolean,
+  deviation = false
 ) {
   const index = usePlanIndex(shown)
   const library = useWorkspace((state) => state.tools)
   const { resolution } = useRemovalResolution()
-  const prepared = useMemo(
-    () =>
-      enabled
-        ? removalInput(
-            shown,
-            index?.plan.program,
-            shown?.tools ?? library,
-            resolution
-          )
-        : { input: null, problem: null },
-    [enabled, shown, index, library, resolution]
-  )
+  const prepared = useMemo(() => {
+    const candidate = enabled
+      ? removalInput(
+          shown,
+          index?.plan.program,
+          shown?.tools ?? library,
+          resolution
+        )
+      : { input: null, problem: null }
+    if (candidate.input && deviation) {
+      const reference = shown?.plate.setup.reference
+      if (!reference)
+        return {
+          input: null,
+          problem:
+            "Import a finished model before enabling deviation comparison.",
+        }
+      return { ...candidate, input: { ...candidate.input, reference } }
+    }
+    return candidate
+  }, [enabled, shown, index, library, resolution, deviation])
   const [state, setState] = useState<State>({
     input: null,
     grid: null,

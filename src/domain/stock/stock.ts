@@ -1,4 +1,5 @@
 import { z } from "zod"
+import { MaterialAppearanceSchema } from "../materials/appearance"
 import { COORDINATE_LIMIT } from "@/domain/primitives"
 
 /** Persisted library shapes shared by the UI and its runtime validators. */
@@ -22,6 +23,7 @@ export const StockSchema = z.object({
   width: dimension("Width"),
   depth: dimension("Depth"),
   height: dimension("Height"),
+  appearance: MaterialAppearanceSchema.optional(),
   color: z.string().regex(/^#(?:[\da-f]{3}|[\da-f]{6})$/i),
 })
 export type Stock = z.infer<typeof StockSchema>

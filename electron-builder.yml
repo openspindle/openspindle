@@ -56,7 +56,7 @@ mac:
   # package:mac signs ad-hoc instead.
   forceCodeSigning: true
   fileAssociations:
-    - ext: [nc, cnc, gcode, tap, ngc]
+    - ext: [nc, cnc, gcode, tap, ngc, ospjob]
       name: NC program
       role: Viewer
       rank: Alternate

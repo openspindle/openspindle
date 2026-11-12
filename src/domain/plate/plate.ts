@@ -1,4 +1,5 @@
 import { z } from "zod"
+import { ReferenceModelSchema } from "../models/reference"
 import { DEVICE_ASSISTS, PlateAssistsSchema } from "@/machine/contract"
 import {
   FIXTURE_LIMIT,
@@ -60,6 +61,7 @@ export type StockSource = z.infer<typeof StockSourceSchema>
 export const PlateSetupSchema = z
   .object({
     stock: StockSchema.nullable(),
+    reference: ReferenceModelSchema.nullable().optional(),
     stockSource: StockSourceSchema,
     stockAnchor: Point3Schema,
     /**

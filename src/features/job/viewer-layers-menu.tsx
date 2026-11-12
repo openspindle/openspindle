@@ -32,6 +32,8 @@ const LAYERS: readonly [keyof ViewerLayers, string][] = [
   ["ahead", "Path ahead highlight"],
   ["tool", "Tool"],
   ["stock", "Stock"],
+  ["reference", "Finished model"],
+  ["deviation", "Deviation from model"],
   ["fixtures", "Fixtures"],
   ["bed", "Machine bed"],
   ["toolSetter", "Tool setter"],
@@ -117,6 +119,13 @@ export function ViewerLayersMenu({
                 <FieldDescription className="font-numeric">
                   {removal.grid.columns} × {removal.grid.rows} ·{" "}
                   {removal.grid.resolution.toFixed(3)} mm
+                </FieldDescription>
+              )}
+              {layers.deviation && (
+                <FieldDescription>
+                  With Show removal: blue = material remaining, red = below
+                  model, green = within ±0.05 mm, grey = no model coverage.
+                  Nominal top-surface comparison only.
                 </FieldDescription>
               )}
               <Separator />

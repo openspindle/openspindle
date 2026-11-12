@@ -114,6 +114,7 @@ export function toViewerPlate(
     machineProgram: machineProgramOf,
     tools: toolRuns(plate, compiled, library),
     toolpathBounds: toolpath.ok ? toolpath.bounds : null,
+    reference: plate.setup.reference,
     stock: plate.setup.stock,
     stockAnchor: plate.setup.stockAnchor,
     workOrigin: plate.setup.workOrigin,

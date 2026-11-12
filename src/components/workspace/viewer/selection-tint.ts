@@ -54,6 +54,11 @@ export class SelectionTint {
   private tint(material: SolidMaterial) {
     // Keep node-based normal maps and texture coordinates when a stock is selected.
     const tint = material.clone()
+    if (tint instanceof MeshStandardNodeMaterial) {
+      tint.colorNode = null
+      tint.roughnessNode = null
+      tint.map = null
+    }
     tint.color.copy(this.color)
     tint.metalness = 0.1
     tint.roughness = 0.6

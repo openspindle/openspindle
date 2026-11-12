@@ -1,4 +1,5 @@
 import {
+  Box,
   CircuitBoard,
   Crosshair,
   Settings2,
@@ -46,6 +47,17 @@ export function PrepareToolbar() {
           aria-label="Prepare tools"
         >
           <ArrangeTools />
+          <ToolbarButton
+            label="Finished model and material"
+            description="Import the finished part and edit its display material and work-frame placement."
+            reason={hasPlate ? null : "Create a plate first."}
+            onClick={() => {
+              const plate = selectedPlate(workspace.state)
+              if (plate) openDialog({ kind: "reference", plateId: plate.id })
+            }}
+          >
+            <Box />
+          </ToolbarButton>
           <ToolbarButton
             label="Reusable processes"
             description="Save and reuse the selected plate's setup, operations and tool definitions."

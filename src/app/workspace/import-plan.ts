@@ -1,3 +1,5 @@
+import { readFreecadHandoff } from "@/formats/freecad/handoff"
+import type { FreecadHandoff } from "@/formats/freecad/handoff"
 import { runRules } from "@/machine/contract"
 import type { RuleSettings } from "@/machine/contract"
 import {
@@ -51,6 +53,7 @@ export type ProgramOrigin = Omit<NcOrigin, "part" | "resolutions">
 
 /** A program to import, read: what the machine it is for would not run as written, and its splits. */
 export type PlannedProgram = {
+  readonly handoff?: FreecadHandoff
   readonly fileName: string
   readonly text: string
   /** Where it came from, for a program that can be updated from there; null for a file. */
@@ -111,6 +114,7 @@ export type ImportPlan = {
 
 /** A program's text to import, the name of the file it came as, and where it came from. */
 export type ProgramText = {
+  readonly handoff?: FreecadHandoff
   readonly fileName: string
   readonly text: string
   readonly origin?: ProgramOrigin
@@ -173,7 +177,7 @@ export function planPrograms(
   const problems: FileProblem[] = []
   let start = FRESH_START
   const resolved = target.kind === "operation" ? target.resolutions : {}
-  for (const { fileName, text, origin = null } of texts) {
+  for (const { fileName, text, origin = null, handoff } of texts) {
     // A program that cannot be used as it is imports as nothing, and is said so.
     const plate = programPlate(fileName, text, context)
     if (!plate.ok) {
@@ -185,6 +189,7 @@ export function planPrograms(
       continue
     }
     programs.push({
+      handoff,
       fileName,
       text,
       origin,
@@ -210,8 +215,26 @@ export async function planImport(
   const unread: FileProblem[] = []
   for (const file of files) {
     const text = await readProgramText(file)
-    if (text.ok) texts.push({ fileName: file.name, text: text.value })
-    else unread.push({ fileName: file.name, message: text.error })
+    if (!text.ok) {
+      unread.push({ fileName: file.name, message: text.error })
+      continue
+    }
+    try {
+      if (/\.ospjob$/i.test(file.name)) {
+        const handoff = await readFreecadHandoff(text.value)
+        texts.push({
+          fileName: handoff.program.name,
+          text: handoff.program.nc,
+          handoff,
+        })
+      } else texts.push({ fileName: file.name, text: text.value })
+    } catch (error) {
+      unread.push({
+        fileName: file.name,
+        message:
+          error instanceof Error ? error.message : "Invalid FreeCAD job.",
+      })
+    }
   }
   const plan = planPrograms(texts, context, kit, settings)
   return { ...plan, problems: [...unread, ...plan.problems] }
@@ -229,7 +252,40 @@ export function describedPlate(
   const program = plan.programs.at(0)
   if (!program) return null
   const plate = programPlate(program.fileName, program.text, context)
-  return plate.ok ? { ...plate.value, operations: [], tools: [] } : null
+  if (!plate.ok) return null
+  const result = { ...plate.value, operations: [], tools: [] }
+  const bundle = program.handoff
+  if (!bundle) return result
+  const min = bundle.stock.min
+  const max = bundle.stock.max
+  const anchor = result.setup.stockAnchor
+  const stock = result.setup.stock ?? {
+    id: result.id,
+    name: bundle.material?.name ?? "FreeCAD stock",
+    material: "Unspecified material",
+    color: "#aab3bb",
+    width: 1,
+    depth: 1,
+    height: 1,
+  }
+  return {
+    ...result,
+    setup: {
+      ...result.setup,
+      reference: bundle.reference,
+      stockSource: "source",
+      stock: {
+        ...stock,
+        width: max[0] - min[0],
+        depth: max[1] - min[1],
+        height: max[2] - min[2],
+        material: bundle.material?.name ?? stock.material,
+        color: bundle.material?.color ?? stock.color,
+        appearance: bundle.material,
+      },
+      workOrigin: anchor.map((v, i) => v - min[i]) as [number, number, number],
+    },
+  }
 }
 
 /** A file's name without its extension: "1002_top_1_Face3_T1". */
