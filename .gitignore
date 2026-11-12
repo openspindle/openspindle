@@ -37,3 +37,6 @@ __unconfig*
 todos.json
 
 .gitnexus
+
+dist-host/
+openspindle-data/

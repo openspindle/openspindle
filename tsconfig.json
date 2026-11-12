@@ -9,21 +9,14 @@
     "eslint.config.js",
     "vite.config.ts",
     "electron.vite.config.ts",
-    "host/services/**/*.ts"
+    "host/**/*.ts",
+    "host/**/*.tsx"
   ],
   "compilerOptions": {
-    "lib": [
-      "ES2022",
-      "DOM",
-      "DOM.Iterable"
-    ],
-    "types": [
-      "vite/client"
-    ],
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["vite/client", "node"],
     "paths": {
-      "@/*": [
-        "./src/*"
-      ]
+      "@/*": ["./src/*"]
     }
   }
 }
