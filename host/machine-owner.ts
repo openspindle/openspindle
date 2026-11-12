@@ -27,9 +27,15 @@ const controller = new MachineController({
 })
 const gateway = new MachineGateway(controller, { kind: "app" })
 let camera: (() => void) | null = null
-controller.subscribe((snapshot) =>
+let cameraConnection: string | null = null
+controller.subscribe((snapshot) => {
+  if (camera && cameraConnection !== snapshot.connection.id) {
+    camera()
+    camera = null
+    port.postMessage({ kind: "camera-status", status: "off" })
+  }
   port.postMessage({ kind: "snapshot", snapshot })
-)
+})
 port.postMessage({ kind: "snapshot", snapshot: gateway.snapshot() })
 port.on(
   "message",
@@ -70,6 +76,7 @@ port.on(
           result = await gateway.execute(input)
           break
         case "camera.start":
+          cameraConnection = gateway.snapshot().connection.id
           camera ??= gateway.watchCamera((event) => {
             if (event.kind === "frame")
               port.postMessage({

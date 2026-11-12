@@ -1,4 +1,4 @@
-import { readFileSync, unlinkSync } from "node:fs"
+import { createReadStream, readFileSync, unlinkSync } from "node:fs"
 import { createServer } from "node:http"
 import type { IncomingMessage, ServerResponse } from "node:http"
 import { createHash, timingSafeEqual, randomUUID } from "node:crypto"
@@ -20,6 +20,12 @@ import { z } from "zod"
 import { readFreecadHandoff } from "../src/formats/freecad/handoff.ts"
 import { SharedLibrarySchema } from "../src/formats/shared-tools/library.ts"
 import { JobHistory } from "./services/job-history.ts"
+import { Cameras } from "./services/cameras.ts"
+import {
+  CameraIdSchema,
+  TimelapseSettingSchema,
+  CAMERA_IDS,
+} from "./camera-contract.ts"
 import { OwnerClient } from "./owner-client.ts"
 
 const bind = process.env.OPENSPINDLE_HOST_BIND ?? "127.0.0.1"
@@ -98,6 +104,8 @@ const owner = new OwnerClient(
   },
   warning
 )
+const cameras = new Cameras(data, owner, warning)
+await cameras.initialize()
 const history = new JobHistory(data, warning)
 const StateSchema = z.object({
   selected: z.uuid().nullable(),
@@ -197,7 +205,7 @@ async function handle(request: IncomingMessage, response: ServerResponse) {
   response.setHeader("Referrer-Policy", "no-referrer")
   response.setHeader(
     "Content-Security-Policy",
-    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; font-src 'self' data:; connect-src 'self'; worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'none'"
+    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; media-src 'self' blob:; font-src 'self' data:; connect-src 'self'; worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'none'"
   )
   const url = new URL(request.url ?? "/", "http://host.local")
   if (url.pathname === "/health" && request.method === "GET") {
@@ -241,6 +249,7 @@ async function handle(request: IncomingMessage, response: ServerResponse) {
         ...state,
         machine: owner.snapshot,
         camera: owner.cameraStatus,
+        cameras: cameras.states(),
       })
       return
     }
@@ -307,20 +316,41 @@ async function handle(request: IncomingMessage, response: ServerResponse) {
       }
       return
     }
-    if (request.method === "POST" && url.pathname === "/api/camera/start") {
-      await owner.call("camera.start")
-      json(response, 200, { enabled: true })
+    const cameraAction =
+      /^\/api\/cameras\/(machine|webcam)\/(start|stop|timelapse)$/.exec(
+        url.pathname
+      )
+    if (request.method === "POST" && cameraAction) {
+      const id = CameraIdSchema.parse(cameraAction[1])
+      if (cameraAction[2] === "start") await cameras.start(id)
+      if (cameraAction[2] === "stop") await cameras.stop(id)
+      if (cameraAction[2] === "timelapse")
+        await cameras.configure(
+          id,
+          TimelapseSettingSchema.parse(JSON.parse(await body(request, 4096)))
+        )
+      json(response, 200, cameras.states())
       return
     }
-    if (request.method === "POST" && url.pathname === "/api/camera/stop") {
-      await owner.call("camera.stop")
-      owner.camera = null
-      owner.cameraStatus = "off"
-      json(response, 200, { enabled: false })
+    // Existing machine-camera routes remain compatible with older monitors.
+    if (
+      request.method === "POST" &&
+      ["/api/camera/start", "/api/camera/stop"].includes(url.pathname)
+    ) {
+      if (url.pathname.endsWith("/start")) await cameras.start("machine")
+      else await cameras.stop("machine")
+      json(response, 200, { enabled: !url.pathname.endsWith("/stop") })
       return
     }
-    if (request.method === "GET" && url.pathname === "/api/camera") {
-      const frame = owner.camera
+    const cameraFrame = /^\/api\/cameras\/(machine|webcam)\/frame$/.exec(
+      url.pathname
+    )
+    if (
+      request.method === "GET" &&
+      (cameraFrame || url.pathname === "/api/camera")
+    ) {
+      const id = CameraIdSchema.parse(cameraFrame?.[1] ?? "machine")
+      const frame = cameras.frame(id)
       if (!frame || Date.now() - frame.at > 15000) {
         json(response, 404, { error: "No fresh camera frame." })
         return
@@ -331,6 +361,73 @@ async function handle(request: IncomingMessage, response: ServerResponse) {
         "X-Frame-Received-At": String(frame.at),
       })
       response.end(frame.jpeg)
+      return
+    }
+    const timelapseList = /^\/api\/history\/([a-f\d-]{36})\/timelapses$/.exec(
+      url.pathname
+    )
+    if (request.method === "GET" && timelapseList) {
+      json(
+        response,
+        200,
+        await Promise.all(
+          CAMERA_IDS.map((id) => cameras.timelapses.read(timelapseList[1], id))
+        )
+      )
+      return
+    }
+    const timelapseFrame =
+      /^\/api\/history\/([a-f\d-]{36})\/timelapses\/(machine|webcam)\/frames\/(\d+)$/.exec(
+        url.pathname
+      )
+    if (request.method === "GET" && timelapseFrame) {
+      const bytes = await cameras.timelapses.frame(
+        timelapseFrame[1],
+        CameraIdSchema.parse(timelapseFrame[2]),
+        Number(timelapseFrame[3])
+      )
+      response.writeHead(200, {
+        "Content-Type": "image/jpeg",
+        "Cache-Control": "no-store",
+      })
+      response.end(bytes)
+      return
+    }
+    const timelapseExport =
+      /^\/api\/history\/([a-f\d-]{36})\/timelapses\/(machine|webcam)\/export$/.exec(
+        url.pathname
+      )
+    if (request.method === "POST" && timelapseExport) {
+      const cancel = new AbortController()
+      const onClose = () => cancel.abort()
+      response.once("close", onClose)
+      const exported = await cameras.timelapses.export(
+        timelapseExport[1],
+        CameraIdSchema.parse(timelapseExport[2]),
+        cancel.signal
+      )
+      try {
+        if (response.destroyed) return
+        response.writeHead(200, {
+          "Content-Type": "video/mp4",
+          "Cache-Control": "no-store",
+          "Content-Disposition": `attachment; filename="${timelapseExport[1]}-${timelapseExport[2]}.mp4"`,
+        })
+        await new Promise<void>((done, reject) => {
+          response.setTimeout(60000, () => response.destroy())
+          const stream = createReadStream(exported.file)
+          stream.on("error", reject)
+          response.once("finish", done)
+          response.once("close", () => {
+            stream.destroy()
+            done()
+          })
+          stream.pipe(response)
+        })
+      } finally {
+        response.off("close", onClose)
+        await exported.cleanup()
+      }
       return
     }
     if (request.method === "GET" && url.pathname === "/api/history") {
@@ -529,7 +626,11 @@ const shutdown = () => {
     "Host is exiting; any physical job may continue. No automatic Stop was sent."
   )
   server.close()
-  void owner.worker.terminate().finally(() => process.exit(0))
+  void cameras
+    .close()
+    .catch((error) => warning(String(error)))
+    .finally(() => owner.worker.terminate())
+    .finally(() => process.exit(0))
 }
 process.on("SIGTERM", shutdown)
 process.on("SIGINT", shutdown)

@@ -27,6 +27,8 @@ npm run start:host
 | `OPENSPINDLE_MACHINE_PORT` | CNC/simulator port; defaults to `2222` |
 | `OPENSPINDLE_USB_ID` | Explicit FTDI ID from the `usb` terminal command; one USB connection attempt at startup; mutually exclusive with the TCP address |
 | `OPENSPINDLE_CAMERA_HOST` | Optional local camera IPv4 when using USB |
+| `OPENSPINDLE_WEBCAM_DEVICE` | Optional local Linux USB webcam endpoint, e.g. `/dev/video0` or a `/dev/v4l/by-id/` path |
+| `OPENSPINDLE_FFMPEG` | Optional ffmpeg executable; defaults to `ffmpeg` on PATH |
 
 Open the host URL and enter the access key. The browser keeps the key in memory, not a URL, cookie, saved project or local storage. Use TLS through a same-origin reverse proxy for LAN access, or an SSH tunnel to the default loopback listener. There is no permissive CORS or password-in-query mode. All `/api/` routes require Bearer authentication. `/health` returns only `{status:"ok"}`. The host restricts cross-origin requests, upload size/concurrency and request rate. No API reads arbitrary host paths or executes shell commands.
 
@@ -50,7 +52,7 @@ Interactive stdin commands are:
 
 `state.json` keeps selected inbox ID and the association between a Run and its package. Deterministic geometry plus the owner's reported line reconstruct the nominal visualization; a server-side GPU scene is not needed. The preview is in the NC work frame, not a full machine/fixture collision scene. Three-axis flat/V-bit removal requires dimensioned tool comments; unsupported cycles, raw probing, rotary axes or unavailable geometry show a reason rather than invented removal. This monitor previews at 512 intervals along the longest stock side. Unknown/offline physical outcomes must be read as unknown.
 
-The inbox keeps at most 100 immutable packages/2 GiB. Back up `inbox`, `state.json`, `shared.osptools` and `job-history`. Move older, inactive inbox packages and their metadata out of the data directory to free space. Job history retains its own explicit deletion controls and limits. Desktop history exports complete ZIPs including camera JPEGs; browser history downloads the full NC/context record as JSON and shows camera frames separately. Camera recording occurs only while an explicit camera subscription is active; it is never enabled by receiving a job.
+The inbox keeps at most 100 immutable packages/2 GiB. Back up `inbox`, `state.json`, `shared.osptools` and `job-history`. Move older, inactive inbox packages and their metadata out of the data directory to free space. Job history retains its own explicit deletion controls and limits. Desktop history exports complete ZIPs including camera JPEGs; browser history downloads the full NC/context record as JSON and shows camera frames separately. Camera recording occurs only while an explicit camera subscription is active; it is never enabled by receiving a job. The monitor supports a second USB webcam, viewing either/both cameras, independent per-job timelapses and MP4 playback/download. See [Host cameras](host-cameras.md) for setup, recording controls and storage limits.
 
 ## Transport and validation limits
 

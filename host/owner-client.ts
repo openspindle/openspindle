@@ -37,7 +37,11 @@ export class OwnerClient {
     this.worker.on("message", (message) => {
       if (message.kind === "snapshot") {
         const checked = MachineSnapshotSchema.safeParse(message.snapshot)
-        if (checked.success) this.snapshot = checked.data
+        if (checked.success) {
+          if (checked.data.connection.id !== this.snapshot.connection.id)
+            this.camera = null
+          this.snapshot = checked.data
+        }
         return
       }
       if (message.kind === "frame") {

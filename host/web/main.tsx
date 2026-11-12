@@ -1,5 +1,5 @@
 import { createRoot } from "react-dom/client"
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import {
   QueryClient,
   QueryClientProvider,
@@ -23,6 +23,8 @@ import {
 } from "@/components/ui/card"
 import { OptionSelect } from "@/components/option-select"
 import { FilePicker } from "@/components/file-picker"
+import { CameraPanel, JobTimelapses } from "./cameras"
+import type { CameraState } from "../camera-contract"
 import { Preview } from "./preview"
 import type { FreecadHandoff } from "@/formats/freecad/handoff"
 import { isTerminalJobPhase } from "@/machine/contract"
@@ -36,6 +38,7 @@ type State = {
   runId: string | null
   machine: MachineSnapshot
   camera: string
+  cameras: CameraState[]
 }
 type Inbox = {
   id: string
@@ -47,7 +50,6 @@ type Inbox = {
 function Monitor({ token, onLogout }: { token: string; onLogout: () => void }) {
   const [error, setError] = useState("")
   const [recordId, setRecordId] = useState("")
-  const [image, setImage] = useState<string | null>(null)
   async function api<T>(
     path: string,
     method = "GET",
@@ -111,33 +113,6 @@ function Monitor({ token, onLogout }: { token: string; onLogout: () => void }) {
     },
     onError: (err) => setError(err.message),
   })
-  useEffect(() => {
-    if (state.data?.camera === "off" || !state.data) return
-    let ended = false,
-      last: string | null = null
-    const timer = setInterval(() => {
-      fetch("/api/camera", { headers: { Authorization: `Bearer ${token}` } })
-        .then(async (response) => {
-          if (!response.ok) {
-            setImage(null)
-            return
-          }
-          const blob = await response.blob()
-          if (ended) return
-          const next = URL.createObjectURL(blob)
-          if (last) URL.revokeObjectURL(last)
-          last = next
-          setImage(next)
-        })
-        .catch(() => {})
-    }, 1000)
-    return () => {
-      ended = true
-      clearInterval(timer)
-      if (last) URL.revokeObjectURL(last)
-      setImage(null)
-    }
-  }, [state.data?.camera, token])
   async function downloadRecord() {
     if (!record.data) return
     const blob = new Blob([JSON.stringify(record.data, null, 2)], {
@@ -169,18 +144,6 @@ function Monitor({ token, onLogout }: { token: string; onLogout: () => void }) {
             <FieldDescription>{error || state.error?.message}</FieldDescription>
           )}
           <div className="flex flex-wrap gap-2">
-            <Button
-              variant="outline"
-              onClick={() => action.mutate({ path: "/api/camera/start" })}
-            >
-              Enable camera
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => action.mutate({ path: "/api/camera/stop" })}
-            >
-              Disable camera
-            </Button>
             <Button variant="ghost" onClick={onLogout}>
               Sign out
             </Button>
@@ -248,16 +211,11 @@ function Monitor({ token, onLogout }: { token: string; onLogout: () => void }) {
           )}
         </CardContent>
       </Card>
-      {image && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Machine camera</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <img src={image} alt="Live Makera camera" />
-          </CardContent>
-        </Card>
-      )}
+      <CameraPanel
+        cameras={state.data?.cameras ?? []}
+        token={token}
+        refresh={() => void state.refetch()}
+      />
       <Card>
         <CardHeader>
           <CardTitle>History</CardTitle>
@@ -281,6 +239,7 @@ function Monitor({ token, onLogout }: { token: string; onLogout: () => void }) {
               <Button onClick={() => void downloadRecord()}>
                 Download full job record
               </Button>
+              <JobTimelapses key={recordId} jobId={recordId} token={token} />
               {record.data.summary.frameTimes.map((at, index) => (
                 <HistoricalFrame
                   key={index}
