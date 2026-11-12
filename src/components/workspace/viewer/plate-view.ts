@@ -4,6 +4,7 @@ import { billboarding } from "three/tsl"
 import { MeshBasicNodeMaterial } from "three/webgpu"
 import type { RemovalGrid } from "@/domain/tools/material-removal"
 import { RemovalStockGeometry } from "./removal-stock"
+import { removalSurfaces } from "./removal-surface"
 import { Line2 } from "three/addons/lines/webgpu/Line2.js"
 import { LineGeometry } from "three/addons/lines/LineGeometry.js"
 import { SeeThroughLineMaterial } from "./see-through-line"
@@ -395,18 +396,12 @@ function stockObjects(
   const bounds = plateStockBounds(plate)
   if (!stock || !bounds) return []
   const { top, body } = stockFaces(stock)
-  if (removal)
+  if (removal) {
+    const geometry = new RemovalStockGeometry(plate, removal)
     return [
-      new THREE.Mesh(
-        new RemovalStockGeometry(plate, removal),
-        new THREE.MeshStandardMaterial({
-          color: top.color,
-          metalness: top.metalness,
-          roughness: top.roughness,
-          side: THREE.DoubleSide,
-        })
-      ),
+      new THREE.Mesh(geometry, removalSurfaces(stock, geometry, top, body)),
     ]
+  }
   const surface = ({ color, metalness, roughness }: StockFace) =>
     new THREE.MeshStandardMaterial({
       color,
