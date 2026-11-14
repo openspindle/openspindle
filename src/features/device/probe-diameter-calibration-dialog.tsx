@@ -245,7 +245,7 @@ export function ProbeDiameterCalibrationDialog({
       draft.signalToolId !== tool?.id)
   )
     runIssue =
-      "Position the probe, touch once and remove contact; wait for Probe signal verified."
+      "Position the probe and wait for the automatic released-input check."
   if (!runIssue && binding?.tool !== probeNumber)
     runIssue = "The checked active probe must match this library probe."
   if (!runIssue && (!plan || !plan.success))

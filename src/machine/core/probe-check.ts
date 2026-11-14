@@ -123,10 +123,13 @@ export class ProbeSignalCheck {
       this.moved()
       return
     }
+    if (triggered) {
+      this.invalidate()
+      return
+    }
     const retained = this.value?.phase === "verified" ? this.value : null
     if (!this.validPose(telemetry, connectionId, now)) this.value = null
     if (!this.value) {
-      if (triggered) return
       const binding: ProbeCheckBinding = {
         id: crypto.randomUUID(),
         position: [
@@ -139,7 +142,7 @@ export class ProbeSignalCheck {
       }
       if (!this.matches(binding, telemetry, now)) return
       this.value = {
-        phase: retained ? "verified" : "released",
+        phase: "verified",
         binding,
         connectionId,
         startedAt: retained?.startedAt ?? now,
@@ -147,11 +150,6 @@ export class ProbeSignalCheck {
       }
       return
     }
-    if (this.value.phase === "released" && triggered)
-      this.value = { ...this.value, phase: "triggered" }
-    else if (this.value.phase === "triggered" && !triggered)
-      this.value = { ...this.value, phase: "verified" }
-    else if (this.value.phase === "verified" && triggered) this.invalidate()
   }
 
   consume(
@@ -169,7 +167,7 @@ export class ProbeSignalCheck {
     if (!valid)
       throw new MachineError(
         "refused",
-        "Touch and release the measured probe once, then wait for a released-input check at the current stationary position before Run. The check expires after 120 seconds and can be used once."
+        "Wait for an automatic released-input check of the measured probe at the current stationary position before Run. The check expires after 120 seconds and can be used once."
       )
   }
 }

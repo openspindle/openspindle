@@ -204,7 +204,7 @@ export function AnchorCalibrationDialog({ onClose }: { onClose: () => void }) {
   let runReason = reason
   if (!runReason && !signalVerified)
     runReason =
-      "Position the probe, touch it once and remove contact; wait for Probe signal verified."
+      "Position the probe and wait for the automatic released-input check."
   if (!runReason && binding?.tool !== probeNumber)
     runReason = "Check the selected, measured probe's live signal again."
   if (!runReason && binding && target && reference)
