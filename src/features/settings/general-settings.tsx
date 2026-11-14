@@ -2,6 +2,7 @@ import { useAppearance } from "@/components/appearance-provider"
 import {
   Field,
   FieldError,
+  FieldContent,
   FieldGroup,
   FieldLabel,
   FieldDescription,
@@ -14,6 +15,8 @@ import { FONTS, FONT_CHOICES, isFontFor } from "@/lib/fonts"
 import type { FontRole } from "@/lib/fonts"
 import { useSimulatorStatus, useUpdateSimulator } from "@/platform/simulator"
 import { useRemovalResolution } from "@/app/job/removal-preferences"
+
+import { useProbingPreferences } from "@/app/probing/probing-preferences"
 
 const APPEARANCE_OPTIONS = [
   { value: "system", label: "System" },
@@ -52,6 +55,7 @@ const simulatorHint = (host: string, port: number) =>
 /** Settings › General: appearance and the simulated Z1. Changes apply at once. */
 export function GeneralSettings() {
   const removal = useRemovalResolution()
+  const probing = useProbingPreferences()
   const { appearance, setAppearance, fonts, setFont, saveError } =
     useAppearance()
   const simulator = useSimulatorStatus().data
@@ -116,6 +120,21 @@ export function GeneralSettings() {
         </FieldDescription>
         {removal.saveError && <FieldError>{removal.saveError}</FieldError>}
       </Field>
+      <Field orientation="horizontal">
+        <FieldContent>
+          <FieldLabel htmlFor="guided-probing">Guided probing</FieldLabel>
+          <FieldDescription>
+            Use step-by-step Z probing, calibration and inspection guides. Off
+            by default: add Z surface from the Probing menu and run it from Job.
+          </FieldDescription>
+        </FieldContent>
+        <Switch
+          id="guided-probing"
+          checked={probing.guided}
+          onCheckedChange={probing.update}
+        />
+      </Field>
+      {probing.saveError && <FieldError>{probing.saveError}</FieldError>}
       {simulator && (
         <Field orientation="horizontal">
           <FieldLabel htmlFor="z1-simulator">

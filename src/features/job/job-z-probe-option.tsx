@@ -1,3 +1,4 @@
+import { useProbingPreferences } from "@/app/probing/probing-preferences"
 import { useId } from "react"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
@@ -11,9 +12,12 @@ import { kitForPlate } from "@/domain/fixtures/catalog"
 import type { Plate } from "@/domain/plate/plate"
 
 export function JobZProbeOption({ plate }: { plate: Plate }) {
+  const { guided } = useProbingPreferences()
   const id = useId()
   const workspace = useWorkspaceStore()
   if (!kitForPlate(plate).zProbing) return null
+  // Keep a saved request visible so it can be disabled, never silently skipped.
+  if (!guided && !plate.setup.probeBeforeRun) return null
   return (
     <Field orientation="horizontal">
       <Checkbox

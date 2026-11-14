@@ -1,3 +1,4 @@
+import { useProbingPreferences } from "@/app/probing/probing-preferences"
 import { useId, useState } from "react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
@@ -47,6 +48,7 @@ export function PointProbeDraft({
   intent: PointIntent
   onClose: () => void
 }) {
+  const { guided } = useProbingPreferences()
   const id = useId()
   const plate = useWorkspace((state) =>
     state.plates.find((entry) => entry.id === intent.plateId)
@@ -79,14 +81,18 @@ export function PointProbeDraft({
           Picked model point: X {intent.position[0].toFixed(3)}, Y{" "}
           {intent.position[1].toFixed(3)}, Z {intent.position[2].toFixed(3)} mm.
         </p>
-        <Button onClick={() => openZProbe(undefined, intent)}>
-          Probe part Z here…
-        </Button>
-        <FieldDescription>
-          The Z guide keeps the measured probe fitted, retracts, moves to this
-          XY, then probes down from the raised height to the real surface.
-          Review and start the complete sequence in its sidebar.
-        </FieldDescription>
+        {guided && (
+          <>
+            <Button onClick={() => openZProbe(undefined, intent)}>
+              Probe part Z here…
+            </Button>
+            <FieldDescription>
+              The Z guide keeps the measured probe fitted, retracts, moves to
+              this XY, then probes down from the raised height to the real
+              surface. Review and start the complete sequence in its sidebar.
+            </FieldDescription>
+          </>
+        )}
         <ProbeSafetyNotice native />
         <Field>
           <FieldLabel htmlFor={`${id}-routine`}>3D probing draft</FieldLabel>

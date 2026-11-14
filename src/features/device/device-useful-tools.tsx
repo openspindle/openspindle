@@ -1,3 +1,4 @@
+import { useProbingPreferences } from "@/app/probing/probing-preferences"
 import { Wrench } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { FieldLegend, FieldSet } from "@/components/ui/field"
@@ -14,11 +15,12 @@ export function DeviceUsefulTools({
   calibrationName: string | null
   probing: boolean
 }) {
-  if (!probing && !calibrationName) return null
+  const { guided } = useProbingPreferences()
+  if (!probing && (!guided || !calibrationName)) return null
   return (
     <ControlCard title="Useful tools" icon={<Wrench size={16} />}>
       <div className="grid grid-cols-2 gap-2">
-        {calibrationName && (
+        {guided && calibrationName && (
           <Button
             variant="outline"
             onClick={() => openDialog({ kind: "anchor-calibration" })}
@@ -32,21 +34,27 @@ export function DeviceUsefulTools({
               variant="outline"
               onClick={() => openDialog({ kind: "probing" })}
             >
-              3D probe routines
+              {guided ? "3D probe routines" : "Probing"}
             </Button>
-            <Button variant="outline" onClick={() => openZProbe()}>
-              Z probe routines
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => openDialog({ kind: "probe-diameter-calibration" })}
-            >
-              Probe diameter
-            </Button>
+            {guided && (
+              <>
+                <Button variant="outline" onClick={() => openZProbe()}>
+                  Z probe routines
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() =>
+                    openDialog({ kind: "probe-diameter-calibration" })
+                  }
+                >
+                  Probe diameter
+                </Button>
+              </>
+            )}
           </>
         )}
       </div>
-      {probing && (
+      {guided && probing && (
         <FieldSet>
           <FieldLegend>Inspection</FieldLegend>
           <div className="grid grid-cols-2 gap-2">

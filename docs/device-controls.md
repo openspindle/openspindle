@@ -1,5 +1,7 @@
 # Device controls
 
+With **Settings → General → Guided probing** off (the default), Device's **Useful tools → Probing** opens the operation picker, including **Z surface**, for review in Prepare and execution from Job. Enable **Guided probing** for the following calibration and inspection shortcuts.
+
 Device's right column includes **Useful tools** directly below **Spindle**. **Anchor 1 probe** opens anchor calibration; **3D probe routines** opens the illustrated outside/inside corner, boss/pocket centre, height-map and outline picker; **Z probe routines** opens the bounded part-top guide for the wired Z probe, conductive XYZ rod or mechanical 3D touch probe; **Probe diameter** opens diameter calibration. **Inspection** provides shortcuts to stock inspection, feature spacing, surface inspection and repeatability. Opening any shortcut sends no machine commands. Anchor 1 and Z probing offer explicit temporary runs without adding project plates. General probing and inspection prepare operations to review in Prepare and run from Job. Supported native corner, centre and grid cycles run through prepared Jobs with the existing tool/spindle checks. The bounded guides add host-verified per-contact checks; raw console probing stays restricted.
 
 On Job, **Probe part Z before cutting** opens the Z guide at Run, then requires **Continue to cutting** after a verified surface measurement before the normal cutter-change prompt. See [Z surface](touch-off.md) for setup, limits and restrictions.

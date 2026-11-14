@@ -1,3 +1,4 @@
+import { useProbingPreferences } from "@/app/probing/probing-preferences"
 import { ArrowLeft, Ruler } from "lucide-react"
 import { INSPECTION_RECIPES } from "@/domain/probing/inspection-recipes"
 import { openDialog } from "@/features/shell/dialogs"
@@ -120,6 +121,7 @@ export function ProbingSteps({
   onAdded: () => void
   onBack?: () => void
 }) {
+  const { guided } = useProbingPreferences()
   const library = useWorkspace((state) => state.tools)
   const selected = useWorkspace(selectedPlate)
   const context = useImportContext()
@@ -145,7 +147,7 @@ export function ProbingSteps({
         <FieldLegend>Setup</FieldLegend>
         <ItemGroup className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           {PROBING_STRATEGIES.filter(
-            (strategy) => strategy.id !== "touch-off"
+            (strategy) => !guided || strategy.id !== "touch-off"
           ).map((strategy) => (
             <StrategyChoice
               key={strategy.id}
@@ -165,23 +167,25 @@ export function ProbingSteps({
           ))}
         </ItemGroup>
       </FieldSet>
-      <FieldSet>
-        <FieldLegend>Inspection</FieldLegend>
-        <ItemGroup className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-          {INSPECTION_RECIPES.map((recipe) => (
-            <StrategyItem
-              key={recipe.id}
-              title={recipe.label}
-              description={recipe.description}
-              picture={null}
-              icon={<Ruler />}
-              onSelect={() =>
-                openDialog({ kind: "inspection", recipe: recipe.id })
-              }
-            />
-          ))}
-        </ItemGroup>
-      </FieldSet>
+      {guided && (
+        <FieldSet>
+          <FieldLegend>Inspection</FieldLegend>
+          <ItemGroup className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            {INSPECTION_RECIPES.map((recipe) => (
+              <StrategyItem
+                key={recipe.id}
+                title={recipe.label}
+                description={recipe.description}
+                picture={null}
+                icon={<Ruler />}
+                onSelect={() =>
+                  openDialog({ kind: "inspection", recipe: recipe.id })
+                }
+              />
+            ))}
+          </ItemGroup>
+        </FieldSet>
+      )}
     </div>
   )
 }

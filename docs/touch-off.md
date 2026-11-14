@@ -1,5 +1,7 @@
 # Z surface
 
+By default, add **Z surface** from **Prepare → Probing**, edit the operation, and review and run it from **Job**. **Device → Useful tools → Probing** opens the same menu. The separate bounded guide below is optional: enable **Settings → General → Guided probing** to show it and its point-probing shortcuts. The preference is saved on this device and applies immediately; it does not change motion or safety checks. A saved **Probe part Z before cutting** request is still shown and honoured with guides off, and can be unchecked explicitly. Free-position generic `G38.2` touch-off is restricted on physical machines; choose a stored-anchor native Z surface or enable the bounded guide.
+
 ## Bounded part Z guide
 
 Open **Device → Useful tools → Z probe routines**. Choose the actual fitted probe: the wired Z probe with laser (T0), the conductive XYZ rod, or the mechanical 3D touch probe (T9999). Fit and cable it, home the machine, and choose **Run tool-setter detection**. The temporary run uses the normal tool-change prompt and verifies a completed tool-sensor measurement before **Continue to Z probing**. Reuse an existing measurement only while the same probe remains fitted and active. There is no manual probe-length entry.

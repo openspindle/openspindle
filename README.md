@@ -14,6 +14,7 @@ OpenSpindle is a desktop app for preparing, checking and running jobs on a Maker
 - Placement relative to the machine's stored anchors, with move, snap and lock in the 3D view
 - Import of `.nc`, `.cnc`, `.gcode`, `.tap` and `.ngc` programs from your CAM, Finder or Explorer, split into operations by tool or toolpath
 - Discover NC programs in Fusion 360, import them directly through the installable Python add-in, and update imported operations from them
+- Simple probing by default, with **Z surface** in the Probing menu; enable **Settings › General › Guided probing** for optional Z-probe, calibration and inspection guides
 - Probing chosen by what it does, each strategy pictured as it probes, with a probe from your tool library that can do it: Z surface sets work Z on the stock top, Height map compensates later cuts for an uneven surface, and Outline trace traces where the plate cuts, or the edges you choose, with the probe's laser
 - The work origin found with the Makera 3D Probe: Outside corner, Inside corner, Pocket center or Boss center, on the stock or on a bracket or anything else on the bed, from a start picked in the 3D view that snaps to the corners, holes and centres there
 - Design rules that catch what the Z1 would not run as written, with fixes, checked before Run and marked where they are in the 3D view

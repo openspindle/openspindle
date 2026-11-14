@@ -1,3 +1,4 @@
+import { useProbingPreferences } from "@/app/probing/probing-preferences"
 import { useId, useMemo, useState } from "react"
 import { useNavigate } from "@tanstack/react-router"
 import { Button } from "@/components/ui/button"
@@ -72,6 +73,7 @@ function PointPositioning({
   intent: PointIntent
   onClose: () => void
 }) {
+  const { guided } = useProbingPreferences()
   const id = useId()
   const machine = useMachineSnapshot()
   const workspace = useWorkspace((state) => state)
@@ -299,7 +301,7 @@ function PointPositioning({
                 ? "First retract to the machine's upper clearance (or keep an already higher Z), then move X and Y separately at 100% of their configured maximum speeds. Z stays retracted afterwards."
                 : "Keep X and Y fixed over the picked point. Move Z at 20% of its configured maximum to 5 mm above the modeled surface. This is positioning, not a surface measurement: contact stops and fails the run without setting Z0. The 5 mm clearance depends on the real work Z reference matching the model; tool-setter detection alone does not establish that reference."}
             </p>
-            {intent.action === "z" && (
+            {guided && intent.action === "z" && (
               <Button
                 variant="outline"
                 onClick={() => openZProbe(undefined, intent)}
