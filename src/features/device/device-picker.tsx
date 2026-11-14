@@ -33,7 +33,8 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { EmptyMedia } from "@/components/ui/empty"
 import { DEFAULT_KIT, kitForDevice } from "@/domain/fixtures/catalog"
-import { isLocalIPv4 } from "@/machine/contract"
+import { UsbPicker } from "./usb-picker"
+import { endpointLabel, isLocalIPv4 } from "@/machine/contract"
 import type { ConnectTarget } from "@/machine/contract"
 import {
   machineErrorCode,
@@ -55,8 +56,10 @@ const ManualTargetSchema = z.object({
     ),
 })
 
-const targetId = (target: Pick<ConnectTarget, "host" | "port">) =>
-  `${target.host}:${target.port}`
+const targetId = (target: ConnectTarget) =>
+  target.transport === "serial"
+    ? target.portId
+    : `${target.host}:${target.port}`
 
 /** The controller refused the request until the user confirms it: the picker asks. */
 const needsConfirmation = (error: Error | null) =>
@@ -184,7 +187,7 @@ export function DevicePicker({ close }: { close: () => void }) {
         onSuccess: close,
         onError: (error) =>
           askToLeave(error, {
-            title: `Connect to ${target.name ?? target.host}?`,
+            title: `Connect to ${target.name ?? endpointLabel(target)}?`,
             action: "Connect",
             confirm: () => connectTo(target, true),
           }),
@@ -223,7 +226,7 @@ export function DevicePicker({ close }: { close: () => void }) {
         <DeviceItem
           model={device.model}
           name={device.name}
-          description={`${device.host} · Connected`}
+          description={`${endpointLabel(device)} · Connected`}
         >
           <Button
             variant="outline"
@@ -234,6 +237,12 @@ export function DevicePicker({ close }: { close: () => void }) {
           </Button>
         </DeviceItem>
       )}
+      <UsbPicker
+        busy={busy}
+        device={device}
+        pendingId={pendingId}
+        connectTo={connectTo}
+      />
       <FieldSet>
         <FieldLegend
           variant="label"

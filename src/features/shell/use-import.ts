@@ -254,6 +254,26 @@ export function useApplyImport() {
         })
       else if (name !== into.name)
         commands.push({ type: "plate.rename", plateId: into.id, name })
+      const bundle = plan.programs.find((program) => program.handoff)?.handoff
+      if (bundle) {
+        commands.push({
+          type: "plate.setup",
+          plateId: into.id,
+          patch: {
+            reference: bundle.reference,
+            ...(into.setup.stock && bundle.material
+              ? {
+                  stock: {
+                    ...into.setup.stock,
+                    material: bundle.material.name,
+                    color: bundle.material.color ?? into.setup.stock.color,
+                    appearance: bundle.material,
+                  },
+                }
+              : {}),
+          },
+        })
+      }
       for (const { operation, preferredTools } of operations)
         commands.push({
           type: "operation.add",

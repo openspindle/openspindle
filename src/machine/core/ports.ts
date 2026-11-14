@@ -1,4 +1,11 @@
-import type { PrepareResult } from "../contract/index.ts"
+import type {
+  MachineSnapshot,
+  RunRequest,
+  PreparedProgram,
+  PrepareResult,
+  SerialDevice,
+  SerialTarget,
+} from "../contract/index.ts"
 
 /**
  * Everything the machine core needs from its host. The machine process supplies Node
@@ -13,11 +20,24 @@ export interface Clock {
   clearTimeout: (handle: TimerHandle | null | undefined) => void
 }
 
-export interface TcpConnection {
+export interface MachineByteConnection {
   write: (bytes: Uint8Array) => void
   destroy: () => void
 }
 
+export type TcpConnection = MachineByteConnection
+export interface ByteStreamEvents {
+  open: () => void
+  data: (bytes: Uint8Array) => void
+  closed: (error: string | null) => void
+}
+export interface SerialConnector {
+  list: () => Promise<SerialDevice[]>
+  connect: (
+    target: SerialTarget,
+    events: ByteStreamEvents
+  ) => MachineByteConnection
+}
 export interface TcpConnector {
   connect: (
     host: string,
@@ -73,9 +93,20 @@ export interface ProgramPreparer {
   prepare: (firmware: string, source: string) => Promise<PrepareResult>
 }
 
+export interface MachineJournal {
+  begin: (
+    request: RunRequest,
+    program: PreparedProgram,
+    snapshot: MachineSnapshot
+  ) => void
+  observe: (snapshot: MachineSnapshot) => void
+  frame: (jpeg: Uint8Array, at: number) => void
+}
 export type MachinePorts = {
+  readonly journal?: MachineJournal
   readonly clock: Clock
   readonly tcp: TcpConnector
+  readonly serial?: SerialConnector
   readonly udp: DatagramListener
   readonly camera: CameraConnector
   readonly md5: (bytes: Uint8Array) => string

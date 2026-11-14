@@ -1,3 +1,4 @@
+import type { HistoryStore } from "./contract/history"
 import type {
   AnchorConfiguration,
   FirmwareConfiguration,
@@ -8,12 +9,19 @@ import type {
   DisconnectRequest,
   HeightMap,
   SwitchReport,
+  ReadSwitchesRequest,
   MachineCommand,
   MachineSnapshot,
   NetworkDevice,
+  SerialDevice,
   PrepareResult,
   RunRequest,
   SimulatedBed,
+  BeginSimulatedJogRequest,
+  SimulatedJogSession,
+  SimulatedJogSample,
+  SimulatedJogReceipt,
+  SimulatedJogAction,
   WriteAnchorsRequest,
   WriteAnchorsResult,
 } from "@/machine/contract"
@@ -51,8 +59,19 @@ import type {
 
 /** Machine access through the machine process's controller. */
 export interface MachineHost {
+  beginSimulatedJog: (
+    input: BeginSimulatedJogRequest
+  ) => Promise<SimulatedJogSession>
+  sampleSimulatedJog: (
+    input: SimulatedJogSample
+  ) => Promise<SimulatedJogReceipt>
+  actionSimulatedJog: (
+    input: SimulatedJogAction
+  ) => Promise<SimulatedJogReceipt>
+  endSimulatedJog: (input: SimulatedJogSession) => Promise<MachineSnapshot>
   snapshot: () => Promise<MachineSnapshot>
   subscribe: (listener: (snapshot: MachineSnapshot) => void) => () => void
+  serialDevices: () => Promise<SerialDevice[]>
   discover: () => Promise<NetworkDevice[]>
   connect: (request: ConnectRequest) => Promise<MachineSnapshot>
   disconnect: (request: DisconnectRequest) => Promise<MachineSnapshot>
@@ -70,7 +89,7 @@ export interface MachineHost {
   reset: () => Promise<MachineSnapshot>
   prepare: (source: string) => Promise<PrepareResult>
   run: (request: RunRequest) => Promise<MachineSnapshot>
-  dismissJob: () => Promise<MachineSnapshot>
+  dismissJob: (expectedJobId?: string) => Promise<MachineSnapshot>
   readAnchors: (signal?: AbortSignal) => Promise<AnchorConfiguration>
   /** Stores the anchors in the machine's configuration; what it reads back afterwards. */
   writeAnchors: (request: WriteAnchorsRequest) => Promise<WriteAnchorsResult>
@@ -80,7 +99,7 @@ export interface MachineHost {
   ) => Promise<WriteConfigurationResult>
   readHeightMap: (signal?: AbortSignal) => Promise<HeightMap>
   /** The machine's switches as it reads them now. */
-  readSwitches: () => Promise<SwitchReport>
+  readSwitches: (request?: ReadSwitchesRequest) => Promise<SwitchReport>
   watchCamera: (listener: (event: CameraEvent) => void) => () => void
   /** The machine console: its backlog at once, then new entries in batches. */
   watchConsole: (listener: (entries: ConsoleEntry[]) => void) => () => void
@@ -198,6 +217,7 @@ export interface SimulatorHost {
  * typed RPC call.
  */
 export interface Host {
+  readonly history: HistoryStore
   readonly machine: MachineLink
   readonly files: FileHost
   readonly fusion: FusionHost

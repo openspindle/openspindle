@@ -10,7 +10,16 @@ export function createMachineHandlers(
 ): Handlers<MachineContract> {
   return {
     methods: {
+      "machine.beginSimulatedJog": (input) =>
+        machine(() => gateway.beginSimulatedJog(input)),
+      "machine.sampleSimulatedJog": (input) =>
+        machine(() => gateway.sampleSimulatedJog(input)),
+      "machine.actionSimulatedJog": (input) =>
+        machine(() => gateway.actionSimulatedJog(input)),
+      "machine.endSimulatedJog": (input) =>
+        machine(() => gateway.endSimulatedJog(input)),
       "machine.snapshot": () => machine(() => gateway.snapshot()),
+      "machine.serialDevices": () => machine(() => gateway.serialDevices()),
       "machine.discover": () => machine(() => gateway.discover()),
       "machine.connect": (request) => machine(() => gateway.connect(request)),
       "machine.disconnect": (request) =>
@@ -24,7 +33,8 @@ export function createMachineHandlers(
       "machine.reset": () => machine(() => gateway.reset()),
       "machine.prepare": (input) => machine(() => gateway.prepare(input)),
       "machine.run": (request) => machine(() => gateway.run(request)),
-      "machine.dismissJob": () => machine(() => gateway.dismissJob()),
+      "machine.dismissJob": (expectedJobId) =>
+        machine(() => gateway.dismissJob(expectedJobId)),
       "machine.readAnchors": (_params, { signal }) =>
         machine(() => gateway.readAnchors(signal)),
       "machine.writeAnchors": (request) =>
@@ -35,7 +45,8 @@ export function createMachineHandlers(
         machine(() => gateway.writeConfiguration(request)),
       "machine.readHeightMap": (_params, { signal }) =>
         machine(() => gateway.readHeightMap(signal)),
-      "machine.readSwitches": () => machine(() => gateway.readSwitches()),
+      "machine.readSwitches": (request) =>
+        machine(() => gateway.readSwitches(request)),
       "machine.protocolTrace": () => formatTrace(gateway.protocolTrace()),
     },
     events: {

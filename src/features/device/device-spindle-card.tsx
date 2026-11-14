@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from "react"
+import { useId } from "react"
 import { Gauge, Play, Square } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Field, FieldLabel } from "@/components/ui/field"
@@ -17,6 +17,9 @@ import { ControlCard } from "./device-control-card"
 /** The target speed field, start/apply and stop, and the actual and requested speeds. */
 export function DeviceSpindleCard({
   device,
+  rpmInput,
+  setRpmInput,
+  suggestedRpm,
   telemetry,
   limits,
   pending,
@@ -24,6 +27,9 @@ export function DeviceSpindleCard({
   execute,
 }: {
   device: ConnectedDevice | null
+  rpmInput: string
+  setRpmInput: (value: string) => void
+  suggestedRpm: number | undefined
   telemetry: Telemetry | null
   limits: ControlLimits | null
   pending: boolean
@@ -31,12 +37,6 @@ export function DeviceSpindleCard({
   execute: (action: MachineCommand) => void
 }) {
   const fieldId = useId()
-  const [rpmInput, setRpmInput] = useState("")
-  useEffect(() => {
-    setRpmInput("")
-  }, [device?.host, device?.port])
-  // The machine's target, else its fastest; unknown without a machine.
-  const suggestedRpm = telemetry?.spindleTargetRpm ?? limits?.spindleRpmMax
   const rpm = rpmInput === "" ? (suggestedRpm ?? 0) : Number(rpmInput)
   const startSpindle: MachineCommand = { type: "spindleStart", rpm }
   let spindleState = "—"
@@ -69,7 +69,7 @@ export function DeviceSpindleCard({
             placeholder={
               suggestedRpm === undefined ? undefined : numberText(suggestedRpm)
             }
-            disabled={!device}
+            disabled={!device || reason("spindleStart") !== null}
             onChange={(event) => setRpmInput(event.target.value)}
           />
         </Field>

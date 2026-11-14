@@ -22,7 +22,13 @@ import type {
 import { ORIGIN_ROUTINE, distanceSigns, routineOf } from "./3d-probe/blocks"
 import { gridSamples } from "./wired-probe/grid"
 import { CLEARANCE_Z } from "./wired-probe/travel"
-import { SETTER_RADIUS, SETTER_TOP, tipBedZ, tipMachineZ } from "./tool-setter"
+import {
+  SETTER_FROM_ANCHOR,
+  SETTER_RADIUS,
+  SETTER_TOP,
+  tipBedZ,
+  tipMachineZ,
+} from "./tool-setter"
 import { Z1_MOTION } from "./motion"
 
 /**
@@ -42,7 +48,7 @@ const Z1 = {
   /** Where a manual tool change waits, from anchor 1: `toolrack_offset_x` + 132 and `_y`. */
   change: [48.78 + 132, 179.74],
   /** The tool setter, from anchor 1 (`fill_cali_scripts` on the Z1 and Z1 Pro). */
-  setter: [181, 181],
+  setter: SETTER_FROM_ANCHOR,
   /**
    * `default_seek_rate` and `default_feed_rate`: G0, and G1 before any F. A machine's
    * configuration may set others, which its motion limits hold.
@@ -144,7 +150,7 @@ class Z1Frame {
   surface(at: readonly number[]) {
     const [x, y] = at
     const oz = this.setup.workOrigin[2]
-    const [setterX, setterY] = this.fromAnchor(Z1.setter)
+    const [setterX, setterY] = this.fromAnchor(SETTER_FROM_ANCHOR)
     if (Math.hypot(x - setterX, y - setterY) <= SETTER_RADIUS)
       return SETTER_TOP - oz
     const bed = this.onBed(at)
@@ -226,13 +232,23 @@ class Z1Preview implements GCodeFirmware {
     target: UNKNOWN_TOOL,
   }
   readonly initialPosition?: Point3
+  readonly initialUnits?: "mm" | "in"
+  readonly initialAbsolute?: boolean
   private readonly frame: Z1Frame
   private active: number | null = null
+  private readonly probeRadius: number
 
   constructor(setup: FirmwareSetup) {
     this.frame = new Z1Frame(setup)
     if (setup.start) this.initialPosition = setup.start
+    this.initialUnits = setup.units
+    this.initialAbsolute = setup.absolute
     this.active = setup.tool ?? null
+    this.probeRadius = setup.probeRadius ?? 0
+    if (setup.initialTool !== undefined) {
+      this.initialStatus = holding(setup.initialTool)
+      this.active = setup.initialTool
+    }
   }
 
   handles(letter: "G" | "M", code: number) {
@@ -308,9 +324,31 @@ class Z1Preview implements GCodeFirmware {
       words.get("Z") ?? 0,
     ]
     if (delta.every((distance) => distance === 0)) return { moves: [] }
+    if (block.gCodes.some((code) => code === 38.4 || code === 38.5)) {
+      // Release stops on the input opening, not on a solid ahead. Show its
+      // maximum travel conservatively; physical release is verified by the host.
+      moves.to(moves.at.map((value, axis) => value + delta[axis]) as Point3, {
+        rapid: false,
+        feed: words.get("F") ?? Z1.grid.slow,
+        probing: true,
+      })
+      return { moves: moves.list }
+    }
+    if (this.probeRadius > 0 && !delta[2] && !!delta[0] !== !!delta[1]) {
+      const axis = delta[0] ? 0 : 1
+      this.sideSearch(moves, axis, delta[axis], null, this.probeRadius, {
+        rapid: false,
+        feed: words.get("F") ?? Z1.grid.slow,
+      })
+      return { moves: moves.list }
+    }
     this.search(moves, delta, {
       rapid: false,
       feed: words.get("F") ?? Z1.grid.slow,
+      ...(block.gCodes.includes(38.6) &&
+        delta[0] === 0 &&
+        delta[1] === 0 &&
+        delta[2] < 0 && { toolSetterTouch: true }),
     })
     return { moves: moves.list }
   }
@@ -609,8 +647,8 @@ class Z1Preview implements GCodeFirmware {
     const measuring = { tool: to, status: { tool: NO_TOOL, target: to } }
     const style = { ...RAPID, ...measuring }
     moves.z(frame.z(Z1.clearanceZ), style)
-    moves.xy(frame.fromAnchor(Z1.setter), style)
-    this.touches(moves, measuring)
+    moves.xy(frame.fromAnchor(SETTER_FROM_ANCHOR), style)
+    this.touches(moves, { ...measuring, toolSetterTouch: true })
     moves.z(frame.z(Z1.safeZ), style)
     if (automation) return
     const back = { ...RAPID, tool: to, status: holding(to) }
@@ -619,7 +657,10 @@ class Z1Preview implements GCodeFirmware {
   }
 
   /** A fast touch, back off, a slow touch: calibration's and the Z probe's (G38 distances). */
-  private touches(moves: Moves, by: Pick<Style, "tool" | "status">) {
+  private touches(
+    moves: Moves,
+    by: Pick<Style, "tool" | "status" | "toolSetterTouch">
+  ) {
     const { fast, slow, retract } = Z1.touch
     this.search(moves, [0, 0, Z1.search], { ...by, rapid: false, feed: fast })
     moves.z(moves.at[2] + retract, { ...by, ...RAPID })
@@ -661,7 +702,7 @@ class Z1Preview implements GCodeFirmware {
       this.toolChange(moves, block.tool, PROBE_TOOL, true)
     if (probes) this.active = PROBE_TOOL
     // With the probe, it reports holding it, as its change left it.
-    const by: Pick<Style, "tool" | "status"> = probes
+    const by: Pick<Style, "tool" | "status" | "toolSetterTouch"> = probes
       ? { tool: PROBE_TOOL, status: holding(PROBE_TOOL) }
       : { tool: block.tool }
     const style = { ...RAPID, ...by }

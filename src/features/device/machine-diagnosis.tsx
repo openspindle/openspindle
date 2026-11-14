@@ -194,7 +194,16 @@ function useResolutions() {
  */
 export function MachineDiagnosis() {
   const findings = useMachineFindings()
+  const { connection } = useMachineSnapshot()
   const { action, dialog } = useResolutions()
+  if (connection.health === "stale")
+    findings.unshift({
+      id: "connection/status-stale",
+      severity: "error",
+      title: "Device status unavailable",
+      problem: connection.error ?? "Waiting for fresh device status.",
+      resolutions: [],
+    })
   if (!findings.length) return null
   return (
     <>

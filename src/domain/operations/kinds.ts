@@ -16,6 +16,8 @@ import {
 import type { ProbingTask } from "../probing/strategy"
 import type { Tool } from "../tools/tool"
 import { fileKind, pcbKind, unsupportedKind } from "./kept-nc"
+import { facingKind } from "./facing-kind"
+import { anchorCalibrationIssue } from "../anchors/calibration"
 import type {
   Operation,
   Phase,
@@ -26,6 +28,8 @@ import type {
 
 /** The NC an operation contributes and what that NC may contain. */
 export type ResolvedNc = {
+  /** A protected procedure starts at an already checked pose; composition must not move it. */
+  readonly standalone?: boolean
   readonly nc: string
   readonly policy: NcPolicy
   /** 1-based lines of `nc` where the program pauses for a review. */
@@ -133,6 +137,14 @@ const probingKind: OperationKind<"probing"> = {
     const method = machine && methodFor(source, machine, plate)
     if (!machine || !method) return fail(unsupported(operation, kit))
     const subject = operationSubject(operation.id)
+    const calibrationIssue =
+      source.task === "origin"
+        ? anchorCalibrationIssue(source, plate.setup, kit)
+        : null
+    if (calibrationIssue)
+      return fail(
+        error("anchor-calibration-invalid", calibrationIssue, { subject })
+      )
     const edit: QuickFix = { kind: "edit-operation", operationId: operation.id }
     const probe = boundProbe(
       operation,
@@ -165,6 +177,70 @@ const probingKind: OperationKind<"probing"> = {
           fix: { kind: "assign-tool", toolNumber: table },
         })
       )
+    if (source.task === "origin" && source.diameterCalibration) {
+      const plan = source.diameterCalibration
+      const generate = kit.diameterCalibration?.boundedNc
+      if (
+        !generate ||
+        plate.operations.length !== 1 ||
+        operation.stopBefore ||
+        plan.deviceId !== plate.setup.deviceId ||
+        source.anchorCalibration ||
+        source.params.routine !== "boss-center" ||
+        source.strategy !== "boss-center" ||
+        source.params.axes !== "x" ||
+        source.params.placement.kind !== "probe-position" ||
+        source.params.distance.some((value) => value !== plan.distance) ||
+        source.params.depth !== plan.depth ||
+        probe.value.tool.diameter !== plan.diameter ||
+        probe.value.number !== plan.binding.tool ||
+        operation.tools.some((binding) => binding.local !== binding.plate)
+      )
+        return fail(
+          error(
+            "diameter-calibration-invalid",
+            "Run this bounded diameter reading alone with its original checked probe, device, reference and parameters. Recreate it with the guide after changes.",
+            { subject }
+          )
+        )
+      return ok({
+        nc: generate(plan),
+        standalone: true,
+        policy: { probing: "origin", anchoredProbing: false },
+        reviewLines: [],
+      })
+    }
+    if (source.task === "origin" && source.anchorCalibration?.approach) {
+      const approach = source.anchorCalibration.approach
+      const generate = kit.anchorCalibration?.boundedNc
+      if (
+        !generate ||
+        !approach.maxTravel ||
+        plate.operations.length !== 1 ||
+        operation.stopBefore ||
+        probe.value.tool.diameter !== approach.diameter ||
+        probe.value.number !== approach.binding.tool ||
+        operation.tools.some((binding) => binding.local !== binding.plate)
+      )
+        return fail(
+          error(
+            "anchor-calibration-invalid",
+            "Run this bounded calibration alone with the original checked probe and diameter. Recreate it with the guide after changes.",
+            { subject }
+          )
+        )
+      return ok({
+        nc: generate(
+          approach.binding,
+          approach.gap,
+          approach.diameter,
+          approach.maxTravel
+        ),
+        standalone: true,
+        policy: { probing: "origin", anchoredProbing: false },
+        reviewLines: [],
+      })
+    }
     const generated = generateProbing(method, source, {
       plate,
       probe: probe.value,
@@ -196,6 +272,7 @@ const probingKind: OperationKind<"probing"> = {
 export const OPERATION_KINDS: {
   readonly [TKind in SourceKind]: OperationKind<TKind>
 } = {
+  facing: facingKind,
   file: fileKind,
   pcb: pcbKind,
   unsupported: unsupportedKind,

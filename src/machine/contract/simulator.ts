@@ -5,8 +5,8 @@ import type { ConnectedDevice } from "./snapshot.ts"
  * A device on this computer: the Z1 simulator, which listens only on the loopback address.
  * A machine is never there.
  */
-export const isSimulator = (device: Pick<ConnectedDevice, "host">) =>
-  device.host.startsWith("127.")
+export const isSimulator = (device: ConnectedDevice) =>
+  device.transport !== "serial" && device.host.startsWith("127.")
 
 const Coordinate = z.number().min(-10_000).max(10_000)
 

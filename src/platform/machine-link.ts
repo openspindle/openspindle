@@ -13,9 +13,16 @@ const STOPPED =
 /** The machine process over one port: the requests go to it as they are. */
 function machineOver(peer: Peer<MachineContract>): MachineHost {
   return {
+    beginSimulatedJog: (input) => peer.call("machine.beginSimulatedJog", input),
+    sampleSimulatedJog: (input) =>
+      peer.call("machine.sampleSimulatedJog", input),
+    actionSimulatedJog: (input) =>
+      peer.call("machine.actionSimulatedJog", input),
+    endSimulatedJog: (input) => peer.call("machine.endSimulatedJog", input),
     snapshot: () => peer.call("machine.snapshot", undefined),
     subscribe: (listener) =>
       peer.subscribe("machine.changed", undefined, listener),
+    serialDevices: () => peer.call("machine.serialDevices", undefined),
     discover: () => peer.call("machine.discover", undefined),
     connect: (request) => peer.call("machine.connect", request),
     disconnect: (request) => peer.call("machine.disconnect", request),
@@ -27,7 +34,8 @@ function machineOver(peer: Peer<MachineContract>): MachineHost {
     reset: () => peer.call("machine.reset", undefined),
     prepare: (source) => peer.call("machine.prepare", { source }),
     run: (request) => peer.call("machine.run", request),
-    dismissJob: () => peer.call("machine.dismissJob", undefined),
+    dismissJob: (expectedJobId) =>
+      peer.call("machine.dismissJob", expectedJobId),
     readAnchors: (signal) =>
       peer.call("machine.readAnchors", undefined, signal ? { signal } : {}),
     writeAnchors: (request) => peer.call("machine.writeAnchors", request),
@@ -41,7 +49,7 @@ function machineOver(peer: Peer<MachineContract>): MachineHost {
       peer.call("machine.writeConfiguration", request),
     readHeightMap: (signal) =>
       peer.call("machine.readHeightMap", undefined, signal ? { signal } : {}),
-    readSwitches: () => peer.call("machine.readSwitches", undefined),
+    readSwitches: (request) => peer.call("machine.readSwitches", request),
     watchCamera: (listener) =>
       peer.subscribe("machine.camera", undefined, listener),
     watchConsole: (listener) =>
@@ -69,11 +77,16 @@ function unreachableMachine(error: string | null): MachineHost {
       listener(snapshot)
       return () => {}
     },
+    serialDevices: refuse,
     discover: refuse,
     connect: refuse,
     disconnect: refuse,
     execute: refuse,
     simulateBed: refuse,
+    beginSimulatedJog: refuse,
+    sampleSimulatedJog: refuse,
+    actionSimulatedJog: refuse,
+    endSimulatedJog: refuse,
     sendConsoleLine: refuse,
     stop: refuse,
     reset: refuse,

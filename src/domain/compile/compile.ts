@@ -289,7 +289,7 @@ function compileUncached(plate: Plate, tools: readonly Tool[]): CompiledPlate {
   const lone =
     resolved.length === 1 && plate.operations.length === 1 ? resolved[0] : null
   // A work origin kept relative to an anchor sets the machine's work X/Y before everything.
-  const preamble = workOriginNc(plate.setup, kit)
+  const preamble = lone?.nc.standalone ? [] : workOriginNc(plate.setup, kit)
   let mode: CompiledPlate["mode"] = "compose"
   let text: string
   let spans: OperationSpan[]

@@ -18,6 +18,30 @@ const speedChanges = (...lines: string[]) =>
     (change) => change.reason === "spindle-speed"
   )
 
+describe("tool-change spindle interlock", () => {
+  test("refuses an M3/M4 in the same block as M6", () => {
+    for (const line of [
+      "T2 M6 M3 S12000",
+      "M6 T2 M3 S12000",
+      "M3 S12000 M6 T2",
+      "T2 M6 M4 S12000",
+    ]) {
+      assert.throws(
+        () => prepare(line),
+        (error) =>
+          error instanceof ProgramError &&
+          error.line === 1 &&
+          /before tool calibration completes/.test(error.message),
+        line
+      )
+    }
+  })
+
+  test("allows spindle start on a following line after tool change", () => {
+    assert.deepEqual(sent("T2 M6", "M3 S12000"), ["T2 M6", "M3 S12000"])
+  })
+})
+
 describe("spindle speed", () => {
   test("pcb2gcode's speed on a line of its own reaches its bare M3", () => {
     const program = prepare(

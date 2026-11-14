@@ -1,3 +1,4 @@
+import { JobHistory } from "../../host/services/job-history"
 import { Menu, app, dialog } from "electron"
 import type { BrowserWindow } from "electron"
 import path from "node:path"
@@ -70,7 +71,10 @@ function filesInArgs(argv: readonly string[]): string[] {
 if (!app.requestSingleInstanceLock()) app.quit()
 else {
   const diagnostics = startDiagnostics()
-  const openedFiles = new OpenedFileBus()
+  const files = new FileService(currentWindow)
+  const openedFiles = new OpenedFileBus((filePath) =>
+    files.rememberProject(filePath)
+  )
   for (const filePath of filesInArgs(process.argv)) openedFiles.open(filePath)
   app.on("second-instance", (_event, argv) => {
     for (const filePath of filesInArgs(argv)) openedFiles.open(filePath)
@@ -89,7 +93,7 @@ else {
   })
   void app
     .whenReady()
-    .then(() => start(diagnostics, openedFiles))
+    .then(() => start(diagnostics, openedFiles, files))
     .catch((error: unknown) => {
       log.error("OpenSpindle failed to start", error)
       dialog.showErrorBox(
@@ -121,8 +125,13 @@ function startDiagnostics(): Diagnostics {
   return new Diagnostics(settings, reports)
 }
 
-function start(diagnostics: Diagnostics, openedFiles: OpenedFileBus) {
-  hardenSessions()
+function start(
+  diagnostics: Diagnostics,
+  openedFiles: OpenedFileBus,
+  files: FileService
+) {
+  const entry = rendererEntry()
+  hardenSessions(entry.origin)
   handleAppProtocol(RENDERER_ROOT)
   if (DEV_ICON) app.dock?.setIcon(DEV_ICON)
   void configureAboutPanel()
@@ -130,9 +139,11 @@ function start(diagnostics: Diagnostics, openedFiles: OpenedFileBus) {
   const menu = new MenuBus()
   const unsaved = new UnsavedChanges(currentWindow, menu)
   const keptWorkspace = new KeptWorkspace()
+  const history = new JobHistory(app.getPath("userData"), (message) =>
+    log.warn(message)
+  )
   const storage = new StorageService(app.getPath("userData"))
   const models = createModelLibrary(app.getPath("userData"))
-  const files = new FileService(currentWindow)
   const fusion = new FusionService(
     storedFusionCredentials(
       path.join(app.getPath("userData"), "fusion-connection")
@@ -159,10 +170,10 @@ function start(diagnostics: Diagnostics, openedFiles: OpenedFileBus) {
   // machine process tries as it starts: once the app's simulator, which it may be, listens.
   // That takes milliseconds; the window asks for its port to the machine process much later.
   void simulator.start().finally(() => machine.start())
-  const entry = rendererEntry()
   const pcb = new PcbService(app.getPath("userData"), currentWindow)
   serveHostConnections({
     handlers: createHostHandlers({
+      history,
       files,
       fusion,
       menu,

@@ -1,4 +1,5 @@
 import { z } from "zod"
+import { ReferenceModelSchema } from "../models/reference"
 import { DEVICE_ASSISTS, PlateAssistsSchema } from "@/machine/contract"
 import {
   FIXTURE_LIMIT,
@@ -60,6 +61,7 @@ export type StockSource = z.infer<typeof StockSourceSchema>
 export const PlateSetupSchema = z
   .object({
     stock: StockSchema.nullable(),
+    reference: ReferenceModelSchema.nullable().optional(),
     stockSource: StockSourceSchema,
     stockAnchor: Point3Schema,
     /**
@@ -81,6 +83,8 @@ export const PlateSetupSchema = z
      */
     machineOrigin: z.boolean().optional(),
     assists: PlateAssistsSchema,
+    /** Run first opens the bounded surface guide; cutting needs a verified continuation. */
+    probeBeforeRun: z.boolean().optional(),
     /**
      * What is on the bed: the bed itself, wasteboards, clamps and the rest. The fixture commands
      * change them (`fixture.add` and the others in `WorkspaceCommand`).
@@ -94,6 +98,22 @@ export const PlateSetupSchema = z
      * snapshot holds after the device's; null or absent for none.
      */
     bedSetupId: EntityIdSchema.nullable().optional(),
+    /** Audit of the last explicit measured-XY application; later edits may change those values. */
+    lastMeasurement: z
+      .object({
+        runId: EntityIdSchema,
+        operationId: EntityIdSchema,
+        deviceId: EntityIdSchema,
+        source: z.enum(["simulator", "physical"]),
+        mode: z.enum(["origin", "stock"]),
+        anchors: StoredAnchorSetupSchema,
+        appliedAt: z.number().finite().nonnegative(),
+        bedXY: z.tuple([z.number().finite(), z.number().finite()]),
+        stockSize: z
+          .tuple([z.number().positive(), z.number().positive()])
+          .nullable(),
+      })
+      .optional(),
   })
   .refine(
     (setup) => !setup.anchors || setup.anchors.deviceId === setup.deviceId,

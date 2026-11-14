@@ -1,3 +1,5 @@
+import { DEFAULT_VIEWER_LAYERS } from "./viewer-input"
+import type { ViewerLayers } from "./viewer-input"
 import * as THREE from "three"
 import type { PlaybackFrame } from "@/app/job/frame"
 import type { Point3 } from "@/domain/nc/gcode"
@@ -32,6 +34,7 @@ export type PathPresentation = Omit<
    * program's (the simulator's camera) while there is no frame; null or absent for the program's.
    */
   liveTool?: { readonly tool: number | null; readonly position: Point3 } | null
+  layers?: ViewerLayers
   showRapids: boolean
   /**
    * The frame of playback the plate is drawn at: the moves before it made, the one under way up
@@ -114,7 +117,8 @@ export class PlatePath {
       palette,
       plate.tools,
       models,
-      collide
+      collide,
+      plate.operationColors
     )
     this.workArea = new WorkAreaView(plate.toolpathBounds, palette.workArea)
     this.workArea.place(plate.workOrigin, surfaceZ(plate))
@@ -145,11 +149,14 @@ export class PlatePath {
         this.palette,
         plate.tools,
         this.models,
-        this.collide
+        this.collide,
+        plate.operationColors
       )
       this.group.add(this.toolpath.group)
     } else {
       this.toolpath.place(workOrigin)
+      if (!samePlate(previous, plate, ["operationColors"]))
+        this.toolpath.setColors(plate.operationColors ?? [])
       if (!samePlate(previous, plate, ["tools"]))
         this.toolpath.setTools(plate.tools)
     }
@@ -199,11 +206,15 @@ export class PlatePath {
     this.toolpath.hide(state.hidden)
     this.toolpath.select(state.ranges)
     this.ghosts.show(state.ghosts ?? NO_GHOSTS)
-    this.toolpath.apply(frame, state.showRapids)
+    const layers = state.layers ?? DEFAULT_VIEWER_LAYERS
+    this.toolpath.apply(frame, state.showRapids, layers)
+    this.probes.group.visible = layers.probes
+    this.workArea.group.visible = layers.axes
+    this.ghosts.group.visible = layers.past || layers.future
     this.toolpath.emphasize(state.active)
     this.workArea.emphasize(state.active)
     this.probes.present({ ...state, ...probeCursor(frame) })
-    if (state.liveTool && !frame) {
+    if (layers.tool && state.liveTool && !frame) {
       const [x, y, z] = state.liveTool.position
       const [ox, oy, oz] = this.plate.workOrigin
       this.toolpath.showLiveTool({

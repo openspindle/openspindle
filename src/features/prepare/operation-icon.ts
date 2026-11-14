@@ -32,6 +32,8 @@ export const probingIcon = ({
 export function operationIcon(operation: Operation): LucideIcon {
   const { source } = operation
   switch (source.kind) {
+    case "facing":
+      return LandPlot
     case "file":
     case "unsupported":
       return FileCode2

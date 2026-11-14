@@ -46,6 +46,18 @@ const M5_HOLES: readonly HoleXY[] = [
 ]
 
 /**
+ * MDF+Bed+Replacement.step: Ø10 counterbores, 2 mm deep, over Ø5.4 through bores.
+ * Its XY is translated by (-132, +88) into the kit's Anchor 1 bed frame; the hole
+ * pattern matches M5_HOLES. These are geometry candidates, never measured clearance.
+ */
+export const Z1_MDF_ENTRY_POCKETS = M5_HOLES.map(([x, y]) => ({
+  name: `MDF recess · bed X${x + 88} Y${y + 88}`,
+  xy: [x + 88, y + 88] as const,
+  diameter: 10,
+  depth: 2,
+}))
+
+/**
  * The Z1's 6 mm MDF bed, laid on the aluminium bed with its dowel holes over the bed's pins.
  * Its frame is its STEP's: centred on the origin, its underside at Z 0.
  */

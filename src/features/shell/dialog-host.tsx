@@ -1,4 +1,15 @@
+import { HistoryDialog } from "@/features/history/history-dialog"
+import { SharedToolsDialog } from "@/features/tool-library/shared-tools-dialog"
+import { ReferenceDialog } from "@/features/models/reference-dialog"
 import { DevicePicker } from "@/features/device/device-picker"
+import { AnchorCalibrationDialog } from "@/features/device/anchor-calibration-dialog"
+import { ProbeDiameterCalibrationDialog } from "@/features/device/probe-diameter-calibration-dialog"
+import { ZProbeDialog } from "@/features/device/z-probe-dialog"
+import { PointActionsDialog } from "@/features/prepare/point-actions-dialog"
+import { GuidedSetup } from "@/features/workshop/guided-setup"
+import { FacingDialog } from "@/features/workshop/facing-dialog"
+import { MeasurementSetup } from "@/features/workshop/measurement-setup"
+import { ProcessDialog } from "@/features/workshop/process-dialog"
 import { DeviceConfigurationDialog } from "@/features/device/device-configuration"
 import { FusionSource } from "@/features/fusion360/fusion-source"
 import { FusionPairingDialog } from "@/features/fusion360/fusion-pairing-dialog"
@@ -11,6 +22,7 @@ import { GCodeGlossaryDialog } from "@/features/glossary/gcode-glossary-dialog"
 import { ModelsDialog } from "@/features/models/models-dialog"
 import { AddOperationDialog } from "@/features/prepare/add-operation/add-operation-dialog"
 import { ProbingPicker } from "@/features/prepare/add-operation/probing-picker"
+import { InspectionWizard } from "@/features/probing/inspection-wizard"
 import { ProgramSourceDialog } from "@/features/prepare/source/program-source-dialog"
 import {
   NewProjectDialog,
@@ -22,14 +34,55 @@ import { AddFixtureDialog } from "@/features/prepare/fixtures/add-fixture-dialog
 import { SettingsDialog } from "@/features/settings/settings-dialog"
 import { WorkspaceToolLibrary } from "@/features/tool-library"
 import { WorkspaceSettingsDialog } from "@/features/workspace-settings/workspace-settings-dialog"
-import { AppDialog } from "./app-dialog"
-import { closeDialog, openDialog, useOpenDialog } from "./dialogs"
+import { AppDialog, GuidePanelContext } from "./app-dialog"
+import {
+  closeDialog,
+  isGuideDialog,
+  openDialog,
+  useOpenDialog,
+} from "./dialogs"
 import { ImportDialog } from "./import-dialog"
 import type { WorkspaceDialog } from "./dialogs"
 
 /** The open workspace dialog; opening another replaces it. */
 function OpenDialog({ dialog }: { dialog: WorkspaceDialog }) {
   switch (dialog.kind) {
+    case "history":
+      return <HistoryDialog onClose={closeDialog} />
+    case "shared-tools":
+      return <SharedToolsDialog onClose={closeDialog} />
+    case "reference":
+      return <ReferenceDialog plateId={dialog.plateId} onClose={closeDialog} />
+    case "anchor-calibration":
+      return <AnchorCalibrationDialog onClose={closeDialog} />
+    case "z-probe":
+      return <ZProbeDialog job={dialog.job} onClose={closeDialog} />
+    case "point-actions":
+      return <PointActionsDialog intent={dialog.intent} onClose={closeDialog} />
+    case "probe-diameter-calibration":
+      return <ProbeDiameterCalibrationDialog onClose={closeDialog} />
+    case "processes":
+      return <ProcessDialog onClose={closeDialog} />
+    case "measurement-setup":
+      return (
+        <MeasurementSetup
+          key={`${dialog.session.runId}-${dialog.feature.operationId}`}
+          session={dialog.session}
+          feature={dialog.feature}
+          onClose={closeDialog}
+        />
+      )
+    case "facing":
+      return (
+        <FacingDialog
+          key={`${dialog.plateId}-${dialog.operationId}`}
+          plateId={dialog.plateId}
+          operationId={dialog.operationId}
+          onClose={closeDialog}
+        />
+      )
+    case "guided-setup":
+      return <GuidedSetup onClose={closeDialog} />
     case "fusion":
       return (
         <AppDialog title="Fusion 360" width="wide" onClose={closeDialog}>
@@ -72,7 +125,12 @@ function OpenDialog({ dialog }: { dialog: WorkspaceDialog }) {
       return <AddFixtureDialog plateId={dialog.plateId} onClose={closeDialog} />
     case "tools":
       return (
-        <WorkspaceToolLibrary assign={dialog.assign} onClose={closeDialog} />
+        <WorkspaceToolLibrary
+          assign={dialog.assign}
+          onClose={() =>
+            dialog.back ? openDialog(dialog.back) : closeDialog()
+          }
+        />
       )
     case "source":
       return (
@@ -86,6 +144,14 @@ function OpenDialog({ dialog }: { dialog: WorkspaceDialog }) {
       return <AddOperationDialog preset={dialog.preset} onClose={closeDialog} />
     case "probing":
       return <ProbingPicker onClose={closeDialog} />
+    case "inspection":
+      return (
+        <InspectionWizard
+          key={dialog.recipe}
+          recipe={dialog.recipe}
+          onClose={closeDialog}
+        />
+      )
     case "new-project":
       return <NewProjectDialog />
     case "open-project":
@@ -114,5 +180,16 @@ export function DialogHost() {
   useFusionSync()
   useFusionPairing()
   const dialog = useOpenDialog()
-  return dialog && <OpenDialog dialog={dialog} />
+  return dialog && !isGuideDialog(dialog) && <OpenDialog dialog={dialog} />
+}
+
+/** A guide is part of the workspace layout, with no overlay or focus trap. */
+export function GuideHost() {
+  const dialog = useOpenDialog()
+  if (!dialog || !isGuideDialog(dialog)) return null
+  return (
+    <GuidePanelContext.Provider value>
+      <OpenDialog dialog={dialog} />
+    </GuidePanelContext.Provider>
+  )
 }

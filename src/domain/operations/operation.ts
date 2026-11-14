@@ -1,4 +1,7 @@
 import { z } from "zod"
+import { FacingParamsSchema } from "./facing"
+import { BoundedDiameterSchema } from "../probing/probe-calibration"
+import { AnchorCalibrationSchema } from "../anchors/calibration"
 import { utf8ByteLength } from "@/machine/contract"
 import { GridParamsSchema } from "../probing/tasks/grid/params"
 import { OutlineParamsSchema } from "../probing/tasks/outline/params"
@@ -162,7 +165,10 @@ export const ProbingSourceSchema = z.discriminatedUnion("task", [
   probingSource("grid", GridParamsSchema),
   probingSource("touch-off", TouchOffParamsSchema),
   probingSource("outline", OutlineParamsSchema),
-  probingSource("origin", OriginParamsSchema),
+  probingSource("origin", OriginParamsSchema).extend({
+    anchorCalibration: AnchorCalibrationSchema.optional(),
+    diameterCalibration: BoundedDiameterSchema.optional(),
+  }),
 ])
 export type ProbingSource = z.infer<typeof ProbingSourceSchema>
 export type ProbingSourceOf<TTask extends ProbingSource["task"]> = Extract<
@@ -171,6 +177,11 @@ export type ProbingSourceOf<TTask extends ProbingSource["task"]> = Extract<
 >
 
 export const OperationSourceSchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("facing"),
+    tool: ToolNumberSchema,
+    params: FacingParamsSchema,
+  }),
   FileSourceSchema,
   PcbSourceSchema,
   UnsupportedSourceSchema,
@@ -186,6 +197,11 @@ export type SourceOf<TKind extends SourceKind> = Extract<
 export const OperationSchema = z.object({
   id: EntityIdSchema,
   name: TextSchema,
+  /** Optional path colour, saved with the operation; absent uses the viewer palette. */
+  displayColor: z
+    .string()
+    .regex(/^#[0-9a-f]{6}$/i)
+    .optional(),
   /** Increments on every change; editors save against the revision they read. */
   revision: z.int().nonnegative(),
   /** Pause the program before this operation (a program stop the dialect maps). */

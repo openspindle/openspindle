@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from "react"
 import {
   Field,
+  FieldError,
   FieldGroup,
   FieldLabel,
   FieldLegend,
@@ -31,6 +32,7 @@ export function BoundedMeasurementInput({
   disabled,
   onCommit,
   onClear,
+  onDraftValidityChange,
 }: {
   id: string
   axis: MeasurementAxis
@@ -42,49 +44,76 @@ export function BoundedMeasurementInput({
   disabled?: boolean
   onCommit: (value: number) => void
   onClear?: () => void
+  /** Opt-in transactional forms retain invalid text and wait for valid blur/Enter commits. */
+  onDraftValidityChange?: (ready: boolean) => void
 }) {
   const shown = value === null ? "" : String(rounded(value))
   const [draft, setDraft] = useState(shown)
   const canceled = useRef(false)
+  const draftListener = useRef(onDraftValidityChange)
+  draftListener.current = onDraftValidityChange
   useEffect(() => {
     setDraft(shown)
+    draftListener.current?.(true)
   }, [shown])
+  const parsed = rounded(Number(draft))
+  const draftValid = draft.trim()
+    ? Number.isFinite(parsed) && parsed >= min && parsed <= max
+    : onClear !== undefined
   return (
-    <MeasurementInput
-      id={id}
-      axis={axis}
-      unit={unit}
-      aria-label={label}
-      type="text"
-      inputMode="decimal"
-      disabled={disabled}
-      value={draft}
-      onChange={(event) => setDraft(event.target.value)}
-      onBlur={() => {
-        const next = rounded(Number(draft))
-        const cleared = !canceled.current && !draft.trim() && onClear
-        if (cleared) {
-          if (value !== null) onClear()
-        } else if (
-          !canceled.current &&
-          draft.trim() &&
-          Number.isFinite(next) &&
-          next >= min &&
-          next <= max
-        ) {
-          setDraft(String(next))
-          if (String(next) !== shown) onCommit(next)
-        } else setDraft(shown)
-        canceled.current = false
-      }}
-      onKeyDown={(event) => {
-        if (event.key === "Enter") event.currentTarget.blur()
-        if (event.key === "Escape") {
-          canceled.current = true
-          event.currentTarget.blur()
-        }
-      }}
-    />
+    <>
+      <MeasurementInput
+        id={id}
+        axis={axis}
+        unit={unit}
+        aria-label={label}
+        type="text"
+        inputMode="decimal"
+        disabled={disabled}
+        value={draft}
+        aria-invalid={onDraftValidityChange && !draftValid}
+        onChange={(event) => {
+          const next = event.target.value
+          setDraft(next)
+          onDraftValidityChange?.(next === shown)
+        }}
+        onBlur={() => {
+          const next = rounded(Number(draft))
+          const cleared = !canceled.current && !draft.trim() && onClear
+          if (cleared) {
+            if (value !== null) onClear()
+            onDraftValidityChange?.(true)
+          } else if (
+            !canceled.current &&
+            draft.trim() &&
+            Number.isFinite(next) &&
+            next >= min &&
+            next <= max
+          ) {
+            setDraft(String(next))
+            if (String(next) !== shown) onCommit(next)
+            onDraftValidityChange?.(true)
+          } else if (canceled.current || !onDraftValidityChange) {
+            setDraft(shown)
+            onDraftValidityChange?.(true)
+          } else onDraftValidityChange(false)
+          canceled.current = false
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") event.currentTarget.blur()
+          if (event.key === "Escape") {
+            canceled.current = true
+            event.currentTarget.blur()
+          }
+        }}
+      />
+      {onDraftValidityChange && !draftValid && (
+        <FieldError>
+          Enter a number from {min} to {max}
+          {onClear ? ", or leave empty." : "."}
+        </FieldError>
+      )}
+    </>
   )
 }
 
@@ -101,6 +130,7 @@ export function CoordinateInput({
   title,
   onCommit,
   onClear,
+  onDraftValidityChange,
 }: {
   axis: MeasurementAxis
   unit: string
@@ -111,6 +141,7 @@ export function CoordinateInput({
   title?: string
   onCommit: (value: number) => void
   onClear?: () => void
+  onDraftValidityChange?: (ready: boolean) => void
 }) {
   const id = useId()
   return (
@@ -127,6 +158,7 @@ export function CoordinateInput({
         disabled={disabled}
         onCommit={onCommit}
         onClear={onClear}
+        onDraftValidityChange={onDraftValidityChange}
       />
     </Field>
   )

@@ -63,6 +63,12 @@ export async function connectElectronHost(
     log,
   })
   return {
+    history: {
+      list: () => peer.call("history.list", undefined),
+      read: (id) => peer.call("history.read", { id }),
+      frame: (id, index) => peer.call("history.frame", { id, index }),
+      remove: (id) => peer.call("history.remove", { id }),
+    },
     machine,
     files: {
       open: (kind) => peer.call("files.open", { kind }),

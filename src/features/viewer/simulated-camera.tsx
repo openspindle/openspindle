@@ -3,7 +3,7 @@ import { cn } from "cn"
 import type { FrameSource } from "@/app/job/frame"
 import { bedPositionOf } from "@/app/workspace/machine-program"
 import { BedViewer } from "@/components/workspace/bed-viewer"
-import type { LiveTool } from "@/components/workspace/bed-viewer"
+import type { LiveTool, ViewMode } from "@/components/workspace/bed-viewer"
 import { kitForSetup } from "@/domain/fixtures/catalog"
 import {
   useCachedConfiguration,
@@ -22,15 +22,18 @@ const NO_SETUP = { deviceId: null, fixtures: [] }
  * machine reports where it reports it. Following a job, the frames that follow the machine show
  * the tool and the path cut so far instead, as the 3D view does. Its picture has the shape the
  * device's configuration sets for the camera's stream, once the configuration has been read.
- * Only to look at.
+ * The perspective preset permits orbiting and zooming without issuing machine commands.
  */
 export function SimulatedCamera({
   shown,
   frames,
+  view = "camera",
 }: {
   shown: ShownPlate | null
   /** The frames of the shown plate's plan the 3D view draws, while a job there is followed. */
   frames?: FrameSource
+  /** Perspective permits orbiting the live bed/tool; the camera preset is fixed. */
+  view?: ViewMode
 }) {
   const drawn = useWorkspaceViewerPlates(shown)
   const plate = shown?.plate ?? null
@@ -53,10 +56,16 @@ export function SimulatedCamera({
   const { connection } = useMachineSnapshot()
   const picture = useCachedConfiguration(connection.id)?.cameraPicture
   const camera = kitForSetup(plate?.setup ?? NO_SETUP).camera
-  let aspect = camera?.aspect
-  if (camera && picture) aspect = picture.width / picture.height
+  let aspect = view === "camera" ? camera?.aspect : undefined
+  if (view === "camera" && camera && picture)
+    aspect = picture.width / picture.height
   return (
-    <div className="pointer-events-none absolute inset-0 flex justify-center">
+    <div
+      className={cn(
+        "absolute inset-0 flex justify-center",
+        view === "camera" && "pointer-events-none"
+      )}
+    >
       {/* The camera's picture, as its stream is shown: with bars at its sides when narrower. */}
       <div
         className={cn("relative h-full max-w-full", !aspect && "w-full")}
@@ -69,7 +78,7 @@ export function SimulatedCamera({
           frames={frames}
           showRapids={false}
           showStock
-          view="camera"
+          view={view}
           resetKey={0}
           zoom={1}
           liveTool={liveTool}

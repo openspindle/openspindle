@@ -1,4 +1,4 @@
-import { useId, useState } from "react"
+import { useEffect, useId, useRef, useState } from "react"
 import { Scan } from "lucide-react"
 import { FieldGroup, FieldLegend, FieldSet } from "@/components/ui/field"
 import { fitGrid } from "@/domain/probing/tasks/grid/fit"
@@ -37,6 +37,7 @@ export type GridSettingsProps = {
   /** Picking its start in the 3D view; null where it cannot be picked. */
   pick?: ProbingPick | null
   disabled?: boolean
+  onValidityChange?: (valid: boolean) => void
 }
 
 /** What Fit grid covers, or why there is nothing to fit to. */
@@ -68,6 +69,7 @@ export function GridSettings({
   onChange,
   pick = null,
   disabled = false,
+  onValidityChange,
 }: GridSettingsProps) {
   const draft = useProbingDraft(value, onChange)
   return (
@@ -80,6 +82,7 @@ export function GridSettings({
       pick={pick}
       disabled={disabled}
       onChange={draft.onChange}
+      onValidityChange={onValidityChange}
     />
   )
 }
@@ -92,12 +95,24 @@ function GridForm({
   onChange,
   pick,
   disabled,
-}: Required<GridSettingsProps>) {
+  onValidityChange,
+}: Required<Omit<GridSettingsProps, "onValidityChange">> &
+  Pick<GridSettingsProps, "onValidityChange">) {
   const id = useId()
   const schema = rangedSchema(GridParamsSchema, parameters)
   // Switching back from the probe position restores the anchor settings.
   const [lastAnchor, setLastAnchor] = useState<AnchorPlacement | null>(null)
-  const form = useProbingForm(value, schema, onChange)
+  const [parametersValid, setParametersValid] = useState(true)
+  const [placementReady, setPlacementReady] = useState(true)
+  const validityListener = useRef(onValidityChange)
+  validityListener.current = onValidityChange
+  useEffect(() => {
+    validityListener.current?.(parametersValid && placementReady)
+  }, [parametersValid, placementReady])
+  const form = useProbingForm(value, schema, onChange, (valid) => {
+    setParametersValid(valid)
+    onValidityChange?.(valid && placementReady)
+  })
   const fitToWorkArea = () => {
     if (!workArea.result.ok) return
     const fitted = fitGrid(
@@ -165,6 +180,14 @@ function GridForm({
         setLastAnchor={setLastAnchor}
         pick={pick}
         disabled={disabled}
+        onDraftValidityChange={
+          onValidityChange
+            ? (ready) => {
+                setPlacementReady(ready)
+                onValidityChange(ready && parametersValid)
+              }
+            : undefined
+        }
       />
       <form.Field name="reviewAfterProbe">
         {(field) => (

@@ -8,13 +8,20 @@ import {
   ConnectRequestSchema,
   ConsoleLineSchema,
   SimulatedBedSchema,
+  BeginSimulatedJogRequestSchema,
+  SimulatedJogSessionSchema,
+  SimulatedJogSampleSchema,
+  SimulatedJogReceiptSchema,
+  SimulatedJogActionSchema,
   ConsoleEntrySchema,
   DisconnectRequestSchema,
   HeightMapSchema,
   SwitchReportSchema,
+  ReadSwitchesRequestSchema,
   MachineCommandSchema,
   MachineSnapshotSchema,
   NetworkDeviceSchema,
+  SerialDeviceSchema,
   PrepareResultSchema,
   RunRequestSchema,
   WriteAnchorsRequestSchema,
@@ -24,7 +31,7 @@ import {
 export const CameraEventSchema = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("status"),
-    status: z.enum(["connecting", "live", "error"]),
+    status: z.enum(["connecting", "live", "paused", "error"]),
   }),
   z.object({
     kind: z.literal("frame"),
@@ -38,9 +45,35 @@ const none = z.undefined()
 
 /** The machine surface the machine process serves to the app renderer and the main process. */
 export const machineMethods = {
+  "machine.beginSimulatedJog": {
+    params: BeginSimulatedJogRequestSchema,
+    result: SimulatedJogSessionSchema,
+    timeoutMs: 10_000,
+  },
+  "machine.sampleSimulatedJog": {
+    params: SimulatedJogSampleSchema,
+    result: SimulatedJogReceiptSchema,
+    timeoutMs: 1000,
+  },
+  "machine.actionSimulatedJog": {
+    params: SimulatedJogActionSchema,
+    result: SimulatedJogReceiptSchema,
+    timeoutMs: 35_000,
+  },
+  "machine.endSimulatedJog": {
+    params: SimulatedJogSessionSchema,
+    result: MachineSnapshotSchema,
+    timeoutMs: 10_000,
+    budget: null,
+  },
   "machine.snapshot": {
     params: none,
     result: MachineSnapshotSchema,
+    timeoutMs: 15_000,
+  },
+  "machine.serialDevices": {
+    params: none,
+    result: z.array(SerialDeviceSchema).max(128),
     timeoutMs: 15_000,
   },
   "machine.discover": {
@@ -92,14 +125,14 @@ export const machineMethods = {
     timeoutMs: 30_000,
   },
   // Returns once the first part plays: every part is sent before, each within the
-  // controller's own deadline.
+  // controller's own byte/transport-aware deadline (USB can take longer than TCP).
   "machine.run": {
     params: RunRequestSchema,
     result: MachineSnapshotSchema,
-    timeoutMs: 1_200_000,
+    timeoutMs: 0,
   },
   "machine.dismissJob": {
-    params: none,
+    params: z.uuid().optional(),
     result: MachineSnapshotSchema,
     timeoutMs: 15_000,
   },
@@ -112,12 +145,12 @@ export const machineMethods = {
   "machine.readConfiguration": {
     params: none,
     result: FirmwareConfigurationSchema,
-    timeoutMs: 45_000,
+    timeoutMs: 0,
   },
   "machine.writeConfiguration": {
     params: WriteConfigurationRequestSchema,
     result: WriteConfigurationResultSchema,
-    timeoutMs: 90_000,
+    timeoutMs: 0,
   },
   "machine.readHeightMap": {
     params: none,
@@ -125,7 +158,7 @@ export const machineMethods = {
     timeoutMs: 0,
   },
   "machine.readSwitches": {
-    params: none,
+    params: ReadSwitchesRequestSchema.optional(),
     result: SwitchReportSchema,
     timeoutMs: 30_000,
   },

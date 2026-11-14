@@ -1,3 +1,4 @@
+import type { ViewerLayers } from "./viewer/viewer-input"
 import { CircleAlert, TriangleAlert } from "lucide-react"
 import { cn } from "cn"
 import { Button } from "@/components/ui/button"
@@ -8,6 +9,7 @@ import {
 } from "@/components/ui/tooltip"
 import { useEffect, useRef, useState } from "react"
 import type { FrameSource } from "@/app/job/frame"
+import type { RemovalGrid } from "@/domain/tools/material-removal"
 import { useHost } from "@/platform/host-context"
 import { plateLabel } from "@/domain/plate/plate"
 import type {
@@ -43,6 +45,8 @@ export type {
   PickedPoint,
 } from "./viewer/setup-arranger"
 type Props = {
+  layers?: ViewerLayers
+  removal?: { readonly plateId: string; readonly grid: RemovalGrid } | null
   plates: ViewerPlate[]
   selectedPlateId: string | null
   onSelectPlate: (id: string) => void
@@ -86,6 +90,8 @@ type Props = {
 }
 
 export function BedViewer({
+  layers,
+  removal,
   plates,
   selectedPlateId,
   onSelectPlate,
@@ -169,6 +175,8 @@ export function BedViewer({
   // Presentation first, so plates added in the same render start in their final state.
   useEffect(() => {
     sceneRef.current?.present({
+      removal,
+      layers,
       selectedPlateId,
       selectedLineRanges,
       hiddenLineRanges,
@@ -182,6 +190,8 @@ export function BedViewer({
       liveTool,
     })
   }, [
+    layers,
+    removal,
     selectedPlateId,
     selectedLineRanges,
     hiddenLineRanges,

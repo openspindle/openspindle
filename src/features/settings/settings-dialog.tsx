@@ -1,6 +1,6 @@
 import { useRef, useState } from "react"
 import type { CSSProperties } from "react"
-import { CircuitBoard, Lock, SlidersHorizontal } from "lucide-react"
+import { CircuitBoard, Lock, Mouse, SlidersHorizontal } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import {
@@ -16,9 +16,10 @@ import {
 } from "@/components/ui/sidebar"
 import { GeneralSettings } from "./general-settings"
 import { PrivacySettings } from "./privacy-settings"
+import { SpaceMouseSettings } from "./spacemouse-settings"
 import { PcbSettings } from "@/features/pcb/pcb-settings"
 
-export type SettingsSection = "general" | "pcb" | "privacy"
+export type SettingsSection = "general" | "spacemouse" | "pcb" | "privacy"
 
 const SECTIONS: ReadonlyArray<{
   id: SettingsSection
@@ -26,6 +27,7 @@ const SECTIONS: ReadonlyArray<{
   icon: LucideIcon
 }> = [
   { id: "general", label: "General", icon: SlidersHorizontal },
+  { id: "spacemouse", label: "SpaceMouse", icon: Mouse },
   { id: "pcb", label: "PCB", icon: CircuitBoard },
   { id: "privacy", label: "Privacy", icon: Lock },
 ]
@@ -34,6 +36,8 @@ function SectionContent({ section }: { section: SettingsSection }) {
   switch (section) {
     case "general":
       return <GeneralSettings />
+    case "spacemouse":
+      return <SpaceMouseSettings />
     case "pcb":
       return <PcbSettings />
     case "privacy":

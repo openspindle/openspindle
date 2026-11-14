@@ -1,0 +1,7 @@
+# Future experiment: part detection and metrology
+
+Joseph requested a later exploration of 3D touch-probe uses beyond offsets: detecting part boundaries and experimenting with dimensional inspection. Assess probe support, repeatability and calibration before choosing a design. This is separate from the current simulator XYZ/spindle controller work; no probing implementation or physical motion is authorized by this note.
+
+Joseph has now asked to start this work and confirmed interest in all three areas: rectangular stock detection and width/length, holes/pockets and feature distances, and surface mapping/flatness. He owns Makera's wired 3D touch probe, conductive 3D probe and Z probe. First publish the controller prototype to the jralph fork, then investigate existing support and design the measurement workflow. Physical motion still needs an explicitly chosen and reviewed experiment.
+
+The fork is published. The first software experiment now adds a shared Job inspection report over the existing origin/grid operations; see [the current workflow](../../metrology.md). This reuses existing probing and introduces no new motion cycles. The report records frozen Run/device/probe provenance and raw measurements, excludes incomplete centers from comparisons, and distinguishes sampled all-point flatness from the existing outlier-filtered analysis. It remains simulator-only in this prototype. Dedicated origin-preserving cycles, calibrated accuracy, automatic stock rotation detection and reconstruction of arbitrary geometry remain future work.

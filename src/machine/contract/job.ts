@@ -1,4 +1,5 @@
 import { z } from "zod"
+import { ProbeCheckBindingSchema } from "./probe-check.ts"
 import { PlateAssistsSchema } from "./assists.ts"
 import { HEIGHT_MAP_LIMITS } from "./height-map.ts"
 import {
@@ -6,7 +7,7 @@ import {
   DisplayNameSchema,
   utf8ByteLength,
 } from "./primitives.ts"
-import { JobProgressSchema } from "./telemetry.ts"
+import { JobProgressSchema, PositionSchema } from "./telemetry.ts"
 
 const MiB = 1024 * 1024
 
@@ -22,10 +23,34 @@ export const RUN_LIMITS = {
   fileLines: 250_000,
 } as const
 
+const LinearPositionSchema = PositionSchema.pick({ x: true, y: true, z: true })
+const CheckedStartSchema = z.strictObject({
+  machine: LinearPositionSchema,
+  work: LinearPositionSchema,
+  units: z.enum(["mm", "in"]),
+  keptTool: z.number().nullable(),
+})
+export type CheckedStart = z.infer<typeof CheckedStartSchema>
+
 export const RunRequestSchema = z.strictObject({
+  /** Immutable complete job context for local history; never transmitted to firmware. */
+  archive: z
+    .string()
+    .max(100 * 1024 * 1024)
+    .optional(),
   /** A fresh UUID per Run; a used ID is never replayed. */
   id: z.uuid(),
   name: DisplayNameSchema,
+  /** A reviewed run cannot migrate to another connection while preparation is in flight. */
+  expectedConnectionId: z.uuid().optional(),
+  /** A pre-job surface reference must survive preparation unchanged. Checked in the machine host. */
+  zReference: z
+    .strictObject({
+      tool: z.int().nonnegative(),
+      toolOffset: z.number().finite().min(-10000).max(10000),
+      originZ: z.number().finite().min(-10000).max(10000),
+    })
+    .optional(),
   source: z
     .string()
     .min(1, "The NC program is empty.")
@@ -35,10 +60,12 @@ export const RunRequestSchema = z.strictObject({
     ),
   assists: PlateAssistsSchema.nullable(),
   /**
-   * Keep the tool the machine holds: Run does not make it forget the tool before play, so a
-   * first tool change to that tool changes nothing and the job starts without stopping for it.
+   * Request keeping the current tool. Refused when a manual Z1 must forget its tool for the
+   * program's first M6 to stop and measure it: bypassing calibration is unsafe.
    */
   keepTool: z.boolean().optional(),
+  /** The position and units used for the app’s tool setter clearance check. */
+  checkedStart: CheckedStartSchema.optional(),
 })
 export type RunRequest = z.infer<typeof RunRequestSchema>
 
@@ -84,6 +111,12 @@ export const PreparedProgramSchema = z.object({
   changes: z.array(ProgramChangeSchema),
   /** Total changes; `changes` is capped. */
   changeCount: z.int().nonnegative(),
+  /** Computed by the trusted preparer, never accepted in a Run request. Undefined is unassessed. */
+  physicalExecutionIssue: z.string().nullable().optional(),
+  /** Trusted preparer requirement for an inline, contact-by-contact verified routine. */
+  probeCheck: ProbeCheckBindingSchema.optional(),
+  /** Trusted permission to shorten the first downward Z search to the live machine limit. */
+  probeDownToLimit: z.boolean().optional(),
   /**
    * The files the program is sent as, in order: one with every line, or parts when it exceeds
    * a file's limits. None from a main process before parts, which sent every line as one.

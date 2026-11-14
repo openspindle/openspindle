@@ -1,4 +1,10 @@
-import type { NcWord } from "@/machine/contract"
+import type {
+  NcWord,
+  ProbeCheckBinding,
+  ProbeMovePlan,
+  PointZProbePlan,
+  ZProbeSettings,
+} from "@/machine/contract"
 import type { FixtureDefinition } from "@/domain/fixtures/definitions"
 import type { CamMarkers } from "@/domain/nc/cam-markers"
 import type { Point3 } from "@/domain/nc/gcode"
@@ -9,6 +15,8 @@ import type { FirmwareModel } from "../firmware/firmware-model"
 import type { MachineOrigin } from "../plate/work-origin"
 import type { Result } from "../primitives"
 import type { MachineProbing } from "../probing/strategy"
+import type { BoundedDiameter } from "../probing/probe-calibration"
+import type { OriginParams } from "../probing/tasks/origin/params"
 import type { Fixture } from "./fixture"
 import type { MachineBed } from "./machine-bed"
 
@@ -73,7 +81,67 @@ export type MachineAlarm = {
   readonly clear: "unlock" | "reset" | "power"
 }
 
+/** A protected footprint and its top, in bed coordinates, with a minimum tool clearance. */
+export type FacingKeepOut = {
+  readonly name: string
+  readonly min: readonly [number, number]
+  readonly max: readonly [number, number]
+  readonly top: number
+  readonly margin: number
+}
+
 export abstract class FixtureKit {
+  readonly probePositioning: {
+    readonly clearance: number
+    readonly boundedNc: (
+      binding: ProbeCheckBinding,
+      plan: ProbeMovePlan
+    ) => string
+  } | null = null
+  readonly zProbing: {
+    readonly pointNc?: (
+      binding: ProbeCheckBinding,
+      plan: PointZProbePlan
+    ) => string
+    readonly tools: readonly number[]
+    readonly boundedNc: (
+      binding: ProbeCheckBinding,
+      settings: ZProbeSettings
+    ) => string
+    readonly measurementNc: (tool: number) => string
+  } | null = null
+  /** The machine's supported physical reference for an inside-corner anchor calibration. */
+  readonly anchorCalibration: {
+    readonly anchorId: string
+    readonly name: string
+    readonly reference: string
+    readonly fixtureIds: readonly string[]
+    readonly params: Pick<OriginParams, "corner" | "distance" | "depth">
+    readonly measurementNc?: () => string
+    readonly startTolerance: number
+    readonly boundedNc?: (
+      binding: ProbeCheckBinding,
+      gap: number,
+      diameter: number,
+      maxTravel: readonly [number, number, number]
+    ) => string
+  } | null = null
+  readonly diameterCalibration: {
+    readonly boundedNc: (plan: BoundedDiameter) => string
+    readonly measurementNc: () => string
+  } | null = null
+  /** Modeled recesses only: the operator must verify clearance on the installed bed. */
+  readonly facingEntryPockets: readonly {
+    readonly name: string
+    readonly xy: readonly [number, number]
+    readonly diameter: number
+    readonly depth: number
+  }[] = []
+  /** Built-in equipment which generated facing passes must avoid, independent of fixture visibility. */
+  readonly facingKeepOuts: readonly FacingKeepOut[] = []
+  /** Known spindle operating range; absent for a kit that supplies no verified limits. */
+  readonly spindleRange: { readonly min: number; readonly max: number } | null =
+    null
   /** Unique among kits, and never changes: rules name the machines they hold for by it (`Rule.machines`). */
   abstract readonly id: string
   abstract readonly name: string

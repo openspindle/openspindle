@@ -107,6 +107,7 @@ export function GCodeLines({
   check,
   line,
   onSeekLine,
+  requestedLine,
   follow,
   label,
   className,
@@ -118,6 +119,7 @@ export function GCodeLines({
   /** The line on show: highlighted, and kept in view while `follow` is on. */
   line: number
   onSeekLine: (line: number) => void
+  requestedLine?: number | null
   follow: boolean
   /** The list's accessible name. */
   label: string
@@ -178,6 +180,19 @@ export function GCodeLines({
     if (range && index >= range.startIndex && index <= range.endIndex) return
     virtualizer.scrollToIndex(index, { align: "center" })
   }, [follow, line, model, virtualizer])
+
+  // An explicit jump reveals the row even when following playback is off.
+  useEffect(() => {
+    if (
+      requestedLine == null ||
+      requestedLine < 1 ||
+      requestedLine > lines.length
+    )
+      return
+    virtualizer.scrollToIndex(model.rowOfLine(requestedLine), {
+      align: "center",
+    })
+  }, [requestedLine, lines.length, model, virtualizer])
 
   // The list is one tab stop: the keyboard moves the line on show, and focus never sits on
   // a row that scrolling can unmount.
@@ -293,6 +308,7 @@ export function GCodeListing({
   check,
   line,
   onSeekLine,
+  requestedLine,
 }: {
   compiled: CompiledPlate
   /** The plate's operations, for the operation headers. */
@@ -301,6 +317,7 @@ export function GCodeListing({
   /** The line on show: highlighted, and kept in view while Follow is on. */
   line: number
   onSeekLine: (line: number) => void
+  requestedLine?: number | null
 }) {
   const id = useId()
   const [follow, setFollow] = useState(true)
@@ -334,6 +351,7 @@ export function GCodeListing({
         check={check}
         line={line}
         onSeekLine={onSeekLine}
+        requestedLine={requestedLine}
         follow={follow}
         label="G-code to run"
       />

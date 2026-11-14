@@ -61,6 +61,8 @@ export const TelemetrySchema = z.object({
   spindleTemperature: reading,
   controllerTemperature: reading,
   spindleOn: flag,
+  /** The fixed tool-length setter input, separate from the workpiece probe. */
+  toolSetterTriggered: flag,
   tool: reading,
   /** The tool's length offset from the tool work Z was set with, in millimetres. */
   toolOffset: reading,
@@ -83,10 +85,16 @@ export const TelemetrySchema = z.object({
   /** Halt reason while the controller is halted. */
   alarm: reading,
   estop: flag,
-  /** Maximum height-map deviation while compensation is active. */
+  /** Zero when disabled, maximum height-map deviation while active, null if malformed. */
   compensation: reading,
+  /** Separate from deviation: an enabled, flat height map can also report zero. */
+  compensationActive: flag,
 })
 export type Telemetry = z.infer<typeof TelemetrySchema>
+
+export const isHeightCompensationOff = (
+  telemetry: Pick<Telemetry, "compensation" | "compensationActive">
+) => telemetry.compensationActive === false && telemetry.compensation === 0
 
 /** Status older than this is not trusted for any decision. */
 export const TELEMETRY_FRESH_MS = 5000

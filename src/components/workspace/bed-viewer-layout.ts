@@ -72,6 +72,8 @@ export function problemAnchor({ places: [place] }: ViewerProblem): Point3 {
         (place.min[1] + place.max[1]) / 2,
         Math.max(place.min[2], place.max[2]),
       ]
+    case "cylinder":
+      return [place.center[0], place.center[1], place.center[2] + place.height]
   }
 }
 

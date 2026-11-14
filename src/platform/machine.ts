@@ -252,15 +252,19 @@ export const useWriteConfiguration = () => {
 
 /**
  * What the connected firmware would execute for this program, or why it cannot. The check stays
- * while its program is unchanged, however long no view shows it, so opening the Job tab again
- * never prepares that program again; a new check drops the checks no view shows.
+ * while its program and connection are unchanged. A simulator's admission must never be
+ * reused on a physical device; a new check drops the checks no view shows.
  */
 export function useProgramCheck(source: string | null) {
   const machine = useMachineHost()
   const client = useQueryClient()
+  const { connection } = useMachineSnapshot()
   const key = useMemo(
-    () => (source === null ? null : fingerprint(source)),
-    [source]
+    () =>
+      source === null
+        ? null
+        : `${connection.id}:${connection.status}:${fingerprint(source)}`,
+    [source, connection.id, connection.status]
   )
   return useQuery({
     queryKey: machineKeys.program(key ?? "none"),

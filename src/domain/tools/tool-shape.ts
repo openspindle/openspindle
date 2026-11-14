@@ -1,5 +1,10 @@
 import { toolKindKey } from "@/domain/tools/tool"
-import type { Tool, ToolGeometry, ToolShaft } from "@/domain/tools/tool"
+import type {
+  ProbeProfile,
+  Tool,
+  ToolGeometry,
+  ToolShaft,
+} from "@/domain/tools/tool"
 
 /*
  * A tool as a solid of revolution, built from its dimensions (Fusion 360's tool model:
@@ -41,7 +46,7 @@ export type ToolShape = {
 export type ToolShapeSource = Pick<
   Tool,
   "kind" | "diameter" | "geometry" | "shaft"
->
+> & { readonly probe?: Pick<ProbeProfile, "contact"> | null }
 
 /** Outline points per quarter circle of a rounded corner. */
 const QUARTER_STEPS = 12
@@ -388,11 +393,16 @@ function buildShape({
   diameter,
   geometry,
   shaft: profile,
+  probe,
 }: ToolShapeSource): ToolShape | null {
   const cutting = positive(diameter)
   if (cutting === null) return null
   const shank = (positive(geometry.shankDiameter) ?? cutting) / 2
-  const cutter = (CUTTERS[toolKindKey(kind)] ?? endMill)({
+  const shape =
+    toolKindKey(kind) === "probe" && probe?.contact === "conductive"
+      ? endMill
+      : (CUTTERS[toolKindKey(kind)] ?? endMill)
+  const cutter = shape({
     radius: cutting / 2,
     shank,
     flutes: positive(geometry.fluteLength),

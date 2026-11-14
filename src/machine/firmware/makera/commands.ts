@@ -245,6 +245,14 @@ const validTool = (tool: number | null) =>
 const spindleStopped = (telemetry: Telemetry) =>
   telemetry.spindleOn === false && (telemetry.spindleRpm ?? 0) === 0
 
+function toolSetterReason(telemetry: Telemetry): string | null {
+  if (telemetry.toolSetterTriggered === true)
+    return "The fixed tool setter is triggered. Inspect it before running or measuring a tool."
+  if (telemetry.toolSetterTriggered === null)
+    return "Waiting for the device to report that the fixed tool setter is released."
+  return null
+}
+
 /** Machine-state preconditions; connection, freshness, busy and job-stream checks live in the core. */
 export const makeraRules: FirmwareRules = {
   supports(kind: CommandKind, telemetry: Telemetry, identity: Identity) {
@@ -344,7 +352,7 @@ export const makeraRules: FirmwareRules = {
         if (telemetry.spindleOn !== false)
           return "The device must report the spindle stopped first."
         return state === "Tool" && telemetry.spindleRpm === 0
-          ? null
+          ? toolSetterReason(telemetry)
           : "Tool confirmation requires a tool-change wait with the spindle stopped."
       case "spindleStop":
         return state === "Idle" ||
@@ -355,6 +363,10 @@ export const makeraRules: FirmwareRules = {
       case "spindleStart":
         if (telemetry.estop !== false)
           return "Waiting for the device to report a released emergency stop."
+        if (telemetry.toolSetterTriggered !== false)
+          return telemetry.toolSetterTriggered === true
+            ? "The tool setter is triggered. Release it and inspect the sensor before starting the spindle."
+            : "The tool-setter state is unknown. Wait for a fresh diagnostic report before starting the spindle."
         if (!validTool(telemetry.tool))
           return "The device must report a cutting tool before starting the spindle."
         // A running spindle without motion accepts a new target speed.
@@ -416,7 +428,7 @@ export const makeraRules: FirmwareRules = {
           return "Changing the tool requires an idle machine with no active program."
         // The firmware halts a change while the spindle runs.
         return spindleStopped(telemetry)
-          ? null
+          ? toolSetterReason(telemetry)
           : "Stop the spindle before changing the tool."
     }
   },
@@ -430,9 +442,13 @@ export const makeraRules: FirmwareRules = {
       return "Stop the spindle before starting a program."
     if (telemetry.laserMode !== false)
       return "Run requires the device to report milling mode."
+    if (telemetry.toolSetterTriggered !== false)
+      return telemetry.toolSetterTriggered === true
+        ? "The tool setter is triggered. Release it and inspect the sensor before Run."
+        : "The tool-setter state is unknown. Wait for a fresh diagnostic report before Run."
     if (telemetry.bedCleanAuto === null)
       return "The device does not report its bed-clean mode; job completion cannot be verified."
-    return null
+    return toolSetterReason(telemetry)
   },
 
   readHeightMap(telemetry, job: JobState | null) {

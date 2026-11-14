@@ -26,6 +26,7 @@ export type RunFix =
       readonly search: PrepareSearch
     }
   | { readonly kind: "device"; readonly label: string }
+  | { readonly kind: "program-line"; readonly line: number }
   | { readonly kind: "read-anchors"; readonly label: string }
   /** Opens the height map the machine applies, with its work Z. */
   | { readonly kind: "height-map"; readonly label: string }

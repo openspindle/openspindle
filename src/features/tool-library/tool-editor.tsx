@@ -35,6 +35,7 @@ import {
 } from "@/domain/tools/tool"
 import type { ProbeProfile, ToolSegment, ToolSource } from "@/domain/tools/tool"
 import { OptionSelect } from "@/components/option-select"
+import { DEFAULT_PROBE_TIP_DIAMETER } from "@/domain/tools/probe-diameter"
 import { toolKindLabel } from "./tool-format"
 import type { Choice, ToolForm } from "./tool-form"
 import { modelDataUrl } from "./tool-model-file"
@@ -97,6 +98,11 @@ const TOUCHES_HINT =
   "What the stylus senses: touches along Z only, or in X, Y and Z, as a 3D touch probe does."
 const POINTER_HINT =
   "Whether the probe carries a laser pointer, which traces without touching."
+const PROBE_CONTACTS: readonly Choice<NonNullable<ProbeProfile["contact"]>>[] =
+  [
+    { value: "mechanical", label: "Mechanical touch" },
+    { value: "conductive", label: "Conductive rod" },
+  ]
 const EMPTY_SEGMENT: ToolSegment = {
   height: null,
   upperDiameter: null,
@@ -209,7 +215,21 @@ function GeneralSection({ form, source }: SectionProps) {
             {(profiled) =>
               profiled && (
                 <>
-                  <form.AppField name="probe.touch">
+                  <form.AppField
+                    name="probe.touch"
+                    listeners={{
+                      onChange: ({ value }) => {
+                        if (
+                          value === "xyz" &&
+                          form.getFieldValue("diameter") === null
+                        )
+                          form.setFieldValue(
+                            "diameter",
+                            DEFAULT_PROBE_TIP_DIAMETER
+                          )
+                      },
+                    }}
+                  >
                     {(field) => (
                       <field.ChoiceField
                         label="Touches"
@@ -226,6 +246,15 @@ function GeneralSection({ form, source }: SectionProps) {
                         hint={POINTER_HINT}
                         choices={YES_NO}
                         required
+                      />
+                    )}
+                  </form.AppField>
+                  <form.AppField name="probe.contact">
+                    {(field) => (
+                      <field.ChoiceField
+                        label="Contact method"
+                        hint="Conductive rods require an electrical path through the contacted reference to the machine table."
+                        choices={PROBE_CONTACTS}
                       />
                     )}
                   </form.AppField>
@@ -302,9 +331,18 @@ function GeneralSection({ form, source }: SectionProps) {
 function GeometrySection({ form }: SectionProps) {
   return (
     <FieldGroup className="grid grid-cols-2 gap-4">
-      <form.AppField name="diameter">
-        {(field) => <field.NumberField label="Cutting diameter" unit="mm" />}
-      </form.AppField>
+      <form.Subscribe selector={(state) => state.values.probe !== null}>
+        {(probing) => (
+          <form.AppField name="diameter">
+            {(field) => (
+              <field.NumberField
+                label={probing ? "Probe tip diameter" : "Cutting diameter"}
+                unit="mm"
+              />
+            )}
+          </form.AppField>
+        )}
+      </form.Subscribe>
       <form.AppField name="geometry.maxDiameter">
         {(field) => <field.NumberField label="Maximum diameter" unit="mm" />}
       </form.AppField>

@@ -1,12 +1,13 @@
 # Checks every pull request and every push to main; the ruleset on main requires the Checks job.
 # Release pull requests also package the app on macOS and Windows, so a packaging problem shows
 # before the release is tagged, and keep those builds for testers to try. See docs/releasing.md.
-name: CI
+name: Checks and desktop builds
 
 on:
   pull_request:
   push:
     branches: [main]
+    tags: ["v*"]
   workflow_dispatch:
 
 permissions:
@@ -20,6 +21,7 @@ concurrency:
 jobs:
   checks:
     name: Checks
+    if: github.ref_type != 'tag' || github.repository != 'openspindle/openspindle'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
@@ -47,6 +49,45 @@ jobs:
             echo "::error::build/third-party-notices.json is out of date: run npm run build and commit it"
             exit 1
           fi
+
+  fork-packages:
+    name: Windows and Linux installers
+    needs: checks
+    if: github.repository != 'openspindle/openspindle' && github.event_name != 'pull_request'
+    uses: ./.github/workflows/desktop-packages.yml
+
+  fork-release-draft:
+    name: Draft Windows and Linux release
+    needs: fork-packages
+    if: github.event_name == 'push' && github.ref_type == 'tag' && vars.RELEASE_APP_CLIENT_ID == ''
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          pattern: OpenSpindle-*-x64-*
+          path: release-assets
+          merge-multiple: true
+      - name: Create draft with both packages
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" --verify-tag --draft \
+            --title "OpenSpindle $GITHUB_REF_NAME" --generate-notes release-assets/*
+
+  signed-release:
+    name: Signed release
+    needs: checks
+    if: >-
+      github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+      (github.repository == 'openspindle/openspindle' || vars.RELEASE_APP_CLIENT_ID != '')
+    permissions:
+      contents: write
+    uses: ./.github/workflows/release.yml
+    secrets: inherit
 
   package:
     name: Package (macOS)
@@ -110,7 +151,9 @@ jobs:
 
   package-windows:
     name: Package (Windows)
-    if: github.event_name == 'workflow_dispatch' || startsWith(github.head_ref, 'release-please--')
+    if: >-
+      (github.event_name == 'workflow_dispatch' && github.repository == 'openspindle/openspindle') ||
+      startsWith(github.head_ref, 'release-please--')
     runs-on: windows-2025
     timeout-minutes: 30
     defaults:

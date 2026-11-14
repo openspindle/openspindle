@@ -7,14 +7,19 @@ import type { MachineOrigin } from "../../plate/work-origin"
 import type { MachineProbing } from "../../probing/strategy"
 import { PROBE_3D_TOOL, PROBE_TOOL } from "../../tools/tool-table"
 import { FixtureKit } from "../fixture-kit"
-import type { KitFixture, KitRecolor, MachineCamera } from "../fixture-kit"
+import type {
+  FacingKeepOut,
+  KitFixture,
+  KitRecolor,
+  MachineCamera,
+} from "../fixture-kit"
 import { Z1_ALARMS } from "./alarms"
 import { Z1DowelPin } from "./dowel-pin"
 import { Z1Firmware } from "./firmware"
 import { Z1FourthAxis } from "./fourth-axis"
 import { Z1LBracketThick, Z1LBracketThin } from "./l-bracket"
 import { MAKERA_CAM } from "./makera-cam"
-import { Z1MdfBed } from "./mdf-bed"
+import { Z1MdfBed, Z1_MDF_ENTRY_POCKETS } from "./mdf-bed"
 import { Z1MdfWasteboard } from "./mdf-wasteboard"
 import { Z1_GLOSSARY } from "./nc-glossary"
 import { isZ1Park, readZ1Block, z1VacuumSwitch } from "./nc-grammar"
@@ -28,6 +33,20 @@ import { g32Grids } from "./wired-probe/grid"
 import { touchPoints } from "./wired-probe/touch-off"
 import { CLEARANCE_Z } from "./wired-probe/travel"
 import { Z1Bed } from "./z1-bed"
+import {
+  SETTER_CUTOUT_RADIUS,
+  SETTER_TOP,
+  SETTER_FROM_ANCHOR,
+} from "./tool-setter"
+import { boundedDiameterNc } from "./bounded-diameter"
+import { boundedPointZNc, boundedZNc, zProbeMeasurementNc } from "./bounded-z"
+import { boundedMoveNc } from "./bounded-move"
+import { boundedAnchorNc, anchorMeasurementNc } from "./bounded-anchor"
+import {
+  Z1_WORK_AREA,
+  Z1_WORK_AREA_ORIGIN,
+  Z1_SPINDLE_RANGE,
+} from "./work-envelope"
 
 /** An NC number to four decimals, without exponent notation or −0. */
 const ncNumber = (value: number) => String(Number(value.toFixed(4)) + 0)
@@ -51,13 +70,60 @@ export const LEGACY_BED_FRAME = { anchor1: [12, 12], z: 6 } as const
  * the fixtures Makera makes for it and its anchors.
  */
 export class MakeraZ1 extends FixtureKit {
+  override readonly probePositioning = {
+    clearance: CLEARANCE_Z,
+    boundedNc: boundedMoveNc,
+  }
+  override readonly zProbing = {
+    tools: [PROBE_TOOL, PROBE_3D_TOOL],
+    pointNc: boundedPointZNc,
+    boundedNc: boundedZNc,
+    measurementNc: zProbeMeasurementNc,
+  }
+  override readonly anchorCalibration = {
+    boundedNc: boundedAnchorNc,
+    measurementNc: anchorMeasurementNc,
+    startTolerance: 1,
+    anchorId: "anchor-1",
+    name: "Anchor 1",
+    reference:
+      "The supplied L-bracket, pinned and secured in its normal Anchor 1 position",
+    fixtureIds: [new Z1LBracketThick().id, new Z1LBracketThin().id],
+    params: {
+      corner: "front-left",
+      distance: [10, 10] as [number, number],
+      depth: 2,
+    },
+  } as const
+  override readonly diameterCalibration = {
+    boundedNc: boundedDiameterNc,
+    measurementNc: anchorMeasurementNc,
+  }
+  override readonly facingEntryPockets = Z1_MDF_ENTRY_POCKETS
+  /** A conservative square around the modeled setter opening, with 2 mm minimum clearance. */
+  override readonly facingKeepOuts: readonly FacingKeepOut[] = [
+    {
+      name: "Tool setter",
+      min: [
+        SETTER_FROM_ANCHOR[0] - SETTER_CUTOUT_RADIUS,
+        SETTER_FROM_ANCHOR[1] - SETTER_CUTOUT_RADIUS,
+      ],
+      max: [
+        SETTER_FROM_ANCHOR[0] + SETTER_CUTOUT_RADIUS,
+        SETTER_FROM_ANCHOR[1] + SETTER_CUTOUT_RADIUS,
+      ],
+      top: SETTER_TOP,
+      margin: 2,
+    },
+  ]
+  override readonly spindleRange = Z1_SPINDLE_RANGE
   readonly id = MAKERA_Z1_ID
   readonly name = "Makera Z1"
   readonly deviceModels = ["Z1", "Z1 Pro"]
   readonly imageUrl = "/images/makera_z1.png"
   /** The official three-axis work envelope, not the bed's size. */
-  readonly workArea: Point3 = [200, 200, 100]
-  readonly workAreaOrigin = [-12, -12] as const
+  readonly workArea: Point3 = [...Z1_WORK_AREA]
+  readonly workAreaOrigin = Z1_WORK_AREA_ORIGIN
   readonly bed = new Z1Bed()
   /**
    * The firmware selects a Z touch probe, such as Makera's wired Probe 2.0, as T0 and the 3D

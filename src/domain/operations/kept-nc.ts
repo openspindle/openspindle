@@ -5,6 +5,7 @@
  * registry of every kind (`OPERATION_KINDS`) holds their methods.
  */
 
+import { isAnchorMeasurementNc } from "../anchors/calibration"
 import { PLAIN_NC, withoutClosingPark } from "../compile/nc-unit"
 import { error, operationSubject } from "../diagnostics"
 import type { FixtureKit } from "../fixtures/fixture-kit"
@@ -13,6 +14,12 @@ import { fail, ok } from "../primitives"
 import type { OperationKind, ResolveContext, ResolvedNc } from "./kinds"
 import type { Operation, SourceKind } from "./operation"
 import { suppressedParts, withoutParts } from "./toolpath-parts"
+import {
+  facingKeepOuts,
+  facingNc,
+  facingPocketPaths,
+  facingEntryFrameIssue,
+} from "./facing"
 
 const plain = (nc: string): ResolvedNc => ({
   nc,
@@ -35,8 +42,23 @@ export const fileKind: OperationKind<"file"> = {
   verbatim: true,
   generated: false,
   phase: ({ source }) => source.phase ?? "machining",
-  resolve: ({ source }, _plate, { kit }) =>
-    ok(plain(source.park ? source.nc : withoutClosingPark(source.nc, kit))),
+  resolve: ({ source }, plate, { kit }) => {
+    const nc = source.park ? source.nc : withoutClosingPark(source.nc, kit)
+    return ok({
+      ...plain(nc),
+      standalone:
+        plate.operations.length === 1 &&
+        (isAnchorMeasurementNc(nc, kit) ||
+          (!!kit.zProbing &&
+            (/^;@OPENSPINDLE_(Z|MOVE|POINT_Z)_PLAN /m.test(nc) ||
+              plate.tools.some(
+                (tool) =>
+                  tool.number !== null &&
+                  kit.zProbing!.tools.includes(tool.number) &&
+                  nc === kit.zProbing!.measurementNc(tool.number)
+              )))),
+    })
+  },
 }
 
 /** A line's words without its comments, in capitals. */
@@ -160,7 +182,7 @@ const KEPT_NC_KINDS = {
  */
 function keptNcKindOf(operation: Operation): OperationKind<SourceKind> | null {
   const { kind } = operation.source
-  return kind === "probing"
+  return kind === "probing" || kind === "facing"
     ? null
     : (KEPT_NC_KINDS[kind] as unknown as OperationKind<SourceKind>)
 }
@@ -177,6 +199,17 @@ export function machiningPrograms(
 ): (string | null)[] {
   const context = keptNcContext(kit)
   return plate.operations.flatMap((operation) => {
+    if (operation.source.kind === "facing") {
+      const keepOuts = facingKeepOuts(plate.setup, kit)
+      if (
+        facingEntryFrameIssue(operation.source.params, plate.setup) ||
+        facingPocketPaths(operation.source.params, keepOuts).issue
+      )
+        return [null]
+      return [
+        facingNc(operation.source.params, operation.source.tool, keepOuts),
+      ]
+    }
     const kind = keptNcKindOf(operation)
     if (!kind || kind.phase(operation) === "setup") return []
     const resolved = kind.resolve(operation, plate, context)

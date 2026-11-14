@@ -1,7 +1,10 @@
 import { readFile } from "node:fs/promises"
 import path from "node:path"
 import { z } from "zod"
-import { ConnectTargetSchema } from "../../src/machine/contract/index.ts"
+import {
+  ConnectTargetSchema,
+  sameEndpoint,
+} from "../../src/machine/contract/index.ts"
 import type {
   ConnectTarget,
   ConnectedDevice,
@@ -15,7 +18,7 @@ const StoredSchema = z.object({
 })
 
 const same = (a: ConnectTarget, b: ConnectTarget) =>
-  a.host === b.host && a.port === b.port && a.name === b.name
+  sameEndpoint(a, b) && a.name === b.name
 
 /** The device the app last connected to, in the app's data folder, so a launch can try it again. */
 export class LastDevice {
@@ -35,7 +38,9 @@ export class LastDevice {
       )
       if (!stored.success) return null
       this.remembered = stored.data.device
-      return stored.data.device
+      return stored.data.device.transport === "serial"
+        ? null
+        : stored.data.device
     } catch {
       return null
     }
@@ -43,11 +48,29 @@ export class LastDevice {
 
   /** Records a connected device; the file is written only when it is another device. */
   remember(device: ConnectedDevice) {
-    const target: ConnectTarget = {
-      host: device.host,
-      port: device.port,
-      name: device.name,
-    }
+    const target: ConnectTarget =
+      device.transport === "serial"
+        ? {
+            transport: "serial",
+            portId: device.portId,
+            pathHint: device.pathHint,
+            name: device.name,
+            cameraHost: device.cameraHost,
+            ...(device.profileId
+              ? {
+                  profile: {
+                    id: device.profileId,
+                    model: device.model,
+                    name: device.name,
+                  },
+                }
+              : {}),
+          }
+        : {
+            host: device.host,
+            port: device.port,
+            name: device.name,
+          }
     if (this.remembered && same(this.remembered, target)) return
     this.remembered = target
     const contents = `${JSON.stringify({ version: 1, device: target }, null, 2)}\n`

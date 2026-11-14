@@ -26,11 +26,21 @@ export type FirmwareSetup = {
    * origin: where the machine was at Run. Absent, the program starts at the work origin.
    */
   readonly start?: Point3
+  /** The unit mode the machine is in when the program starts. */
+  readonly units?: "mm" | "in"
+  /** The distance mode the machine is in when the program starts. */
+  readonly absolute?: boolean
   /**
    * The tool the machine holds as the program starts, which a tool change to changes nothing:
    * one kept at Run. Absent, it holds none the program knows.
    */
   readonly tool?: number
+  /** A protected near-surface program must be previewed from its checked start, not home. */
+  readonly fixedStart?: boolean
+  /** A program that retains an already measured tool instead of changing it. */
+  readonly initialTool?: number
+  /** Radius used for explicit side searches by that probe; absent for ordinary raw G38. */
+  readonly probeRadius?: number
 }
 
 /**

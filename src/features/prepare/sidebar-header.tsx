@@ -1,3 +1,4 @@
+import { endpointLabel } from "@/machine/contract"
 import { ChevronRight, Cpu, Plus, RotateCcw } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
@@ -50,7 +51,9 @@ export function DeviceCard() {
             <CardTitle>
               {device?.name ?? (restarting ? "Restarting…" : "Connect device")}
             </CardTitle>
-            {device && <CardDescription>{device.host}</CardDescription>}
+            {device && (
+              <CardDescription>{endpointLabel(device)}</CardDescription>
+            )}
           </div>
           <ChevronRight />
         </Button>

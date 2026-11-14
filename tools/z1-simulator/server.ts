@@ -82,7 +82,10 @@ export function serveSimulator({
       }
     })
     socket.on("close", () => {
-      if (client === socket) client = null
+      if (client === socket) {
+        device.disconnectDirect()
+        client = null
+      }
       log("app disconnected")
     })
     socket.on("error", () => socket.destroy())

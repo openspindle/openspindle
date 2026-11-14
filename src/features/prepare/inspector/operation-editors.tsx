@@ -394,6 +394,21 @@ export function OperationEditor({
 }) {
   const source = operation.source
   switch (source.kind) {
+    case "facing":
+      return (
+        <Button
+          variant="outline"
+          onClick={() =>
+            openDialog({
+              kind: "facing",
+              plateId: plate.id,
+              operationId: operation.id,
+            })
+          }
+        >
+          Edit facing and cutting data
+        </Button>
+      )
     case "file":
       return <FileEditor plate={plate} operation={{ ...operation, source }} />
     case "pcb":

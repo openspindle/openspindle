@@ -5,6 +5,7 @@ export const MenuCommandSchema = z.enum([
   "project.new",
   "project.open",
   "project.save",
+  "project.saveAs",
   /** Closing with unsaved changes, the user chose Save: save, then close the window. */
   "project.saveAndClose",
   "program.import",

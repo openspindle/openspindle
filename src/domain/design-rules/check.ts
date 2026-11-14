@@ -15,6 +15,9 @@ import {
 import type { Diagnostic, Place, ProgramLines, QuickFix } from "../diagnostics"
 import { kitForPlate } from "../fixtures/catalog"
 import type { FixtureKit } from "../fixtures/fixture-kit"
+import { entersSetterClearance } from "../fixtures/makera-z1/setter-clearance"
+import { toolSetterClearance } from "../fixtures/makera-z1/design-rules"
+import { toolSetterPlacement } from "../fixtures/makera-z1/tool-setter-placement"
 import { keptNcContext, kindOf } from "../operations/kinds"
 import type { Operation } from "../operations/operation"
 import { ownLine } from "../operations/toolpath-parts"
@@ -116,7 +119,67 @@ function toolRadii(plate: Plate, library: readonly Tool[]) {
     const tool = library.find((item) => item.id === entry.toolId)
     if (tool?.diameter) radii.set(entry.number, tool.diameter / 2)
   }
+
   return (number: number) => radii.get(number) ?? radii.get(null) ?? 0
+}
+
+function toolSetterViolation(
+  plate: Plate,
+  compiled: CompiledPlate,
+  settings: RuleSettings,
+  library: readonly Tool[]
+): DesignRuleViolation | null {
+  const setting = ruleSetting(toolSetterClearance, settings)
+  if (setting.severity === "ignore") return null
+  const setter = toolSetterPlacement(plate, settings)
+  if (!setter) return null
+  const { center, radius, height } = setter
+  const x = center[0] - plate.setup.workOrigin[0]
+  const y = center[1] - plate.setup.workOrigin[1]
+  const bottom = center[2] - plate.setup.workOrigin[2]
+  const top = bottom + height
+  const radii = toolRadii(plate, library)
+  const hits = compiled.program.segments.filter((segment) =>
+    entersSetterClearance(
+      segment,
+      { x, y, bottom, top, radius },
+      radii(segment.tool)
+    )
+  )
+  if (!hits.length) return null
+  const lines = [...new Set(hits.map((segment) => segment.line))].sort(
+    (a, b) => a - b
+  )
+  const ranges = coarsen(
+    lines.map((line): ProgramLines => ({ start: line, end: line })),
+    SHOWN_RANGES
+  )
+  const report = setting.severity === "error" ? error : warning
+  const first = hits[0]
+  return {
+    ...report(
+      ruleCode(toolSetterClearance.id),
+      `Line ${first.line} enters the fixed tool setter’s clearance cylinder.`,
+      {
+        subject: PLATE_SUBJECT,
+        line: first.line,
+        lines: ranges,
+        places: [
+          {
+            kind: "cylinder",
+            center,
+            radius,
+            height,
+          },
+        ],
+      }
+    ),
+    rule: toolSetterClearance.id,
+    label: toolSetterClearance.label,
+    suggestion: "Move the toolpath clear of the fixed tool setter cylinder.",
+    lineCount: lines.length,
+    lines: ranges,
+  }
 }
 
 /**
@@ -494,6 +557,7 @@ export function checkDesignRules(
         ruleOrder.indexOf(a.rule) - ruleOrder.indexOf(b.rule)
     )
   const programs = programViolations(plate, compiled, settings)
+  const setter = toolSetterViolation(plate, compiled, settings, library)
   const checked = new Set(
     compiled.spans
       .filter((span) => span.bodyStartLine <= span.endLine)
@@ -506,12 +570,18 @@ export function checkDesignRules(
       )
   if (compiled.mode === "empty") {
     notes.push("No moves are checked: the plate has no program.")
-    return { violations: sorted(programs), notes }
+    return {
+      violations: sorted(setter ? [...programs, setter] : programs),
+      notes,
+    }
   }
   const region = stockRegion(plate, segments)
   if (!region) {
     notes.push("No moves are checked: the plate has no stock and nothing cuts.")
-    return { violations: sorted(programs), notes }
+    return {
+      violations: sorted(setter ? [...programs, setter] : programs),
+      notes,
+    }
   }
   if (
     region.bottom === null &&
@@ -565,5 +635,8 @@ export function checkDesignRules(
       lines: coarsen(failure.lines, SHOWN_RANGES),
     }
   })
-  return { violations: sorted([...moves, ...programs]), notes }
+  return {
+    violations: sorted([...moves, ...programs, ...(setter ? [setter] : [])]),
+    notes,
+  }
 }

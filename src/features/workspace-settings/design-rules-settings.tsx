@@ -121,6 +121,72 @@ export function DesignRulesSettings({ onClose }: { onClose: () => void }) {
         )}
       </form.Field>
     )
+    if (rule.parameters?.length)
+      return (
+        <FieldSet key={rule.id}>
+          <FieldLegend>
+            <Hint text={rule.description}>{rule.label}</Hint>
+          </FieldLegend>
+          <FieldGroup>
+            <Field orientation="horizontal">
+              <FieldLabel>{rule.label} severity</FieldLabel>
+              {severity}
+            </Field>
+            {rule.parameters.map((parameter) => (
+              <form.Field
+                key={parameter.id}
+                name={`${rule.id}.parameters.${parameter.id}`}
+                validators={{
+                  onChange: ({ value }) =>
+                    typeof value === "number" &&
+                    value >= parameter.min &&
+                    value <= parameter.max
+                      ? undefined
+                      : {
+                          message: `${parameter.label} must be from ${parameter.min} to ${parameter.max.toLocaleString("en-US")} ${parameter.unit}.`,
+                        },
+                }}
+              >
+                {(field) => {
+                  const errors = visibleErrors(field.state.meta)
+                  const invalid = !!errors?.length
+                  return (
+                    <Field orientation="horizontal" data-invalid={invalid}>
+                      <FieldLabel htmlFor={fieldId(rule.id, parameter.id)}>
+                        {parameter.label}
+                      </FieldLabel>
+                      <MeasurementInput
+                        id={fieldId(rule.id, parameter.id)}
+                        type="number"
+                        unit={parameter.unit}
+                        min={parameter.min}
+                        max={parameter.max}
+                        step="any"
+                        value={
+                          field.state.value === undefined ||
+                          Number.isNaN(field.state.value)
+                            ? ""
+                            : field.state.value
+                        }
+                        aria-invalid={invalid}
+                        onBlur={field.handleBlur}
+                        onChange={(event) =>
+                          field.handleChange(
+                            event.target.value.trim()
+                              ? Number(event.target.value)
+                              : Number.NaN
+                          )
+                        }
+                      />
+                      <FieldError errors={errors} />
+                    </Field>
+                  )
+                }}
+              </form.Field>
+            ))}
+          </FieldGroup>
+        </FieldSet>
+      )
     const { limit } = rule
     if (!limit)
       return (

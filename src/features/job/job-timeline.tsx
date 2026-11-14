@@ -26,11 +26,31 @@ function etaText({ seconds, toolChanges, remaining }: JobEta) {
     .join(" ")
 }
 
-function timelineTitle({ following, target, eta }: JobTimeline): string {
+function timelineTitle({ following, target, eta }: JobTimeline): ReactNode {
   let title = "Toolpath preview"
   if (following && target)
     title = target.active ? "Live position" : "End of job"
-  return eta ? `${title} · ${etaText(eta)}` : title
+  if (!eta) return title
+  const finishAt = eta.finishAt
+  return (
+    <>
+      {title} · {etaText(eta)}
+      {finishAt != null && (
+        <span className="font-numeric text-muted-foreground">
+          {" · Est. finish "}
+          <time
+            dateTime={new Date(finishAt).toISOString()}
+            title={new Date(finishAt).toLocaleString()}
+          >
+            {new Date(finishAt).toLocaleTimeString(undefined, {
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
+          </time>
+        </span>
+      )}
+    </>
+  )
 }
 
 /** The timeline under the viewer: preview playback, or this window's job position. */

@@ -5,7 +5,7 @@ import type { AnchorStart } from "../../../probing/placement"
  * Machine Z the Z1 moves in (G53): the firmware stops a move above Z -1, its soft limit, and
  * below `soft_endstop.z_min`, -102 in Makera's Z1 and Z1 Pro configurations.
  */
-export const MACHINE_Z = { min: -102, max: -1 } as const
+export { MACHINE_Z } from "../work-envelope"
 
 /**
  * Where probing rises to before it moves in X and Y, as Makera Studio's probing does: the

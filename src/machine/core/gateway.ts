@@ -53,6 +53,11 @@ export class MachineGateway {
     return this.controller.watchConsole(listener)
   }
 
+  serialDevices() {
+    this.requireApp()
+    return this.controller.serialDevices()
+  }
+
   discover(): Promise<NetworkDevice[]> {
     this.requireApp()
     return this.controller.discover()
@@ -91,6 +96,24 @@ export class MachineGateway {
   }
 
   /** The app and the system menu may always stop the machine. */
+  beginSimulatedJog(input: unknown) {
+    this.requireApp()
+    return this.controller.beginSimulatedJog(input)
+  }
+  sampleSimulatedJog(input: unknown) {
+    this.requireApp()
+    return this.controller.sampleSimulatedJog(input)
+  }
+  actionSimulatedJog(input: unknown) {
+    this.requireApp()
+    return this.controller.actionSimulatedJog(input)
+  }
+  endSimulatedJog(input: unknown) {
+    this.requireApp()
+    return this.controller.endSimulatedJog(input)
+  }
+
+  /** The app and the system menu may always stop the machine. */
   stop(): Promise<MachineSnapshot> {
     return this.controller.stop()
   }
@@ -105,9 +128,9 @@ export class MachineGateway {
     return this.controller.run(request)
   }
 
-  dismissJob(): MachineSnapshot {
+  dismissJob(expectedJobId?: string): MachineSnapshot {
     this.requireApp()
-    return this.controller.dismissJob()
+    return this.controller.dismissJob(expectedJobId)
   }
 
   readAnchors(signal?: AbortSignal): Promise<AnchorConfiguration> {
@@ -124,8 +147,8 @@ export class MachineGateway {
     return this.controller.readHeightMap(signal)
   }
 
-  readSwitches(): Promise<SwitchReport> {
-    return this.controller.readSwitches()
+  readSwitches(request?: unknown): Promise<SwitchReport> {
+    return this.controller.readSwitches(request)
   }
 
   readConfiguration(signal?: AbortSignal): Promise<FirmwareConfiguration> {

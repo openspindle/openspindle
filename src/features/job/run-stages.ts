@@ -1,5 +1,7 @@
 import type { OperationSpan } from "@/domain/compile/compile"
 import type { Operation } from "@/domain/operations/operation"
+import { kitForPlate } from "@/domain/fixtures/catalog"
+import { reportsProbingMeasurements } from "@/domain/probing/strategies"
 import type {
   ContactsMeasurement,
   GridMeasurement,
@@ -107,7 +109,14 @@ function reachedOperations(view: Exclude<JobView, { kind: "idle" }>) {
   }
   const taskAt = (index: number) => {
     const { source } = stages[index].operation
-    return source.kind === "probing" ? source.task : null
+    if (source.kind !== "probing") return null
+    return reportsProbingMeasurements(
+      source,
+      kitForPlate(subject.plate).probing,
+      subject.plate
+    )
+      ? source.task
+      : null
   }
   const measured: Map<number, JobMeasurement[]> = new Map()
   for (const measurement of view.job.measurements) {

@@ -1,4 +1,7 @@
 import { CircleAlert } from "lucide-react"
+import { toast } from "sonner"
+import { useWorkspaceStore } from "@/app/workspace/workspace-context"
+import { hasUnsavedChanges } from "@/app/workspace/project-session"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import {
   AlertDialog,
@@ -39,6 +42,7 @@ function SaveChangesDialog({
   replace: () => void
 }) {
   const save = useSaveProject()
+  const workspace = useWorkspaceStore()
   const proceed = () => {
     closeDialog()
     replace()
@@ -75,7 +79,14 @@ function SaveChangesDialog({
             onClick={() =>
               save.mutate(undefined, {
                 onSuccess: ({ result }) => {
-                  if (result.status !== "canceled") proceed()
+                  if (result.status === "canceled") return
+                  if (hasUnsavedChanges(workspace.state)) {
+                    toast.error(
+                      "The project changed while saving. Save again or review discarding the remaining changes."
+                    )
+                    return
+                  }
+                  proceed()
                 },
               })
             }
@@ -95,12 +106,13 @@ export function OpenProjectDialog({
   candidate: ProjectCandidate
 }) {
   const apply = useApplyProject()
+  const workspace = useWorkspaceStore()
   return (
     <SaveChangesDialog
       title="Save changes before opening?"
       description={`Open ${candidate.fileName} with ${plural(candidate.document.plates.length, "plate")}.`}
       confirm="Save and open"
-      replace={() => apply.mutate(candidate)}
+      replace={() => apply.mutate({ candidate, expected: workspace.state })}
     />
   )
 }
@@ -108,12 +120,13 @@ export function OpenProjectDialog({
 /** Starting a new project over unsaved changes: save them first, discard them, or keep working. */
 export function NewProjectDialog() {
   const start = useStartNewProject()
+  const workspace = useWorkspaceStore()
   return (
     <SaveChangesDialog
       title="Save changes before starting a new project?"
       description="Start a new project with an empty Plate 1."
       confirm="Save and start new"
-      replace={() => start.mutate()}
+      replace={() => start.mutate(workspace.state)}
     />
   )
 }

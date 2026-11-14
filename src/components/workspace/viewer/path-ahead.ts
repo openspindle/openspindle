@@ -50,7 +50,13 @@ export class PathAhead {
    * Shows a plan's moves [move, aheadEnd) from `from`, where the tool is drawn: the rest of the
    * move under way, then each whole move after it. None to show hides it.
    */
-  show(plan: MotionPlan, move: MoveIndex, aheadEnd: MoveIndex, from: Vec3) {
+  show(
+    plan: MotionPlan,
+    move: MoveIndex,
+    aheadEnd: MoveIndex,
+    from: Vec3,
+    visible: (index: number) => boolean = () => true
+  ) {
     const starts = this.starts.array as Float32Array
     const { to } = plan
     const last = Math.min(aheadEnd, plan.count, move + MAX_PIECES)
@@ -58,7 +64,7 @@ export class PathAhead {
     let pieces = 0
     for (let index: number = move; index < last; index++) {
       const end = to.subarray(index * 3, index * 3 + 3)
-      if (end.some((value, axis) => value !== start[axis])) {
+      if (visible(index) && end.some((value, axis) => value !== start[axis])) {
         starts.set(start, pieces * 6)
         starts.set(end, pieces * 6 + 3)
         pieces++

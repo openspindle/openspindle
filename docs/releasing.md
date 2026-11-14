@@ -20,7 +20,7 @@ The About panel credits the open-source software the app includes, with the lice
 
 `main` is the trunk: every change reaches it as a squash-merged pull request that passed CI, and every release is cut from it. [ci.yml](../.github/workflows/ci.yml) runs `npm ci`, the typecheck, lint, Prettier check and build on every pull request and every push to `main`, and fails when the build changes the committed `build/third-party-notices.json`; [pr-title.yml](../.github/workflows/pr-title.yml) checks that a pull request's title is a Conventional Commit. On release pull requests CI also packages the app on macOS and Windows runners, so a packaging problem shows before the release is tagged, and keeps the builds for testers ([Trying the next release](#trying-the-next-release)).
 
-Every push to `main` runs [release.yml](../.github/workflows/release.yml):
+After checks pass on `main`, **Checks and desktop builds** calls [release.yml](../.github/workflows/release.yml) in the upstream repository and in forks that configure a release app.
 
 1. release-please keeps a release pull request open, titled `chore(main): release <version>`. It raises the version and adds the release's section to CHANGELOG.md, and every merge to `main` updates it. It changes nothing else, so it can stay open until you want a release.
 2. Merging it releases. release-please tags the merge commit `v<version>` and creates a draft GitHub release whose notes are the new CHANGELOG.md section ([release-please-config.json](../release-please-config.json)). Two build jobs check out that commit and run `npm ci`. On a macOS runner, `npm run dist:mac` builds with the build number above; the job checks that the app carries its notarization ticket and the update feed, and attaches the DMG, the zip, their blockmaps and `latest-mac.yml` to the draft. On a Windows runner, `npm run dist:win` builds the installer; the job checks for the update feed and attaches the installer, its blockmap and `latest.yml`. Once both have, the publish job publishes the draft as the latest release, "OpenSpindle <version>".
@@ -94,6 +94,30 @@ To make them with the GitHub CLI:
 2. In App Store Connect → Users and Access → Integrations → App Store Connect API, add a team key with Developer access and download it (Apple offers the file once). Then run `gh secret set APPLE_API_KEY_P8 --env release < AuthKey_<key id>.p8`, `gh secret set APPLE_API_KEY_ID --env release --body <key id>` and `gh secret set APPLE_API_ISSUER --env release --body <issuer id>`.
 
 Until the app and the secrets are set, the release workflow stops with an error naming this page. For private repositories, GitHub bills macOS and Windows runner minutes at higher rates than Linux ones.
+
+
+## Packages on a fork
+
+After checks pass on a fork's `main`, **Checks and desktop builds** produces an
+unsigned Windows x64 NSIS installer and a Linux x64 AppImage. Find both downloads
+in the run's **Summary** or **Artifacts** for 14 days. The package archives include
+the commit ID, and the apps use the fork's GitHub Releases for update metadata.
+
+- Use **Actions → Checks and desktop builds → Run workflow** to build a selected
+  branch on demand. The manual run also offers an ad-hoc macOS build.
+- For a versioned release on a fork without a release app, push a new
+  `v<version>` tag at the intended release commit. The tag must match
+  `package.json`. The run builds both packages and creates a draft GitHub
+  Release with their update metadata. Publish the draft to make it available
+  to installed apps. Each release uses a new version and tag.
+- For a local Linux package, use Node 24, run `npm ci`, then run
+  `npm run dist:linux -- --publish never`. The output goes to `release/`.
+  If building for a fork locally, pass
+  `-c.publish.owner=OWNER -c.publish.repo=REPOSITORY` to select its update feed.
+
+On GitHub forks, enable Actions if the Actions tab prompts you to do so. A
+packaging run confirms artifact creation. Verify app launch and NC import with
+the simulator before using a new platform build with a machine.
 
 ## Updates
 

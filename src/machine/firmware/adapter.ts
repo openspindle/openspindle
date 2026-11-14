@@ -1,3 +1,4 @@
+import type { SimulatorJogProtocol } from "./makera/simulator-jog.ts"
 import type {
   AddedAnchor,
   AnchorConfiguration,
@@ -21,10 +22,15 @@ import type {
   PlateAssists,
   PrepareResult,
   PreparedProgram,
+  ProbeCheckBinding,
   Telemetry,
 } from "../contract/index.ts"
 
 export type { FirmwareRules, Identity } from "../contract/index.ts"
+
+export type ExecutionContent =
+  | { kind: "console"; source: string }
+  | { kind: "program" | "resume"; program: PreparedProgram | null }
 
 export type InboundFrame = {
   readonly type: number
@@ -142,7 +148,19 @@ export function prepareResult(
   source: string
 ): PrepareResult {
   try {
-    return { ok: true, program: adapter.prepareProgram(source) }
+    const program = adapter.prepareProgram(source)
+    const assessment = adapter.assessPhysicalProgram?.(source, program)
+    return {
+      ok: true,
+      program: {
+        ...program,
+        physicalExecutionIssue: assessment?.issue ?? null,
+        ...(assessment?.probeCheck
+          ? { probeCheck: assessment.probeCheck }
+          : {}),
+        ...(assessment?.probeDownToLimit ? { probeDownToLimit: true } : {}),
+      },
+    }
   } catch (error) {
     if (!(error instanceof ProgramError)) throw error
     return { ok: false, error: error.message, line: error.line }
@@ -179,6 +197,8 @@ export interface TransferProtocol {
   readonly uploadedBytes: number
   readonly verifiedBytes: number
   readonly stage: "upload" | "readback" | "done"
+  /** Delay between upload acknowledgement and opening the readback, when needed by the device. */
+  readonly readbackDelayMs?: number
   /** Done, and the device acknowledged the end: its file is closed and another may follow. */
   readonly finished: boolean
   start: () => OutboundFrame[]
@@ -255,7 +275,8 @@ export interface JobProtocol {
   createTransfer: (
     bytes: Uint8Array,
     md5: string,
-    path: string
+    path: string,
+    blockBytes?: 128 | 8192
   ) => TransferProtocol
   play: (path: string) => OutboundFrame
   /**
@@ -277,6 +298,13 @@ export interface JobProtocol {
 }
 
 export interface FirmwareAdapter {
+  /** Physical finite controller jogging; bounds use freshly read machine anchors. */
+  readonly controllerStepBounds?: (anchors: AnchorConfiguration) => {
+    min: readonly [number, number, number]
+    max: readonly [number, number, number]
+  } | null
+  /** Local simulator extension; never sent to a physical device. */
+  readonly simulatorJog?: SimulatorJogProtocol
   readonly id: string
   readonly defaultPort: number
   readonly discovery: {
@@ -306,14 +334,46 @@ export interface FirmwareAdapter {
   /** The ranges its manual controls accept; commands outside them are refused. */
   readonly limits: ControlLimits
   prepareProgram: (source: string) => PreparedProgram
+  /** Content assessment runs once alongside normalization in the program-preparer worker. */
+  assessPhysicalProgram?: (
+    source: string,
+    program: PreparedProgram
+  ) => {
+    issue: string | null
+    probeCheck?: ProbeCheckBinding
+    probeDownToLimit?: boolean
+  }
+  /** Tools whose contact input is checked at rest; separate from tool-setter calibration. */
+  probeCheckTools?: readonly number[]
+  /** Actual enabled, homed soft limits; probing may bypass the firmware's ordinary limit guard. */
+  probeTravelBounds?: {
+    readonly query: string
+    parse: (text: string) => {
+      min: readonly [number, number, number]
+      max: readonly [number, number, number]
+    } | null
+  }
+  probeContact?: (
+    text: string
+  ) => { position: [number, number, number]; success: boolean } | null
+  /** Constant-time admission for prepared programs; console text is bounded by its contract. */
+  executionIssue?: (
+    input: ExecutionContent & {
+      device: ConnectedDevice | null
+    }
+  ) => string | null
   readonly job: JobProtocol
   /** A fixed firmware configuration file, downloaded and fully verified after a save. */
   readonly configuration?: {
     readonly path: string
     readAdmit: (telemetry: Telemetry) => string | null
     writeAdmit: (telemetry: Telemetry) => string | null
-    createDownload: () => DownloadProtocol
-    createUpload: (bytes: Uint8Array, md5: string) => TransferProtocol
+    createDownload: (blockBytes?: 128 | 8192) => DownloadProtocol
+    createUpload: (
+      bytes: Uint8Array,
+      md5: string,
+      blockBytes?: 128 | 8192
+    ) => TransferProtocol
     vacuumDefaultPower: (content: string) => number | null
     withVacuumDefaultPower: (content: string, percent: number) => string
     /** The size of the camera's stream the file sets; null when it sets none. */

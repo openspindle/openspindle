@@ -14,6 +14,7 @@ import {
   PROBE_SETUP_CODES,
   probeFields,
 } from "./wired-probe/blocks"
+import { CLEARANCE_Z } from "./wired-probe/travel"
 
 /**
  * Path control: G61 exact path, G61.1 exact stop and G64 blending. The Z1 firmware has none (it
@@ -86,7 +87,7 @@ export const isZ1Park = (words: readonly Pick<NcWord, "letter" | "value">[]) =>
  * The Z1's own blocks beyond plain three-axis machining, as combining operations reads them: the
  * park its programs may end with, the wired probe's routines, which only its probing operations
  * may run with T0 active, the 3D probe's, which only 3D probing may run with its tool active,
- * path control, which its firmware ignores, waiting for moves to finish, and its switches. Null
+ * cutting retracts to clearance, path control, waiting for moves to finish, and its switches. Null
  * for any other block.
  */
 export function readZ1Block(
@@ -109,11 +110,13 @@ export function readZ1Block(
   if (mCodes.some((word) => PROBE_SETUP_CODES.includes(word.value)))
     return probeSetup(words, mCodes, state)
   if (gCodes.some((word) => word.value === 53))
-    return probeTravel(words, gCodes, state)
+    return state.policy.probing === "none"
+      ? cuttingTravel(words, gCodes, state)
+      : probeTravel(words, gCodes, state)
   if (gCodes.some((word) => PATH_CONTROL_CODES.includes(word.value)))
     return pathControl(words, gCodes)
   if (mCodes.some((word) => word.value === WAIT_FOR_MOVES))
-    return waitForMoves(words)
+    return waitForMoves(words, state)
   const switched = mCodes.find((word) => SWITCH_CODES.includes(word.value))
   if (switched) return switchBlock(words, mCodes, switched)
   return null
@@ -145,12 +148,15 @@ function switchBlock(
   return ok({})
 }
 
-/** M400 alone in its block: the moves before it finish, and nothing changes. */
-function waitForMoves(words: readonly NcWord[]): Reading {
+/** M400 alone in its block waits for the preceding moves. */
+function waitForMoves(
+  words: readonly NcWord[],
+  { clearance }: NcUnitState
+): Reading {
   const codes = words.filter((word) => word.letter !== "N")
   if (codes.length !== 1)
     return fail("M400 is supported only alone in its block.")
-  return ok({})
+  return ok(clearance === "retracting" ? { clearance: "settled" } : {})
 }
 
 /** G28 parks only alone in its block, after the program's last move. */
@@ -419,6 +425,48 @@ function probeSetup(
       "Clearing height compensation is supported only for explicit anchored probe placement."
     )
   return ok({})
+}
+
+/** Cutting operations can retract and traverse at the kit's machine clearance. */
+function cuttingTravel(
+  words: readonly NcWord[],
+  gCodes: readonly NcWord[],
+  { metric, absolute, activeTool, spindleRunning, clearance }: NcUnitState
+): Reading {
+  if (
+    !metric ||
+    !absolute ||
+    gCodes.length !== 2 ||
+    gCodes[0].value !== 53 ||
+    gCodes[1].value !== 0
+  )
+    return fail(
+      "Machine-coordinate cutting travel requires an explicit G53 G0 in G21 G90."
+    )
+  const z = probeFields(words, ["N", "G", "Z"])
+  if (z?.get("Z") === CLEARANCE_Z)
+    return ok({ motion: 0, clearance: "retracting" })
+
+  const xy = probeFields(words, ["N", "G", "X", "Y"])
+  const x = xy?.get("X")
+  const y = xy?.get("Y")
+  if (
+    x === undefined ||
+    y === undefined ||
+    x < -200 ||
+    x > -1 ||
+    y < -200 ||
+    y > -1 ||
+    activeTool === null ||
+    activeTool < 1 ||
+    activeTool > 999 ||
+    spindleRunning ||
+    clearance !== "settled"
+  )
+    return fail(
+      `Use G53 G0 Z${CLEARANCE_Z} then M400 before a G53 G0 XY move with a cutting tool selected, spindle off and X and Y between -200 and -1 mm.`
+    )
+  return ok({ motion: 0 })
 }
 
 /**

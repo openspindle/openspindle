@@ -1,3 +1,4 @@
+import type { HistoryStore } from "../../../src/platform/contract/history"
 import type { Handlers } from "@openspindle/rpc"
 import type { HostContract } from "../../../src/platform/contract/host-contract"
 import type { FileService } from "../services/file-service"
@@ -13,6 +14,7 @@ import type { Diagnostics } from "../diagnostics/diagnostics"
 import type { SimulatorService } from "../simulator/simulator-service"
 
 export type HostServices = {
+  readonly history: HistoryStore
   readonly files: FileService
   readonly fusion: FusionService
   readonly menu: MenuBus
@@ -42,6 +44,10 @@ export function createHostHandlers(
   } = services
   return {
     methods: {
+      "history.list": () => services.history.list(),
+      "history.read": ({ id }) => services.history.read(id),
+      "history.frame": ({ id, index }) => services.history.frame(id, index),
+      "history.remove": ({ id }) => services.history.remove(id),
       "files.open": ({ kind }) => files.open(kind),
       "files.save": (request) => files.save(request),
       "files.linkedStatus": (request) => files.linkedStatus(request),

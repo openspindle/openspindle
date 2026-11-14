@@ -13,6 +13,11 @@ export type ProgramTool = {
   readonly fluteLength: number | null
   /** A tool kind as tool libraries name them: "flat end mill". */
   readonly kind: string | null
+  /** FreeCAD cutter geometry, with angles expressed as included angles in degrees. */
+  readonly freecad?: {
+    readonly tipDiameter: number | null
+    readonly includedAngle: number | null
+  }
 }
 
 /**

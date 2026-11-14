@@ -1,0 +1,73 @@
+name: Windows and Linux packages
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    name: Package (${{ matrix.platform }} x64)
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows
+            runner: windows-2025
+            script: dist:win
+          - platform: linux
+            runner: ubuntu-24.04
+            script: dist:linux
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+      - name: Check release version
+        if: github.ref_type == 'tag'
+        run: |
+          version=$(node -p "require('./package.json').version")
+          if [[ "$GITHUB_REF_NAME" != "v$version" ]]; then
+            echo "::error::Tag $GITHUB_REF_NAME must match package.json version v$version"
+            exit 1
+          fi
+      - run: npm ci
+      - name: Build package for this repository
+        env:
+          BUILD_SCRIPT: ${{ matrix.script }}
+        run: |
+          npm run "$BUILD_SCRIPT" -- --publish never \
+            -c.publish.owner="$GITHUB_REPOSITORY_OWNER" \
+            -c.publish.repo="${GITHUB_REPOSITORY#*/}"
+      - name: Collect package and update metadata
+        id: files
+        run: |
+          mkdir -p packages-out
+          if [[ "$RUNNER_OS" == Windows ]]; then
+            cp release/OpenSpindle-Setup-*.exe release/OpenSpindle-Setup-*.exe.blockmap release/latest.yml packages-out/
+          else
+            cp release/*.AppImage release/latest-linux.yml packages-out/
+          fi
+          echo "short-sha=${GITHUB_SHA:0:7}" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        id: upload
+        with:
+          name: OpenSpindle-${{ matrix.platform }}-x64-${{ steps.files.outputs.short-sha }}
+          path: packages-out/*
+          retention-days: 14
+          if-no-files-found: error
+      - name: Link the installer from the run summary
+        env:
+          PLATFORM: ${{ matrix.platform }}
+          URL: ${{ steps.upload.outputs.artifact-url }}
+        run: |
+          printf '### Download OpenSpindle\n\n[Download the %s x64 package](%s)\n' \
+            "$PLATFORM" "$URL" >> "$GITHUB_STEP_SUMMARY"

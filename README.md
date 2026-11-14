@@ -14,19 +14,23 @@ OpenSpindle is a desktop app for preparing, checking and running jobs on a Maker
 - Placement relative to the machine's stored anchors, with move, snap and lock in the 3D view
 - Import of `.nc`, `.cnc`, `.gcode`, `.tap` and `.ngc` programs from your CAM, Finder or Explorer, split into operations by tool or toolpath
 - Discover NC programs in Fusion 360, import them directly through the installable Python add-in, and update imported operations from them
+- Simple probing by default, with **Z surface** in the Probing menu; enable **Settings › General › Guided probing** for optional Z-probe, calibration and inspection guides
 - Probing chosen by what it does, each strategy pictured as it probes, with a probe from your tool library that can do it: Z surface sets work Z on the stock top, Height map compensates later cuts for an uneven surface, and Outline trace traces where the plate cuts, or the edges you choose, with the probe's laser
 - The work origin found with the Makera 3D Probe: Outside corner, Inside corner, Pocket center or Boss center, on the stock or on a bracket or anything else on the bed, from a start picked in the 3D view that snaps to the corners, holes and centres there
 - Design rules that catch what the Z1 would not run as written, with fixes, checked before Run and marked where they are in the 3D view
 - Playback of the program as the firmware runs it, timed as the Z1's planner would move it by the machine's own limits, with how long it takes and the depth and width of cut
 - The G-code exactly as the machine receives it, and a glossary of the Z1's codes (**Help › G-code Glossary**)
 - A run checklist, upload read-back and large programs sent in parts
+- Guided probing, inspection reports with JSON/CSV export, repeatability measurements, reviewed measurement-to-setup proposals and bounded physical probe positioning/calibration
+- Guided stock/workholding/origin/tool setup, editable facing with a feeds and speeds assistant, reusable local processes and sampled stock-removal playback
 - The job followed live in the 3D view, with the moves ahead, where the probe touches next and the time left
+- Xbox-style gamepad Step jogging and spindle controls, with continuous Direct steering on the simulator ([controls](docs/gamepad-prototype.md))
 - Machine controls, a console to send the machine one line at a time, the machine's camera, its height map and its stored anchors
 - Machine alarms by name, with what clears them; a pressed E-stop and failed homing diagnosed, with a read of the home switches
 - A simulated Z1 to try jobs on without a machine, moving as the Z1's planner moves it, its camera picture drawn as the Z1's camera sees the bed (**Settings › General › Z1 Simulator device**)
 - A firmware configuration editor with verified saves, a saved vacuum-power default, and work-light brightness for each appearance with an inactivity timer; the machine's own light timer, which darkens a dimmed light as a job starts, turned off from the Device page
 - A tool library with Fusion 360 import and Makera, Genmitsu, SpeTool, Dreanique and FoxAlien catalogs
-- STEP-NC project files, and NC export with the plate's setup
+- STEP-NC project files with Save/Save As, a centered filename and unsaved-change marker, and NC export with the plate's setup
 - Built-in PCB preparation from KiCad Gerber and Excellon files, using your local pcb2gcode installation
 - Error reports and logs under your control; no account or cloud service
 - An app for Windows, and a signed and notarized app for Apple silicon and Intel Macs, that update themselves
@@ -39,13 +43,27 @@ OpenSpindle is a desktop app for preparing, checking and running jobs on a Maker
 
 **Windows:** download `OpenSpindle-Setup-<version>.exe` from the [latest release](../../releases/latest) and run it: it installs OpenSpindle for your user, without administrator rights, and starts it. The installer is for x64 PCs and runs on Windows on Arm too. It is not signed yet, so Windows warns before running it: choose **More info**, then **Run anyway**. Allow OpenSpindle through the firewall when Windows asks, or it does not find machines on the network; entering a machine's IP address works either way.
 
+
+**Linux (x64):** download the AppImage from the repository's release or a
+[Windows and Linux packages build](docs/releasing.md#packages-on-a-fork).
+Mark it executable and open it. For FreeCAD handoff, select that executable
+AppImage as the OpenSpindle program.
+
 ## Quick start
 
-1. **Connect:** click the device card in **Prepare** and choose your Z1, or enter its IP address.
+1. **Connect:** click the device card in **Prepare** and choose your Z1, enter its IP address, or use **Scan USB** for the experimental [USB serial transport](docs/usb-serial.md).
 2. **Import:** drop your CAM's NC files on the window, open them with OpenSpindle from Finder or Explorer, or choose **File › Import…** or **File › Import from Fusion 360**. When a program splits into operations, or holds what the Z1 would not run as written, OpenSpindle asks first: which plate it goes to, how to split it and how to fix it.
 3. **Set up:** place the stock, set the work origin and assign the tools that were not matched from your library.
 4. **Check:** play the program back on the **Job** tab.
 5. **Run:** once the run checklist passes. **Machine › Stop** (⌘. on macOS, Ctrl+. on Windows) stops at any time.
+
+### SpaceMouse navigation
+
+OpenSpindle detects compatible 3Dconnexion SpaceMouse and SpaceNavigator controllers in **Prepare** and **Job**. In **Settings › SpaceMouse**, choose which direction zooms, turn pan/zoom or rotation on or off, and set sensitivity and direction per axis. The other zoom direction pans vertically. **Dominant axis** uses only the strongest enabled input at a time. The six live meters show the input before navigation settings are applied. The 3D view keeps Z pointing up, so roll is shown on the meter only. **Center input** takes the cap's resting position as neutral for the current connection. Navigation preferences are saved automatically.
+
+The mouse wheel zooms the work view. Wheel events that arrive during or shortly after a forward or backward SpaceMouse push or tilt are ignored in the work view to reduce driver-emulated scrolling. This also affects wheel input from a regular mouse if both devices are used at the same time.
+
+The controller must be available to the app as a multi-axis HID device over USB or a receiver. On Linux, the logged-in user needs access to its `hidraw` device. The app reads the motion reports directly, without loading a 3DxWare profile.
 
 ## Status and safety
 
@@ -57,12 +75,13 @@ Machine behaviour follows the source of [Makera's Z1 firmware](https://github.co
 - Stop ending in Alarm
 - programs sent in parts
 
-Importing, previewing and saving projects never send anything to the machine, and Run lives only on the Job tab. The Device tab explicitly saves firmware configuration and vacuum defaults; startup settings take effect after a separate restart. Work-light preferences can adjust brightness while idle and turn the light off after the configured inactivity period. Controls the machine's state does not allow are refused, and a command whose outcome is unknown is never retried. Stop does not replace the machine's emergency stop.
+Importing, previewing and saving projects never send anything to the machine. Machining Run lives on the Job tab; the Anchor 1 calibration guide offers explicit temporary tool-setter and bounded-contact runs with progress, tool-change prompts and Stop, without adding project plates. The Device tab explicitly saves firmware configuration and vacuum defaults; startup settings take effect after a separate restart. Work-light preferences can adjust brightness while idle and turn the light off after the configured inactivity period. Controls the machine's state does not allow are refused, and a command whose outcome is unknown is never retried. Stop does not replace the machine's emergency stop.
 
 If something behaves differently, **Help › Export Protocol Trace…** saves the recent exchange with the machine. Please open an issue with what you saw and the trace.
 
 ## Documentation
 
+- [Guided workshop](docs/guided-workshop.md): setup, facing, cutting presets, measurement proposals, reusable processes, material removal and simulator trials
 - [Probing](docs/probing.md): [Z surface](docs/touch-off.md), [height map](docs/height-map.md), [outline trace](docs/outline-trace.md), and [corners and centres](docs/3d-probing.md) with the 3D probe
 - [PCB operations](docs/pcb.md) from KiCad Gerber and Excellon files, and setting up pcb2gcode
 - [Fusion 360](docs/fusion360.md): install the add-in, connect, and import and update NC programs

@@ -20,6 +20,18 @@ const FILE = path.join(ROOT, "build/third-party-notices.json")
  */
 const UNBUNDLED: Readonly<Record<string, ReadonlyArray<string>>> = {
   electron: ["electron"],
+  serial: [
+    "@serialport/stream",
+    "@serialport/bindings-cpp",
+    "@serialport/bindings-interface",
+    "@serialport/parser-readline",
+    "@serialport/parser-delimiter",
+    "node-addon-api",
+    "node-gyp-build",
+    "@serialport/bindings-cpp/node_modules/debug",
+    "@serialport/stream/node_modules/debug",
+    "ms",
+  ],
   styles: ["shadcn", "tailwindcss", "tw-animate-css"],
 }
 

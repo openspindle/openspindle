@@ -100,6 +100,32 @@ export const StoredAnchorSetupSchema = z
       })
   })
 export type StoredAnchorSetup = z.infer<typeof StoredAnchorSetupSchema>
+
+/** The same device and bed frame, including kept anchors, regardless of when it was read. */
+export function sameAnchorFrame(
+  a: StoredAnchorSetup | null | undefined,
+  b: StoredAnchorSetup | null | undefined
+): boolean {
+  if (!a || !b) return a === b
+  return (
+    a.deviceId === b.deviceId &&
+    a.source === b.source &&
+    a.bedOffset.every((value, axis) => value === b.bedOffset[axis]) &&
+    a.anchors.length === b.anchors.length &&
+    a.anchors.every((anchor, index) => {
+      const other = b.anchors[index]
+      return (
+        anchor.id === other.id &&
+        anchor.name === other.name &&
+        anchor.bedSetup === other.bedSetup &&
+        anchor.machinePosition.every(
+          (value, axis) => value === other.machinePosition[axis]
+        )
+      )
+    })
+  )
+}
+
 export type BedAnchor = {
   id: string
   name: string

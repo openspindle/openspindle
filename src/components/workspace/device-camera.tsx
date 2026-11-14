@@ -1,6 +1,13 @@
 import { useEffect, useRef, useState } from "react"
 import type { ComponentProps, ReactNode } from "react"
-import { Camera, LoaderCircle, Maximize2, Play, Square } from "lucide-react"
+import {
+  Camera,
+  LoaderCircle,
+  Maximize2,
+  Minimize2,
+  Play,
+  Square,
+} from "lucide-react"
 import { cn } from "cn"
 import {
   Card,
@@ -12,11 +19,11 @@ import {
 } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { isSimulator } from "@/machine/contract"
+import { endpointLabel, isSimulator } from "@/machine/contract"
 import type { ConnectedDevice } from "@/machine/contract"
 import { useMachineHost } from "@/platform/machine"
 
-type Phase = "idle" | "connecting" | "live" | "error"
+type Phase = "idle" | "connecting" | "live" | "paused" | "error"
 
 /** A button on the camera's feed: the secondary colour, see-through. */
 export function CameraFeedButton({
@@ -47,6 +54,7 @@ export function DeviceCamera({
   className,
   actions,
   simulated,
+  title = "Camera",
 }: {
   device: ConnectedDevice | null
   available: boolean
@@ -58,28 +66,44 @@ export function DeviceCamera({
   actions?: ReactNode
   /** What the camera would see, drawn here when the device is the simulator. */
   simulated?: ReactNode
+  title?: string
 }) {
   const machine = useMachineHost()
   const [attempt, setAttempt] = useState(0)
   const [phase, setPhase] = useState<Phase>("idle")
   const [frameUrl, setFrameUrl] = useState<string | null>(null)
+  const [fullscreen, setFullscreen] = useState(false)
   const [fullscreenError, setFullscreenError] = useState(false)
   const panel = useRef<HTMLDivElement>(null)
   const urls = useRef(new Set<string>())
   const watching = attempt > 0 && available && !!device && !hidden
   const simulator = !!device && isSimulator(device) && simulated !== undefined
-  const active = phase === "connecting" || phase === "live"
+  const subject = simulator ? "preview" : "camera"
+  const active =
+    phase === "connecting" || phase === "live" || phase === "paused"
   const fullscreenSupported =
     typeof document.documentElement.requestFullscreen === "function"
 
   // A new device always starts stopped.
-  useEffect(() => setAttempt(0), [device?.host, device?.port])
+  useEffect(() => setAttempt(0), [device ? endpointLabel(device) : null])
+
+  useEffect(() => {
+    const syncFullscreen = () => {
+      setFullscreen(
+        !!panel.current && document.fullscreenElement === panel.current
+      )
+      setFullscreenError(false)
+    }
+    document.addEventListener("fullscreenchange", syncFullscreen)
+    return () =>
+      document.removeEventListener("fullscreenchange", syncFullscreen)
+  }, [])
 
   // Hiding it leaves fullscreen, which would otherwise show nothing.
   useEffect(() => {
-    if (hidden && document.fullscreenElement === panel.current)
-      void document.exitFullscreen()
-  }, [hidden])
+    if (hidden && fullscreen && panel.current === document.fullscreenElement)
+      void document.exitFullscreen().catch(() => setFullscreenError(true))
+  }, [hidden, fullscreen])
 
   useEffect(() => {
     if (!watching) {
@@ -124,17 +148,28 @@ export function DeviceCamera({
   let cameraAction = "Start"
   if (phase === "error") cameraAction = "Retry"
   if (active) cameraAction = "Stop"
-  let cameraStatus = "Camera stopped"
+  let cameraStatus = simulator ? "Preview stopped" : "Camera stopped"
   if (phase === "connecting") cameraStatus = "Connecting to camera…"
+  if (phase === "paused") cameraStatus = "Camera paused for job setup"
   if (phase === "error" || !available) cameraStatus = "Camera unavailable"
   if (!device) cameraStatus = "Camera offline"
   const toggleCamera = () => setAttempt((value) => (active ? 0 : value + 1))
+  const fullscreenLabel = fullscreen
+    ? "Exit camera fullscreen"
+    : "Fullscreen camera"
   const fullscreenTitle = fullscreenError
     ? "Fullscreen unavailable"
-    : "Fullscreen"
-  const enterFullscreen = () => {
-    if (!panel.current?.requestFullscreen) return
-    void panel.current.requestFullscreen().catch(() => setFullscreenError(true))
+    : fullscreenLabel
+  const FullscreenIcon = fullscreen ? Minimize2 : Maximize2
+  const toggleFullscreen = () => {
+    const element = panel.current
+    if (!element?.requestFullscreen) return
+    setFullscreenError(false)
+    const change =
+      document.fullscreenElement === element
+        ? document.exitFullscreen()
+        : element.requestFullscreen()
+    void change.catch(() => setFullscreenError(true))
   }
   const image = frameUrl && (
     <img
@@ -167,7 +202,7 @@ export function DeviceCamera({
           "group/camera relative flex aspect-video items-center justify-center overflow-hidden rounded-lg bg-neutral-950 ring-1 ring-foreground/10",
           className
         )}
-        aria-label="Machine camera"
+        aria-label={title}
       >
         {picture}
         <div
@@ -181,27 +216,36 @@ export function DeviceCamera({
             className="size-10 rounded-full [&_svg:not([class*='size-'])]:size-5"
             disabled={!available || !device}
             onClick={toggleCamera}
-            aria-label={`${cameraAction} camera`}
+            aria-label={`${cameraAction} ${subject}`}
             title={cameraAction}
           >
             {phase === "connecting" && (
               <LoaderCircle className="animate-spin" />
             )}
-            {phase === "live" && <Square />}
+            {(phase === "live" || phase === "paused") && <Square />}
             {!active && <Play />}
           </CameraFeedButton>
           {!showing && (
             <CardDescription role={statusRole}>{cameraStatus}</CardDescription>
           )}
         </div>
+        {showing && (phase === "paused" || phase === "connecting") && (
+          <Badge
+            variant="secondary"
+            className="absolute top-2 left-2"
+            role="status"
+          >
+            {cameraStatus}
+          </Badge>
+        )}
         <div className={cn("absolute top-2 right-2 flex gap-1", reveal)}>
           <CameraFeedButton
             disabled={!fullscreenSupported}
-            aria-label="Fullscreen camera"
+            aria-label={fullscreenLabel}
             title={fullscreenTitle}
-            onClick={enterFullscreen}
+            onClick={toggleFullscreen}
           >
-            <Maximize2 />
+            <FullscreenIcon />
           </CameraFeedButton>
           {actions}
         </div>
@@ -218,15 +262,15 @@ export function DeviceCamera({
         "fullscreen:flex fullscreen:h-screen fullscreen:flex-col fullscreen:rounded-none pb-0",
         className
       )}
-      aria-label="Machine camera"
+      aria-label={title}
     >
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Camera size={16} />
-          <span>Camera</span>
+          <span>{title}</span>
           {active && (
             <Badge variant="secondary">
-              {phase === "live" ? "Live" : "Connecting"}
+              {phase === "live" ? "Live" : cameraStatus}
             </Badge>
           )}
         </CardTitle>
@@ -237,7 +281,7 @@ export function DeviceCamera({
             type="button"
             disabled={!available || !device}
             onClick={toggleCamera}
-            aria-label={`${cameraAction} camera`}
+            aria-label={`${cameraAction} ${subject}`}
           >
             {active ? <Square /> : <Play />}
             {cameraAction}
@@ -247,11 +291,11 @@ export function DeviceCamera({
             size="icon-sm"
             type="button"
             disabled={!fullscreenSupported}
-            aria-label="Fullscreen camera"
+            aria-label={fullscreenLabel}
             title={fullscreenTitle}
-            onClick={enterFullscreen}
+            onClick={toggleFullscreen}
           >
-            <Maximize2 />
+            <FullscreenIcon />
           </Button>
           {actions}
         </CardAction>

@@ -88,12 +88,19 @@ const sameToolRuns = sameList<ViewerToolRun>(
  * plate compare by identity; arrays and points derived per render compare by value.
  */
 const PLATE_EQUALITY: FieldEquality<ViewerPlate> = {
+  operationColors: sameList(
+    (a, b) =>
+      a.startLine === b.startLine &&
+      a.endLine === b.endLine &&
+      a.color === b.color
+  ),
   id: Object.is,
   name: Object.is,
   program: Object.is,
   machineProgram: Object.is,
   tools: sameToolRuns,
   toolpathBounds: sameBounds,
+  reference: Object.is,
   stock: Object.is,
   stockAnchor: samePoint,
   workOrigin: samePoint,
@@ -108,6 +115,13 @@ const PLATE_EQUALITY: FieldEquality<ViewerPlate> = {
   anchorSetup: Object.is,
   fixtures: Object.is,
   deviceId: Object.is,
+  toolSetter: (a, b) =>
+    a === b ||
+    (!!a &&
+      !!b &&
+      samePoint(a.center, b.center) &&
+      a.radius === b.radius &&
+      a.height === b.height),
 }
 
 /** Whether two versions of a plate render identically, optionally for some fields only. */

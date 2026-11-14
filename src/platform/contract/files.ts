@@ -29,9 +29,9 @@ export const FILE_KINDS = {
   },
   program: {
     title: "NC program",
-    extensions: ["nc", "cnc", "gcode", "tap", "ngc"],
+    extensions: ["nc", "cnc", "gcode", "tap", "ngc", "ospjob"],
     saveExtensions: ["nc", "cnc"],
-    maxBytes: 20 * MiB,
+    maxBytes: 64 * MiB,
     mime: "text/plain",
   },
   /**
@@ -49,12 +49,42 @@ export const FILE_KINDS = {
     mime: "application/zip",
   },
   /** A copy of stored app data that could not be restored. */
+  historyArchive: {
+    title: "Job history archive",
+    extensions: ["zip"],
+    saveExtensions: ["zip"],
+    binary: true,
+    maxBytes: 200 * MiB,
+    mime: "application/zip",
+  },
+  sharedTools: {
+    title: "Shared tool library",
+    extensions: ["osptools"],
+    saveExtensions: ["osptools"],
+    maxBytes: 16 * MiB,
+    mime: "application/json",
+  },
   recovery: {
     title: "Recovery copy",
     extensions: ["json"],
     saveExtensions: ["json"],
     maxBytes: 512 * MiB,
     mime: "application/json",
+  },
+  /** A read-only report of a probing run, never an executable program. */
+  inspectionJson: {
+    title: "Inspection report JSON",
+    extensions: ["json"],
+    saveExtensions: ["json"],
+    maxBytes: 32 * MiB,
+    mime: "application/json",
+  },
+  inspectionCsv: {
+    title: "Inspection report CSV",
+    extensions: ["csv"],
+    saveExtensions: ["csv"],
+    maxBytes: 32 * MiB,
+    mime: "text/csv",
   },
   /** The recent protocol exchange with the machine (Help › Export Protocol Trace). */
   trace: {
@@ -95,10 +125,14 @@ export const FILE_KINDS = {
 } as const satisfies Record<string, FileKindSpec>
 
 export const FileKindSchema = z.enum([
+  "historyArchive",
+  "sharedTools",
   "project",
   "program",
   "toolLibrary",
   "recovery",
+  "inspectionJson",
+  "inspectionCsv",
   "trace",
   "log",
   "pcb",
@@ -173,6 +207,7 @@ export const OpenFileResultSchema = z.discriminatedUnion("status", [
   z.strictObject({
     status: z.literal("opened"),
     fileName: z.string().min(1).max(1024),
+    destinationId: z.uuid().optional(),
     contents: z.string(),
   }),
   z.strictObject({ status: z.literal("canceled") }),
@@ -230,6 +265,7 @@ export const OpenedFilesSchema = z.strictObject({
       z.strictObject({
         kind: z.enum(["program", "project"]),
         fileName: z.string().min(1).max(1024),
+        destinationId: z.uuid().optional(),
         contents: z.string(),
       })
     )
@@ -273,6 +309,8 @@ export const SaveFileRequestSchema = z
   .strictObject({
     kind: FileKindSchema,
     suggestedName: z.string().min(1).max(200),
+    /** Opaque native capability from opening/saving this project; never a renderer path. */
+    destinationId: z.uuid().optional(),
     /** Text, or bytes for a binary kind. */
     contents: z.union([z.string(), FileBytesSchema]),
   })
@@ -288,6 +326,7 @@ export type SaveFileRequest = z.infer<typeof SaveFileRequestSchema>
 export const SaveFileResultSchema = z.strictObject({
   status: z.enum(["saved", "canceled"]),
   fileName: z.string(),
+  destinationId: z.uuid().optional(),
 })
 export type SaveFileResult = z.infer<typeof SaveFileResultSchema>
 
@@ -301,6 +340,12 @@ export function validateOpenedFile(
     throw new Error(
       `Choose a ${FILE_KINDS[kind].extensions.map((e) => `.${e}`).join(", ")} file.`
     )
+  if (
+    kind === "program" &&
+    !/\.ospjob$/i.test(fileName) &&
+    utf8ByteLength(contents) > 20 * MiB
+  )
+    throw new Error("The NC program exceeds the 20 MB limit.")
   const error = fileContentsError(kind, contents)
   if (error) throw new Error(error)
   return { fileName, contents }

@@ -1,0 +1,22 @@
+[Unit]
+Description=OpenSpindle CNC monitor host
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/openspindle
+EnvironmentFile=/etc/openspindle-host.env
+ExecStart=/usr/bin/node /opt/openspindle/dist-host/index.js
+Restart=on-failure
+RestartSec=5
+User=openspindle
+Group=openspindle
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/openspindle
+
+[Install]
+WantedBy=multi-user.target

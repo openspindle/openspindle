@@ -188,6 +188,11 @@ export function strategyRefuses(
  */
 type AnyTaskMethod = {
   readonly task: ProbingTask
+  reportsMeasurements?: (
+    params: ProbingSource["params"],
+    plate: Plate,
+    machine: MachineProbing
+  ) => boolean
   blocked?: (
     plate: Plate,
     machine: MachineProbing,
@@ -205,6 +210,20 @@ type AnyTaskMethod = {
 }
 const anyTask = <TTask extends ProbingTask>(method: TaskMethod<TTask>) =>
   method as unknown as AnyTaskMethod
+
+/** A played route must explicitly promise measurements before reports can be associated with it. */
+export function reportsProbingMeasurements(
+  source: ProbingSource,
+  machine: MachineProbing | null,
+  plate: Plate
+): boolean {
+  if (!machine) return false
+  const method = methodFor(source, machine, plate)
+  return method
+    ? anyTask(method).reportsMeasurements?.(source.params, plate, machine) ===
+        true
+    : false
+}
 
 /**
  * The method that writes a probing operation's NC on a machine: the first of its strategy's

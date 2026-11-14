@@ -1,3 +1,4 @@
+import { serialConnector } from "./serial-ports.ts"
 import { createHash } from "node:crypto"
 import { createSocket } from "node:dgram"
 import { Socket } from "node:net"
@@ -42,19 +43,22 @@ const tcp: TcpConnector = {
     const close = (error: string | null) => {
       if (closed) return
       closed = true
+      socket.destroy()
       events.closed(error)
     }
     socket.on("connect", () => {
+      if (closed) return
       connected = true
       socket.setNoDelay(true)
       socket.setKeepAlive(true, 1000)
       events.open()
     })
-    socket.on("data", (chunk: Buffer) =>
+    socket.on("data", (chunk: Buffer) => {
+      if (closed) return
       events.data(
         new Uint8Array(chunk.buffer, chunk.byteOffset, chunk.byteLength)
       )
-    )
+    })
     socket.on("error", (error: NodeJS.ErrnoException) =>
       close(
         connected
@@ -67,7 +71,15 @@ const tcp: TcpConnector = {
     socket.connect({ host, port, family: 4 })
     return {
       write: (bytes) => {
-        if (!closed) socket.write(bytes)
+        if (closed || !connected || socket.destroyed)
+          throw new Error("The device connection is not writable.")
+        // The file protocol already waits for each block's reply. A growing write queue
+        // means the transport is stuck; never retain more commands to send later.
+        if (socket.writableLength + bytes.byteLength > 64 * 1024)
+          throw new Error(
+            "The device connection's write queue is full. Nothing was retried."
+          )
+        socket.write(bytes)
       },
       destroy: () => {
         closed = true
@@ -107,24 +119,36 @@ const udp: DatagramListener = {
 const camera: CameraConnector = {
   open(url, events) {
     const socket = new WebSocket(url)
+    let closed = false
+    const dispose = () => {
+      socket.onopen = null
+      socket.onmessage = null
+      socket.onerror = null
+      socket.onclose = null
+      socket.close()
+    }
+    const fail = () => {
+      if (closed) return
+      closed = true
+      dispose()
+      events.closed()
+    }
     socket.binaryType = "arraybuffer"
     socket.onopen = () => events.open()
     socket.onmessage = (event: MessageEvent) => {
       if (event.data instanceof ArrayBuffer)
         events.binary(new Uint8Array(event.data))
     }
-    socket.onerror = () => events.closed()
-    socket.onclose = () => events.closed()
+    socket.onerror = fail
+    socket.onclose = fail
     return {
       send: (text) => {
-        if (socket.readyState === WebSocket.OPEN) socket.send(text)
+        if (!closed && socket.readyState === WebSocket.OPEN) socket.send(text)
       },
       close: () => {
-        socket.onopen = null
-        socket.onmessage = null
-        socket.onerror = null
-        socket.onclose = null
-        socket.close()
+        if (closed) return
+        closed = true
+        dispose()
       },
     }
   },
@@ -133,6 +157,7 @@ const camera: CameraConnector = {
 export const nodeMachinePorts: MachinePorts = {
   clock,
   tcp,
+  serial: serialConnector,
   udp,
   camera,
   md5: (bytes) => createHash("md5").update(bytes).digest("hex"),

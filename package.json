@@ -32,13 +32,17 @@
     "package:win": "electron-vite build && electron-builder --win",
     "predist:win": "install-electron",
     "dist:win": "node --env-file-if-exists=.env node_modules/electron-vite/bin/electron-vite.js build && node --env-file-if-exists=.env node_modules/electron-builder/cli.js --win",
+    "predist:linux": "install-electron",
+    "dist:linux": "node --env-file-if-exists=.env node_modules/electron-vite/bin/electron-vite.js build && node --env-file-if-exists=.env node_modules/electron-builder/cli.js --linux",
     "typecheck": "tsc -p tsconfig.json && tsc -p electron/tsconfig.json && tsc -p tools/z1-simulator/tsconfig.json",
-    "lint": "eslint src electron packages vite.config.ts electron.vite.config.ts tools",
-    "format": "prettier --write src electron packages tools vite.config.ts electron.vite.config.ts",
-    "check": "prettier --check src electron packages tools vite.config.ts electron.vite.config.ts",
+    "lint": "eslint src electron packages vite.config.ts electron.vite.config.ts tools host",
+    "format": "prettier --write src electron host packages tools vite.config.ts electron.vite.config.ts",
+    "check": "prettier --check src electron host packages tools vite.config.ts electron.vite.config.ts",
     "test": "node --test \"src/**/*.test.ts\"",
     "icon": "electron scripts/app-icon.mjs",
-    "sim:z1": "node tools/z1-simulator/main.ts"
+    "sim:z1": "node tools/z1-simulator/main.ts",
+    "build:host": "node host/build.ts",
+    "start:host": "node dist-host/index.js"
   },
   "devDependencies": {
     "@base-ui/react": "^1.8.0",
@@ -93,6 +97,8 @@
     "@fontsource-variable/ibm-plex-sans": "^5.3.0",
     "@fontsource-variable/jetbrains-mono": "^5.3.0",
     "@fontsource-variable/roboto": "^5.3.0",
+    "@serialport/bindings-cpp": "^13.0.0",
+    "@serialport/stream": "^13.0.0",
     "input-otp": "^1.5.0"
   },
   "overrides": {

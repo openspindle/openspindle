@@ -186,7 +186,14 @@ export class MakeraConfigurationDownload implements DownloadProtocol {
   private cancelled = false
   private digest: string | null = null
   private blocks = 0
-  private blockSize = FILE_BLOCK_BYTES
+  private blockSize: number
+
+  private readonly maxBlockBytes: 128 | 8192
+
+  constructor(maxBlockBytes: 128 | 8192 = FILE_BLOCK_BYTES) {
+    this.maxBlockBytes = maxBlockBytes
+    this.blockSize = maxBlockBytes
+  }
   private sequence = 0
   private length = 0
   private content = new Uint8Array(0)
@@ -251,11 +258,11 @@ export class MakeraConfigurationDownload implements DownloadProtocol {
         ) {
           this.blocks = reader.getUint32(0)
           this.blockSize =
-            data.length === 6 ? reader.getUint16(4) : FILE_BLOCK_BYTES
+            data.length === 6 ? reader.getUint16(4) : this.maxBlockBytes
           if (
             this.blocks < 1 ||
             this.blockSize < 1 ||
-            this.blockSize > FILE_BLOCK_BYTES ||
+            this.blockSize > this.maxBlockBytes ||
             (this.blocks - 1) * this.blockSize >= CONFIGURATION_MAX_BYTES
           )
             throw new TransferError("Invalid configuration file size.")

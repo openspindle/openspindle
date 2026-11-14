@@ -139,6 +139,7 @@ export function DeviceAnchors({
   action,
   writing,
   storing,
+  calibration,
 }: {
   setup?: StoredAnchorSetup
   loading: boolean
@@ -151,6 +152,7 @@ export function DeviceAnchors({
   writing?: AnchorWriting
   /** Whether the device stores the bed setups' anchors too; absent where it cannot. */
   storing?: AnchorStoring
+  calibration?: ReactNode
 }) {
   const [editing, setEditing] = useState(false)
   if (!setup && !loading && !error && !action) return null
@@ -191,6 +193,7 @@ export function DeviceAnchors({
           </CardAction>
         )}
       </CardHeader>
+      {calibration && <CardContent>{calibration}</CardContent>}
       {setup && (
         <CardContent className="flex min-w-0 flex-col gap-4">
           <Table className="table-fixed font-numeric [&_td]:text-right [&_th:not(:first-child)]:text-right">

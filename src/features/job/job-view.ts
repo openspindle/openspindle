@@ -242,6 +242,8 @@ export type JobSubject = {
   readonly tools?: readonly Tool[]
   /** The plan a job's Run was sent with; the selected plate has none. */
   readonly plan?: MotionPlan | null
+  /** The device frozen by Run; absent for the selected plate's preview. */
+  readonly device?: JobSession["device"]
 }
 
 export function jobSubject(

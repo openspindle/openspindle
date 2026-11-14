@@ -24,10 +24,18 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { DeviceCard } from "@/features/prepare/sidebar-header"
 import { MachineDiagnosis } from "@/features/device/machine-diagnosis"
+import {
+  useCalibrationRunRecord,
+  calibrationRunDialog,
+  calibrationRunLabel,
+} from "@/features/device/use-calibration-run"
+import { Button } from "@/components/ui/button"
+import { openDialog, useOpenDialog } from "@/features/shell/dialogs"
 import { MachineConsole } from "./machine-console"
 import { CutFacts } from "./cut-facts"
 import { GCodeListing } from "./gcode-listing"
 import { JobCamera } from "./job-camera"
+import { InspectionReportCard } from "./inspection-report-card"
 import { useJobActions, useRunChecklist, useRunJob } from "./job-hooks"
 import type { MachineAction } from "./job-hooks"
 import { JobSummary } from "./job-stages"
@@ -43,6 +51,9 @@ import { useCutPrediction } from "./use-cut-prediction"
 import { useJobTimeline } from "./use-job-timeline"
 import type { JobTimeline } from "./use-job-timeline"
 import { useJobView } from "./use-job-view"
+import { JobZProbeOption } from "./job-z-probe-option"
+import { zJobIssue } from "./z-probe-job"
+import { kitForPlate } from "@/domain/fixtures/catalog"
 
 /**
  * The job panel: the connected device and the job's controls on top, then its stages from the
@@ -58,13 +69,14 @@ function JobPanel({
   check: ProgramCheck
 }) {
   const actions = useJobActions()
+  const calibrationRun = useCalibrationRunRecord()
+  const dialog = useOpenDialog()
+  const calibrationOpen =
+    !!calibrationRun &&
+    subject?.plate.id === calibrationRun.session.plate.id &&
+    dialog?.kind === calibrationRunDialog(calibrationRun).kind
   const runJob = useRunJob()
   const library = useWorkspace((state) => state.tools)
-  const checklist = useRunChecklist(
-    subject?.plate ?? null,
-    subject?.compiled ?? null,
-    check
-  )
   // The machine holds the program's first tool: Run may keep it rather than change to it.
   const held = useFreshTelemetry()?.tool ?? null
   const source = subject?.compiled.program.source ?? null
@@ -75,17 +87,25 @@ function JobPanel({
   const [keep, setKeep] = useState(false)
   const keepable =
     view.kind === "idle" && firstTool !== null && held === firstTool
+  const keptTool = keepable && keep ? firstTool : null
+  const checklist = useRunChecklist(
+    subject?.plate ?? null,
+    subject?.compiled ?? null,
+    check
+  )
   const run: MachineAction = {
-    reason: checklist.blocker,
+    reason:
+      checklist.blocker ??
+      (subject?.plate.setup.probeBeforeRun
+        ? zJobIssue(
+            subject.compiled,
+            kitForPlate(subject.plate).zProbing?.tools ?? []
+          )
+        : null),
     pending: runJob.pending,
     run: () => {
       if (subject && checklist.ready)
-        runJob.start(
-          subject.plate,
-          subject.compiled,
-          library,
-          keepable && keep ? firstTool : null
-        )
+        runJob.start(subject.plate, subject.compiled, library, keptTool)
     },
   }
   return (
@@ -109,19 +129,33 @@ function JobPanel({
       <ScrollArea className="min-h-0 flex-1">
         <div className="flex flex-col gap-3 p-3">
           <JobSummary view={view} subject={subject} />
+          {view.kind === "idle" && subject && (
+            <JobZProbeOption plate={subject.plate} />
+          )}
+          {calibrationRun && (
+            <Button
+              variant="outline"
+              onClick={() => openDialog(calibrationRunDialog(calibrationRun))}
+            >
+              {calibrationRunLabel(calibrationRun)}
+            </Button>
+          )}
           <MachineDiagnosis />
-          <RunStageList
-            view={view}
-            subject={subject}
-            tools={
-              view.kind !== "idle" && view.session
-                ? view.session.tools
-                : library
-            }
-            actions={actions}
-            checklist={checklist}
-            parts={Math.max(1, preparedProgram(check)?.parts.length ?? 1)}
-          />
+          <InspectionReportCard view={view} subject={subject} />
+          {!calibrationOpen && (
+            <RunStageList
+              view={view}
+              subject={subject}
+              tools={
+                view.kind !== "idle" && view.session
+                  ? view.session.tools
+                  : library
+              }
+              actions={actions}
+              checklist={checklist}
+              parts={Math.max(1, preparedProgram(check)?.parts.length ?? 1)}
+            />
+          )}
         </div>
       </ScrollArea>
     </aside>
@@ -133,10 +167,12 @@ function ProgramPanel({
   subject,
   check,
   timeline,
+  requestedLine,
 }: {
   subject: JobSubject | null
   check: ProgramCheck
   timeline: JobTimeline
+  requestedLine: number | null
 }) {
   const layout = useDefaultLayout({
     id: "openspindle-job-program",
@@ -156,6 +192,7 @@ function ProgramPanel({
             operations={subject.plate.operations}
             check={check}
             line={timeline.line}
+            requestedLine={requestedLine}
             onSeekLine={timeline.seekLine}
           />
         ) : (
@@ -270,7 +307,12 @@ export function JobPage({
         maxSize={640}
         groupResizeBehavior="preserve-pixel-size"
       >
-        <ProgramPanel subject={subject} check={check} timeline={timeline} />
+        <ProgramPanel
+          subject={subject}
+          check={check}
+          timeline={timeline}
+          requestedLine={requestedLine}
+        />
       </ResizablePanel>
     </ResizablePanelGroup>
   )

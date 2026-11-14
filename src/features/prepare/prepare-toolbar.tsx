@@ -1,4 +1,13 @@
-import { CircuitBoard, Crosshair, Settings2, ShieldCheck } from "lucide-react"
+import {
+  Box,
+  CircuitBoard,
+  Crosshair,
+  Settings2,
+  ShieldCheck,
+  ListChecks,
+  Layers,
+  BookOpen,
+} from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import { TooltipProvider } from "@/components/ui/tooltip"
@@ -38,7 +47,40 @@ export function PrepareToolbar() {
           aria-label="Prepare tools"
         >
           <ArrangeTools />
+          <ToolbarButton
+            label="Finished model and material"
+            description="Import the finished part and edit its display material and work-frame placement."
+            reason={hasPlate ? null : "Create a plate first."}
+            onClick={() => {
+              const plate = selectedPlate(workspace.state)
+              if (plate) openDialog({ kind: "reference", plateId: plate.id })
+            }}
+          >
+            <Box />
+          </ToolbarButton>
+          <ToolbarButton
+            label="Reusable processes"
+            description="Save and reuse the selected plate's setup, operations and tool definitions."
+            onClick={() => openDialog({ kind: "processes" })}
+          >
+            <BookOpen />
+          </ToolbarButton>
           <Separator orientation="vertical" />
+          <ToolbarButton
+            label="Facing wizard"
+            description="Create an editable facing raster with cutting data from your tool library."
+            reason={hasPlate ? null : "Create a plate with Guided setup first."}
+            onClick={() => openDialog({ kind: "facing" })}
+          >
+            <Layers />
+          </ToolbarButton>
+          <ToolbarButton
+            label="Guided setup"
+            description="Set up stock, workholding, work zero and tools, then review the job."
+            onClick={() => openDialog({ kind: "guided-setup" })}
+          >
+            <ListChecks />
+          </ToolbarButton>
           <ToolbarButton
             label="Probing"
             description={PROBING_DESCRIPTION}

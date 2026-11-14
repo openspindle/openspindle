@@ -1,3 +1,4 @@
+import { endpointLabel } from "@/machine/contract"
 import { useEffect, useId, useState } from "react"
 import { Gauge } from "lucide-react"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
@@ -35,7 +36,7 @@ export function DeviceOverridesCard({
   useEffect(() => {
     setFeedPercent("")
     setSpindlePercent("")
-  }, [device?.host, device?.port])
+  }, [device ? endpointLabel(device) : null])
   return (
     <ControlCard title="Overrides" icon={<Gauge size={16} />}>
       <FieldGroup className="grid gap-4 sm:grid-cols-2">

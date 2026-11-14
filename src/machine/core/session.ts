@@ -1,3 +1,4 @@
+import { endpointLabel } from "../contract/index.ts"
 import type {
   ConnectTarget,
   ConnectedDevice,
@@ -29,10 +30,12 @@ import type {
   TimerHandle,
 } from "./ports.ts"
 import { TelemetryStore } from "./telemetry-store.ts"
+import { isFresh } from "../contract/telemetry.ts"
 
 const HANDSHAKE_MS = 8000
-/** Polling this long without a status reply closes the connection. */
+/** Missing status changes control trust, never the TCP connection's lifecycle. */
 const STALE_MS = 5000
+const STALE_POLL_MS = 5000
 const POLL_MS = 1000
 const FAST_POLL_MS = 250
 /** A query unanswered this long may be repeated. */
@@ -69,14 +72,17 @@ export type SessionEvents = {
   /** Lines no lease claimed: job evidence, unsolicited reports. */
   readonly line: (line: Line) => void
   readonly tick: (now: number) => void
+  readonly health: () => void
   readonly closed: (error: string | null) => void
 }
 
 /**
- * One TCP connection: handshake and identity, event routing, the reply lease,
+ * One framed byte-stream connection: handshake and identity, event routing, the reply lease,
  * status polling and the stale-status watchdog. It holds no policy.
  */
 export class MachineSession {
+  readonly transferBlockBytes: 128 | 8192
+  readonly minimumTransferRate: number
   readonly store: TelemetryStore
   /** Latest diagnostic reply and its order, independent of cached ordinary status. */
   diagnostics: {
@@ -88,6 +94,10 @@ export class MachineSession {
   identityReplyState: MachineState | null = null
   device: ConnectedDevice | null = null
   closed = false
+  health: "waiting" | "fresh" | "stale" = "waiting"
+  lastFrameAt: number | null = null
+  /** An unverified command must be settled by Stop, even after status recovers. */
+  lockout: string | null = null
   /** The job monitor wants the fast rate (starting, finishing, cleaning). */
   fastPolling = false
   private boosts = 0
@@ -103,6 +113,7 @@ export class MachineSession {
     until: number
     accept: (event: ReplyEvent) => boolean
   } | null = null
+  private readonly drainWaiters = new Set<(error: Error) => void>()
   private pollTimer: TimerHandle | null = null
   private handshakeTimer: TimerHandle | null = null
   private suspensions = 0
@@ -121,36 +132,85 @@ export class MachineSession {
     events: SessionEvents,
     trace: ProtocolTrace
   ) {
+    if (target.transport === "serial" && !ports.serial)
+      throw new MachineError(
+        "refused",
+        "USB serial is not available in this host."
+      )
     this.adapter = adapter
     this.clock = ports.clock
     this.events = events
     this.target = target
     this.trace = trace
-    trace.record("note", `Connecting to ${target.host}:${target.port}`)
+    this.transferBlockBytes = target.transport === "serial" ? 128 : 8192
+    this.minimumTransferRate = target.transport === "serial" ? 1024 : 8192
+    trace.record(
+      "note",
+      target.transport === "serial"
+        ? "Connecting via USB serial (115200 8N1)"
+        : `Connecting to ${endpointLabel(target)}`
+    )
     this.store = new TelemetryStore(ports.clock)
     this.interpreter = adapter.createInterpreter()
     this.handshakeTimer = this.clock.setTimeout(
       () => this.close("Timed out verifying the device."),
       HANDSHAKE_MS
     )
-    this.connection = ports.tcp.connect(target.host, target.port, {
+    const streamEvents = {
       open: () => {
         if (this.closed) return
-        this.send(adapter.queries.identity)
+        // Handshake writes have no operation awaiting them yet.
+        try {
+          this.send(adapter.queries.identity)
+        } catch {
+          return
+        }
         this.requestStatus(true)
         this.schedulePoll()
       },
-      data: (bytes) => this.receive(bytes),
-      closed: (error) =>
+      data: (bytes: Uint8Array) => this.receive(bytes),
+      closed: (error: string | null) =>
         this.close(error ?? "The device closed the connection."),
-    })
+    }
+    if (target.transport === "serial") {
+      if (!ports.serial)
+        throw new MachineError(
+          "refused",
+          "USB serial is not available in this host."
+        )
+      this.connection = ports.serial.connect(target, streamEvents)
+    } else
+      this.connection = ports.tcp.connect(
+        target.host,
+        target.port,
+        streamEvents
+      )
   }
 
   get ready() {
     return !this.closed && this.device !== null
   }
 
+  get healthy() {
+    return (
+      this.ready &&
+      this.health === "fresh" &&
+      isFresh(this.store.telemetry, this.clock.now())
+    )
+  }
+
   send(frame: OutboundFrame) {
+    if (
+      this.suspensions === 0 &&
+      frame !== this.adapter.halt &&
+      frame !== this.adapter.queries.identity &&
+      frame !== this.adapter.job.homedQuery &&
+      (!this.healthy || this.lockout)
+    )
+      throw new MachineError(
+        "refused",
+        this.lockout ?? "Waiting for fresh device status. No command was sent."
+      )
     this.write(frame, true)
   }
 
@@ -158,15 +218,21 @@ export class MachineSession {
   requestStatus(force = false) {
     if (this.closed || this.suspensions > 0) return
     const now = this.clock.now()
+    let minimumInterval = force ? FAST_POLL_MS : OUTSTANDING_MS
+    if (this.health === "stale") minimumInterval = STALE_POLL_MS
     if (
-      !force &&
       this.outstandingSince !== null &&
-      now - this.outstandingSince < OUTSTANDING_MS
+      now - this.outstandingSince < minimumInterval
     )
       return
     this.outstandingSince = now
-    this.write(this.adapter.queries.diagnostics, false)
-    this.write(this.adapter.queries.status, false)
+    try {
+      this.write(this.adapter.queries.diagnostics, false)
+      this.write(this.adapter.queries.status, false)
+    } catch (error) {
+      // A failed write already closed the session and rejected its operations.
+      if (!this.isClosed()) throw error
+    }
   }
 
   /** Fast polling while an operation verifies its effect. */
@@ -188,9 +254,11 @@ export class MachineSession {
       if (released) return
       released = true
       this.suspensions--
+      if (this.suspensions > 0 || this.closed) return
       // The transfer had no status traffic; restart the stale window.
       this.silentMs = 0
       this.outstandingSince = null
+      this.setHealth("waiting")
     }
   }
 
@@ -257,7 +325,17 @@ export class MachineSession {
       }
       const lease: Lease = {
         handle: (event) => {
-          const verdict = handler(event)
+          let verdict: ReplyVerdict<TResult>
+          try {
+            verdict = handler(event)
+          } catch (error) {
+            finish(
+              error instanceof Error
+                ? error
+                : new Error("Invalid device reply.")
+            )
+            return true
+          }
           if (verdict === "ignored") return false
           if (verdict === "consumed") {
             if (options.rearm) arm()
@@ -292,13 +370,52 @@ export class MachineSession {
     milliseconds: number,
     accept: (event: ReplyEvent) => boolean = () => true
   ) {
-    this.drain = { until: this.clock.now() + milliseconds, accept }
+    const now = this.clock.now()
+    const previous = this.drain && now < this.drain.until ? this.drain : null
+    this.drain = {
+      until: Math.max(now + milliseconds, previous?.until ?? 0),
+      accept: previous
+        ? (event) => previous.accept(event) || accept(event)
+        : accept,
+    }
+  }
+
+  /** New operations wait before sending; Stop uses telemetry and never waits for this. */
+  async waitForDrain(signal: AbortSignal): Promise<void> {
+    while (this.drain && this.clock.now() < this.drain.until) {
+      if (signal.aborted) throw abortError(signal)
+      if (this.closed)
+        throw new MachineError("connection-lost", "The device is disconnected.")
+      await new Promise<void>((resolve, reject) => {
+        const finish = (error?: Error) => {
+          this.clock.clearTimeout(timer)
+          signal.removeEventListener("abort", onAbort)
+          this.drainWaiters.delete(fail)
+          if (error) reject(error)
+          else resolve()
+        }
+        const fail = (error: Error) => finish(error)
+        const onAbort = () => finish(abortError(signal))
+        const timer = this.clock.setTimeout(
+          () => finish(),
+          Math.max(1, (this.drain?.until ?? 0) - this.clock.now())
+        )
+        this.drainWaiters.add(fail)
+        signal.addEventListener("abort", onAbort, { once: true })
+      })
+    }
+    if (signal.aborted) throw abortError(signal)
+    if (this.closed)
+      throw new MachineError("connection-lost", "The device is disconnected.")
   }
 
   close(error: string | null = null) {
     if (this.closed) return
     this.closed = true
-    this.trace.record("note", `Disconnected: ${error ?? "closed by the app"}`)
+    this.trace.record(
+      "note",
+      `Disconnected: ${error ?? "closed by the app"}; last status ${this.store.telemetry?.receivedAt ?? "none"}; last frame ${this.lastFrameAt ?? "none"}`
+    )
     this.clock.clearTimeout(this.pollTimer)
     this.clock.clearTimeout(this.handshakeTimer)
     this.connection.destroy()
@@ -308,6 +425,7 @@ export class MachineSession {
     )
     this.lease?.fail(failure)
     this.lease = null
+    for (const fail of [...this.drainWaiters]) fail(failure)
     this.store.fail(failure)
     this.events.closed(error)
   }
@@ -325,7 +443,24 @@ export class MachineSession {
       describeOutbound(frame),
       command && typeof frame.payload === "string" ? COMMAND : undefined
     )
-    this.connection.write(this.adapter.encode(frame))
+    try {
+      this.connection.write(this.adapter.encode(frame))
+    } catch (error) {
+      const reason =
+        error instanceof Error ? error.message : "The device write failed."
+      this.close(reason)
+      throw new MachineError("connection-lost", reason)
+    }
+  }
+
+  private setHealth(health: MachineSession["health"]) {
+    if (this.health === health) return
+    this.health = health
+    this.trace.record(
+      "note",
+      `TCP telemetry ${health}; last status ${this.store.telemetry?.receivedAt ?? "none"}; last frame ${this.lastFrameAt ?? "none"}`
+    )
+    this.events.health()
   }
 
   private schedulePoll() {
@@ -337,12 +472,9 @@ export class MachineSession {
       if (this.ready && this.suspensions === 0) {
         // A poll that comes late, after the process was held up, counts one interval: its
         // query goes out now, and replies that arrived meanwhile are read next.
-        this.silentMs += interval
+        this.silentMs = Math.min(STALE_MS, this.silentMs + interval)
         if (this.silentMs >= STALE_MS) {
-          this.close(
-            "Device status stopped responding. The connection was closed."
-          )
-          return
+          this.setHealth("stale")
         }
       }
       this.requestStatus()
@@ -372,6 +504,7 @@ export class MachineSession {
   }
 
   private route(event: FirmwareEvent) {
+    this.lastFrameAt = this.clock.now()
     this.trace.record("received", describeInbound(event), consoleReply(event))
     switch (event.kind) {
       case "diagnostics":
@@ -385,6 +518,7 @@ export class MachineSession {
         this.outstandingSince = null
         if (!this.identify(event.identity)) return
         this.store.update(event.telemetry, () => {
+          this.setHealth("fresh")
           if (this.ready) this.events.status(event.telemetry)
         })
         return
@@ -419,12 +553,34 @@ export class MachineSession {
     this.identity = identity
     if (!this.device) {
       this.clock.clearTimeout(this.handshakeTimer)
-      this.device = {
-        name: this.target.name ?? this.target.host,
-        host: this.target.host,
-        port: this.target.port,
-        model: identity.model,
-      }
+      if (this.target.transport === "serial") {
+        const profile = this.target.profile
+        if (profile && profile.model !== identity.model) {
+          this.close(
+            "IDENTITY_MISMATCH: The USB-reported model differs from the explicitly associated profile."
+          )
+          return false
+        }
+        const target = {
+          transport: this.target.transport,
+          portId: this.target.portId,
+          pathHint: this.target.pathHint,
+          cameraHost: this.target.cameraHost,
+          name: this.target.name,
+        }
+        this.device = {
+          ...target,
+          name: profile?.name ?? target.name ?? `USB ${identity.model}`,
+          model: identity.model,
+          ...(profile ? { profileId: profile.id } : {}),
+        }
+      } else
+        this.device = {
+          name: this.target.name ?? this.target.host,
+          host: this.target.host,
+          port: this.target.port,
+          model: identity.model,
+        }
       this.trace.record(
         "note",
         `Connected: ${this.device.name} (${identity.model})`

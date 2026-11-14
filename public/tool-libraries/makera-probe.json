@@ -12,7 +12,8 @@
       "flutes": null,
       "probe": {
         "touch": "z",
-        "pointer": true
+        "pointer": true,
+        "contact": "mechanical"
       },
       "vendor": "Makera",
       "productId": null,
@@ -102,7 +103,8 @@
       "flutes": null,
       "probe": {
         "touch": "xyz",
-        "pointer": false
+        "pointer": false,
+        "contact": "mechanical"
       },
       "vendor": "Makera",
       "productId": null,
@@ -200,6 +202,76 @@
         "unit": null,
         "raw": {
           "builtinId": "makera-3d-probe"
+        }
+      }
+    },
+    {
+      "schemaVersion": 5,
+      "id": "makera-3d-probe-rod",
+      "name": "Makera 3D Probe Rod",
+      "kind": "probe",
+      "diameter": null,
+      "flutes": null,
+      "probe": {
+        "touch": "xyz",
+        "pointer": false,
+        "contact": "conductive"
+      },
+      "vendor": "Makera",
+      "productId": null,
+      "productLink": "https://wiki.makera.com/en/Z1/QuickStart",
+      "vendorDescription": "Conductive XYZ probe rod",
+      "material": null,
+      "grade": null,
+      "coating": null,
+      "notes": "Conductive XYZ rod: enter the actual contact diameter before probing. Diameter, shank and overall dimensions are not verified by the supplied source and are left unknown. Use its own cable and tool-setter measurement. The contacted reference faces must be electrically connected to the aluminium table through pins, screws or another conductor; coatings can insulate them. Never reuse the ruby probe diameter or mounting length.",
+      "image": null,
+      "model": null,
+      "geometry": {
+        "shankDiameter": null,
+        "fluteLength": null,
+        "overallLength": null,
+        "bodyLength": null,
+        "shoulderLength": null,
+        "shoulderDiameter": null,
+        "tipDiameter": null,
+        "tipLength": null,
+        "pointAngle": null,
+        "taperAngle": null,
+        "cornerRadius": null,
+        "assemblyGaugeLength": null,
+        "numberOfTeeth": null,
+        "threadPitchMin": null,
+        "threadPitchMax": null,
+        "threadProfileAngle": null,
+        "handedness": null,
+        "maxDiameter": null,
+        "upperRadius": null,
+        "taperedTip": null,
+        "threadTip": null,
+        "coolantThrough": null
+      },
+      "holder": null,
+      "shaft": {
+        "segments": []
+      },
+      "presets": [],
+      "postProcess": {
+        "number": 9999,
+        "diameterOffset": null,
+        "lengthOffset": null,
+        "turret": null,
+        "manualToolChange": null,
+        "breakControl": null,
+        "liveTool": null,
+        "comment": null
+      },
+      "source": {
+        "format": "native",
+        "fileName": null,
+        "unit": null,
+        "raw": {
+          "builtinId": "makera-3d-probe-rod"
         }
       }
     }

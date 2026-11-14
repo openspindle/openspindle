@@ -11,6 +11,9 @@ import {
   ContextMenuRadioItem,
   ContextMenuSeparator,
   ContextMenuShortcut,
+  ContextMenuSub,
+  ContextMenuSubContent,
+  ContextMenuSubTrigger,
 } from "@/components/ui/context-menu"
 import { useWorkspaceStore } from "@/app/workspace/workspace-context"
 import { useFixtureLibrary } from "@/app/fixtures/fixture-context"
@@ -29,6 +32,8 @@ import type { MoveAxes } from "@/domain/plate/setup-items"
 import { setMoveAxes, setMoving, setSnap, useArrange } from "./arrange-state"
 import type { ArrangeTarget } from "./arrange-state"
 import { toggleLock } from "./use-arrange-events"
+import { bedAnchors } from "@/domain/anchors/stored-anchors"
+import type { PointIntent } from "../point-intent"
 
 const isMoveAxes = (value: unknown): value is MoveAxes =>
   MOVE_AXES.some((axes) => axes === value)
@@ -98,6 +103,57 @@ export function ArrangeMenu({
     [request]
   )
   const offered = request?.alignment
+  const picked = request?.point
+  const pickedPlate = workspace.state.plates.find(
+    (plate) => plate.id === picked?.plateId
+  )
+  const openPoint = (action: PointIntent["action"]) => {
+    if (!picked || !pickedPlate) return
+    openDialog({
+      kind: "point-actions",
+      intent: {
+        id: crypto.randomUUID(),
+        plateId: pickedPlate.id,
+        position: picked.position,
+        setup: pickedPlate.setup,
+        action,
+      },
+    })
+  }
+  const moveStock = (anchorId: string) => {
+    if (
+      !picked ||
+      !pickedPlate ||
+      picked.item.kind !== "stock" ||
+      !picked.setupPoint
+    )
+      return
+    const destination = bedAnchors(pickedPlate.setup.anchors ?? undefined).find(
+      (entry) => entry.id === anchorId
+    )
+    if (!destination) return
+    const result = workspace.dispatch({
+      type: "batch",
+      commands: [
+        {
+          type: "plate.moveItem",
+          plateId: pickedPlate.id,
+          item: { kind: "stock" },
+          delta: [
+            destination.position[0] - picked.position[0],
+            destination.position[1] - picked.position[1],
+            0,
+          ],
+        },
+        {
+          type: "plate.setup",
+          plateId: pickedPlate.id,
+          patch: { stockRelativeTo: destination.id },
+        },
+      ],
+    })
+    if (!result.ok) toast.error(result.error)
+  }
   const align = (along: MoveAxes) => {
     if (!target || !offered) return
     const result = workspace.dispatch({
@@ -116,6 +172,46 @@ export function ArrangeMenu({
       }}
     >
       <ContextMenuContent anchor={anchor} className="w-60">
+        {picked && pickedPlate && (
+          <>
+            {moving && picked.item.kind === "stock" && picked.setupPoint && (
+              <ContextMenuSub>
+                <ContextMenuSubTrigger>
+                  Move stock point to
+                </ContextMenuSubTrigger>
+                <ContextMenuSubContent>
+                  {bedAnchors(pickedPlate.setup.anchors ?? undefined).map(
+                    (entry) => (
+                      <ContextMenuItem
+                        key={entry.id}
+                        onClick={() => moveStock(entry.id)}
+                      >
+                        {entry.name}
+                      </ContextMenuItem>
+                    )
+                  )}
+                </ContextMenuSubContent>
+              </ContextMenuSub>
+            )}
+            {!moving && (
+              <ContextMenuItem onClick={() => openPoint("probe")}>
+                Probe at point…
+              </ContextMenuItem>
+            )}
+            <ContextMenuSub>
+              <ContextMenuSubTrigger>Jog to point</ContextMenuSubTrigger>
+              <ContextMenuSubContent>
+                <ContextMenuItem onClick={() => openPoint("xy")}>
+                  X / Y · retract Z first…
+                </ContextMenuItem>
+                <ContextMenuItem onClick={() => openPoint("z")}>
+                  Z · 5 mm above modeled surface…
+                </ContextMenuItem>
+              </ContextMenuSubContent>
+            </ContextMenuSub>
+            <ContextMenuSeparator />
+          </>
+        )}
         {target && (
           <>
             <ContextMenuGroup>

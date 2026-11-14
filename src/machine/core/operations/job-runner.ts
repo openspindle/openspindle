@@ -1,5 +1,12 @@
-import { DEVICE_ASSISTS, partText, programParts } from "../../contract/index.ts"
+import {
+  DEVICE_ASSISTS,
+  isHeightCompensationOff,
+  partText,
+  programParts,
+} from "../../contract/index.ts"
 import type {
+  CheckedStart,
+  Identity,
   JobState,
   PlateAssists,
   PreparedProgram,
@@ -10,33 +17,35 @@ import { FAILURE_LINES, excerpt } from "../../firmware/adapter.ts"
 import type {
   AssistStep,
   FirmwareAdapter,
+  JobProtocol,
   OutboundFrame,
   SettingStep,
   TransferProtocol,
 } from "../../firmware/adapter.ts"
 import { MachineError, abortError } from "../errors.ts"
 import { PartedCompletion } from "../parted-completion.ts"
-import { freshStatus, requireAdmission } from "./context.ts"
+import {
+  freshDiagnosticStatus,
+  requireAdmission,
+  requireExecution,
+} from "./context.ts"
 import type { OperationContext } from "./context.ts"
+import { runInlineProbe } from "./inline-probe.ts"
 
 const STEP_MS = 10_000
 /** Silence in a transfer after which it asks the device again (`TransferProtocol.stalled`). */
 const STALL_MS = 3000
 /** Upload, readback and both preflights together, for each file sent. */
 const PREPARATION_MS = 80_000
-/**
- * The slowest a program may go up and be read back, bytes per second: under half the slowest
- * seen over a Z1's network. A transfer that stalls fails sooner, at `STEP_MS` without progress.
- */
-const MIN_TRANSFER_RATE = 8 * 1024
-
-/** How long preparing a file of `bytes` may take: `PREPARATION_MS`, and its upload and readback at `MIN_TRANSFER_RATE`. */
-const preparationMs = (bytes: number) =>
-  PREPARATION_MS + ((2 * bytes) / MIN_TRANSFER_RATE) * 1000
+/** Overall upload/readback budget at the transport's conservative minimum throughput. */
+const preparationMs = (bytes: number, minimumRate: number) =>
+  PREPARATION_MS + ((2 * bytes) / minimumRate) * 1000
 const START_MS = 8_000
 
 export type JobRunnerHooks = {
   readonly md5: (bytes: Uint8Array) => string
+  /** Suspends camera traffic and returns an idempotent resume callback. */
+  readonly pauseCamera: () => () => void
   readonly update: (patch: Partial<JobState>) => void
   /** From here on the controller feeds statuses and unclaimed lines to the tracker. */
   readonly attach: (tracker: PartedCompletion) => void
@@ -90,6 +99,46 @@ function assistSteps(
   }
 }
 
+/**
+ * A manual tool change is not complete until the Z1 has actually measured the cutter.
+ * Keep tool skips M6 when the firmware believes that cutter is already mounted, so refuse
+ * this option whenever the first M6 needs a forced change and tool-setter measurement.
+ * Run this check before upload and again with fresh telemetry immediately before play.
+ */
+export function toolResetForRun(
+  job: JobProtocol,
+  program: PreparedProgram,
+  identity: Identity,
+  telemetry: Telemetry,
+  keepTool = false
+): SettingStep | null {
+  const reset = job.toolReset(program, identity, telemetry)
+  if (keepTool && reset)
+    throw new MachineError(
+      "refused",
+      "Keep tool would skip the first M6 and its tool-setter measurement. Run again without Keep tool so the cutter is calibrated before spindle start."
+    )
+  return reset
+}
+
+function requireZReference(request: RunRequest, telemetry: Telemetry) {
+  const reference = request.zReference
+  if (!reference) return
+  if (
+    telemetry.tool !== reference.tool ||
+    telemetry.toolOffset !== reference.toolOffset ||
+    !telemetry.workOrigin ||
+    Math.abs(telemetry.workOrigin.z - reference.originZ) > 0.001 ||
+    !isHeightCompensationOff(telemetry) ||
+    telemetry.spindleRpm !== 0 ||
+    telemetry.spindleOn === true
+  )
+    throw new MachineError(
+      "unverified",
+      "The measured part Z reference changed before cutting. The program was not started; probe Z again."
+    )
+}
+
 /** Aborts with the context, or when the preparation outlasts `milliseconds`. */
 function withDeadline(context: OperationContext, milliseconds: number) {
   const { clock } = context
@@ -126,15 +175,38 @@ export async function prepareAndStart(
   program: PreparedProgram,
   hooks: JobRunnerHooks
 ): Promise<void> {
+  requireExecution(context, { kind: "program", program })
+  if (program.probeCheck) {
+    const resumeCamera = hooks.pauseCamera()
+    try {
+      await preflight(context)
+      await runInlineProbe(context, program, hooks)
+    } finally {
+      resumeCamera()
+    }
+    return
+  }
   const { session, adapter, clock } = context
   const job = adapter.job
   const parts = programParts(program)
   const { scoped, release } = withDeadline(
     context,
-    parts.reduce((total, part) => total + preparationMs(part.bytes), 0)
+    parts.reduce(
+      (total, part) =>
+        total + preparationMs(part.bytes, session.minimumTransferRate),
+      0
+    )
   )
+  const resumeCamera = hooks.pauseCamera()
   try {
     let telemetry = await preflight(scoped)
+    const initialIdentity = session.identity
+    if (!initialIdentity)
+      throw new MachineError("connection-lost", "The device is disconnected.")
+    // Refuse a dangerous Keep tool request before any file is uploaded.
+    toolResetForRun(job, program, initialIdentity, telemetry, request.keepTool)
+    verifyCheckedStart(request.checkedStart, telemetry)
+    requireZReference(request, telemetry)
     hooks.bedCleanBefore(job.bedClean(telemetry))
     const assists = partAssists(
       request.assists,
@@ -156,11 +228,18 @@ export async function prepareAndStart(
       hooks.update({ part: index, path })
       await transferProgram(
         scoped,
-        job.createTransfer(bytes, hooks.md5(bytes), path),
+        job.createTransfer(
+          bytes,
+          hooks.md5(bytes),
+          path,
+          session.transferBlockBytes
+        ),
         hooks
       )
     }
     telemetry = await preflight(scoped)
+    verifyCheckedStart(request.checkedStart, telemetry)
+    requireZReference(request, telemetry)
     if (job.assistPlan(assists, telemetry).length)
       throw new MachineError(
         "refused",
@@ -169,10 +248,14 @@ export async function prepareAndStart(
     const identity = session.identity
     if (!identity)
       throw new MachineError("connection-lost", "The device is disconnected.")
-    // Kept, the tool the machine holds stays: a first change to it changes nothing.
-    const reset = request.keepTool
-      ? null
-      : job.toolReset(program, identity, telemetry)
+    // Re-check against the final machine state: no first M6 may be skipped.
+    const reset = toolResetForRun(
+      job,
+      program,
+      identity,
+      telemetry,
+      request.keepTool
+    )
     if (reset)
       await applySetting(
         scoped,
@@ -183,6 +266,7 @@ export async function prepareAndStart(
     const tracker = new PartedCompletion(program, (part, bedClean) =>
       job.createCompletion(part, bedClean, () => clock.now())
     )
+    resumeCamera()
     await play(
       scoped,
       tracker,
@@ -192,6 +276,7 @@ export async function prepareAndStart(
       hooks
     )
   } finally {
+    resumeCamera()
     release()
   }
 }
@@ -204,11 +289,13 @@ export async function prepareAndStart(
 export async function playNextPart(
   context: OperationContext,
   request: RunRequest,
+  program: PreparedProgram,
   bedCleanBefore: boolean | null,
   tracker: PartedCompletion,
   index: number,
   hooks: JobRunnerHooks
 ): Promise<void> {
+  requireExecution(context, { kind: "program", program })
   const { adapter } = context
   const count = tracker.parts.length
   const { scoped, release } = withDeadline(context, PREPARATION_MS)
@@ -269,12 +356,40 @@ async function preflight(context: OperationContext): Promise<Telemetry> {
   )
   if (!(await report))
     throw new MachineError("refused", "Home all reported axes before Run.")
-  const telemetry = await freshStatus(
+  const telemetry = await freshDiagnosticStatus(
     context,
     "Timed out waiting for fresh device status. No play command was sent."
   )
   requireAdmission(context, { key: "run" }, telemetry)
   return telemetry
+}
+
+/** The geometry checked before Run must still be current after transfer. */
+function verifyCheckedStart(
+  checked: CheckedStart | undefined,
+  telemetry: Telemetry
+) {
+  if (!checked) return
+  const near = (
+    expected: CheckedStart["machine"],
+    actual: Telemetry["machine"]
+  ) =>
+    actual &&
+    Math.hypot(
+      actual.x - expected.x,
+      actual.y - expected.y,
+      actual.z - expected.z
+    ) <= 0.05
+  if (
+    !near(checked.machine, telemetry.machine) ||
+    !near(checked.work, telemetry.work) ||
+    checked.units !== telemetry.units ||
+    (checked.keptTool !== null && checked.keptTool !== telemetry.tool)
+  )
+    throw new MachineError(
+      "refused",
+      "The machine position, work offset, units or kept tool changed after the clearance check. Review the setup and run again. The program was not started."
+    )
 }
 
 /** Sends a setting, then awaits its acknowledgement and a newer status showing it applied. */
@@ -344,11 +459,19 @@ async function transferProgram(
   const release = session.suspendPolling()
   const { clock } = context
   let stall: ReturnType<typeof clock.setTimeout> | null = null
+  let readback: ReturnType<typeof clock.setTimeout> | null = null
   const watch = () => {
     clock.clearTimeout(stall)
     stall = clock.setTimeout(() => {
-      for (const frame of protocol.stalled?.() ?? []) session.send(frame)
-      watch()
+      if (context.signal.aborted || session.closed) return
+      try {
+        for (const frame of protocol.stalled?.() ?? []) session.send(frame)
+        watch()
+      } catch (error) {
+        session.close(
+          error instanceof Error ? error.message : "File transfer write failed."
+        )
+      }
     }, STALL_MS)
   }
   watch()
@@ -367,6 +490,7 @@ async function transferProgram(
             : "ignored"
         if (event.kind !== "transfer") return "ignored"
         watch()
+        const stage = protocol.stage
         let frames
         try {
           frames = protocol.receive(event.frame)
@@ -378,7 +502,23 @@ async function transferProgram(
             ),
           }
         }
-        for (const frame of frames) session.send(frame)
+        const delay = protocol.readbackDelayMs ?? 0
+        if (stage === "upload" && protocol.stage === "readback" && delay > 0) {
+          readback = clock.setTimeout(() => {
+            if (context.signal.aborted || session.closed) return
+            try {
+              for (const frame of frames) session.send(frame)
+            } catch (error) {
+              session.close(
+                error instanceof Error
+                  ? error.message
+                  : "File readback request failed."
+              )
+            }
+          }, delay)
+        } else {
+          for (const frame of frames) session.send(frame)
+        }
         progress()
         // A part sent next must not meet this transfer's last acknowledgement.
         return protocol.finished ? { done: undefined } : "consumed"
@@ -396,6 +536,7 @@ async function transferProgram(
     throw error
   } finally {
     clock.clearTimeout(stall)
+    clock.clearTimeout(readback)
     hooks.transferring(null)
     release()
   }

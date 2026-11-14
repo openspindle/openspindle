@@ -105,6 +105,44 @@ const SIZE_TOLERANCE = 0.01
 const sameSize = (a: number | null, b: number | null) =>
   a !== null && b !== null && Math.abs(a - b) <= SIZE_TOLERANCE
 
+/** A FreeCAD description must identify one cutter in the active library. */
+function freecadMatch(library: readonly Tool[], described: ProgramTool) {
+  const profile = described.freecad
+  if (!profile || !described.kind || described.diameter === null) return
+  const kind = toolKindKey(described.kind)
+  const candidates = library.filter((tool) => {
+    if (
+      toolKindKey(tool.kind) !== kind ||
+      !sameSize(tool.diameter, described.diameter)
+    )
+      return false
+    if (kind === "chamfer mill") {
+      const { taperAngle, pointAngle, tipDiameter } = tool.geometry
+      const includedAngle = taperAngle === null ? pointAngle : 2 * taperAngle
+      return (
+        sameSize(tipDiameter, profile.tipDiameter) &&
+        sameSize(includedAngle, profile.includedAngle)
+      )
+    }
+    return (
+      (profile.includedAngle === null ||
+        sameSize(tool.geometry.pointAngle, profile.includedAngle)) &&
+      (described.fluteLength === null ||
+        sameSize(tool.geometry.fluteLength, described.fluteLength))
+    )
+  })
+  if (candidates.length === 1) return candidates[0]
+  const nameKey = (value: string) =>
+    value.trim().toLowerCase().replace(/\s+/g, " ")
+  const name = described.name ? nameKey(described.name) : null
+  const named = candidates.filter((tool) =>
+    [tool.name, tool.vendorDescription].some(
+      (value) => value && nameKey(value) === name
+    )
+  )
+  return named.length === 1 ? named[0] : undefined
+}
+
 /**
  * How well a library tool fits a program's description of one of its tools, the better the
  * higher, compared in order: its name, the vendor's or its product ID is the one the CAM
@@ -165,11 +203,13 @@ export function describedPreferences(
   numbered = true
 ): Map<number | null, string> {
   // Numbers it does not describe: a probe's slot always, others when numbers pick tools.
+  const useNumbers =
+    numbered && ![...described.values()].some((tool) => tool.freecad)
   const preferred = libraryPreferences(
     locals.filter(
       (local) =>
         local !== null &&
-        (isProbeSlot(local) || (numbered && !described.has(local)))
+        (isProbeSlot(local) || (useNumbers && !described.has(local)))
     ),
     library
   )
@@ -177,6 +217,11 @@ export function describedPreferences(
     const description =
       local === null || isProbeSlot(local) ? undefined : described.get(local)
     if (!description) continue
+    if (description.freecad) {
+      const tool = freecadMatch(library, description)
+      if (tool) preferred.set(local, tool.id)
+      continue
+    }
     let best: { tool: Tool; score: readonly number[] } | null = null
     for (const tool of library) {
       const score = fit(tool, description)

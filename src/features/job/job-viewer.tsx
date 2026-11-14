@@ -1,5 +1,9 @@
+import { DEFAULT_VIEWER_LAYERS } from "@/components/workspace/viewer/viewer-input"
+import { ViewerLayersMenu } from "./viewer-layers-menu"
 import type { FrameSource } from "@/app/job/frame"
-import { useDispatch } from "@/app/workspace/workspace-context"
+import { useMemo, useState } from "react"
+import { useMaterialRemoval } from "@/features/workshop/use-material-removal"
+import { useDispatch, useWorkspace } from "@/app/workspace/workspace-context"
 import { BedViewer } from "@/components/workspace/bed-viewer"
 import {
   ViewerToolbar,
@@ -25,7 +29,47 @@ export function JobViewer({
   /** The frames of the shown plate's plan the view follows every frame on its own. */
   frames: FrameSource
 }) {
-  const plates = useWorkspaceViewerPlates(shown)
+  const originalPlates = useWorkspaceViewerPlates(shown)
+  const workspacePlates = useWorkspace((state) => state.plates)
+  const editingPlate = workspacePlates.find(
+    (plate) => plate.id === shown?.plate.id
+  )
+  const operations = editingPlate?.operations ?? shown?.plate.operations ?? []
+  const [layers, setLayers] = useState(DEFAULT_VIEWER_LAYERS)
+  const [hidden, setHidden] = useState<ReadonlySet<string>>(() => new Set())
+  const hiddenLineRanges = useMemo(() => {
+    if (!shown) return {}
+    return {
+      [shown.plate.id]: shown.compiled.spans
+        .filter((span) => hidden.has(span.operationId))
+        .map((span) => ({ start: span.startLine, end: span.endLine })),
+    }
+  }, [shown, hidden])
+  const plates = useMemo(
+    () =>
+      originalPlates.map((plate) => {
+        if (!shown || plate.id !== shown.plate.id) return plate
+        return {
+          ...plate,
+          operationColors: shown.compiled.spans.flatMap((span) => {
+            const color = (editingPlate ?? shown.plate).operations.find(
+              (operation) => operation.id === span.operationId
+            )?.displayColor
+            return color
+              ? [{ startLine: span.startLine, endLine: span.endLine, color }]
+              : []
+          }),
+        }
+      }),
+    [originalPlates, shown, editingPlate]
+  )
+  const [showRemoval, setShowRemoval] = useState(false)
+  const removal = useMaterialRemoval(
+    shown,
+    frames,
+    showRemoval,
+    layers.deviation
+  )
   const dispatch = useDispatch()
   const camera = useViewerCamera()
   const [style] = useVisualStyle()
@@ -34,12 +78,19 @@ export function JobViewer({
   return (
     <div className="relative min-h-0 flex-1 overflow-hidden">
       <BedViewer
+        removal={
+          shown && removal.grid
+            ? { plateId: shown.plate.id, grid: removal.grid }
+            : null
+        }
         plates={plates}
         selectedPlateId={shown?.plate.id ?? null}
         onSelectPlate={(plateId) => dispatch({ type: "plate.select", plateId })}
         frames={frames}
-        showRapids={false}
-        showStock
+        layers={layers}
+        hiddenLineRanges={hiddenLineRanges}
+        showRapids={layers.rapids}
+        showStock={layers.stock}
         view={camera.view}
         style={style}
         resetKey={camera.resetKey}
@@ -48,6 +99,35 @@ export function JobViewer({
         machineOrigin={machineOrigin}
       />
       <ViewerToolbar camera={camera} />
+      <ViewerLayersMenu
+        layers={layers}
+        change={(key, value) =>
+          setLayers((current) => ({ ...current, [key]: value }))
+        }
+        showRemoval={showRemoval}
+        setShowRemoval={setShowRemoval}
+        removal={removal}
+        operations={operations}
+        hidden={hidden}
+        editable={!!editingPlate}
+        setVisible={(id, visible) =>
+          setHidden((current) => {
+            const next = new Set(current)
+            if (visible) next.delete(id)
+            else next.add(id)
+            return next
+          })
+        }
+        setColor={(operationId, color) => {
+          if (editingPlate)
+            dispatch({
+              type: "operation.color",
+              plateId: editingPlate.id,
+              operationId,
+              color,
+            })
+        }}
+      />
       <TrackerOverlay />
       <div className="absolute right-4 bottom-4 z-10 flex flex-col gap-2">
         <MachineStatusCard telemetry={telemetry} />

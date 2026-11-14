@@ -4,9 +4,11 @@ import { ALARM_RULES, DIAGNOSIS_RULES } from "../diagnosis/rules"
 import { PROGRAM_RULES } from "../design-rules/common-rules"
 import { MOVE_RULES } from "../design-rules/move-rules"
 import { Z1_DIAGNOSIS_RULES } from "../fixtures/makera-z1/diagnosis"
+import { Z1_DESIGN_RULES } from "../fixtures/makera-z1/design-rules"
 import { Z1_RULES } from "../fixtures/makera-z1/program-rules"
 import { PART_RULES } from "../operations/part-rules"
 import { PCB_RULES } from "../pcb/rules"
+import { Z1_PROBING_RULES } from "../fixtures/makera-z1/probing-rules"
 import { PLATE_RUN_RULES } from "../plate/run-rules"
 import { WORK_ORIGIN_RULES } from "../plate/work-origin"
 import { PROBING_RUN_RULES } from "../probing/rules"
@@ -30,6 +32,7 @@ export const RULES: readonly AnyRule[] = [
   ...WORK_ORIGIN_RULES,
   ...PROBING_RUN_RULES,
   ...GRID_RUN_RULES,
+  ...Z1_PROBING_RULES,
   ...TOOL_RULES,
   ...GRID_RULES,
   ...TOUCH_OFF_RULES,
@@ -40,6 +43,7 @@ export const RULES: readonly AnyRule[] = [
   ...PART_RULES,
   ...MOVE_RULES,
   ...PROGRAM_RULES,
+  ...Z1_DESIGN_RULES,
   ...Z1_RULES,
   ...HEIGHT_MAP_RULES,
   ...DIAGNOSIS_RULES,

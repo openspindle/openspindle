@@ -1,4 +1,5 @@
 import { useId, useState } from "react"
+import { useMutation } from "@tanstack/react-query"
 import { toast } from "sonner"
 import {
   AlertDialog,
@@ -34,10 +35,17 @@ import { followDeviceAnchors } from "@/app/workspace/project-session"
 import { useWorkspaceStore } from "@/app/workspace/workspace-context"
 import { withMovedAnchor } from "@/domain/anchors/stored-anchors"
 import type { BedSetupAnchor } from "@/domain/anchors/stored-anchors"
+import type { AnchorCalibration } from "@/domain/anchors/calibration"
+import { calibrationAnchorsMatch } from "@/domain/anchors/calibration"
 import { WORKSPACE_PROFILE } from "@/domain/fixtures/profiles"
 import type { Plate } from "@/domain/plate/plate"
 import { toMicrometre } from "@/domain/primitives"
-import { useMachineSnapshot, useWriteAnchors } from "@/platform/machine"
+import {
+  useMachineHost,
+  useMachineSnapshot,
+  useWriteAnchors,
+} from "@/platform/machine"
+import { machineId } from "@/machine/contract"
 
 const coordinateFormat = new Intl.NumberFormat("en-US", {
   useGrouping: false,
@@ -62,14 +70,24 @@ const NEW_ANCHOR = "new"
 export function SaveAsAnchor({
   position,
   plate,
+  deviceId,
+  calibration,
+  measurementRunId,
+  onSaved,
 }: {
   /** The machine X and Y the probing found. */
   position: readonly [number, number]
   /** The plate the probing ran on, whose bed setup can keep the anchor. */
   plate: Plate
+  /** The originating device frozen by Run, including for an unanchored plate. */
+  deviceId: string | null
+  calibration?: AnchorCalibration
+  measurementRunId?: string
+  onSaved?: () => void
 }) {
   const id = useId()
   const machine = useMachineSnapshot()
+  const host = useMachineHost()
   const writeAnchors = useWriteAnchors()
   const fixtures = useFixtureLibraryStore()
   const workspace = useWorkspaceStore()
@@ -80,10 +98,24 @@ export function SaveAsAnchor({
     live?.anchors[0] ? `device:${live.anchors[0].id}` : ""
   )
   const [follow, setFollow] = useState(true)
+  const saveMutation = useMutation({
+    mutationFn: () => save(),
+    onError: (error) => toast.error(error.message),
+  })
+  const pending = saveMutation.isPending || writeAnchors.isPending
   if (machine.features?.anchors === false || !live?.anchors.length) return null
+  const matchingDevice =
+    deviceId !== null &&
+    machine.connection.status === "connected" &&
+    machine.connection.device !== null &&
+    machineId(machine.connection.device) === deviceId
+  const deviceReason = matchingDevice
+    ? null
+    : "Connect the device that made this measurement before saving its anchor."
   // The plate's bed setup, in its device's profile, which the Device tab shows and edits.
   const profileId = plate.setup.deviceId ?? WORKSPACE_PROFILE
   const bedSetup =
+    profileId === deviceId &&
     profileId === library.selectedId &&
     Object.hasOwn(library.profiles, profileId)
       ? (library.profiles[profileId].bedSetups.find(
@@ -97,8 +129,10 @@ export function SaveAsAnchor({
     toMicrometre(position[1]),
   ]
   const [origin] = live.anchors
-  const deviceChoice = live.anchors.find(
-    (anchor) => choice === `device:${anchor.id}`
+  const deviceChoice = live.anchors.find((anchor) =>
+    calibration
+      ? anchor.id === calibration.anchorId
+      : choice === `device:${anchor.id}`
   )
   const kept =
     bedSetup?.anchors.find((anchor) => choice === `bed:${anchor.id}`) ?? null
@@ -111,7 +145,12 @@ export function SaveAsAnchor({
   ]
   // A device anchor moves where it was found; the others follow the first unless they stay.
   const next = chosen
-    ? withMovedAnchor(live.anchors, chosen.id, found, follow)
+    ? withMovedAnchor(
+        live.anchors,
+        chosen.id,
+        found,
+        calibration ? true : follow
+      )
     : live.anchors
   // A bed setup's anchor is kept from the device's first anchor.
   const offset: [number, number] = [
@@ -160,41 +199,98 @@ export function SaveAsAnchor({
   }
   /** Plates set up for the profile's device follow its bed setups' anchors. */
   const followProfile = () => {
+    if (fixtures.state.selectedId !== profileId) return
     const anchors = profileAnchors(
       fixtures.state.selectedId,
       selectedProfile(fixtures.state)
     )
     if (anchors) followDeviceAnchors(workspace, anchors)
   }
-  const save = () => {
+  const reviewedBedSetups = bedSetup
+    ? library.profiles[profileId].bedSetups
+    : null
+  const currentBedSetups = () =>
+    Object.hasOwn(fixtures.state.profiles, profileId)
+      ? fixtures.state.profiles[profileId].bedSetups
+      : null
+  async function save() {
+    const fresh = await host.snapshot()
+    if (
+      !deviceId ||
+      fresh.connection.status !== "connected" ||
+      !fresh.connection.device ||
+      machineId(fresh.connection.device) !== deviceId ||
+      !fresh.connection.id ||
+      fresh.connection.id !== machine.connection.id
+    )
+      throw new Error(
+        "The device connection changed. Reopen Save as anchor on the device that made this measurement."
+      )
+    if (
+      !fresh.anchors.value ||
+      JSON.stringify(fresh.anchors.value) !== JSON.stringify(live)
+    )
+      throw new Error(
+        "The stored anchors changed. Review Save as anchor again."
+      )
+    if (
+      calibration &&
+      (calibration.deviceId !== deviceId ||
+        !calibrationAnchorsMatch(
+          calibration.expectedAnchors,
+          fresh.anchors.value
+        ) ||
+        !fresh.anchors.value.anchors.some(
+          (anchor) => anchor.id === calibration.anchorId
+        ) ||
+        fresh.job?.phase !== "completed" ||
+        fresh.job.id !== measurementRunId)
+    )
+      throw new Error(
+        "The calibration's device or anchor configuration changed. Prepare a fresh calibration before saving."
+      )
+    if (
+      bedSetup &&
+      (fixtures.state.selectedId !== profileId ||
+        currentBedSetups()?.find((setup) => setup.id === bedSetup.id) !==
+          bedSetup)
+    )
+      throw new Error("The bed setup changed. Review Save as anchor again.")
     if (chosen) {
+      const freshEntry = fresh.availability.writeAnchors
+      if (!freshEntry.allowed || freshEntry.deferred)
+        throw new Error(freshEntry.reason ?? "Writing anchors is unavailable.")
       const moved = next.find((anchor) => anchor.id === origin.id) ?? origin
       const delta: [number, number] = [moved.x - origin.x, moved.y - origin.y]
-      writeAnchors.mutate(
-        {
-          anchors: next.map((anchor) => ({
-            id: anchor.id,
-            x: toMicrometre(anchor.x),
-            y: toMicrometre(anchor.y),
-          })),
-        },
-        {
-          onSuccess: ({ afterRestart }) => {
-            // Bed setups' anchors stay where they are when the first moves without them.
-            if (first && !follow && bedSetup) {
-              fixtures.moveBedSetupAnchors([-delta[0], -delta[1]])
-              followProfile()
-            }
-            setOpen(false)
-            toast.success(`Saved as ${chosen.name}.`, {
-              description: afterRestart
-                ? "Reset the machine for its own moves to use it."
-                : undefined,
-            })
-          },
-          onError: (error) => toast.error(error.message),
-        }
-      )
+      const { afterRestart } = await writeAnchors.mutateAsync({
+        expectedConnectionId: fresh.connection.id,
+        expectedAnchors: fresh.anchors.value,
+        anchors: next.map((anchor) => ({
+          id: anchor.id,
+          x: toMicrometre(anchor.x),
+          y: toMicrometre(anchor.y),
+        })),
+      })
+      // Apply the proposal's local change only to the profile it reviewed.
+      if (first && !calibration && !follow && bedSetup) {
+        if (
+          fixtures.state.selectedId !== profileId ||
+          JSON.stringify(currentBedSetups()) !==
+            JSON.stringify(reviewedBedSetups)
+        )
+          throw new Error(
+            "The device anchor was saved, but the selected profile changed; its bed anchors were not adjusted."
+          )
+        fixtures.moveBedSetupAnchors([-delta[0], -delta[1]])
+        followProfile()
+      }
+      setOpen(false)
+      toast.success(`Saved as ${chosen.name}.`, {
+        description: afterRestart
+          ? "Reset the machine for its own moves to use it."
+          : undefined,
+      })
+      onSaved?.()
       return
     }
     if (!bedSetup) return
@@ -212,19 +308,41 @@ export function SaveAsAnchor({
       `Saved as ${kept?.name ?? newAnchor?.name} of ${bedSetup.name}.`
     )
   }
-  const confirmReason = chosen ? writeReason : null
+  const calibrationReason =
+    calibration &&
+    (calibration.deviceId !== deviceId ||
+      !calibrationAnchorsMatch(calibration.expectedAnchors, live) ||
+      !deviceChoice ||
+      machine.job?.phase !== "completed" ||
+      machine.job.id !== measurementRunId)
+      ? "Complete this calibration on its original device with unchanged anchors before saving."
+      : null
+  const confirmReason =
+    deviceReason ?? calibrationReason ?? (chosen ? writeReason : null)
+  const saveLabel = chosen ? "Write anchors" : "Save anchor"
+  const buttonLabel = pending ? "Writing…" : saveLabel
   return (
     <>
       <ReasonButton
-        label="Save as anchor"
+        label={
+          calibration
+            ? `Save as ${deviceChoice?.name ?? "calibrated anchor"}`
+            : "Save as anchor"
+        }
         variant="outline"
         size="sm"
         className="self-start"
-        reason={bedSetup ? null : writeReason}
-        disabled={writeAnchors.isPending}
+        reason={
+          calibration
+            ? confirmReason
+            : (deviceReason ?? (bedSetup ? null : writeReason))
+        }
+        disabled={pending}
         onClick={() => setOpen(true)}
       >
-        Save as anchor
+        {calibration
+          ? `Save as ${deviceChoice?.name ?? "calibrated anchor"}`
+          : "Save as anchor"}
       </ReasonButton>
       <AlertDialog open={open} onOpenChange={setOpen}>
         <AlertDialogContent>
@@ -241,46 +359,54 @@ export function SaveAsAnchor({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <FieldGroup>
-            <Field orientation="horizontal">
-              <FieldLabel htmlFor={`${id}-anchor`}>Anchor</FieldLabel>
-              <OptionSelect
-                id={`${id}-anchor`}
-                className="ml-auto w-56"
-                options={[
-                  ...live.anchors.map((anchor) => ({
-                    value: `device:${anchor.id}`,
-                    label: anchor.name,
-                  })),
-                  ...(bedSetup
-                    ? [
-                        ...bedSetup.anchors.map((anchor) => ({
-                          value: `bed:${anchor.id}`,
-                          label: anchor.name,
-                        })),
-                        {
-                          value: NEW_ANCHOR,
-                          label: `New anchor in ${bedSetup.name}`,
-                        },
-                      ]
-                    : []),
-                ]}
-                value={
-                  chosen
-                    ? `device:${chosen.id}`
-                    : kept
-                      ? `bed:${kept.id}`
-                      : NEW_ANCHOR
-                }
-                disabled={writeAnchors.isPending}
-                onValueChange={setChoice}
-              />
-            </Field>
-            {first && others.length > 0 && (
+            {!calibration && (
+              <Field orientation="horizontal">
+                <FieldLabel htmlFor={`${id}-anchor`}>Anchor</FieldLabel>
+                <OptionSelect
+                  id={`${id}-anchor`}
+                  className="ml-auto w-56"
+                  options={[
+                    ...live.anchors.map((anchor) => ({
+                      value: `device:${anchor.id}`,
+                      label: anchor.name,
+                    })),
+                    ...(bedSetup
+                      ? [
+                          ...bedSetup.anchors.map((anchor) => ({
+                            value: `bed:${anchor.id}`,
+                            label: anchor.name,
+                          })),
+                          {
+                            value: NEW_ANCHOR,
+                            label: `New anchor in ${bedSetup.name}`,
+                          },
+                        ]
+                      : []),
+                  ]}
+                  value={
+                    chosen
+                      ? `device:${chosen.id}`
+                      : kept
+                        ? `bed:${kept.id}`
+                        : NEW_ANCHOR
+                  }
+                  disabled={pending}
+                  onValueChange={setChoice}
+                />
+              </Field>
+            )}
+            {calibration && (
+              <p>
+                Save the measured X/Y as {deviceChoice?.name}. The other anchors
+                retain their offsets and move with it.
+              </p>
+            )}
+            {!calibration && first && others.length > 0 && (
               <Field orientation="horizontal">
                 <Checkbox
                   id={`${id}-follow`}
                   checked={follow}
-                  disabled={writeAnchors.isPending}
+                  disabled={pending}
                   aria-description={FOLLOW_HINT}
                   onCheckedChange={(checked) => setFollow(checked)}
                 />
@@ -314,20 +440,14 @@ export function SaveAsAnchor({
             </TableBody>
           </Table>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={writeAnchors.isPending}>
-              Cancel
-            </AlertDialogCancel>
+            <AlertDialogCancel disabled={pending}>Cancel</AlertDialogCancel>
             <ReasonButton
-              label={chosen ? "Write anchors" : "Save anchor"}
+              label={saveLabel}
               reason={confirmReason}
-              disabled={writeAnchors.isPending || !changes.length}
-              onClick={save}
+              disabled={pending || !changes.length}
+              onClick={() => saveMutation.mutate()}
             >
-              {writeAnchors.isPending
-                ? "Writing…"
-                : chosen
-                  ? "Write anchors"
-                  : "Save anchor"}
+              {buttonLabel}
             </ReasonButton>
           </AlertDialogFooter>
         </AlertDialogContent>

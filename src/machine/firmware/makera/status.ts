@@ -15,6 +15,7 @@ const ATC_FLAG = 1 << 2
 export type Diagnostics = {
   receivedAt: number
   spindleOn: boolean | null
+  toolSetterTriggered: boolean | null
   lightOn: boolean | null
   beepOn: boolean | null
   vacuumOn: boolean | null
@@ -203,6 +204,7 @@ export function parseStatus(
       spindleTargetRpm: n("S", 1),
       spindleOverride: n("S", 2),
       spindleOn: diagnostic?.spindleOn ?? null,
+      toolSetterTriggered: diagnostic?.toolSetterTriggered ?? null,
       spindleTemperature: f.S?.length === 10 ? n("S", 4) : null,
       controllerTemperature: f.S?.length === 10 ? n("S", 5) : null,
       // Kernel.cpp prints tool numbers as integers ("T:%d,%1.3f,%d").
@@ -223,7 +225,11 @@ export function parseStatus(
       job,
       alarm: integer(f.H?.[0]),
       estop: diagnostic?.estop ?? null,
-      compensation: n("O"),
+      // Kernel::get_query_string emits O only while compensationTransform exists.
+      // Its absence in a complete, validated status means off; O:0 means active
+      // with zero deviation. A present malformed field never becomes disabled.
+      compensation: Object.hasOwn(f, "O") ? n("O") : 0,
+      compensationActive: Object.hasOwn(f, "O"),
     },
   }
 }
@@ -242,6 +248,7 @@ export function parseDiagnostics(
   return {
     receivedAt,
     spindleOn: flag(f.S?.[0]),
+    toolSetterTriggered: flag(f.P?.[1]),
     lightOn: flag(f.G?.[0]),
     beepOn: flag(f.G?.[1]),
     vacuumOn: flag(f.G?.[3]),

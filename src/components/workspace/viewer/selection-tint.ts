@@ -1,10 +1,12 @@
 import * as THREE from "three"
+import { MeshStandardNodeMaterial } from "three/webgpu"
+
+type SolidMaterial = THREE.MeshStandardMaterial | MeshStandardNodeMaterial
 
 /** The viewer's solids: meshes in standard (PBR) materials, which its lights shade. */
-const isSolid = (
-  material: THREE.Material
-): material is THREE.MeshStandardMaterial =>
-  material instanceof THREE.MeshStandardMaterial
+const isSolid = (material: THREE.Material): material is SolidMaterial =>
+  material instanceof THREE.MeshStandardMaterial ||
+  material instanceof MeshStandardNodeMaterial
 
 /**
  * A selected object drawn in the selection's colour: its solids' materials swapped for ones of
@@ -49,16 +51,17 @@ export class SelectionTint {
     this.clear()
   }
 
-  private tint(material: THREE.MeshStandardMaterial) {
-    const tint = new THREE.MeshStandardMaterial({
-      color: this.color,
-      metalness: 0.1,
-      roughness: 0.6,
-      transparent: material.transparent,
-      opacity: material.opacity,
-      depthWrite: material.depthWrite,
-      side: material.side,
-    })
+  private tint(material: SolidMaterial) {
+    // Keep node-based normal maps and texture coordinates when a stock is selected.
+    const tint = material.clone()
+    if (tint instanceof MeshStandardNodeMaterial) {
+      tint.colorNode = null
+      tint.roughnessNode = null
+      tint.map = null
+    }
+    tint.color.copy(this.color)
+    tint.metalness = 0.1
+    tint.roughness = 0.6
     this.materials.push(tint)
     return tint
   }

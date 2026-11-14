@@ -1,4 +1,7 @@
-import { ConfigurationContentSchema } from "../../contract/index.ts"
+import {
+  CONFIGURATION_MAX_BYTES,
+  ConfigurationContentSchema,
+} from "../../contract/index.ts"
 import type {
   FirmwareConfiguration,
   WriteConfigurationRequest,
@@ -33,6 +36,18 @@ async function transferFile(
   const { session, signal } = context
   hooks.transferring(protocol)
   const release = session.suspendPolling()
+  const deadline = new AbortController()
+  const timer = context.clock.setTimeout(
+    () =>
+      deadline.abort(
+        new MachineError(
+          "timeout",
+          "The configuration transfer exceeded its overall time limit."
+        )
+      ),
+    30_000 +
+      ((4 * CONFIGURATION_MAX_BYTES) / session.minimumTransferRate) * 1000
+  )
   try {
     await session.request<void>(
       protocol.start(),
@@ -69,9 +84,10 @@ async function transferFile(
         }
       },
       {
-        timeoutMs: 30_000,
+        timeoutMs: 10_000,
+        rearm: true,
         timeoutMessage: "The configuration transfer timed out.",
-        signal,
+        signal: AbortSignal.any([signal, deadline.signal]),
       }
     )
   } catch (error) {
@@ -86,6 +102,7 @@ async function transferFile(
     }
     throw error
   } finally {
+    context.clock.clearTimeout(timer)
     hooks.transferring(null)
     release()
   }
@@ -101,7 +118,9 @@ async function downloadConfiguration(
       "refused",
       "This machine does not expose a configuration file."
     )
-  const protocol = configuration.createDownload()
+  const protocol = configuration.createDownload(
+    context.session.transferBlockBytes
+  )
   await transferFile(context, protocol, hooks)
   const revision = hooks.md5(protocol.bytes)
   if (protocol.md5 !== null && protocol.md5 !== revision)
@@ -214,7 +233,11 @@ export async function writeFirmwareConfiguration(
   requireAdmission(context, { key: "writeConfiguration" }, ready)
   const bytes = new TextEncoder().encode(content)
   const revision = hooks.md5(bytes)
-  const protocol = configuration.createUpload(bytes, revision)
+  const protocol = configuration.createUpload(
+    bytes,
+    revision,
+    context.session.transferBlockBytes
+  )
   sending()
   try {
     await transferFile(context, protocol, hooks)

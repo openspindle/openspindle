@@ -1,5 +1,6 @@
+import type { ReferenceModel } from "@/domain/models/reference"
 import type { ToolpathBounds } from "@/domain/compile/toolpath-bounds"
-import type { Place, Severity } from "@/domain/diagnostics"
+import type { Cylinder, Place, Severity } from "@/domain/diagnostics"
 import type { FixtureInstance } from "@/domain/fixtures/definitions"
 import type { GCodeProgram, Point3 } from "@/domain/nc/gcode"
 import type { Stock } from "@/domain/stock/stock"
@@ -37,6 +38,7 @@ export type ViewerToolRun = {
 
 export type ViewerPlate = {
   id: string
+  operationColors?: readonly OperationPathColor[]
   /** The plate's name; empty while it has none, and its label shows its number. */
   name: string
   program: GCodeProgram
@@ -50,6 +52,7 @@ export type ViewerPlate = {
   tools: readonly ViewerToolRun[]
   /** Where the plate's machining cuts, from its work origin; null when it cuts nothing. */
   toolpathBounds: ToolpathBounds | null
+  reference?: ReferenceModel | null
   stock: Stock | null
   /** Physical minimum stock corner and the plate's single NC zero, in millimeter bed coordinates. */
   stockAnchor: Point3
@@ -62,6 +65,8 @@ export type ViewerPlate = {
    * probe the plate is drawn with (`kitForSetup`).
    */
   deviceId: string | null
+  /** Fixed machine hardware, in bed coordinates, independent of the stock's placement. */
+  toolSetter?: Cylinder | null
 }
 
 /**
@@ -91,3 +96,42 @@ export type ViewerProblem = {
 
 /** Which problem: its plate and its key there. */
 export type ViewerProblemRef = Pick<ViewerProblem, "plateId" | "key">
+
+export type OperationPathColor = {
+  readonly startLine: number
+  readonly endLine: number
+  readonly color: string
+}
+
+export type ViewerLayers = {
+  readonly reference: boolean
+  readonly deviation: boolean
+  readonly past: boolean
+  readonly future: boolean
+  readonly cuts: boolean
+  readonly probes: boolean
+  readonly tool: boolean
+  readonly ahead: boolean
+  readonly stock: boolean
+  readonly rapids: boolean
+  readonly axes: boolean
+  readonly bed: boolean
+  readonly fixtures: boolean
+  readonly toolSetter: boolean
+}
+export const DEFAULT_VIEWER_LAYERS: ViewerLayers = {
+  reference: true,
+  deviation: false,
+  past: true,
+  future: true,
+  cuts: true,
+  probes: true,
+  tool: true,
+  ahead: true,
+  stock: true,
+  rapids: false,
+  axes: true,
+  bed: true,
+  fixtures: true,
+  toolSetter: true,
+}

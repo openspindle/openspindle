@@ -15,9 +15,15 @@ The design rules are the rules a project sets: the move rules and the program ru
 | Max cut depth                 | `max-cut-depth`                 | A cut reaching further below the stock top than the limit, in total (not per pass)                   | 3 mm, warning        |
 | Max depth under the stock     | `max-depth-under-stock`         | A cut reaching further below the stock bottom than the limit, into what the stock lies on            | 0.3 mm, warning      |
 | Spindle stopped while cutting | `spindle-stopped-while-cutting` | A cutting move while the spindle is stopped (`M5`, or no `M3`/`M4` yet), or turns without a speed    | warning              |
-| Rapid move into the stock     | `rapid-into-stock`              | A rapid move (`G0`) into the stock                                                                   | warning              |
+| Rapid move into the stock     | `rapid-into-stock`              | A rapid move (`G0`) into the stock                                                                   | warning        |
+| Fixed tool setter clearance   | `tool-setter-clearance`         | A tool entering the configured tool-setter cylinder                                                   | error          |
 
 Limits are from 1 to 100,000 mm/min for feeds and from 0 to 1,000 mm for depths. Feeds are the feeds the moves run at, `M220` overrides included.
+
+The fixed tool setter clearance is available for Makera Z1 plates. Its Design Rules settings
+configure the cylinder's X and Y from Anchor 1, bottom Z, radius and height. The default is an
+error; changing it to a warning allows Run to continue, and Ignore disables the check. When the
+rule finds a move, the cylinder is shown in the 3D view with the affected program line.
 
 ## Program rules
 
@@ -48,7 +54,7 @@ The move rules are checked on the plate's program as it runs: every operation co
 - **Without stock**, the stock is taken to reach down from the program's Z0 over the area the program cuts, and Max depth under the stock is not checked; the results say so.
 - **Cutting moves** are feed moves (`G1`, `G2`, `G3`) that reach below the stock top. The probes' moves (T0, and the 3D probe's T9999) do not cut, and a move straight up (a retract) leaves through what the tool has cut, so none of these count.
 - **Rapid moves** count when they end below the stock top or travel sideways below it; a rapid straight up out of a cut does not.
-- **Lifts to the clearance.** A move in machine coordinates is not in the program's work coordinates. After one that moves Z alone (`G53 G0 Z…`, which the combined program makes between operations and before it ends), and at the start of the program, the tool is taken to be at the machine's clearance: moves that keep Z travel above the stock, and the first move that sets Z comes down from there.
+- **Lifts to the clearance.** A move in machine coordinates is not in the program's work coordinates. After one that moves Z alone (`G53 G0 Z…`, which the combined program makes between operations and before it ends. A cutting operation may also explicitly retract with `G53 G0 Z-3` in metric absolute mode), and at the start of the program, the tool is taken to be at the machine's clearance: moves that keep Z travel above the stock, and the first move that sets Z comes down from there.
 - **Operations that do not compile** (for example a PCB operation that has not generated its NC) are not in the program. The results say their moves are not checked; the program rules still read their NC.
 
 The check does not model material already removed: a move into a pocket that an earlier move cleared counts as a move into the stock.

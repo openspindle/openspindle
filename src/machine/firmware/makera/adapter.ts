@@ -1,4 +1,8 @@
 import {
+  simulatorJogProtocol,
+  SIMULATOR_SPINDLE_LIMITS,
+} from "./simulator-jog.ts"
+import {
   ADDED_ANCHOR_LIMIT,
   ASSIST_KEYS,
   AnchorConfigurationSchema,
@@ -42,8 +46,17 @@ import {
   parseFileSize,
   parseHomedReport,
   parseSwitchReport,
+  parseProbeTravelBounds,
 } from "./lines.ts"
 import { MakeraTransfer } from "./transfer.ts"
+import {
+  makeraExecutionIssue,
+  assessMakeraPhysicalProgram,
+} from "./execution-safety.ts"
+import {
+  MACHINE_Z,
+  z1WorkBounds,
+} from "../../../domain/fixtures/makera-z1/work-envelope.ts"
 
 const command = (payload: string): OutboundFrame => ({
   type: FRAME_TYPES.command,
@@ -101,7 +114,8 @@ const makeraJob: JobProtocol = {
   homed: parseHomedReport,
   assistPlan,
   bedClean: (telemetry) => telemetry.bedCleanAuto,
-  createTransfer: (bytes, md5, path) => new MakeraTransfer(bytes, md5, path),
+  createTransfer: (bytes, md5, path, blockBytes) =>
+    new MakeraTransfer(bytes, md5, path, blockBytes),
   // ATCHandler skips M6 for the tool it believes is loaded, so on a manual-change machine the
   // program's first change would neither stop for the tool nor measure it at the tool sensor.
   // Never with an automatic changer: it tracks the clamped tool, and with none set it picks
@@ -232,6 +246,7 @@ function parseAnnouncement(
 }
 
 export const makeraAdapter: FirmwareAdapter = {
+  simulatorJog: simulatorJogProtocol,
   id: "makera",
   defaultPort: 2222,
   discovery: { port: 3333, parse: parseAnnouncement },
@@ -254,17 +269,49 @@ export const makeraAdapter: FirmwareAdapter = {
   plan: planMakeraCommand,
   rules: makeraRules,
   // Application limits for jogging, spindle speed and overrides, not the machine's rating.
+  controllerStepBounds: (anchors) => {
+    const anchor = anchors.anchors.find((entry) => entry.id === "anchor-1")
+    if (!anchor) return null
+    const bounds = z1WorkBounds([anchor.x, anchor.y])
+    return {
+      min: [...bounds.min, MACHINE_Z.min],
+      max: [...bounds.max, MACHINE_Z.max],
+    }
+  },
   limits: {
     jogMinDistance: 0.01,
     jogMaxDistance: 10,
     jogMinSpeedScale: 0.01,
-    jogMaxSpeedScale: 0.25,
-    spindleRpmMin: 1000,
-    spindleRpmMax: 10000,
+    jogMaxSpeedScale: 1,
+    spindleRpmMin: SIMULATOR_SPINDLE_LIMITS.min,
+    spindleRpmMax: SIMULATOR_SPINDLE_LIMITS.max,
     overrideMin: 50,
     overrideMax: 150,
   },
   prepareProgram: prepareMakeraProgram,
+  executionIssue: makeraExecutionIssue,
+  assessPhysicalProgram: assessMakeraPhysicalProgram,
+  probeCheckTools: [0, 9999],
+  probeTravelBounds: { query: "M211", parse: parseProbeTravelBounds },
+  probeContact: (text) => {
+    const match =
+      /^\[PRB:([+-]?[\d.]+),([+-]?[\d.]+),([+-]?[\d.]+):([01])\]$/.exec(
+        text.trim()
+      )
+    if (!match) return null
+    const position = [Number(match[1]), Number(match[2]), Number(match[3])] as [
+      number,
+      number,
+      number,
+    ]
+    if (
+      !position.every(
+        (value) => Number.isFinite(value) && Math.abs(value) <= COORDINATE_LIMIT
+      )
+    )
+      return null
+    return { position, success: match[4] === "1" }
+  },
   job: makeraJob,
   configuration: {
     path: MAKERA_CONFIGURATION_PATH,
@@ -280,9 +327,9 @@ export const makeraAdapter: FirmwareAdapter = {
         return "Stop the spindle before saving the device configuration."
       return null
     },
-    createDownload: () => new MakeraConfigurationDownload(),
-    createUpload: (bytes, md5) =>
-      new MakeraTransfer(bytes, md5, MAKERA_CONFIGURATION_PATH),
+    createDownload: (blockBytes) => new MakeraConfigurationDownload(blockBytes),
+    createUpload: (bytes, md5, blockBytes) =>
+      new MakeraTransfer(bytes, md5, MAKERA_CONFIGURATION_PATH, blockBytes),
     vacuumDefaultPower: readMakeraVacuumDefaultPower,
     withVacuumDefaultPower: withMakeraVacuumDefaultPower,
     cameraPicture: readMakeraCameraPicture,
@@ -419,5 +466,8 @@ export const makeraAdapter: FirmwareAdapter = {
     seconds: (now) =>
       Math.floor(now / 1000) - new Date(now).getTimezoneOffset() * 60,
   },
-  cameraUrl: (device) => `ws://${device.host}:82/ws_video`,
+  cameraUrl: (device) => {
+    const host = device.transport === "serial" ? device.cameraHost : device.host
+    return host ? `ws://${host}:82/ws_video` : null
+  },
 }

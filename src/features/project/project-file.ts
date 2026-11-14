@@ -3,7 +3,16 @@ import { readTextFile } from "@/platform/read-text-file"
 
 export const isProjectFileName = (name: string) =>
   hasFileExtension("project", name)
-export type OpenedProjectFile = { fileName: string; contents: string }
+export type OpenedProjectFile = {
+  fileName: string
+  contents: string
+  destinationId?: string
+}
+const destinations = new WeakMap<File, string>()
+export function rememberOpenedProject(file: File, destinationId?: string) {
+  if (destinationId) destinations.set(file, destinationId)
+  return file
+}
 
 export const suggestedProjectName = (name: string) =>
   suggestedFileName("project", name, "OpenSpindle project")
@@ -13,6 +22,9 @@ export const suggestedProjectName = (name: string) =>
  * validates the file exactly as the host does when it opens one, so a project ⌘O refuses fails
  * the same way when it is dropped.
  */
-export function readProjectFile(file: File): Promise<OpenedProjectFile> {
-  return readTextFile("project", file)
+export async function readProjectFile(file: File): Promise<OpenedProjectFile> {
+  return {
+    ...(await readTextFile("project", file)),
+    destinationId: destinations.get(file),
+  }
 }

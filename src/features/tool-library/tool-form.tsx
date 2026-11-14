@@ -208,7 +208,7 @@ function ChoiceField<T extends string | boolean>({
         id={id}
         className="w-full"
         options={options}
-        value={field.state.value === null ? "" : String(field.state.value)}
+        value={field.state.value == null ? "" : String(field.state.value)}
         aria-description={hint}
         aria-invalid={!field.state.meta.isValid}
         onBlur={field.handleBlur}

@@ -151,6 +151,13 @@ export type ArrangeMenuRequest = {
   /** Where the menu opens, in client coordinates. */
   readonly x: number
   readonly y: number
+  /** Actual shown surface under the pointer; coordinates exclude the display-only plate offset. */
+  readonly point?: {
+    readonly plateId: string
+    readonly position: Point3
+    readonly item: SetupItemRef
+    readonly setupPoint: SetupPoint | null
+  }
   /** A picked point of the moving item and the point right-clicked: an alignment on offer. */
   readonly alignment: {
     readonly from: SetupPoint
@@ -1229,6 +1236,60 @@ export class SetupArranger {
         sameSetupItem(hit.item, selection.item)
       if (hit && !selected) this.events.select(hit.plateId, hit.item)
     }
-    this.events.menu({ x: event.clientX, y: event.clientY, alignment: offered })
+    this.host.aim(event)
+    let nearest: {
+      plateId: string
+      distance: number
+      position: Point3
+      item: SetupItemRef
+      setupPoint: SetupPoint | null
+    } | null = null
+    for (const [plateId, view] of this.host.views()) {
+      const hit = view.itemHit(this.host.raycaster)
+      if (!hit || (nearest && nearest.distance <= hit.distance)) continue
+      const rect = this.host.canvas.getBoundingClientRect()
+      let setupPoint: SetupPoint | null = null
+      let reach = PICK_RADIUS
+      for (const candidate of view.setupPoints()) {
+        if (!sameSetupItem(candidate.item, hit.item)) continue
+        // Do not snap a visible top to an occluded bottom corner with the same screen XY.
+        if (Math.abs(candidate.position[2] - hit.point.z) > 0.25) continue
+        const at = this.screen(plateId, candidate.position, rect)
+        const distance = Math.hypot(
+          at.x + rect.left - event.clientX,
+          at.y + rect.top - event.clientY
+        )
+        if (distance < reach) {
+          setupPoint = candidate
+          reach = distance
+        }
+      }
+      nearest = {
+        plateId,
+        distance: hit.distance,
+        item: hit.item,
+        setupPoint,
+        position: setupPoint?.position ?? [
+          millimetres(hit.point.x - this.host.offset(plateId)),
+          millimetres(hit.point.y),
+          millimetres(hit.point.z),
+        ],
+      }
+    }
+    this.events.menu({
+      x: event.clientX,
+      y: event.clientY,
+      alignment: offered,
+      ...(nearest
+        ? {
+            point: {
+              plateId: nearest.plateId,
+              position: nearest.position,
+              item: nearest.item,
+              setupPoint: nearest.setupPoint,
+            },
+          }
+        : {}),
+    })
   }
 }

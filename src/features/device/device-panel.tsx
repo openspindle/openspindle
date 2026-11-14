@@ -15,6 +15,7 @@ import { Alert, AlertAction, AlertDescription } from "@/components/ui/alert"
 import { FieldDescription } from "@/components/ui/field"
 import { Badge } from "@/components/ui/badge"
 import {
+  endpointLabel,
   MachineCommandSchema,
   isFresh,
   outsideLimits,
@@ -41,9 +42,11 @@ import { ResetMachineDialog } from "./reset-machine-dialog"
 export function DevicePanel({
   openPicker,
   fixturePanel,
+  usefulTools,
 }: {
   openPicker: () => void
   fixturePanel?: ReactNode
+  usefulTools?: ReactNode
 }) {
   const snapshot = useMachineSnapshot()
   const command = useMachineCommand()
@@ -56,11 +59,24 @@ export function DevicePanel({
     ? snapshot.telemetry
     : null
   const [notice, setNotice] = useState("")
+  const [spindleTargetInput, setSpindleTargetInput] = useState("")
+  const reportedTarget =
+    snapshot.simulatorController.targetRpm ?? telemetry?.spindleTargetRpm
+  useEffect(
+    () => setSpindleTargetInput(""),
+    [snapshot.connection.id, reportedTarget]
+  )
+  const suggestedRpm =
+    reportedTarget && limits && reportedTarget >= limits.spindleRpmMin
+      ? reportedTarget
+      : limits?.spindleRpmMax
+  const spindleRpm =
+    spindleTargetInput === "" ? (suggestedRpm ?? 0) : Number(spindleTargetInput)
   const pending = command.isPending || stop.isPending || reset.isPending
 
   useEffect(() => {
     setNotice("")
-  }, [device?.host, device?.port])
+  }, [device ? endpointLabel(device) : null])
   useEffect(() => {
     if (!notice) return
     const timer = setTimeout(() => setNotice(""), 2500)
@@ -102,17 +118,24 @@ export function DevicePanel({
   let state = "Disconnected"
   if (snapshot.connection.restarting) state = "Restarting"
   if (device) state = telemetry ? telemetry.state : "Waiting for status"
+  if (device && snapshot.connection.health === "stale")
+    state = "Status unavailable"
   let actionStatus = notice
   if (activity) actionStatus = `${activity.label}…`
   const failure = stop.error ?? reset.error ?? command.error
 
   return (
-    <main className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-auto p-5">
+    <main
+      data-machine-controls
+      className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-auto p-5"
+    >
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
           <div className="flex min-w-0 flex-col gap-1">
             <h2>{device?.name ?? "No device connected"}</h2>
-            {device && <FieldDescription>{device.host}</FieldDescription>}
+            {device && (
+              <FieldDescription>{endpointLabel(device)}</FieldDescription>
+            )}
           </div>
           <Badge variant={state === "Alarm" ? "destructive" : "secondary"}>
             {state}
@@ -222,11 +245,13 @@ export function DevicePanel({
           </AlertAction>
         </Alert>
       )}
-      {!failure && snapshot.connection.error && (
-        <Alert variant="destructive" role="alert">
-          <AlertDescription>{snapshot.connection.error}</AlertDescription>
-        </Alert>
-      )}
+      {!failure &&
+        snapshot.connection.error &&
+        snapshot.connection.health !== "stale" && (
+          <Alert variant="destructive" role="alert">
+            <AlertDescription>{snapshot.connection.error}</AlertDescription>
+          </Alert>
+        )}
       <MachineDiagnosis />
       <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(320px,1fr)]">
         <div className="flex min-w-0 flex-col gap-4">
@@ -264,12 +289,17 @@ export function DevicePanel({
             execute={execute}
           />
           <DeviceJogCard
+            spindleRpm={spindleRpm}
             limits={limits}
             reason={reason}
             allowed={allowed}
             execute={execute}
+            stop={() => stop.mutateAsync(undefined)}
           />
           <DeviceSpindleCard
+            rpmInput={spindleTargetInput}
+            setRpmInput={setSpindleTargetInput}
+            suggestedRpm={suggestedRpm}
             device={device}
             telemetry={telemetry}
             limits={limits}
@@ -286,6 +316,7 @@ export function DevicePanel({
             execute={execute}
             change={changeTool}
           />
+          {usefulTools}
           <DeviceSimulatorCard device={device} />
         </div>
       </div>

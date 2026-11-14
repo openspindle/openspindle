@@ -1,4 +1,7 @@
-import { ArrowLeft } from "lucide-react"
+import { useProbingPreferences } from "@/app/probing/probing-preferences"
+import { ArrowLeft, Ruler } from "lucide-react"
+import { INSPECTION_RECIPES } from "@/domain/probing/inspection-recipes"
+import { openDialog } from "@/features/shell/dialogs"
 import { Button } from "@/components/ui/button"
 import { FieldDescription, FieldLegend, FieldSet } from "@/components/ui/field"
 import { targetPlate } from "@/app/workspace/defaults"
@@ -31,6 +34,7 @@ import { useStrategyPicture } from "@/features/probing/use-strategy-picture"
 import { StrategyItem } from "./strategy-item"
 import { useAddOperation } from "./use-add-operation"
 import type { AddedOperation } from "./use-add-operation"
+import { ProbeSafetyNotice } from "@/features/probing/probe-safety-notice"
 
 /** What Probing adds, as the toolbar and Add operation offer it. */
 export const PROBING_DESCRIPTION =
@@ -117,6 +121,7 @@ export function ProbingSteps({
   onAdded: () => void
   onBack?: () => void
 }) {
+  const { guided } = useProbingPreferences()
   const library = useWorkspace((state) => state.tools)
   const selected = useWorkspace(selectedPlate)
   const context = useImportContext()
@@ -130,6 +135,7 @@ export function ProbingSteps({
 
   return (
     <div className="flex flex-col gap-4">
+      <ProbeSafetyNotice native />
       {onBack && (
         <Button variant="ghost" className="self-start" onClick={onBack}>
           <ArrowLeft />
@@ -140,7 +146,9 @@ export function ProbingSteps({
       <FieldSet>
         <FieldLegend>Setup</FieldLegend>
         <ItemGroup className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-          {PROBING_STRATEGIES.map((strategy) => (
+          {PROBING_STRATEGIES.filter(
+            (strategy) => !guided || strategy.id !== "touch-off"
+          ).map((strategy) => (
             <StrategyChoice
               key={strategy.id}
               strategy={strategy}
@@ -159,6 +167,25 @@ export function ProbingSteps({
           ))}
         </ItemGroup>
       </FieldSet>
+      {guided && (
+        <FieldSet>
+          <FieldLegend>Inspection</FieldLegend>
+          <ItemGroup className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            {INSPECTION_RECIPES.map((recipe) => (
+              <StrategyItem
+                key={recipe.id}
+                title={recipe.label}
+                description={recipe.description}
+                picture={null}
+                icon={<Ruler />}
+                onSelect={() =>
+                  openDialog({ kind: "inspection", recipe: recipe.id })
+                }
+              />
+            ))}
+          </ItemGroup>
+        </FieldSet>
+      )}
     </div>
   )
 }
