@@ -70,12 +70,12 @@ export function ViewerLayersMenu({
   const id = useId()
   const [open, setOpen] = useState(false)
   return (
-    <div className="absolute top-4 right-4 z-10">
+    <>
       <Popover open={open} onOpenChange={setOpen} modal={false}>
         <PopoverTrigger
           render={
             <Button
-              variant="secondary"
+              variant="ghost"
               size="icon"
               aria-label="Viewer layers"
               title="Viewer layers"
@@ -84,7 +84,7 @@ export function ViewerLayersMenu({
         >
           <Layers3 />
         </PopoverTrigger>
-        <PopoverContent side="left" align="start" className="w-80">
+        <PopoverContent side="right" align="start" className="w-80">
           <PopoverHeader className="flex-row items-center justify-between">
             <PopoverTitle>Layers</PopoverTitle>
             <Button
@@ -183,6 +183,6 @@ export function ViewerLayersMenu({
           </ScrollArea>
         </PopoverContent>
       </Popover>
-    </div>
+    </>
   )
 }

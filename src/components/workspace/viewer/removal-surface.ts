@@ -1,5 +1,6 @@
 import * as THREE from "three"
 import { materialFinish } from "./material-finish"
+import { surfaceDepth } from "./surface-depth"
 import { normalMap, step, texture, uv, vec2 } from "three/tsl"
 import type { SurfaceFinish } from "@/domain/materials/surface-material"
 import type { Stock } from "@/domain/stock/stock"
@@ -16,7 +17,10 @@ export function removalSurfaces(
   deviation = false
 ) {
   const material = (face: Face) =>
-    materialFinish(stock.material, face.color, stock.appearance, face)
+    surfaceDepth(
+      materialFinish(stock.material, face.color, stock.appearance, face),
+      "stock"
+    )
   const surface = material(top)
   if (deviation) {
     surface.colorNode = texture(geometry.deviationMap, uv()).rgb

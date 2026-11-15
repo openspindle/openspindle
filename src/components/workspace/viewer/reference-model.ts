@@ -2,6 +2,7 @@ import * as THREE from "three"
 import { toCreasedNormals } from "three/addons/utils/BufferGeometryUtils.js"
 import type { ReferenceModel } from "@/domain/models/reference"
 import { materialFinish } from "./material-finish"
+import { surfaceDepth } from "./surface-depth"
 
 /** Reference placement is relative to work zero and never alters the machining program. */
 export function referenceObjects(model: ReferenceModel | null | undefined) {
@@ -25,18 +26,20 @@ export function referenceObjects(model: ReferenceModel | null | undefined) {
     source.setIndex(part.indices)
     const geometry = toCreasedNormals(source, Math.PI / 4)
     source.dispose()
-    const material = materialFinish(
-      part.material?.name ?? "Unspecified material",
-      new THREE.Color("#aab3bb"),
-      part.material
+    const material = surfaceDepth(
+      materialFinish("Reference overlay", new THREE.Color("#38bdf8"), {
+        name: "Reference overlay",
+        color: "#38bdf8",
+        metalness: 0,
+        roughness: 0.75,
+        opacity: 0.45,
+        texture: "none",
+      }),
+      "reference"
     )
-    material.transparent = true
-    material.opacity = Math.min(material.opacity, 0.32)
     material.depthWrite = false
-    material.polygonOffset = true
-    material.polygonOffsetFactor = -1
-    material.polygonOffsetUnits = -1
     const mesh = new THREE.Mesh(geometry, material)
+    mesh.renderOrder = 2
     mesh.name = part.name
     group.add(mesh)
   }

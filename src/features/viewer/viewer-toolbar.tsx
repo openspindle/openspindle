@@ -1,4 +1,5 @@
 import { useState } from "react"
+import type { ReactNode } from "react"
 import {
   Cuboid,
   Cylinder,
@@ -63,7 +64,13 @@ export function useViewerCamera(): ViewerCamera {
 const isViewMode = (value: unknown): value is ViewMode =>
   value === "perspective" || value === "top" || value === "front"
 
-export function ViewerToolbar({ camera }: { camera: ViewerCamera }) {
+export function ViewerToolbar({
+  camera,
+  children,
+}: {
+  camera: ViewerCamera
+  children?: ReactNode
+}) {
   return (
     <Card
       className="absolute top-1/2 left-4 z-10 -translate-y-1/2 gap-1 p-1"
@@ -123,6 +130,8 @@ export function ViewerToolbar({ camera }: { camera: ViewerCamera }) {
       </Button>
       <Separator />
       <VisualStyleMenu />
+      {children && <Separator />}
+      {children}
     </Card>
   )
 }

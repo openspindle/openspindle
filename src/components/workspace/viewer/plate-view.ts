@@ -1,3 +1,4 @@
+import { surfaceDepth } from "./surface-depth"
 import { referenceObjects } from "./reference-model"
 import { materialFinish } from "./material-finish"
 import { DEFAULT_VIEWER_LAYERS } from "./viewer-input"
@@ -404,20 +405,24 @@ function stockObjects(
       geometry,
       removalSurfaces(stock, geometry, top, body, !!removal.deviation)
     )
+    mesh.renderOrder = 1
     mesh.userData.deviation = !!removal.deviation
     return [mesh]
   }
   const surface = ({ color, metalness, roughness }: StockFace) =>
-    Object.assign(
-      materialFinish(stock.material, color, stock.appearance, {
-        metalness,
-        roughness,
-      }),
-      {
-        transparent: true,
-        opacity: Math.min(stock.appearance?.opacity ?? 1, 0.76),
-        depthWrite: false,
-      }
+    surfaceDepth(
+      Object.assign(
+        materialFinish(stock.material, color, stock.appearance, {
+          metalness,
+          roughness,
+        }),
+        {
+          transparent: true,
+          opacity: Math.min(stock.appearance?.opacity ?? 1, 0.76),
+          depthWrite: false,
+        }
+      ),
+      "stock"
     )
   const sides = surface(body)
   const geometry = new THREE.BoxGeometry(stock.width, stock.depth, stock.height)
@@ -430,6 +435,7 @@ function stockObjects(
     surface(top),
     sides,
   ])
+  block.renderOrder = 1
   block.position.set(...boundsCenter(bounds))
   const edges = new THREE.LineSegments(
     stockEdges(geometry, top.color, body.color),
@@ -877,6 +883,7 @@ export class PlateView {
       opacity: missing ? 0.35 : 1,
       depthWrite: !missing,
     })
+    surfaceDepth(material, "fixture")
     this.fixtureMaterials.push(material)
     let content: THREE.Object3D
     if (template) content = fixtureMesh(model, template, material)

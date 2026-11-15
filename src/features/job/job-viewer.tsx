@@ -98,36 +98,37 @@ export function JobViewer({
         onZoomChange={camera.setZoom}
         machineOrigin={machineOrigin}
       />
-      <ViewerToolbar camera={camera} />
-      <ViewerLayersMenu
-        layers={layers}
-        change={(key, value) =>
-          setLayers((current) => ({ ...current, [key]: value }))
-        }
-        showRemoval={showRemoval}
-        setShowRemoval={setShowRemoval}
-        removal={removal}
-        operations={operations}
-        hidden={hidden}
-        editable={!!editingPlate}
-        setVisible={(id, visible) =>
-          setHidden((current) => {
-            const next = new Set(current)
-            if (visible) next.delete(id)
-            else next.add(id)
-            return next
-          })
-        }
-        setColor={(operationId, color) => {
-          if (editingPlate)
-            dispatch({
-              type: "operation.color",
-              plateId: editingPlate.id,
-              operationId,
-              color,
+      <ViewerToolbar camera={camera}>
+        <ViewerLayersMenu
+          layers={layers}
+          change={(key, value) =>
+            setLayers((current) => ({ ...current, [key]: value }))
+          }
+          showRemoval={showRemoval}
+          setShowRemoval={setShowRemoval}
+          removal={removal}
+          operations={operations}
+          hidden={hidden}
+          editable={!!editingPlate}
+          setVisible={(id, visible) =>
+            setHidden((current) => {
+              const next = new Set(current)
+              if (visible) next.delete(id)
+              else next.add(id)
+              return next
             })
-        }}
-      />
+          }
+          setColor={(operationId, color) => {
+            if (editingPlate)
+              dispatch({
+                type: "operation.color",
+                plateId: editingPlate.id,
+                operationId,
+                color,
+              })
+          }}
+        />
+      </ViewerToolbar>
       <TrackerOverlay />
       <div className="absolute right-4 bottom-4 z-10 flex flex-col gap-2">
         <MachineStatusCard telemetry={telemetry} />
