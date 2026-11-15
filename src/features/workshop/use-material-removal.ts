@@ -269,13 +269,13 @@ export function useMaterialRemoval(
         // Keep the busy request's cursor so its reply can still be checked after a seek.
         if (!busy) sent = null
         wanted = { move: 0, fraction: 0 }
-        setState({
+        setState((previous) => ({
           input,
-          grid: null,
+          grid: previous.input === input ? previous.grid : null,
           problem:
-            "The live tool is off the planned path. Return to playback to preview removal.",
+            "The live tool is off the planned path. Showing the last calculated removal; return to playback to update it.",
           pending: false,
-        })
+        }))
         return
       }
       offPlan = false
@@ -286,7 +286,12 @@ export function useMaterialRemoval(
         next.move < wanted.move ||
         (next.move === wanted.move && next.fraction < wanted.fraction)
       )
-        setState({ input, grid: null, problem: null, pending: true })
+        setState((previous) => ({
+          input,
+          grid: previous.input === input ? previous.grid : null,
+          problem: null,
+          pending: true,
+        }))
       wanted = next
       if (!timer)
         timer = setTimeout(() => {
@@ -325,12 +330,14 @@ export function useMaterialRemoval(
           sent !== null &&
           (sent.move > wanted.move ||
             (sent.move === wanted.move && sent.fraction > wanted.fraction))
-        setState({
+        // An obsolete reply after a backwards correction must not replace the
+        // visible surface with uncut stock. Hold it until the new cursor is ready.
+        setState((previous) => ({
           input,
-          grid: ahead ? null : event.data.grid,
+          grid: ahead ? previous.grid : event.data.grid,
           problem: null,
           pending: !current,
-        })
+        }))
         post()
       }
     )

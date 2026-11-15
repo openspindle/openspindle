@@ -75,7 +75,8 @@ export function DeviceCamera({
   const [fullscreen, setFullscreen] = useState(false)
   const [fullscreenError, setFullscreenError] = useState(false)
   const panel = useRef<HTMLDivElement>(null)
-  const urls = useRef(new Set<string>())
+  const urls = useRef(new Map<string, number>())
+  const sequence = useRef(0)
   const watching = attempt > 0 && available && !!device && !hidden
   const simulator = !!device && isSimulator(device) && simulated !== undefined
   const subject = simulator ? "preview" : "camera"
@@ -117,34 +118,74 @@ export function DeviceCamera({
     }
     const created = urls.current
     setPhase("connecting")
+    let stopped = false
+    let decoding = false
+    let queued: Uint8Array | null = null
+    // Decode before replacing the visible image. Coalesce frames while decoding
+    // so a slow renderer cannot build an unbounded queue of JPEGs or blob URLs.
+    const decodeNext = () => {
+      if (stopped || decoding || !queued) return
+      const jpeg = queued
+      queued = null
+      decoding = true
+      const url = URL.createObjectURL(
+        new Blob([jpeg.slice()], { type: "image/jpeg" })
+      )
+      created.set(url, ++sequence.current)
+      const image = new Image()
+      image.src = url
+      void image
+        .decode()
+        .then(
+          () => {
+            if (!stopped) setFrameUrl(url)
+          },
+          () => {
+            URL.revokeObjectURL(url)
+            created.delete(url)
+            if (!stopped) setPhase("error")
+          }
+        )
+        .finally(() => {
+          decoding = false
+          decodeNext()
+        })
+    }
     const stop = machine.watchCamera((event) => {
       if (event.kind === "status") {
         if (event.status === "error") setFrameUrl(null)
         setPhase(event.status)
         return
       }
-      const url = URL.createObjectURL(
-        new Blob([event.jpeg.slice()], { type: "image/jpeg" })
-      )
-      created.add(url)
-      setFrameUrl(url)
+      queued = event.jpeg
+      decodeNext()
     })
     return () => {
+      stopped = true
+      queued = null
       stop()
-      for (const url of created) URL.revokeObjectURL(url)
+      for (const url of created.keys()) URL.revokeObjectURL(url)
       created.clear()
       setFrameUrl(null)
     }
   }, [watching, machine, attempt, simulator])
 
-  /** Older frames are released once the newest one is on screen. */
-  const loaded = (url: string) => {
-    for (const other of urls.current)
-      if (other !== url) {
-        URL.revokeObjectURL(other)
-        urls.current.delete(other)
-      }
-  }
+  // Each committed frame releases only its own URL after it is replaced.
+  // An older image's load event must never revoke a newer pending frame.
+  useEffect(() => {
+    if (!frameUrl) return
+    const committed = urls.current.get(frameUrl)
+    if (committed !== undefined)
+      for (const [url, order] of urls.current)
+        if (order < committed) {
+          URL.revokeObjectURL(url)
+          urls.current.delete(url)
+        }
+    return () => {
+      URL.revokeObjectURL(frameUrl)
+      urls.current.delete(frameUrl)
+    }
+  }, [frameUrl])
   let cameraAction = "Start"
   if (phase === "error") cameraAction = "Retry"
   if (active) cameraAction = "Stop"
@@ -177,7 +218,6 @@ export function DeviceCamera({
       src={frameUrl}
       alt="Live machine camera"
       draggable={false}
-      onLoad={() => loaded(frameUrl)}
       onError={() => setPhase("error")}
     />
   )
