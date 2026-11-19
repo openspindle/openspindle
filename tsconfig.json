@@ -6,6 +6,7 @@
     "packages/*/src/**/*.ts",
     "tools/vite/**/*.ts",
     "tools/packaging/**/*.ts",
+    "tools/patterns/**/*.ts",
     "eslint.config.js",
     "vite.config.ts",
     "electron.vite.config.ts",

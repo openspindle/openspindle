@@ -1,9 +1,12 @@
 import { useState } from "react"
-import { ArrowLeft, CircuitBoard, Crosshair } from "lucide-react"
+import { ArrowLeft, CircuitBoard, Crosshair, Waves } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { FieldSet } from "@/components/ui/field"
 import { ImporterView } from "@/features/pcb/importer"
 import { AppDialog } from "@/features/shell/app-dialog"
+import { createOperation } from "@/domain/operations/operation"
+import { defaultPattern } from "@/features/patterns/presets"
+import { useAddOperation } from "./use-add-operation"
 import {
   PROBING_DESCRIPTION,
   ProbingSteps,
@@ -20,6 +23,7 @@ export function AddOperationDialog({
   onClose: () => void
 }) {
   const probingReason = useProbingReason()
+  const addPattern = useAddOperation()
   const [chosen, choose] = useState<"pcb" | "probing" | null>(preset ?? null)
   if (chosen === "probing")
     return (
@@ -46,6 +50,26 @@ export function AddOperationDialog({
   return (
     <AppDialog title="Add operation" width="wide" onClose={onClose}>
       <FieldSet>
+        <SourceItem
+          icon={<Waves />}
+          title="Pattern / Texture"
+          description="Create a mathematical XYZ engraving pattern with adjustable sliders."
+          onSelect={() => {
+            const definition = defaultPattern()
+            if (
+              addPattern({
+                operation: createOperation("Guilloché rosette", {
+                  kind: "pattern",
+                  tool: definition.tool,
+                  definition,
+                  nc: null,
+                }),
+                preferredTools: new Map(),
+              })
+            )
+              onClose()
+          }}
+        />
         <SourceItem
           icon={<CircuitBoard />}
           title="PCB"

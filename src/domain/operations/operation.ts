@@ -1,5 +1,6 @@
 import { z } from "zod"
 import { FacingParamsSchema } from "./facing"
+import { PatternSpecSchema } from "./pattern"
 import { BoundedDiameterSchema } from "../probing/probe-calibration"
 import { AnchorCalibrationSchema } from "../anchors/calibration"
 import { utf8ByteLength } from "@/machine/contract"
@@ -181,6 +182,12 @@ export const OperationSourceSchema = z.discriminatedUnion("kind", [
     kind: z.literal("facing"),
     tool: ToolNumberSchema,
     params: FacingParamsSchema,
+  }),
+  z.object({
+    kind: z.literal("pattern"),
+    tool: ToolNumberSchema,
+    definition: PatternSpecSchema,
+    nc: NcSchema.nullable(),
   }),
   FileSourceSchema,
   PcbSourceSchema,

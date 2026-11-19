@@ -1,10 +1,10 @@
 import { useLocation, useNavigate } from "@tanstack/react-router"
-import { Cpu, Layers3, Play } from "lucide-react"
+import { Cpu, Layers3, Play, Waves } from "lucide-react"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { isJobActive } from "@/machine/contract"
 import { useMachineSnapshot } from "@/platform/machine"
 
-const SECTIONS = ["prepare", "job", "device"] as const
+const SECTIONS = ["prepare", "patterns", "job", "device"] as const
 type Section = (typeof SECTIONS)[number]
 
 const isSection = (value: unknown): value is Section =>
@@ -31,6 +31,10 @@ export function WorkspaceTabs() {
         <TabsTrigger value="prepare" className="px-4">
           <Layers3 />
           Prepare
+        </TabsTrigger>
+        <TabsTrigger value="patterns" className="px-4">
+          <Waves />
+          Patterns
         </TabsTrigger>
         <TabsTrigger value="job" className="px-4">
           <Play />

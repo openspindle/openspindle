@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { useNavigate } from "@tanstack/react-router"
 import type { ComponentProps, MouseEvent, ReactNode } from "react"
 import {
   ArrowDown,
@@ -164,11 +165,13 @@ function RowButton({
   active,
   title,
   onClick,
+  onDoubleClick,
   children,
 }: {
   active: boolean
   title?: string
   onClick: (event: MouseEvent) => void
+  onDoubleClick?: (event: MouseEvent) => void
   children: ReactNode
 }) {
   return (
@@ -178,6 +181,7 @@ function RowButton({
       className="min-w-0 flex-1 translate-x-0 px-1"
       title={title}
       onClick={onClick}
+      onDoubleClick={onDoubleClick}
     >
       {children}
     </SidebarMenuSubButton>
@@ -759,6 +763,7 @@ function OperationRow(
   props: RowProps & { node: Extract<TreeRow, { kind: "operation" }> }
 ) {
   const workspace = useWorkspaceStore()
+  const navigate = useNavigate()
   const { node, row } = props
   const { plate, operation } = node
   const iconOf = useOperationIcon()
@@ -840,6 +845,13 @@ function OperationRow(
           active={active}
           title={suppressed ? `${operation.name} (suppressed)` : operation.name}
           onClick={() => props.onSelectOperation(plate.id, operation.id)}
+          onDoubleClick={() => {
+            if (operation.source.kind === "pattern")
+              void navigate({
+                to: "/patterns",
+                search: { operation: operation.id },
+              })
+          }}
         >
           <Icon className={cn(suppressed && SUPPRESSED)} />
           <span className={cn("truncate", suppressed && SUPPRESSED)}>

@@ -1,5 +1,6 @@
 import { useEffect, useId, useMemo } from "react"
-import { FileCode2, RefreshCw } from "lucide-react"
+import { FileCode2, RefreshCw, Waves } from "lucide-react"
+import { useNavigate } from "@tanstack/react-router"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import {
@@ -384,6 +385,24 @@ function TaskEditor({
   }
 }
 
+function PatternNavigate({ operationId }: { operationId: string }) {
+  const navigate = useNavigate()
+  return (
+    <Button
+      variant="outline"
+      onClick={() =>
+        void navigate({
+          to: "/patterns",
+          search: { operation: operationId },
+        })
+      }
+    >
+      <Waves />
+      Edit pattern and toolpath
+    </Button>
+  )
+}
+
 /** The editor for an operation's source, by kind. */
 export function OperationEditor({
   plate,
@@ -394,6 +413,8 @@ export function OperationEditor({
 }) {
   const source = operation.source
   switch (source.kind) {
+    case "pattern":
+      return <PatternNavigate operationId={operation.id} />
     case "facing":
       return (
         <Button

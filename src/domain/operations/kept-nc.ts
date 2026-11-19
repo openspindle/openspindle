@@ -14,6 +14,7 @@ import { fail, ok } from "../primitives"
 import type { OperationKind, ResolveContext, ResolvedNc } from "./kinds"
 import type { Operation, SourceKind } from "./operation"
 import { suppressedParts, withoutParts } from "./toolpath-parts"
+import { patternKind } from "./pattern-kind"
 import {
   facingKeepOuts,
   facingNc,
@@ -171,6 +172,7 @@ export const unsupportedKind: OperationKind<"unsupported"> = {
 
 const KEPT_NC_KINDS = {
   file: fileKind,
+  pattern: patternKind,
   pcb: pcbKind,
   unsupported: unsupportedKind,
 }

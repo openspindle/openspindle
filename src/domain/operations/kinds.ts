@@ -17,6 +17,7 @@ import type { ProbingTask } from "../probing/strategy"
 import type { Tool } from "../tools/tool"
 import { fileKind, pcbKind, unsupportedKind } from "./kept-nc"
 import { facingKind } from "./facing-kind"
+import { patternKind } from "./pattern-kind"
 import { anchorCalibrationIssue } from "../anchors/calibration"
 import type {
   Operation,
@@ -273,6 +274,7 @@ export const OPERATION_KINDS: {
   readonly [TKind in SourceKind]: OperationKind<TKind>
 } = {
   facing: facingKind,
+  pattern: patternKind,
   file: fileKind,
   pcb: pcbKind,
   unsupported: unsupportedKind,

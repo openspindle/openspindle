@@ -40,3 +40,6 @@ todos.json
 
 dist-host/
 openspindle-data/
+dist-patterns/
+public/pattern-wasm/
+patterns/engine/target/

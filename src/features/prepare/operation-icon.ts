@@ -4,6 +4,7 @@ import {
   CircuitBoard,
   FileCode2,
   LandPlot,
+  Waves,
   SquareDashed,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
@@ -34,6 +35,8 @@ export function operationIcon(operation: Operation): LucideIcon {
   switch (source.kind) {
     case "facing":
       return LandPlot
+    case "pattern":
+      return Waves
     case "file":
     case "unsupported":
       return FileCode2

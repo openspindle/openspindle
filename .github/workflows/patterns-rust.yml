@@ -1,0 +1,31 @@
+name: Patterns Rust and WASM
+
+on:
+  pull_request:
+    paths:
+      - "patterns/**"
+      - ".github/workflows/patterns-rust.yml"
+  push:
+    branches: [main]
+    paths:
+      - "patterns/**"
+      - ".github/workflows/patterns-rust.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  rust:
+    name: Rust and wasm32 compile
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Compile native engine
+        run: cargo check --manifest-path patterns/engine/Cargo.toml
+      - name: Install wasm32 target
+        run: rustup target add wasm32-unknown-unknown
+      - name: Compile WASM engine
+        run: cargo check --manifest-path patterns/engine/Cargo.toml --target wasm32-unknown-unknown

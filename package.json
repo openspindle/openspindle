@@ -41,6 +41,9 @@
     "test": "node --test \"src/**/*.test.ts\"",
     "icon": "electron scripts/app-icon.mjs",
     "sim:z1": "node tools/z1-simulator/main.ts",
+    "patterns:wasm": "wasm-pack build patterns/engine --target web --out-dir ../../public/pattern-wasm --release",
+    "patterns:dev": "vite --config tools/patterns/vite.config.ts --open /standalone.html",
+    "patterns:build": "vite build --config tools/patterns/vite.config.ts",
     "build:host": "node host/build.ts",
     "start:host": "node dist-host/index.js"
   },
