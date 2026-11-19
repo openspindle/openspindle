@@ -6,9 +6,7 @@ import {
 import { PatternEditor } from "./pattern-editor"
 import type { PatternSpec } from "@/domain/operations/pattern"
 import type { PatternOutput } from "./pattern-core"
-import { PrepareViewer } from "@/features/prepare/prepare-viewer"
 
-/** The operation editor shares OpenSpindle's actual 3D bed viewer after committing a toolpath. */
 export function PatternPage({ operationId }: { operationId: string | null }) {
   const plate = useSelectedPlate()
   const operation = plate?.operations.find((item) => item.id === operationId)
@@ -44,16 +42,6 @@ export function PatternPage({ operationId }: { operationId: string | null }) {
           onApply={pattern ? apply : undefined}
         />
       </div>
-      {pattern && (
-        <details className="shrink-0 border-t">
-          <summary className="cursor-pointer px-4 py-2 text-xs font-medium">
-            OpenSpindle 3D machine and stock viewer (saved operation)
-          </summary>
-          <div className="h-[320px] border-t">
-            <PrepareViewer />
-          </div>
-        </details>
-      )}
     </main>
   )
 }

@@ -30,7 +30,11 @@ import {
   problemAnchor,
   problemMarkerId,
 } from "../bed-viewer-layout"
-import type { LineRange, PlatePlacement } from "../bed-viewer-layout"
+import type {
+  LineRange,
+  PlatePlacement,
+  ViewerBounds,
+} from "../bed-viewer-layout"
 import { viewerPalette } from "./palette"
 import { reconcilePlates } from "./plate-identity"
 import { PlateView, bedGrid } from "./plate-view"
@@ -44,6 +48,9 @@ import type { VisualStyle } from "./solid-style"
 import { GLOW } from "./touch-marker"
 import { ViewerAssets } from "./viewer-assets"
 import type { ModelMeshes } from "./viewer-assets"
+import { LineSegments2 } from "three/addons/lines/webgpu/LineSegments2.js"
+import { LineSegmentsGeometry } from "three/addons/lines/LineSegmentsGeometry.js"
+import { SeeThroughLineMaterial } from "./see-through-line"
 import { ViewerStage } from "./viewer-stage"
 
 /**
@@ -51,6 +58,11 @@ import { ViewerStage } from "./viewer-stage"
  * else the perspective.
  */
 export type ViewMode = "perspective" | "top" | "front" | "camera"
+
+export type PreviewStroke = {
+  readonly color: string
+  readonly positions: Float32Array
+}
 
 /** Viewer-wide display state; only the selected plate follows playback and selection. */
 export type ViewerPresentation = {
@@ -192,6 +204,10 @@ export class BedScene {
   private readonly views = new Map<string, PlateView>()
   private plates: readonly ViewerPlate[] = []
   private layout = layoutPlates([], this.emptyBed)
+  private readonly previewGroup = new THREE.Group()
+  private previewBounds: ViewerBounds | null = null
+  private previewStrokes: readonly PreviewStroke[] | undefined
+  private previewLines: LineSegments2[] = []
   /** The frame of playback the selected plate is drawn at; null for its whole program. */
   private playback: PlaybackFrame | null = null
   private presentation: ViewerPresentation = {
@@ -286,7 +302,7 @@ export class BedScene {
     this.controls.addEventListener("end", () =>
       events.zoomChange(this.camera.zoom)
     )
-    this.stage.scene.add(this.emptyGrid)
+    this.stage.scene.add(this.emptyGrid, this.previewGroup)
     this.assets = new ViewerAssets(
       {
         bedChange: (machineBed, template) => {
@@ -338,6 +354,62 @@ export class BedScene {
     })
     if (this.arranger) window.addEventListener("keydown", this.keyDown)
     this.stopSpaceMouse = observeSpaceMouse(this.stage.invalidate)
+  }
+
+  setPreview(preview?: {
+    bounds: ViewerBounds
+    strokes: readonly PreviewStroke[]
+    width: number
+  }) {
+    const previousBounds = this.previewBounds
+    const plate = this.plates.at(0)
+    const offset = plate ? (this.offsetOf(plate.id) ?? 0) : 0
+    this.previewBounds = preview
+      ? {
+          min: [
+            preview.bounds.min[0] + offset,
+            preview.bounds.min[1],
+            preview.bounds.min[2],
+          ],
+          max: [
+            preview.bounds.max[0] + offset,
+            preview.bounds.max[1],
+            preview.bounds.max[2],
+          ],
+        }
+      : null
+    this.previewGroup.position.x = offset
+    if (preview?.strokes !== this.previewStrokes) {
+      this.disposePreview()
+      this.previewStrokes = preview?.strokes
+      for (const stroke of preview?.strokes ?? []) {
+        if (!stroke.positions.length) continue
+        const geometry = new LineSegmentsGeometry().setPositions(
+          stroke.positions
+        )
+        const material = new SeeThroughLineMaterial({
+          color: stroke.color,
+          linewidth: preview?.width ?? 1,
+          toneMapped: false,
+        })
+        const line = new LineSegments2(geometry, material)
+        this.previewLines.push(line)
+        this.previewGroup.add(line)
+      }
+    }
+    for (const line of this.previewLines)
+      line.material.linewidth = preview?.width ?? 1
+    if (!previousBounds && this.previewBounds) this.center()
+    this.stage.invalidate()
+  }
+
+  private disposePreview() {
+    for (const line of this.previewLines) {
+      line.removeFromParent()
+      line.geometry.dispose()
+      line.material.dispose()
+    }
+    this.previewLines = []
   }
 
   /** Keeps the views of plates that render identically; builds, updates or disposes the rest. */
@@ -511,6 +583,7 @@ export class BedScene {
   }
 
   dispose() {
+    this.disposePreview()
     this.stopSpaceMouse()
     cancelAnimationFrame(this.hoverAnchorFrame)
     this.arranger?.dispose()
@@ -741,7 +814,7 @@ export class BedScene {
     Object.assign(
       this.camera,
       fitOrthographicBounds(
-        this.layout.bounds,
+        this.previewBounds ?? this.layout.bounds,
         right,
         up,
         this.container.clientWidth / Math.max(1, this.container.clientHeight)
@@ -752,7 +825,7 @@ export class BedScene {
   }
 
   private center() {
-    const bounds = this.layout.bounds
+    const bounds = this.previewBounds ?? this.layout.bounds
     const target = new THREE.Vector3(...bounds.min)
       .add(new THREE.Vector3(...bounds.max))
       .multiplyScalar(0.5)

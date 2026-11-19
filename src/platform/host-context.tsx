@@ -27,8 +27,10 @@ export function HostProvider({
   return <HostContext.Provider value={host}>{children}</HostContext.Provider>
 }
 
+export const useOptionalHost = () => useContext(HostContext)
+
 export function useHost(): Host {
-  const host = useContext(HostContext)
+  const host = useOptionalHost()
   if (!host) throw new Error("HostProvider is missing.")
   return host
 }

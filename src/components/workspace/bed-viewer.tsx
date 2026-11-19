@@ -10,7 +10,7 @@ import {
 import { useEffect, useRef, useState } from "react"
 import type { FrameSource } from "@/app/job/frame"
 import type { RemovalGrid } from "@/domain/tools/material-removal"
-import { useHost } from "@/platform/host-context"
+import { useOptionalHost } from "@/platform/host-context"
 import { plateLabel } from "@/domain/plate/plate"
 import type {
   ViewerGhost,
@@ -19,9 +19,14 @@ import type {
   ViewerProblemRef,
 } from "@/components/workspace/viewer/viewer-input"
 import { problemMarkerId } from "./bed-viewer-layout"
-import type { LineRange } from "./bed-viewer-layout"
+import type { LineRange, ViewerBounds } from "./bed-viewer-layout"
 import { BedScene } from "./viewer/bed-scene"
-import type { LiveTool, MachineOrigin, ViewMode } from "./viewer/bed-scene"
+import type {
+  LiveTool,
+  MachineOrigin,
+  ViewMode,
+  PreviewStroke,
+} from "./viewer/bed-scene"
 import type { VisualStyle } from "./viewer/solid-style"
 import type { ArrangeEvents, ArrangeView } from "./viewer/setup-arranger"
 
@@ -45,6 +50,12 @@ export type {
   PickedPoint,
 } from "./viewer/setup-arranger"
 type Props = {
+  preview?: {
+    bounds: ViewerBounds
+    strokes: readonly PreviewStroke[]
+    width: number
+  }
+
   layers?: ViewerLayers
   removal?: { readonly plateId: string; readonly grid: RemovalGrid } | null
   plates: ViewerPlate[]
@@ -90,6 +101,7 @@ type Props = {
 }
 
 export function BedViewer({
+  preview,
   layers,
   removal,
   plates,
@@ -124,7 +136,7 @@ export function BedViewer({
   const zoomChange = useRef(onZoomChange)
   const arrange = useRef(onArrange)
   const sceneRef = useRef<BedScene | null>(null)
-  const models = useHost().models
+  const models = useOptionalHost()?.models
   const [error, setError] = useState("")
   useEffect(() => {
     select.current = onSelectPlate
@@ -163,7 +175,7 @@ export function BedViewer({
         error: setError,
         arrange: arrangeEvents,
       },
-      (id) => models.mesh(id)
+      (id) => (models ? models.mesh(id) : Promise.resolve(null))
     )
     sceneRef.current = scene
     return () => {
@@ -219,6 +231,9 @@ export function BedViewer({
   useEffect(() => {
     sceneRef.current?.setPlates(plates)
   }, [plates])
+  useEffect(() => {
+    sceneRef.current?.setPreview(preview)
+  }, [preview, plates])
   // After the plates, so a selection always finds its item drawn.
   useEffect(() => {
     if (arrangement) sceneRef.current?.arrange(arrangement)

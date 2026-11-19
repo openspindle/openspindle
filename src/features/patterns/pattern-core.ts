@@ -205,10 +205,11 @@ type PatternWasm = {
 let wasmEngine: Promise<PatternWasm | null> | undefined
 
 /** Load once, including the optional module's absence in standalone local mode. */
-function loadWasm(): Promise<PatternWasm | null> {
+function loadWasm(baseUrl: string): Promise<PatternWasm | null> {
   wasmEngine ??= (async () => {
     try {
-      const uri = `${import.meta.env.BASE_URL}pattern-wasm/openspindle_pattern_engine.js`
+      const uri = new URL("pattern-wasm/openspindle_pattern_engine.js", baseUrl)
+        .href
       const module: PatternWasm = await import(/* @vite-ignore */ uri)
       await module.default()
       return module
@@ -221,12 +222,13 @@ function loadWasm(): Promise<PatternWasm | null> {
 
 /** Uses Rust when available; formula errors never silently switch engines. */
 export async function generatePattern(
-  spec: PatternSpec
+  spec: PatternSpec,
+  baseUrl: string
 ): Promise<PatternOutput> {
   const validated = PatternSpecSchema.parse(spec)
   // Check the shared formula language before either engine evaluates it.
   for (const axis of [validated.x, validated.y, validated.z]) parseFormula(axis)
-  const module = await loadWasm()
+  const module = await loadWasm(baseUrl)
   if (!module)
     return { generated: generateLocally(validated), engine: "Local preview" }
   const output: GeneratedPattern = JSON.parse(

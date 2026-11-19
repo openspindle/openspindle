@@ -19,14 +19,36 @@ perlage and Grain d'orge**. They are engraving _paths_, not solid-model
 pockets or a simulated rose-engine cutter. Tool radius and actual decorative
 groove geometry depend on the installed cutter.
 
-The SVG preview shows the XY projection of the sampled vector paths. Copy
-or download the generated G-code. In a Pattern operation, **Apply toolpath**
-saves the mathematical recipe and the current generated NC to the plate.
-The operation then compiles with OpenSpindle's existing G-code validation and
-appears in its Prepare and Job viewers. Open the collapsed
-**OpenSpindle 3D machine and stock viewer** below the editor to see the
-actual 3D preview of the saved operation. The editing preview itself is 2D;
-it is not a stock-removal simulation.
+The 3D preview uses the same orbit, pan, zoom and SpaceMouse navigation as
+Prepare and Job. Use the view toolbar for top, front, perspective and fit.
+**Line width** changes all preview strokes and each layer has its own colour.
+The eye buttons hide layers in the toolpath preview. All layers still
+participate in G-code generation and material removal.
+
+Add another **Pattern** layer to combine independent formulae, sliders and
+cutting settings. **Circle mask** protects a round area anywhere in XY.
+**Dial numeral mask** places 1–12 in the selected local font on a ring.
+These layers leave material uncut. The generator splits engraving strokes
+at the mask and retracts across the gap. Set the mask clearance to at least
+the maximum cutting radius engaged by your engraving tool, plus any extra
+margin you want around the protected area.
+
+Add **Circular cutout** to finish with an outside profile. Set the finished
+radius, flat cutter diameter, measured stock thickness, step-down and tool
+number. Its tool centre runs half the cutter diameter outside the part.
+The pass that reaches stock thickness cuts the complete perimeter without
+tabs. Secure the part independently and confirm clearance below the stock
+before running it. Add extra depth only when the setup allows it. An
+intersecting mask blocks generation of that cutout.
+
+**Show removal** uses the same 3D scene and camera. It shows the result of
+engraving with the preview V-bit (including its optional flat tip) and
+cutting the perimeter with the specified flat cutter. The stock is virtual
+and the displayed geometry is sampled.
+
+In a Pattern operation, **Apply toolpath** saves the layer settings and
+generated NC together. The standalone editor can copy or download the
+combined G-code.
 
 ## Standalone
 
@@ -78,8 +100,3 @@ moves. Use the compiled job for the Z1 approach sequence. Standalone NC is
 machine-independent.
 
 Machine operation is always an explicit action from the Job tab.
-
-Use **Line width** and **Line colour** to adjust the 2D toolpath preview.
-**Show removal** displays a sampled top view of the current pattern on flat
-stock. Set the preview V-bit's included angle and diameter to compare groove
-width and depth. Darker areas indicate deeper cuts.
