@@ -1,5 +1,5 @@
 import { useId, useState } from "react"
-import { Layers3, X } from "lucide-react"
+import { Layers3, RotateCcw, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
@@ -51,6 +51,7 @@ export function ViewerLayersMenu({
   setVisible,
   setColor,
   editable,
+  reset,
 }: {
   layers: ViewerLayers
   change: (key: keyof ViewerLayers, value: boolean) => void
@@ -66,6 +67,7 @@ export function ViewerLayersMenu({
   setVisible: (id: string, visible: boolean) => void
   setColor: (id: string, color: string | null) => void
   editable: boolean
+  reset: () => void
 }) {
   const id = useId()
   const [open, setOpen] = useState(false)
@@ -87,14 +89,25 @@ export function ViewerLayersMenu({
         <PopoverContent side="right" align="start" className="w-80">
           <PopoverHeader className="flex-row items-center justify-between">
             <PopoverTitle>Layers</PopoverTitle>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              aria-label="Close layers"
-              onClick={() => setOpen(false)}
-            >
-              <X />
-            </Button>
+            <div className="flex gap-1">
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                title="Reset layer visibility"
+                aria-label="Reset layer visibility"
+                onClick={reset}
+              >
+                <RotateCcw />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Close layers"
+                onClick={() => setOpen(false)}
+              >
+                <X />
+              </Button>
+            </div>
           </PopoverHeader>
           <ScrollArea
             className="h-[min(70vh,36rem)]"

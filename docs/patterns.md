@@ -70,3 +70,8 @@ diagnostics, and verify simulation and the machine's tool-length probe.
 
 Use conservative feed and plunge values until the cut is verified on scrap.
 Machine operation is always an explicit action from the Job tab.
+
+Use **Line width** and **Line colour** to adjust the 2D toolpath preview.
+**Show removal** displays a sampled top view of the current pattern on flat
+stock. Set the preview V-bit's included angle and diameter to compare groove
+width and depth. Darker areas indicate deeper cuts.

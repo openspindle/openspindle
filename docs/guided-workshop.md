@@ -74,8 +74,9 @@ Colours are saved with operations in the project and support Undo/Redo; **Auto**
 restores the normal palette. Visibility changes leave the machining program and
 material-removal calculation unchanged. Completed paths retain full colour and
 upcoming paths use the same colour faintly. Selection keeps its highlight colour.
-Layer and operation visibility choices apply to the current Job view; operation
-colours also appear in Prepare and remain editable while the run's snapshot is shown.
+Job remembers Show removal and layer and operation visibility when you switch
+tabs during the session. The circular arrow in the Layers menu restores default
+visibility. Operation colours are saved separately with the project.
 
 
 ## Finished model and material

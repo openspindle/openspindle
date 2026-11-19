@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input"
 import { Slider } from "@/components/ui/slider"
 import { Textarea } from "@/components/ui/textarea"
 import type { PatternSpec } from "@/domain/operations/pattern"
+import { PatternRemoval } from "./pattern-removal"
 import { generatePattern } from "./pattern-core"
 import type { PatternOutput } from "./pattern-core"
 import { PATTERN_PRESETS, defaultPattern } from "./presets"
@@ -14,7 +15,15 @@ type Props = {
   onApply?: (definition: PatternSpec, output: PatternOutput) => void
 }
 
-function Preview({ output }: { output: PatternOutput | null }) {
+function Preview({
+  output,
+  width: strokeWidth,
+  color,
+}: {
+  output: PatternOutput | null
+  width: number
+  color: string
+}) {
   if (!output)
     return (
       <div className="flex h-full items-center justify-center text-muted-foreground">
@@ -54,8 +63,8 @@ function Preview({ output }: { output: PatternOutput | null }) {
         <path
           key={i}
           d={toPath(points)}
-          stroke="currentColor"
-          strokeWidth={0.09}
+          stroke={color}
+          strokeWidth={strokeWidth}
           strokeLinejoin="round"
           strokeLinecap="round"
           fill="none"
@@ -113,6 +122,9 @@ export function PatternEditor({ initial, onApply }: Props) {
   const output = result?.spec === spec ? result.output : null
   const [problem, setProblem] = useState<string | null>(null)
   const pending = !output && !problem
+  const [lineWidth, setLineWidth] = useState(1)
+  const [lineColor, setLineColor] = useState("#0088bf")
+  const [showRemoval, setShowRemoval] = useState(false)
   const [paramName, setParamName] = useState("")
   const update = (patch: Partial<PatternSpec>) =>
     changeSpec({ ...spec, ...patch })
@@ -398,13 +410,45 @@ export function PatternEditor({ initial, onApply }: Props) {
           </section>
         </div>
         <div className="flex min-h-0 flex-col gap-2">
+          <div className="flex flex-wrap items-end gap-3">
+            <Numeric
+              label="Line width (px)"
+              value={lineWidth}
+              onChange={(value) =>
+                setLineWidth(Math.max(0.5, Math.min(5, value)))
+              }
+              min={0.5}
+              max={5}
+              step={0.25}
+            />
+            <label className="flex flex-col gap-1 text-xs">
+              Line colour
+              <Input
+                type="color"
+                className="w-12 p-0"
+                value={lineColor}
+                onChange={(event) => setLineColor(event.target.value)}
+              />
+            </label>
+            <Button
+              variant="outline"
+              aria-pressed={showRemoval}
+              onClick={() => setShowRemoval(!showRemoval)}
+            >
+              {showRemoval ? "Show toolpath" : "Show removal"}
+            </Button>
+          </div>
           <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-lg border bg-muted/20 p-3">
-            {problem ? (
+            {problem && (
               <p role="alert" className="text-sm text-destructive">
                 {problem}
               </p>
-            ) : (
-              <Preview output={output} />
+            )}
+            {!problem && showRemoval && output && (
+              <PatternRemoval pattern={output.generated} />
+            )}
+            {!problem && (!showRemoval || !output) && (
+              <Preview output={output} width={lineWidth} color={lineColor} />
             )}
           </div>
           <div className="flex max-h-[32%] min-h-32 flex-col rounded-lg border">

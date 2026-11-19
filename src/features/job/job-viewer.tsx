@@ -1,7 +1,8 @@
 import { DEFAULT_VIEWER_LAYERS } from "@/components/workspace/viewer/viewer-input"
 import { ViewerLayersMenu } from "./viewer-layers-menu"
 import type { FrameSource } from "@/app/job/frame"
-import { useMemo, useState } from "react"
+import { useMemo } from "react"
+import { createAtom, useSelector } from "@tanstack/react-store"
 import { useMaterialRemoval } from "@/features/workshop/use-material-removal"
 import { useDispatch, useWorkspace } from "@/app/workspace/workspace-context"
 import { BedViewer } from "@/components/workspace/bed-viewer"
@@ -16,6 +17,13 @@ import { useFreshTelemetry } from "@/platform/machine"
 import { MachineOriginCard, useMachineOrigin } from "./machine-origin"
 import { MachineStatusCard } from "./machine-status"
 import { TrackerOverlay } from "./tracker-overlay"
+
+const defaultVisibility = () => ({
+  layers: DEFAULT_VIEWER_LAYERS,
+  hidden: new Set<string>(),
+  showRemoval: false,
+})
+const visibility = createAtom(defaultVisibility())
 
 /**
  * The 3D bed with every plate; the shown plate is highlighted and drawn at the timeline's frames,
@@ -35,8 +43,7 @@ export function JobViewer({
     (plate) => plate.id === shown?.plate.id
   )
   const operations = editingPlate?.operations ?? shown?.plate.operations ?? []
-  const [layers, setLayers] = useState(DEFAULT_VIEWER_LAYERS)
-  const [hidden, setHidden] = useState<ReadonlySet<string>>(() => new Set())
+  const { layers, hidden, showRemoval } = useSelector(visibility)
   const hiddenLineRanges = useMemo(() => {
     if (!shown) return {}
     return {
@@ -63,7 +70,6 @@ export function JobViewer({
       }),
     [originalPlates, shown, editingPlate]
   )
-  const [showRemoval, setShowRemoval] = useState(false)
   const removal = useMaterialRemoval(
     shown,
     frames,
@@ -102,20 +108,26 @@ export function JobViewer({
         <ViewerLayersMenu
           layers={layers}
           change={(key, value) =>
-            setLayers((current) => ({ ...current, [key]: value }))
+            visibility.set((current) => ({
+              ...current,
+              layers: { ...current.layers, [key]: value },
+            }))
           }
           showRemoval={showRemoval}
-          setShowRemoval={setShowRemoval}
+          setShowRemoval={(value) =>
+            visibility.set((current) => ({ ...current, showRemoval: value }))
+          }
+          reset={() => visibility.set(defaultVisibility())}
           removal={removal}
           operations={operations}
           hidden={hidden}
           editable={!!editingPlate}
           setVisible={(id, visible) =>
-            setHidden((current) => {
-              const next = new Set(current)
+            visibility.set((current) => {
+              const next = new Set(current.hidden)
               if (visible) next.delete(id)
               else next.add(id)
-              return next
+              return { ...current, hidden: next }
             })
           }
           setColor={(operationId, color) => {
