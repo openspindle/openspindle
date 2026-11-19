@@ -1,4 +1,4 @@
-import { firmwareSetup } from "@/app/workspace/firmware-setup"
+import { firmwareSetup } from "@/domain/firmware/firmware-setup"
 import { kitForPlate } from "@/domain/fixtures/catalog"
 import type { FixtureKit } from "@/domain/fixtures/fixture-kit"
 import type { FirmwareModel } from "@/domain/firmware/firmware-model"

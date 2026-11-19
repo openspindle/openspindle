@@ -3,7 +3,7 @@ import { kitForPlate } from "@/domain/fixtures/catalog"
 import type { Plate } from "@/domain/plate/plate"
 import type { GCodeProgram, Point3 } from "@/domain/nc/gcode"
 import type { SimulatedBed } from "@/machine/contract"
-import { firmwareSetup } from "./firmware-setup"
+import { firmwareSetup } from "@/domain/firmware/firmware-setup"
 
 /**
  * A plate's program as its machine moves through it: with its firmware's own moves (tool

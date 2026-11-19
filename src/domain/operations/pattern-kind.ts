@@ -10,7 +10,7 @@ export const patternKind: OperationKind<"pattern"> = {
   generated: false,
   phase: () => "machining",
   tools: ({ source }) => [source.tool],
-  resolve: (operation) => {
+  resolve: (operation, _plate, { kit }) => {
     const { nc } = operation.source
     if (nc === null)
       return fail(
@@ -23,6 +23,28 @@ export const patternKind: OperationKind<"pattern"> = {
           }
         )
       )
-    return ok({ nc, policy: PLAIN_NC, reviewLines: [] })
+    if (!kit.patternApproach.length)
+      return ok({ nc, policy: PLAIN_NC, reviewLines: [] })
+    const lines = nc.split(/\r?\n/)
+    // Both generators emit this header. Require it before inserting machine travel,
+    // including for patterns already saved by older versions of OpenSpindle.
+    const change = lines.findIndex((line) => /^T\d+ M6$/.test(line))
+    if (
+      change !== 2 ||
+      lines[1] !== "G21 G90 G17 G94" ||
+      !/^S\d+ M3$/.test(lines[change + 1] ?? "")
+    )
+      return fail(
+        error(
+          "operation-unsafe",
+          `Regenerate the pattern toolpath for "${operation.name}" to restore its tool-change approach.`,
+          {
+            subject: operationSubject(operation.id),
+            fix: { kind: "edit-operation", operationId: operation.id },
+          }
+        )
+      )
+    lines.splice(change + 1, 0, ...kit.patternApproach)
+    return ok({ nc: lines.join("\n"), policy: PLAIN_NC, reviewLines: [] })
   },
 }

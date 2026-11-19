@@ -69,6 +69,14 @@ stock dimensions and safe Z agree with the setup. Review existing OpenSpindle
 diagnostics, and verify simulation and the machine's tool-length probe.
 
 Use conservative feed and plunge values until the cut is verified on scrap.
+On the Makera Z1, compiling a Pattern operation adds a machine-coordinate
+retract after tool change, moves to the middle of the machine with the spindle
+off, and waits for that move to finish before starting the spindle. This also
+applies to saved Pattern operations. The Job preflight checks setter clearance
+against the Makera motion model, including tool changes and machine-coordinate
+moves. Use the compiled job for the Z1 approach sequence. Standalone NC is
+machine-independent.
+
 Machine operation is always an explicit action from the Job tab.
 
 Use **Line width** and **Line colour** to adjust the 2D toolpath preview.

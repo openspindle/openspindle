@@ -1,5 +1,7 @@
 import { readNcBlock, ruleSetting, runRules } from "@/machine/contract"
 import type { RuleSettings } from "@/machine/contract"
+import { parseGCode } from "@/domain/nc/gcode"
+import { firmwareSetup } from "../firmware/firmware-setup"
 import type { GCodeSegment, Point3 } from "@/domain/nc/gcode"
 import { linesText, programLines } from "@/domain/nc/program-lines"
 import type { Tool } from "@/domain/tools/tool"
@@ -139,7 +141,16 @@ function toolSetterViolation(
   const bottom = center[2] - plate.setup.workOrigin[2]
   const top = bottom + height
   const radii = toolRadii(plate, library)
-  const hits = compiled.program.segments.filter((segment) =>
+  const kit = kitForPlate(plate)
+  const { program } = compiled
+  const placed = kit.firmware
+    ? parseGCode(
+        program.source,
+        program.name,
+        kit.firmware.preview(firmwareSetup(plate, kit))
+      )
+    : program
+  const hits = placed.segments.filter((segment) =>
     entersSetterClearance(
       segment,
       { x, y, bottom, top, radius },

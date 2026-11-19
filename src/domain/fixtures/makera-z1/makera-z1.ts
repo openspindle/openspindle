@@ -178,6 +178,12 @@ export class MakeraZ1 extends FixtureKit {
    * change and park rise to as well.
    */
   readonly clearanceRetract = `G53 G0 Z${formatMillimetres(CLEARANCE_Z)}`
+  override readonly patternApproach = [
+    this.clearanceRetract,
+    "M400",
+    "G53 G0 X-100 Y-100",
+    "M400",
+  ]
   /** Makera CAM's toolpath and stock markers (`;@MKR|…`). */
   readonly camMarkers = MAKERA_CAM
   readonly glossary = Z1_GLOSSARY

@@ -176,6 +176,8 @@ export abstract class FixtureKit {
    * drags it.
    */
   abstract readonly clearanceRetract: string
+  /** Optional spindle-off approach after a generated pattern's tool change. */
+  readonly patternApproach: readonly string[] = []
   /** The markers the CAM made for the machine writes in its programs; null for none. */
   abstract readonly camMarkers: CamMarkers | null
   /** The codes of the machine's NC, as the G-code glossary lists them. */
