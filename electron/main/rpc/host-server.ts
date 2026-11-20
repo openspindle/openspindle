@@ -1,7 +1,7 @@
 import { MessageChannelMain, ipcMain } from "electron"
 import type { IpcMainEvent, MessagePortMain, WebContents } from "electron"
-import { createEndpoint } from "@openspindle/rpc"
-import type { Handlers } from "@openspindle/rpc"
+import { createEndpoint } from "@spinnvill/rpc"
+import type { Handlers } from "@spinnvill/rpc"
 import {
   RPC_CONNECT_CHANNEL,
   RPC_PORT_CHANNEL,

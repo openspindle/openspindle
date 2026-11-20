@@ -34,7 +34,7 @@ export const patternKind: OperationKind<"pattern"> = {
       return ok({ nc, policy: PLAIN_NC, reviewLines: [] })
     const lines = nc.split(/\r?\n/)
     // Both generators emit this header. Require it before inserting machine travel,
-    // including for patterns already saved by older versions of OpenSpindle.
+    // including for patterns already saved by older versions of Spinnvill.
     const changes = lines.flatMap((line, index) =>
       /^T\d+ M6$/.test(line) ? [index] : []
     )

@@ -15,13 +15,13 @@ export class Webcam {
   ) {
     if (device && !/^\/dev\/(?:video\d+|v4l\/by-id\/[\w.:-]+)$/.test(device))
       throw new Error(
-        "Use /dev/videoN or /dev/v4l/by-id/<device> for OPENSPINDLE_WEBCAM_DEVICE."
+        "Use /dev/videoN or /dev/v4l/by-id/<device> for SPINNVILL_WEBCAM_DEVICE."
       )
   }
   start() {
     if (this.process) return
     if (!this.device)
-      throw new Error("Configure OPENSPINDLE_WEBCAM_DEVICE on the host first.")
+      throw new Error("Configure SPINNVILL_WEBCAM_DEVICE on the host first.")
     if (process.platform !== "linux")
       throw new Error("Local webcam capture currently requires Linux V4L2.")
     this.status = "connecting"
@@ -102,7 +102,7 @@ export class Webcam {
     })
     child.on("error", () =>
       fail(
-        "Could not start ffmpeg. Install it on the host or configure OPENSPINDLE_FFMPEG."
+        "Could not start ffmpeg. Install it on the host or configure SPINNVILL_FFMPEG."
       )
     )
     child.on("close", () => {

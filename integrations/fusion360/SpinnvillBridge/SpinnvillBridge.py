@@ -1,4 +1,4 @@
-"""Discover open Fusion NC programs and post them when OpenSpindle imports."""
+"""Discover open Fusion NC programs and post them when Spinnvill imports."""
 
 import json
 import os
@@ -18,10 +18,10 @@ from .bridge_server import (
 )
 
 
-_TAB_ID = "OpenSpindleBridgeTab"
-_PANEL_ID = "OpenSpindleBridgePanel"
-_CONNECTION_ID = "OpenSpindleBridgeConnection"
-_EVENT_ID = "OpenSpindleBridgeMainThreadRequest"
+_TAB_ID = "SpinnvillBridgeTab"
+_PANEL_ID = "SpinnvillBridgePanel"
+_CONNECTION_ID = "SpinnvillBridgeConnection"
+_EVENT_ID = "SpinnvillBridgeMainThreadRequest"
 _bridge = None
 _handlers = []
 _catalog = {}
@@ -34,7 +34,7 @@ def _application():
 
 
 def _pairings_path():
-    # Where the OpenSpindle apps paired with this add-in are kept across Fusion sessions: the
+    # Where the Spinnvill apps paired with this add-in are kept across Fusion sessions: the
     # user's application data, not the add-in's own folder.
     if sys.platform == "win32":
         base = Path(os.environ.get("APPDATA") or Path.home() / "AppData" / "Roaming")
@@ -44,7 +44,7 @@ def _pairings_path():
 
 
 def _show_error(message):
-    _application().userInterface.messageBox(message, "OpenSpindle")
+    _application().userInterface.messageBox(message, "Spinnvill")
 
 
 def _display_name(value, fallback):
@@ -52,7 +52,7 @@ def _display_name(value, fallback):
 
 
 def _program_reference(document, program):
-    # What finds the program again in a later session, when OpenSpindle updates an operation
+    # What finds the program again in a later session, when Spinnvill updates an operation
     # imported from it: its document's lineage id (the same for all versions; None while the
     # document was never saved) and the program's id, which saving and reloading keep.
     document_id = None
@@ -119,7 +119,7 @@ def _refresh_catalog(ensure_live):
 _SPLIT_PROPERTY = "splitFile"
 _SPLIT_OUTPUT = (
     "The post wrote several files, such as one per tool or toolpath. In Fusion, set the "
-    "NC program's post property Split file to No splitting and try again: OpenSpindle "
+    "NC program's post property Split file to No splitting and try again: Spinnvill "
     "splits programs itself. Posts with separate subprogram files are not supported."
 )
 _SUBPROGRAM_CALL = re.compile(r"\b(?:M0*98|M198|G65)(?![\d.])", re.IGNORECASE)
@@ -128,7 +128,7 @@ _MOTION = re.compile(r"(?:^|\s)(?:G0*[0-3](?![\d.])|[XYZ][+-]?[\d.])", re.IGNORE
 
 def _without_splitting(program):
     # Posts that can write a file per tool or toolpath (Makera's "Split file") post one file
-    # for OpenSpindle, which splits programs itself when importing them. Returns what restores
+    # for Spinnvill, which splits programs itself when importing them. Returns what restores
     # the post's setting, or None when it has no such setting or it is off already.
     try:
         parameters = program.postParameters
@@ -152,7 +152,7 @@ def _without_splitting(program):
     return restore
 
 
-# What OpenSpindle's Makera Z1 post reads of the setup that Fusion does not give a post, its Part
+# What Spinnvill's Makera Z1 post reads of the setup that Fusion does not give a post, its Part
 # Position distances and its fixtures: a file beside the program, in the folder it posts to.
 # Fusion's API gives lengths in centimetres; the file holds millimetres.
 _SETUP_FILE = "openspindle-setup.json"
@@ -162,7 +162,7 @@ _MAX_FIXTURES = 32
 def _log(message, level=adsk.core.LogLevels.InfoLogLevel):
     # Fusion's own log file, where imports can be traced afterwards.
     try:
-        _application().log("OpenSpindle: " + message, level, adsk.core.LogTypes.FileLogType)
+        _application().log("Spinnvill: " + message, level, adsk.core.LogTypes.FileLogType)
     except Exception:
         pass
 
@@ -265,7 +265,7 @@ def _whole_program(contents):
 
 def _post_snapshot(document, program, program_id, ensure_live):
     if not program.isValid:
-        raise ValueError("The NC program is no longer available. Refresh the program list in OpenSpindle.")
+        raise ValueError("The NC program is no longer available. Refresh the program list in Spinnvill.")
     if program.postConfiguration is None:
         raise ValueError("Choose a machine post processor in the NC program first.")
     setups = {}
@@ -305,7 +305,7 @@ def _post_snapshot(document, program, program_id, ensure_live):
     overrides = []
     restore_splitting = None
 
-    with tempfile.TemporaryDirectory(prefix="openspindle-fusion-") as directory:
+    with tempfile.TemporaryDirectory(prefix="spinnvill-fusion-") as directory:
         values = [
             (folder_parameter, directory.replace("\\", "/")),
             (file_parameter, stem),
@@ -387,8 +387,8 @@ def _post_snapshot(document, program, program_id, ensure_live):
             raise ValueError("The post must produce UTF-8 or ASCII NC text.") from error
         if not contents.strip() or "\x00" in contents:
             raise ValueError("The posted NC program is empty or contains NUL bytes.")
-        # What the program tells OpenSpindle of its setup, as the post wrote it.
-        markers = [line.strip() for line in contents.splitlines() if line.startswith(";@OPENSPINDLE")]
+        # What the program tells Spinnvill of its setup, as the post wrote it.
+        markers = [line.strip() for line in contents.splitlines() if line.startswith(";@SPINNVILL")]
         _log("Program markers: " + (" ".join(markers[:40])[:4000] or "none"))
         # Other files beside it are its parts or subprograms: it must hold the whole program.
         if len(files) > 1 and not _whole_program(contents):
@@ -476,8 +476,8 @@ class _ConnectionCreatedHandler(adsk.core.CommandCreatedEventHandler):
         )
         command.commandInputs.addTextBoxCommandInput(
             "pairingInstructions", "",
-            "Enter this code in the OpenSpindle connection dialog. "
-            "Keep OpenSpindle open on this computer. The code expires in two minutes.",
+            "Enter this code in the Spinnvill connection dialog. "
+            "Keep Spinnvill open on this computer. The code expires in two minutes.",
             3, True,
         )
 
@@ -541,7 +541,7 @@ def run(_context):
         app = _application()
         _custom_event = app.registerCustomEvent(_EVENT_ID)
         if _custom_event is None:
-            raise ValueError("Fusion could not register the OpenSpindle request event.")
+            raise ValueError("Fusion could not register the Spinnvill request event.")
         # Capture the one documented thread-safe API method on the main thread.
         fire_event = app.fireCustomEvent
         _bridge = SnapshotBridge(
@@ -549,21 +549,21 @@ def run(_context):
         )
         _custom_handler = _MainThreadHandler(_bridge.requests)
         if not _custom_event.add(_custom_handler):
-            raise ValueError("Fusion could not attach the OpenSpindle request handler.")
+            raise ValueError("Fusion could not attach the Spinnvill request handler.")
         ui = app.userInterface
         cleanup_errors = _remove_ui(ui)
         if cleanup_errors:
-            raise ValueError("Could not remove the previous OpenSpindle toolbar.\n" + "\n".join(cleanup_errors))
+            raise ValueError("Could not remove the previous Spinnvill toolbar.\n" + "\n".join(cleanup_errors))
         workspace = ui.workspaces.itemById("CAMEnvironment")
-        tab = workspace.toolbarTabs.add(_TAB_ID, "OpenSpindle")
-        panel = tab.toolbarPanels.add(_PANEL_ID, "OpenSpindle")
+        tab = workspace.toolbarTabs.add(_TAB_ID, "Spinnvill")
+        panel = tab.toolbarPanels.add(_PANEL_ID, "Spinnvill")
         handler = _ConnectionCreatedHandler()
         definition = ui.commandDefinitions.addButtonDefinition(
-            _CONNECTION_ID, "Connect to OpenSpindle",
+            _CONNECTION_ID, "Connect to Spinnvill",
             "Request a connection and show its one-time code.",
         )
         if not definition.commandCreated.add(handler):
-            raise ValueError("Fusion could not attach the OpenSpindle connection command.")
+            raise ValueError("Fusion could not attach the Spinnvill connection command.")
         _handlers.append(handler)
         control = panel.controls.addCommand(definition)
         control.isPromoted = True
@@ -571,7 +571,7 @@ def run(_context):
         _bridge.start()
     except Exception as error:
         cleanup_errors = _cleanup()
-        message = "OpenSpindle Bridge could not start.\n\n" + str(error)
+        message = "Spinnvill Bridge could not start.\n\n" + str(error)
         if cleanup_errors:
             message += "\n\nCleanup also reported:\n" + "\n".join(cleanup_errors)
         _show_error(message)
@@ -580,4 +580,4 @@ def run(_context):
 def stop(_context):
     errors = _cleanup()
     if errors:
-        _show_error("OpenSpindle Bridge cleanup could not finish.\n\n" + "\n".join(errors))
+        _show_error("Spinnvill Bridge cleanup could not finish.\n\n" + "\n".join(errors))

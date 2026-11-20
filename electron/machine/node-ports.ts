@@ -31,7 +31,7 @@ function notConnected(
   error: NodeJS.ErrnoException
 ): string {
   if (error.code === "EHOSTUNREACH" && process.platform === "darwin")
-    return `Could not reach ${host}:${port}. Check that the machine is on this network and that OpenSpindle may use the local network: System Settings › Privacy & Security › Local Network.`
+    return `Could not reach ${host}:${port}. Check that the machine is on this network and that Spinnvill may use the local network: System Settings › Privacy & Security › Local Network.`
   return `Could not connect to ${host}:${port} (${error.code ?? error.message}).`
 }
 

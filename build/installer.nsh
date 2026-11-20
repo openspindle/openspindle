@@ -1,11 +1,11 @@
 ; The Windows installer's additions (nsis.include in electron-builder.yml).
 ;
-; NC programs list OpenSpindle under Explorer's Open with, without OpenSpindle becoming the app
+; NC programs list Spinnvill under Explorer's Open with, without Spinnvill becoming the app
 ; that opens them: they stay with the CAM or editor that opens them now, as on macOS. Associations
 ; in electron-builder.yml would make it their app on Windows, so these are registered here, for
 ; the extensions of FILE_KINDS.program in src/platform/contract/files.ts.
 
-!define NC_PROGRAM_CLASS "OpenSpindle.NcProgram"
+!define NC_PROGRAM_CLASS "Spinnvill.NcProgram"
 
 !macro customInstall
   WriteRegStr SHELL_CONTEXT "Software\Classes\${NC_PROGRAM_CLASS}" "" "NC program"

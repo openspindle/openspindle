@@ -119,9 +119,9 @@ const PREPARED_KEPT = 4
 /** Why leaving a running job waits for the user's confirmation, in the quit prompt's words. */
 const LEAVING_JOB = {
   disconnect:
-    "A job is running on the machine. Disconnecting ends OpenSpindle's tracking of the job, but the machine keeps running the program. Use Stop first to end it.",
+    "A job is running on the machine. Disconnecting ends Spinnvill's tracking of the job, but the machine keeps running the program. Use Stop first to end it.",
   connect:
-    "A job is running on the machine. Connecting to another device disconnects OpenSpindle from it, but the machine keeps running the program. Use Stop first to end it.",
+    "A job is running on the machine. Connecting to another device disconnects Spinnvill from it, but the machine keeps running the program. Use Stop first to end it.",
 } as const
 
 type Foreground = Activity & { readonly controller: AbortController }
@@ -1505,7 +1505,7 @@ export class MachineController {
       count === 1 ? "the program" : `part ${tracker.part + 1} of ${count}`
     const error = new MachineError(
       "rejected",
-      `The machine began playing a file of ${size} bytes instead of the ${bytes} bytes of ${sent}: it finds the file to play by a checksum of its name, so another file on its card may be running. OpenSpindle sent Stop; check the machine before running again.`
+      `The machine began playing a file of ${size} bytes instead of the ${bytes} bytes of ${sent}: it finds the file to play by a checksum of its name, so another file on its card may be running. Spinnvill sent Stop; check the machine before running again.`
     )
     // A start still waiting for the part fails with this reason rather than Stop's.
     if (this.activity?.kind === "run") this.activity.controller.abort(error)
@@ -1528,7 +1528,7 @@ export class MachineController {
     const at = programLineOf(tracker.parts[tracker.part], dropped)
     const error = new MachineError(
       "rejected",
-      `The machine left out line ${at} of the program as it read it, so it no longer runs the program sent. OpenSpindle sent Stop; check the machine before running again.`
+      `The machine left out line ${at} of the program as it read it, so it no longer runs the program sent. Spinnvill sent Stop; check the machine before running again.`
     )
     if (this.activity?.kind === "run") this.activity.controller.abort(error)
     this.failJob(error)

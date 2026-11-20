@@ -1,4 +1,4 @@
-import { defineContract } from "@openspindle/rpc"
+import { defineContract } from "@spinnvill/rpc"
 import { z } from "zod"
 import {
   AnchorConfigurationSchema,

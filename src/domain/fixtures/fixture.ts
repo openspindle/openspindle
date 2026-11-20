@@ -9,7 +9,7 @@ import type { MountPoint } from "@/domain/fixtures/mount-points"
 import type { Finish } from "./machine-bed"
 
 /**
- * A fixture OpenSpindle implements: what it is, how it is drawn, where a new plate puts it and
+ * A fixture Spinnvill implements: what it is, how it is drawn, where a new plate puts it and
  * the points it mounts by. Each is a class of its own that holds its measurements. A profile
  * holds the definition it gives, which the user may rename or recolour, and each plate a
  * snapshot of that. Fixtures the user adds on the Device tab are definitions only.

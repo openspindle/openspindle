@@ -24,7 +24,7 @@ export type LoadOutcome<TValue> =
       readonly issues: readonly LoadIssue[]
     }
   | { readonly status: "failed"; readonly issues: readonly LoadIssue[] }
-  /** Written by a newer OpenSpindle; this version must not overwrite it. */
+  /** Written by a newer Spinnvill; this version must not overwrite it. */
   | { readonly status: "newer"; readonly issues: readonly LoadIssue[] }
 
 export type RepositoryOptions<TValue> = {
@@ -97,7 +97,7 @@ export class Repository<TValue> {
           {
             store: this.key,
             severity: "error",
-            message: `${title} was saved by a newer version of OpenSpindle.`,
+            message: `${title} was saved by a newer version of Spinnvill.`,
           },
         ],
       }
@@ -107,7 +107,7 @@ export class Repository<TValue> {
       (!upgrade || envelope.version < upgrade.oldest)
     )
       return failed(
-        `${title} is from an earlier version of OpenSpindle, which this version cannot read.`
+        `${title} is from an earlier version of Spinnvill, which this version cannot read.`
       )
     try {
       const data =

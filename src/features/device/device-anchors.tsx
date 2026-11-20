@@ -47,7 +47,7 @@ const coordinateFormat = new Intl.NumberFormat("en-US", {
 })
 
 const STORE_HINT =
-  "The device keeps every bed setup's anchors in its configuration too, besides its own (openspindle.anchor3 and on, each X and Y from the first anchor). OpenSpindle reads them with the device's anchors, and writes them when they change while the device is idle. Their names and bed setups stay in OpenSpindle."
+  "The device keeps every bed setup's anchors in its configuration too, besides its own (openspindle.anchor3 and on, each X and Y from the first anchor). Spinnvill reads them with the device's anchors, and writes them when they change while the device is idle. Their names and bed setups stay in Spinnvill."
 
 /** Whether the device stores the bed setups' anchors too, and why it did not store them. */
 export type AnchorStoring = {

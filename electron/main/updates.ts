@@ -71,10 +71,10 @@ export class AppUpdates {
   async check(): Promise<void> {
     if (!this.enabled) {
       await this.inform({
-        message: "This copy of OpenSpindle does not update itself.",
+        message: "This copy of Spinnvill does not update itself.",
         detail: app.isPackaged
-          ? "It was built without a release repository to check. Copies installed from OpenSpindle's releases update themselves."
-          : "Development runs do not check for updates. Copies installed from OpenSpindle's releases update themselves.",
+          ? "It was built without a release repository to check. Copies installed from Spinnvill's releases update themselves."
+          : "Development runs do not check for updates. Copies installed from Spinnvill's releases update themselves.",
       })
       return
     }
@@ -91,20 +91,20 @@ export class AppUpdates {
           this.offerWhenReady = false
         })
         await this.inform({
-          message: `OpenSpindle ${result.updateInfo.version} is downloading.`,
+          message: `Spinnvill ${result.updateInfo.version} is downloading.`,
           detail:
-            "You can keep working: OpenSpindle offers to restart once it has downloaded, and installs it when you quit.",
+            "You can keep working: Spinnvill offers to restart once it has downloaded, and installs it when you quit.",
         })
       } else {
         await this.inform({
-          message: "OpenSpindle is up to date.",
+          message: "Spinnvill is up to date.",
           detail: `Version ${app.getVersion()} is the latest.`,
         })
       }
     } catch (error) {
       await this.inform({
         type: "warning",
-        message: "OpenSpindle could not check for updates.",
+        message: "Spinnvill could not check for updates.",
         detail: error instanceof Error ? error.message : String(error),
       })
     } finally {
@@ -122,10 +122,10 @@ export class AppUpdates {
     const notes = releaseNotesText(info.releaseNotes)
     const page = this.releasePage(info.version)
     const response = await this.inform({
-      message: `OpenSpindle ${info.version} is ready to install.`,
+      message: `Spinnvill ${info.version} is ready to install.`,
       detail: [
         notes,
-        "Restart now to install it, or it installs the next time you quit OpenSpindle.",
+        "Restart now to install it, or it installs the next time you quit Spinnvill.",
       ]
         .filter(Boolean)
         .join("\n\n"),
@@ -140,7 +140,7 @@ export class AppUpdates {
   private notify(info: UpdateInfo) {
     if (!Notification.isSupported()) return
     this.notification = new Notification({
-      title: `OpenSpindle ${info.version} is ready`,
+      title: `Spinnvill ${info.version} is ready`,
       body: "It installs when you quit. Click to see what's new, or to restart now.",
     })
     this.notification.on("click", () => void this.offerInstall(info))

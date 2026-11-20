@@ -145,8 +145,8 @@ export function FusionPairingDialog({
               {error && <FieldError role="alert">{error}</FieldError>}
               {!active && !submitting && !error && (
                 <FieldError role="alert">
-                  This request has expired or ended. Click Connect to
-                  OpenSpindle in Fusion for a new code.
+                  This request has expired or ended. Click Connect to Spinnvill
+                  in Fusion for a new code.
                 </FieldError>
               )}
               <div className="flex justify-end gap-2">

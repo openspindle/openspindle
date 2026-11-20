@@ -70,7 +70,7 @@ await writeFile(
     { positions, normals, indices },
     {
       name: "Makera Z1 dowel pin 4 × 11 mm",
-      generator: "OpenSpindle dowel pin (scripts/dowel-pin.mjs)",
+      generator: "Spinnvill dowel pin (scripts/dowel-pin.mjs)",
       color: [0.55, 0.58, 0.61],
       extras: {
         diameterMm: DIAMETER,

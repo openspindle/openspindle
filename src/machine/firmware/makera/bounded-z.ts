@@ -20,7 +20,7 @@ export function boundedZRequirement(source: string, program: PreparedProgram) {
   if (
     plans.length !== 1 ||
     headers.length !== 1 ||
-    /@OPENSPINDLE_(ANCHOR|DIAMETER)_PLAN/.test(source)
+    /@SPINNVILL_(ANCHOR|DIAMETER)_PLAN/.test(source)
   )
     throw new Error("Include one bounded Z plan and one probe signal check.")
   const binding = ProbeCheckBindingSchema.parse(JSON.parse(headers[0][1]))

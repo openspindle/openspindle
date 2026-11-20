@@ -2,7 +2,7 @@
 /**
  * The Dock and Finder name an app bundle after its folder, whatever its Info.plist says, so dev
  * and preview runs of node_modules' Electron.app show as "Electron" there. Dev and preview runs
- * launch a copy named OpenSpindle.app instead (an APFS clone, which takes no extra space), made
+ * launch a copy named Spinnvill.app instead (an APFS clone, which takes no extra space), made
  * again when Electron changes and started through the electron package's path.txt, which
  * electron-vite reads too. scripts/dev-app-name.mjs then brands whichever bundle that is.
  */
@@ -11,7 +11,7 @@ import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { createRequire } from "node:module"
 import { dirname, join } from "node:path"
 
-const NAME = "OpenSpindle.app"
+const NAME = "Spinnvill.app"
 
 /** The bundle's Electron version, or null when it is missing or incomplete. */
 function electronVersion(bundle) {

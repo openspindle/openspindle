@@ -1,4 +1,4 @@
-# Plan: FreeCAD, verktøybibliotek, historikk og OpenSpindle-vert
+# Plan: FreeCAD, verktøybibliotek, historikk og Spinnvill-vert
 
 Dato: 2026-11-11. Bestilt av Lukas Hill. Dette dokumentet er en implementeringsplan, ikke en beskrivelse av ferdige funksjoner.
 
@@ -7,7 +7,7 @@ Dato: 2026-11-11. Bestilt av Lukas Hill. Dette dokumentet er en implementeringsp
 | Trinn | Leveranse | Ferdig når |
 |---|---|---|
 | 1 | Referansemodell og materialer fra FreeCAD | Send jobb/operasjon leverer NC, arbeidskoordinater, ferdigmodell og materialdata. Modellen kan vises/skjules og plasseres manuelt. Prosjektlagring bevarer alt. |
-| 2 | Felles verktøybibliotek | Samme stabile verktøy-ID og geometrirevisjon følger verktøy mellom FreeCAD og OpenSpindle, uten at T-nummer brukes som identitet. |
+| 2 | Felles verktøybibliotek | Samme stabile verktøy-ID og geometrirevisjon følger verktøy mellom FreeCAD og Spinnvill, uten at T-nummer brukes som identitet. |
 | 3 | Jobbhistorikk | Hver faktisk kjøring arkiverer hele jobbgrunnlaget, NC, tidslinje, utfall og eventuelle kamerabilder. Historikken kan åpnes uten å starte maskinen. |
 | 4 | Alltid-på-vert ved CNC-en | Én maskineier beholder tilkobling og jobbtilstand; FreeCAD sender jobber over nettverket og nettlesere overvåker den samme tilstanden. |
 | 5 | USB og driftsverifisering | Transporten fra ADR 0001 gjenbrukes, med fysiske verifikasjoner av tilkobling, overføring, stopp og frakobling før ordinær USB-kjøring. |
@@ -18,13 +18,13 @@ Implementeringen skjer på egne brancher og PR-er. Planen legges direkte på mai
 
 FreeCAD-broen lager en selvstendig, versjonert jobbpakke med NC, kontrollsum, begrenset trekantnett og materialdata. En ren NC-fil beholdes ved siden av for manuell bruk. Geometrien kommer fra CAM-jobbens modellkloner i jobbens arbeidskoordinater: millimeter, Z opp, ingen automatisk sentrering. Referansemodellen er ferdigdelen, ikke et vilkårlig startemne.
 
-OpenSpindle viser en gjennomsiktig ferdigmodell som eget lag. Manuell STEP/GLB-import og eksplisitte offset-/rotasjons-/skalafelt gjør plasseringen kontrollerbar. Transformasjonen er visuell og endrer ikke NC eller maskinoppsett. En toppflateanalyse mot heightmap kan vise restmateriale og for dype kutt; den skal beskrives som nominell 2.5D-sammenligning, ikke volumetrisk kollisjonskontroll eller fysisk måling.
+Spinnvill viser en gjennomsiktig ferdigmodell som eget lag. Manuell STEP/GLB-import og eksplisitte offset-/rotasjons-/skalafelt gjør plasseringen kontrollerbar. Transformasjonen er visuell og endrer ikke NC eller maskinoppsett. En toppflateanalyse mot heightmap kan vise restmateriale og for dype kutt; den skal beskrives som nominell 2.5D-sammenligning, ikke volumetrisk kollisjonskontroll eller fysisk måling.
 
 Et felles, validert materialsystem styrer PBR-farge, metallandel, ruhet, opasitet, mønster, mønsterskala og styrke. Materialnavn og eksplisitte FreeCAD-egenskaper følger med. Tetthet og mekaniske egenskaper lagres med enheter/proveniens; de velger aldri automatisk feeds/speeds. Tekstur er illustrativ, mens geometriske normal maps følger simuleringens geometri. Uleselig eller for stor geometri skal forklares, ikke erstattes med en feilplassert modell.
 
 ## 2. Felles verktøybibliotek
 
-OpenSpindle får en versjonert utvekslingsrepresentasjon med stabil UUID, navn, produsent/artikkelnummer, geometri, enheter, antall skjær og revisjons-/innholdshash. T-nummer tilhører maskin/oppspenning, og samme bibliotekverktøy kan derfor ha forskjellig T-nummer i forskjellige jobber.
+Spinnvill får en versjonert utvekslingsrepresentasjon med stabil UUID, navn, produsent/artikkelnummer, geometri, enheter, antall skjær og revisjons-/innholdshash. T-nummer tilhører maskin/oppspenning, og samme bibliotekverktøy kan derfor ha forskjellig T-nummer i forskjellige jobber.
 
 Første leveranse er eksplisitt eksport/import på begge sider, også uten nettverk. FreeCAD konverterer til sine eksisterende ToolBit-/ToolController-formater. Verktøy som ikke lar seg representere, rapporteres feltvis. V-bits skiller mellom full spissvinkel og halvvinkel. Fysisk verktøylengde, måleresultater og maskinens slot beholdes lokalt.
 
@@ -65,7 +65,7 @@ Kodegjennomgang og simulator kan bekrefte deler av kontrakten. Fysisk verifikasj
 
 ## Validering og milepæler
 
-Hvert repo følger egne påkrevde bygg-, type- og formateringskontroller. OpenSpindles AGENTS.md sier at automatiske tester ikke legges til eller kjøres uten brukerbestilling; det endres ikke av denne planen. Manuell interoperabilitetsmatrise skal dekke mm/inch-NC med mm-modell, forskjøvet/rotert CAM-modell, V-bit, manglende materialkort, flere verktøy, korrupte og store pakker, save/reopen og Undo.
+Hvert repo følger egne påkrevde bygg-, type- og formateringskontroller. Spinnvills AGENTS.md sier at automatiske tester ikke legges til eller kjøres uten brukerbestilling; det endres ikke av denne planen. Manuell interoperabilitetsmatrise skal dekke mm/inch-NC med mm-modell, forskjøvet/rotert CAM-modell, V-bit, manglende materialkort, flere verktøy, korrupte og store pakker, save/reopen og Undo.
 
 Historikk og vert må i tillegg gjennomgå avbrutt jobb, kamerafeil, full disk, to nettlesere, samtidig opplasting, ugyldig nøkkel, nettbrudd og restart. Ingen sjekkliste eller forhåndsvisning erstatter verifisert fysisk arbeidsnull og oppspenning.
 
@@ -75,7 +75,7 @@ Trinn 1 ferdigstilles før verktøysynkronisering kobles på. Historikk lagres s
 
 Alle funksjonsendringer under er pushet på egne brancher som **PR-utkast**, ikke merget til main. Les og merge i tabellrekkefølge innen hvert repo.
 
-| Trinn | OpenSpindle | FreeCAD Makera Bridge | Status |
+| Trinn | Spinnvill | FreeCAD Makera Bridge | Status |
 |---|---|---|---|
 | Modell/materialer | [PR #15](https://github.com/passeride/openspindle/pull/15) | [PR #4](https://github.com/passeride/FreeCadMakeraBridge/pull/4) | Kode og byggkontroller; visuell kontroll og live CAM-plassering gjenstår |
 | Felles verktøy | [PR #16](https://github.com/passeride/openspindle/pull/16) | [PR #5](https://github.com/passeride/FreeCadMakeraBridge/pull/5) | Filutveksling, stabile ID-er og konfliktvalg implementert; live ToolBit-rundtur gjenstår |

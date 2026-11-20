@@ -1,8 +1,8 @@
 import type { ErrorReport } from "@/app/errors/reports"
 import type { AppInfo } from "@/platform/contract/diagnostics"
 
-/** OpenSpindle's issues; the app opens links to github.com in the browser. */
-const NEW_ISSUE_URL = "https://github.com/openspindle/openspindle/issues/new"
+/** Spinnvill's issues; the app opens links to github.com in the browser. */
+const NEW_ISSUE_URL = "https://github.com/passeride/openspindle/issues/new"
 /** An issue's text travels in its URL: the stack is cut short, the error ID finds the rest. */
 const STACK_LINES = 12
 
@@ -31,7 +31,7 @@ export function newIssueUrl(
     "",
     `- Error ID: \`${report.eventId}\``,
     ...(app
-      ? [`- OpenSpindle ${app.version}, Electron ${app.electron}, ${app.os}`]
+      ? [`- Spinnvill ${app.version}, Electron ${app.electron}, ${app.os}`]
       : []),
     "",
     "<!-- Please attach the log: Download log in the error dialog, or Help › Export Log. -->",

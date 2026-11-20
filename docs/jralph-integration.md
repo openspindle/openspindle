@@ -1,7 +1,7 @@
 # Workshop and gamepad integration
 
 This branch adapts selected work by Joe Ralph from
-[`jralph/openspindle`, `codex/gamepad-feasibility`](https://github.com/jralph/openspindle/tree/codex/gamepad-feasibility),
+[`jralph/spinnvill`, `codex/gamepad-feasibility`](https://github.com/jralph/openspindle/tree/codex/gamepad-feasibility),
 reviewed at commit `87758001cae2b7041ce27e1298859cbba4d852a5`, onto
 `passeride/main` at `1ff9729fa93ce56aa82dc199b5c497666e3388f9`.
 

@@ -15,7 +15,7 @@ export function rememberOpenedProject(file: File, destinationId?: string) {
 }
 
 export const suggestedProjectName = (name: string) =>
-  suggestedFileName("project", name, "OpenSpindle project")
+  suggestedFileName("project", name, "Spinnvill project")
 
 /**
  * Reads a project dropped onto the workspace; dialogs go through the host instead. Reads and

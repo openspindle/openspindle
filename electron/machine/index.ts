@@ -1,6 +1,6 @@
 import { JobHistory } from "../../host/services/job-history.ts"
 import type { MessagePortMain } from "electron"
-import { createEndpoint } from "@openspindle/rpc"
+import { createEndpoint } from "@spinnvill/rpc"
 import { endpointLabel } from "../../src/machine/contract/index.ts"
 import type { MachineSnapshot } from "../../src/machine/contract/index.ts"
 import { MachineController } from "../../src/machine/core/controller.ts"

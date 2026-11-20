@@ -1,6 +1,6 @@
-import { RpcError, createEndpoint } from "@openspindle/rpc"
-import type { EmptyContract, Peer } from "@openspindle/rpc"
-import { messagePortTransport } from "@openspindle/rpc/message-port"
+import { RpcError, createEndpoint } from "@spinnvill/rpc"
+import type { EmptyContract, Peer } from "@spinnvill/rpc"
+import { messagePortTransport } from "@spinnvill/rpc/message-port"
 import type {
   CutEngagement,
   CutStock,

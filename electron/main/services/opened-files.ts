@@ -28,7 +28,7 @@ async function readOpenedFiles(
     if (!kind) {
       opened.problems.push({
         fileName,
-        message: "OpenSpindle opens NC programs and STEP-NC projects.",
+        message: "Spinnvill opens NC programs and STEP-NC projects.",
       })
       continue
     }

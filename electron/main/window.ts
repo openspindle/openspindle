@@ -105,7 +105,7 @@ export function createMainWindow(options: {
     minWidth: 1000,
     minHeight: 700,
     show: false,
-    title: "OpenSpindle",
+    title: "Spinnvill",
     icon: options.icon,
     backgroundColor: nativeTheme.shouldUseDarkColors ? "#0a0a0a" : "#ffffff",
     ...(process.platform === "darwin" ? MAC_TITLE_BAR : {}),
@@ -139,8 +139,8 @@ export function createMainWindow(options: {
         `The window's renderer is gone (${details.reason}, exit code ${details.exitCode}); it crashed too often to keep reloading`
       )
       dialog.showErrorBox(
-        "OpenSpindle keeps crashing",
-        "The window's page crashed repeatedly and was not reloaded again. Restart OpenSpindle to try again."
+        "Spinnvill keeps crashing",
+        "The window's page crashed repeatedly and was not reloaded again. Restart Spinnvill to try again."
       )
       return
     }

@@ -14,7 +14,7 @@ import {
 /**
  * Imports the NC file chosen in the native file window as a dropped file is: into the selected
  * plate, or a new plate without one, after the import questionnaire asks what it needs to. An
- * OpenSpindle export comes in as a plate of its own, with its setup.
+ * Spinnvill export comes in as a plate of its own, with its setup.
  */
 export function useNativeImport() {
   const host = useHost()

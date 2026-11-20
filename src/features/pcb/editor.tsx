@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query"
-import { RpcError } from "@openspindle/rpc"
+import { RpcError } from "@spinnvill/rpc"
 import {
   useWorkspace,
   useWorkspaceStore,

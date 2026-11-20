@@ -245,7 +245,7 @@ export function compactCredits(html: string, electronVersion: string): string {
     title,
     "=".repeat(title.length),
     "",
-    "OpenSpindle is built on Electron, which includes Chromium, Node.js and the other",
+    "Spinnvill is built on Electron, which includes Chromium, Node.js and the other",
     "open-source components below, each with its homepage and license. Passages that several",
     "licenses share, such as the Apache License 2.0, are printed once, under Shared texts at",
     "the end, and cited as [Text N] where they occur. These are the texts of Electron's",

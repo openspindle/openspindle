@@ -1,4 +1,4 @@
-import { defineContract } from "@openspindle/rpc"
+import { defineContract } from "@spinnvill/rpc"
 import { z } from "zod"
 
 const Point3Schema = z.tuple([z.number(), z.number(), z.number()])

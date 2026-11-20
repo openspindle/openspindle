@@ -7,7 +7,7 @@ import type {
 import { createHash, randomUUID } from "node:crypto"
 import { readFile, stat } from "node:fs/promises"
 import path from "node:path"
-import { RpcError } from "@openspindle/rpc"
+import { RpcError } from "@spinnvill/rpc"
 import {
   FILE_KINDS,
   hasFileExtension,

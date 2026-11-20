@@ -1,0 +1,22 @@
+[Unit]
+Description=Spinnvill CNC monitor host
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/spinnvill
+EnvironmentFile=/etc/spinnvill-host.env
+ExecStart=/usr/bin/node /opt/spinnvill/dist-host/index.js
+Restart=on-failure
+RestartSec=5
+User=spinnvill
+Group=spinnvill
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/spinnvill
+
+[Install]
+WantedBy=multi-user.target

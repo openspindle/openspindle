@@ -1,21 +1,21 @@
 # Fusion 360 bridge
 
-The OpenSpindle Bridge is a Python add-in installed in Autodesk Fusion.
-OpenSpindle discovers NC programs in open Fusion documents and requests their
+The Spinnvill Bridge is a Python add-in installed in Autodesk Fusion.
+Spinnvill discovers NC programs in open Fusion documents and requests their
 posted output when you import them or update an operation imported from them.
 Fusion keeps responsibility for CAM generation and the machine post processor;
-OpenSpindle imports the resulting G-code into the workspace.
+Spinnvill imports the resulting G-code into the workspace.
 
 ## Install
 
-1. Find the **OpenSpindleBridge** folder that comes with OpenSpindle. On macOS,
-   in Finder, open **Applications**, right-click **OpenSpindle.app**, choose
+1. Find the **SpinnvillBridge** folder that comes with Spinnvill. On macOS,
+   in Finder, open **Applications**, right-click **Spinnvill.app**, choose
    **Show Package Contents** and open **Contents → Resources → fusion360**. On
-   Windows, it is in `%LOCALAPPDATA%\Programs\openspindle\resources\fusion360`.
+   Windows, it is in `%LOCALAPPDATA%\Programs\spinnvill\resources\fusion360`.
    In Fusion, open **Utilities → Scripts and Add-Ins**, choose **+ → Script or
    add-in from device**, and select that folder. In older Fusion versions, use
    the **Add-Ins** tab and its **+** button.
-2. Find **OpenSpindleBridge** and click **Run**. Keep **Run on Startup** on (the
+2. Find **SpinnvillBridge** and click **Run**. Keep **Run on Startup** on (the
    manifest's default) so the bridge starts with Fusion; for an add-in added
    before, turn it on there.
 
@@ -27,27 +27,27 @@ third-party packages are required. Use a current Fusion release on Windows or ma
 1. In Fusion's **Manufacture** workspace, generate the toolpaths, create an NC
    program containing one setup, and configure its machine and post processor.
    Use the G54 work coordinate system for that setup.
-2. Keep the OpenSpindle app open, then choose **OpenSpindle → Connect to
-   OpenSpindle** in Fusion. Fusion displays a six-digit connection code.
-3. OpenSpindle automatically opens **Fusion 360 wants to connect**. Enter the
+2. Keep the Spinnvill app open, then choose **Spinnvill → Connect to
+   Spinnvill** in Fusion. Fusion displays a six-digit connection code.
+3. Spinnvill automatically opens **Fusion 360 wants to connect**. Enter the
    six-digit code to connect. The program picker lists NC programs from your open
    Fusion documents; it is also available from **File > Import from Fusion 360**.
 4. Choose an NC program and click **Import**. The bridge posts the current
    program to a temporary folder using its post settings, with **Split file** set
-   to **No splitting**, and returns the NC directly to OpenSpindle.
+   to **No splitting**, and returns the NC directly to Spinnvill.
 
-Connecting once is enough: OpenSpindle and the bridge both keep the connection
-across their restarts, until **Disconnect** in OpenSpindle.
+Connecting once is enough: Spinnvill and the bridge both keep the connection
+across their restarts, until **Disconnect** in Spinnvill.
 
 The code can be used once and expires after two minutes. If it expires or five
-incorrect codes are entered, choose **Connect to OpenSpindle** again in Fusion.
+incorrect codes are entered, choose **Connect to Spinnvill** again in Fusion.
 Each click replaces any previous connection request. The Fusion code dialog
-closes by itself once OpenSpindle connects.
+closes by itself once Spinnvill connects.
 
 The picker reads live program metadata without posting. Click **Refresh** after
 adding or renaming programs, or opening or closing documents. After changing
 toolpaths, generate them in Fusion and choose **Update from Fusion 360** on the
-operation in OpenSpindle, which posts the program again. Nothing updates
+operation in Spinnvill, which posts the program again. Nothing updates
 automatically. Importing does not run a machine program.
 
 The NC output must be UTF-8 or ASCII text with an `.nc`, `.cnc`, `.gcode`, `.tap`,
@@ -56,14 +56,14 @@ the post log), the bridge takes the one named after the NC program if it holds t
 whole program; posts with separate subprogram files are rejected.
 NC programs containing multiple setups are rejected. The catalog supports up to
 100 NC programs across open documents. Closing a document removes its programs
-from the catalog. While Fusion is closed or the add-in stopped, OpenSpindle
+from the catalog. While Fusion is closed or the add-in stopped, Spinnvill
 cannot list or import programs; it stays connected for when the add-in runs
 again. Imported plates remain usable.
 
 Before posting, the bridge writes `openspindle-setup.json` into the temporary
 folder: the setup's **Part Position** distances and its fixtures, each a name and
 a box in the design's coordinates, in millimetres. Fusion gives a post neither;
-OpenSpindle's Makera Z1 post reads them there to place the stock from Anchor 1 and
+Spinnvill's Makera Z1 post reads them there to place the stock from Anchor 1 and
 to name the fixtures in its markers
 ([docs/fusion360.md](../../docs/fusion360.md#stock-and-fixtures)). Other posts
 ignore the file.
@@ -82,20 +82,20 @@ changes these parameters.
 ## Connection details
 
 The add-in listens only on `127.0.0.1:38764`. While a connection request is pending,
-it announces that request to OpenSpindle on `127.0.0.1:38765` once per second. The
+it announces that request to Spinnvill on `127.0.0.1:38765` once per second. The
 announcement contains only a request ID and expiry time. It never contains the
 code, a token, or program contents, and it is never sent onto the local network.
 
-After checking the one-time code, the bridge gives that OpenSpindle a bearer
+After checking the one-time code, the bridge gives that Spinnvill a bearer
 token of its own. That token authorizes catalog reads and explicit posting
 requests for NC programs in open documents. Both keep it across restarts:
-OpenSpindle encrypted with the system's key store, the bridge only as a SHA-256
-hash, in `pairings.json` in **OpenSpindle Bridge** under the user's application
+Spinnvill encrypted with the system's key store, the bridge only as a SHA-256
+hash, in `pairings.json` in **Spinnvill Bridge** under the user's application
 data (`~/Library/Application Support` on macOS, `%APPDATA%` on Windows), readable
 by the user only. The bridge keeps the four newest tokens; a fifth pairing forgets
 the oldest. Existing connections keep working if a new code is requested or
 entered incorrectly. When the file cannot be written, a connection lasts until
-the add-in stops. OpenSpindle cannot remotely
+the add-in stops. Spinnvill cannot remotely
 generate toolpaths or execute a machine program. HTTP requests queue catalog reads
 and posting on Fusion's main thread using custom events; the worker threads only
 use the documented thread-safe event signal, never document or CAM APIs.
@@ -106,14 +106,14 @@ HTTP client; its output is discarded after cancellation and the add-in still
 restores the program settings. Posting requests are never retried automatically.
 
 If startup reports that the port is in use, stop the bridge in other Fusion
-instances before starting it here. If OpenSpindle cannot connect, check that the
-add-in is running, open OpenSpindle, and choose **Connect to OpenSpindle** in Fusion.
-Each post leaves lines starting `OpenSpindle:` in Fusion's log: the setup handed to
-the post, and the OpenSpindle markers the post wrote.
+instances before starting it here. If Spinnvill cannot connect, check that the
+add-in is running, open Spinnvill, and choose **Connect to Spinnvill** in Fusion.
+Each post leaves lines starting `Spinnvill:` in Fusion's log: the setup handed to
+the post, and the Spinnvill markers the post wrote.
 If importing fails, open the NC program in Fusion, address its posting/toolpath
 errors, and import again. After updating the add-in, stop it and run it again in
 Fusion. Stopping the add-in closes its local listeners and removes its toolbar.
-Startup also removes any leftover OpenSpindle panel, tab, and connection command
+Startup also removes any leftover Spinnvill panel, tab, and connection command
 from an earlier session, so a failed start does not require restarting Fusion to
 clear a duplicate toolbar ID.
 
@@ -131,7 +131,7 @@ requestId, expiresAt }`, where `requestId` is a UUID and `expiresAt` is Unix
   attempt locks the request and returns 429. An expired, consumed, or replaced
   request returns 410. A locked request also returns 429 until expiry.
 - `DELETE /v1/pairing` with the bearer token and no body makes the bridge forget
-  that token, returning `{}`; OpenSpindle sends it on **Disconnect** and when it
+  that token, returning `{}`; Spinnvill sends it on **Disconnect** and when it
   replaces its token by connecting again.
 - `GET /v2/programs` returns `{ programs: [{ id, name, documentName, documentId,
 operationId }] }` from open Fusion documents without posting or changing their
@@ -141,7 +141,7 @@ operationId }] }` from open Fusion documents without posting or changing their
   selected NC program and returns `{ id, name, documentName, documentId,
 operationId, fileName, contents }`.
 - Program requests require `Authorization: Bearer <token>`; an unknown token
-  returns 401, which makes OpenSpindle drop it and ask to connect again. All HTTP requests
+  returns 401, which makes Spinnvill drop it and ask to connect again. All HTTP requests
   require exactly `Host: 127.0.0.1:38764`. Requests with an `Origin` header are
   rejected, and the server does not enable CORS.
 
@@ -163,5 +163,5 @@ operationId, fileName, contents }`.
 This integration imports posted machine instructions. It does not transfer
 editable Fusion CAM operations, native toolpath geometry, or fixture models. A
 plate gets the stock, and the device's fixtures of the setup's fixtures' names,
-only as the post describes them in OpenSpindle's markers
+only as the post describes them in Spinnvill's markers
 ([docs/fusion360.md](../../docs/fusion360.md#stock-and-fixtures)).

@@ -51,7 +51,7 @@ export const fileKind: OperationKind<"file"> = {
         plate.operations.length === 1 &&
         (isAnchorMeasurementNc(nc, kit) ||
           (!!kit.zProbing &&
-            (/^;@OPENSPINDLE_(Z|MOVE|POINT_Z)_PLAN /m.test(nc) ||
+            (/^;@SPINNVILL_(Z|MOVE|POINT_Z)_PLAN /m.test(nc) ||
               plate.tools.some(
                 (tool) =>
                   tool.number !== null &&

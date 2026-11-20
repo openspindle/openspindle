@@ -13,9 +13,9 @@ Install `ffmpeg` with V4L2 input and `libx264` encoding, and optionally `v4l-uti
 Set these in the host's protected environment file:
 
 ```text
-OPENSPINDLE_WEBCAM_DEVICE=/dev/video0
+SPINNVILL_WEBCAM_DEVICE=/dev/video0
 # Optional if ffmpeg is not on the service user's PATH:
-OPENSPINDLE_FFMPEG=/usr/bin/ffmpeg
+SPINNVILL_FFMPEG=/usr/bin/ffmpeg
 ```
 
 A stable `/dev/v4l/by-id/<device>` path is also accepted. Device paths come only from operator configuration; browser API requests cannot choose executables, device paths, network URLs or shell arguments. Give the service user access to the camera using the system's video group/udev policy, then restart the service. The deployment template leaves supplementary device groups to the local administrator; for example, set `SupplementaryGroups=video dialout` in a systemd override when those groups exist and both camera/serial access are needed. Do not run the controller as root. Containers require explicitly passing the video device through.

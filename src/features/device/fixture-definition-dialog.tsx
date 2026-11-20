@@ -130,7 +130,7 @@ function FixtureModelField({
     ...models.map((model) => ({ value: model.id, label: model.name })),
   ]
   let description = "Nothing is drawn for this fixture."
-  if (bundled) description = "Bundled with OpenSpindle."
+  if (bundled) description = "Bundled with Spinnvill."
   else if (source === "box") description = "A box in the fixture's colour."
   else if (selected)
     description = modelDetails(selected, definition.model?.bounds)

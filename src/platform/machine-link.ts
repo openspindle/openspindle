@@ -1,6 +1,6 @@
-import { RpcError, createEndpoint } from "@openspindle/rpc"
-import type { EmptyContract, EndpointLog, Peer } from "@openspindle/rpc"
-import { messagePortTransport } from "@openspindle/rpc/message-port"
+import { RpcError, createEndpoint } from "@spinnvill/rpc"
+import type { EmptyContract, EndpointLog, Peer } from "@spinnvill/rpc"
+import { messagePortTransport } from "@spinnvill/rpc/message-port"
 import { disconnectedSnapshot } from "@/machine/contract"
 import { machineContract } from "./contract/machine-rpc"
 import type { MachineContract } from "./contract/machine-rpc"
@@ -8,7 +8,7 @@ import type { MachineHost, MachineLink } from "./host"
 
 /** Why the connection ended when the page's port to the machine process closed. */
 const STOPPED =
-  "OpenSpindle's machine process stopped, which ended the connection. A running program keeps running on the machine."
+  "Spinnvill's machine process stopped, which ended the connection. A running program keeps running on the machine."
 
 /** The machine process over one port: the requests go to it as they are. */
 function machineOver(peer: Peer<MachineContract>): MachineHost {
@@ -67,7 +67,7 @@ function unreachableMachine(error: string | null): MachineHost {
     Promise.reject(
       new RpcError(
         "UNAVAILABLE",
-        "OpenSpindle's machine process is not running.",
+        "Spinnvill's machine process is not running.",
         { machine: "not-connected" }
       )
     )

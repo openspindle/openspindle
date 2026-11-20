@@ -2,8 +2,8 @@
 /**
  * macOS titles the application menu with the running bundle's name, which app.setName cannot
  * change, and the About panel shows the bundle's icon, which app.dock.setIcon does not change.
- * Dev and preview runs launch Electron's bundle from node_modules (the OpenSpindle.app copy
- * that scripts/dev-app-bundle.mjs makes), so give that bundle OpenSpindle's name and icon;
+ * Dev and preview runs launch Electron's bundle from node_modules (the Spinnvill.app copy
+ * that scripts/dev-app-bundle.mjs makes), so give that bundle Spinnvill's name and icon;
  * packaged builds take both from electron-builder.
  */
 import { execFileSync } from "node:child_process"
@@ -20,7 +20,7 @@ if (process.platform === "darwin") {
   const contents = resolve(executable, "../..")
   const plist = resolve(contents, "Info.plist")
   for (const key of ["CFBundleName", "CFBundleDisplayName"])
-    execFileSync("plutil", ["-replace", key, "-string", "OpenSpindle", plist])
+    execFileSync("plutil", ["-replace", key, "-string", "Spinnvill", plist])
   const iconFile = execFileSync(
     "plutil",
     ["-extract", "CFBundleIconFile", "raw", "-o", "-", plist],

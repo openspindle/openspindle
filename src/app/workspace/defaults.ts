@@ -9,8 +9,8 @@ import { newPlate } from "./import-program"
 import type { ImportContext, PlatePlacement } from "./import-program"
 
 export const DEFAULT_PROJECT = {
-  name: "OpenSpindle project",
-  fileName: "OpenSpindle project.stpnc",
+  name: "Spinnvill project",
+  fileName: "Spinnvill project.stpnc",
 } as const
 
 /**

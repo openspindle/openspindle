@@ -208,7 +208,7 @@ let wasmEngine: Promise<PatternWasm | null> | undefined
 function loadWasm(baseUrl: string): Promise<PatternWasm | null> {
   wasmEngine ??= (async () => {
     try {
-      const uri = new URL("pattern-wasm/openspindle_pattern_engine.js", baseUrl)
+      const uri = new URL("pattern-wasm/spinnvill_pattern_engine.js", baseUrl)
         .href
       const module: PatternWasm = await import(/* @vite-ignore */ uri)
       await module.default()

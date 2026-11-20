@@ -108,7 +108,7 @@ export function FusionSource({ onDone }: { onDone: () => void }) {
             </EmptyMedia>
             <EmptyTitle>Set up connection with Fusion 360</EmptyTitle>
             <EmptyDescription>
-              In Autodesk Fusion, click OpenSpindle › Connect to OpenSpindle. A
+              In Autodesk Fusion, click Spinnvill › Connect to Spinnvill. A
               dialog will appear here to enter the six-digit code.
             </EmptyDescription>
           </EmptyHeader>
@@ -118,7 +118,7 @@ export function FusionSource({ onDone }: { onDone: () => void }) {
             size="sm"
             nativeButton={false}
             render={
-              <a href="https://github.com/openspindle/openspindle/blob/main/docs/fusion360.md">
+              <a href="https://github.com/passeride/openspindle/blob/main/docs/fusion360.md">
                 Learn More <ArrowUpRightIcon />
               </a>
             }

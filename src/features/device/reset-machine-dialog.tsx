@@ -26,7 +26,7 @@ export function ResetMachineDialog({
           <AlertDialogTitle>Reset the machine?</AlertDialogTitle>
           <AlertDialogDescription>
             Its controller restarts, which takes a few seconds and stops
-            anything it is doing. OpenSpindle connects to it again once it is
+            anything it is doing. Spinnvill connects to it again once it is
             back.
           </AlertDialogDescription>
         </AlertDialogHeader>

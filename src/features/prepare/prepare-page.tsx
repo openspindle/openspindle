@@ -12,7 +12,7 @@ import { BedSetupField, DeviceCard } from "./sidebar-header"
 /** Plates and their operations: set up stock, tools and fixtures, and preview them on the bed. */
 export function PreparePage() {
   const layout = useDefaultLayout({
-    id: "openspindle-prepare",
+    id: "spinnvill-prepare",
     panelIds: ["sidebar", "viewer"],
     onlySaveAfterUserInteractions: true,
   })

@@ -43,7 +43,7 @@ export function useFusionUpdate() {
         throw new Error("This operation did not come from Fusion 360.")
       if (!(await fusion.snapshot()).connected)
         throw new Error(
-          "Connect Fusion 360 first: in Fusion, click OpenSpindle › Connect to OpenSpindle."
+          "Connect Fusion 360 first: in Fusion, click Spinnvill › Connect to Spinnvill."
         )
       const found = findFusionProgram(await fusion.list(), origin)
       if (!found.ok) throw new Error(found.error)

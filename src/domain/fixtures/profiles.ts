@@ -302,7 +302,7 @@ const kitProfile = (
   bundle: kit.version,
 })
 
-/** A device's first profile: its machine's kit, or no fixtures when OpenSpindle has none. */
+/** A device's first profile: its machine's kit, or no fixtures when Spinnvill has none. */
 export function defaultFixtureProfile(
   device?: ConnectedDevice | null,
   definitions?: readonly FixtureDefinition[]

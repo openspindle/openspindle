@@ -1,4 +1,4 @@
-import type { Handlers } from "@openspindle/rpc"
+import type { Handlers } from "@spinnvill/rpc"
 import type { MachineGateway } from "../../src/machine/core/gateway.ts"
 import { formatTrace } from "../../src/machine/core/protocol-trace.ts"
 import type { MachineContract } from "../../src/platform/contract/machine-rpc"

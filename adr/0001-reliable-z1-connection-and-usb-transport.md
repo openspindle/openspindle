@@ -2,15 +2,15 @@
 
 - **Status:** Proposed
 - **Date:** 2026-11-10
-- **Decision owners:** OpenSpindle maintainers
+- **Decision owners:** Spinnvill maintainers
 - **Scope:** Device communications, connection lifecycle, file transfer, observability and run safety
 - **Implementation:** TCP telemetry health, bounded polling and write buffering, persistent motion lockout with Stop available, and camera reconnect are implemented in `src/machine/core/session.ts`, `src/machine/core/controller.ts`, `electron/machine/node-ports.ts` and `src/machine/core/camera.ts`. USB transport and automatic machine reconnection remain proposed. See [Device controls](../docs/device-controls.md).
 
 ## Context and problem
 
-A Makera Z1 can become disconnected from OpenSpindle during normal use on Wi-Fi. A disconnect in the UI does **not** by itself establish that Wi-Fi dropped, that the TCP socket died or that the CNC program stopped. The Z1 can continue an already uploaded program autonomously. Losing the host-side session can therefore remove live progress and software Stop access while the machine continues moving.
+A Makera Z1 can become disconnected from Spinnvill during normal use on Wi-Fi. A disconnect in the UI does **not** by itself establish that Wi-Fi dropped, that the TCP socket died or that the CNC program stopped. The Z1 can continue an already uploaded program autonomously. Losing the host-side session can therefore remove live progress and software Stop access while the machine continues moving.
 
-Makera [documents three Z1 connection modes](https://wiki.makera.com/en/Z1/QuickStart): USB, the machine's own Wi-Fi access point, and a shared local Wi-Fi network. OpenSpindle currently implements only TCP over IPv4. The community controller demonstrates that a USB serial connection can carry the Makera framed protocol. The design must address **two different problems**:
+Makera [documents three Z1 connection modes](https://wiki.makera.com/en/Z1/QuickStart): USB, the machine's own Wi-Fi access point, and a shared local Wi-Fi network. Spinnvill currently implements only TCP over IPv4. The community controller demonstrates that a USB serial connection can carry the Makera framed protocol. The design must address **two different problems**:
 
 1. **Misclassification and recovery of temporary status silence over a still-open transport.**
 2. **Adding a genuine wired USB transport**, including transfers and reliable device identity, without bypassing the existing machine command safety model.
@@ -36,7 +36,7 @@ No real-Z1 trace has yet been attached to establish which failure mode causes th
 
 - [Makera Z1 Quick Start](https://wiki.makera.com/en/Z1/QuickStart) explicitly supports USB connection on Z1/Z1 Pro. [Makera's USB driver instructions](https://wiki.makera.com/en/carvera/manual/software-installation) describe an FTDI 232R UART / USB Serial Port on Windows; these driver instructions are for the Carvera-family controller and **do not replace USB device identification on the specific Z1**.
 - [Carvera Community Controller `USBStream.py`](https://github.com/Carvera-Community/Carvera_Controller/blob/main/carveracontroller/USBStream.py) opens an 8N1 USB serial connection at **115200 baud** by default, with bounded read/write timeouts, DTR toggling, buffer flushing, and an initialization sequence. Those actions are reference behavior, **not safe initialization steps to copy blindly**, particularly when a machine is running.
-- Its [`protocols/makera.py`](https://github.com/Carvera-Community/Carvera_Controller/blob/main/carveracontroller/protocols/makera.py) sends the same Makera command and realtime frame types over a byte stream; [`protocols/session.py`](https://github.com/Carvera-Community/Carvera_Controller/blob/main/carveracontroller/protocols/session.py) can detect/switch between Makera framing and legacy Smoothie protocol. OpenSpindle currently speaks only the Makera framed protocol and must fail safely if an unexpected protocol is encountered.
+- Its [`protocols/makera.py`](https://github.com/Carvera-Community/Carvera_Controller/blob/main/carveracontroller/protocols/makera.py) sends the same Makera command and realtime frame types over a byte stream; [`protocols/session.py`](https://github.com/Carvera-Community/Carvera_Controller/blob/main/carveracontroller/protocols/session.py) can detect/switch between Makera framing and legacy Smoothie protocol. Spinnvill currently speaks only the Makera framed protocol and must fail safely if an unexpected protocol is encountered.
 - The community controller's [`USBStream.py`](https://github.com/Carvera-Community/Carvera_Controller/blob/main/carveracontroller/USBStream.py) constructs XMODEM in `xmodem` mode; [`WIFIStream.py`](https://github.com/Carvera-Community/Carvera_Controller/blob/main/carveracontroller/WIFIStream.py) uses `xmodem8k`; [`XMODEM.py`](https://github.com/Carvera-Community/Carvera_Controller/blob/main/carveracontroller/XMODEM.py) maps those **Makera-framed** transfers to **128-byte USB blocks** versus **8,192-byte Wi-Fi blocks**. This is an essential compatibility requirement, not a generic serial optimization.
 - [Community Controller release notes](https://github.com/Carvera-Community/Carvera_Controller/releases) describe identifying USB devices by FTDI and stable **VID:PID:serial** rather than changing COM paths, and treating missed heartbeats as communications backpressure rather than immediate transport death.
 - [Makera's Z1 motion firmware](https://github.com/MakeraInc/MakeraZ1Firmware) is source for the **motion-controller** portion. It does **not alone** establish all host-to-USB bridge and Wi-Fi ESP-side behavior; validate those behaviors against a real Z1 and a protocol trace.
@@ -100,7 +100,7 @@ Parameterize the existing `MakeraTransfer` block size instead of reimplementing 
 
 | Transport | Initial framed block size | Basis |
 | --- | ---: | --- |
-| TCP over Wi-Fi | 8192 bytes | Current OpenSpindle transfer and community Wi-Fi stream |
+| TCP over Wi-Fi | 8192 bytes | Current Spinnvill transfer and community Wi-Fi stream |
 | USB serial | 128 bytes | Community `USBStream` + `XMODEM` framed transfer |
 
 The exact Z1/firmware combination **must be validated on real hardware**. Negotiate larger USB blocks only after explicit firmware capability evidence, not as a guess. Preserve frame CRC validation, upload acknowledgement rules, no unsafe transfer retries, **full byte-for-byte download/readback before play**, and behavior when stock firmware supplies a placeholder MD5. Model throughput-dependent deadlines by bytes and measured progress, not simply reuse Wi-Fi timing constants. Cancel stalled transfers without replaying the job.
@@ -192,7 +192,7 @@ Use the Z1 simulator with fault injection where practical, then a **real Z1 with
 | Always reconnect TCP immediately after missing a heartbeat | Risks dropping a still-live session, two simultaneous controllers, and wrongly assuming the prior job/command outcome. |
 | Wrap USB serial in a virtual TCP forwarding process | Introduces another process/point of failure and still requires USB-specific protocol and 128-byte transfer handling; not suitable as the core design. |
 | Implement USB separately in the renderer via Web Serial | Violates the single-owner utility-process architecture and is less reliable for Stop, lifecycle, native packaging and background monitoring. |
-| Use the community controller as an OpenSpindle backend | Adds external process/vendor coupling and complicates command verification and job ownership; its implementation is a **reference**, not a shared controller. |
+| Use the community controller as an Spinnvill backend | Adds external process/vendor coupling and complicates command verification and job ownership; its implementation is a **reference**, not a shared controller. |
 | Copy community code wholesale | Different language, license and lifecycle; study the documented behavior, write original code and review compatibility/licensing for any reuse. |
 | Automatically fail over to USB mid-job | Unknown in-flight outcomes and uncertain machine identity make unsupervised failover unsafe. Leave as a possible future ADR after reconciliation is proven. |
 
@@ -212,7 +212,7 @@ Open questions requiring **real hardware** before implementation is accepted:
 
 ## References
 
-**OpenSpindle implementation**
+**Spinnvill implementation**
 
 - [`electron/machine/node-ports.ts`](https://github.com/passeride/openspindle/blob/main/electron/machine/node-ports.ts)
 - [`src/machine/core/ports.ts`](https://github.com/passeride/openspindle/blob/main/src/machine/core/ports.ts)

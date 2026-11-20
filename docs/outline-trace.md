@@ -1,6 +1,6 @@
 # Outline trace
 
-**Outline trace** is the probing strategy for an outline: it traces the edges of the plate's work area, or chosen edges of its stock and fixtures, with a probe's laser pointer at a safe height, so the outline can be checked against the stock and fixtures before anything is cut. OpenSpindle's own NC performs it, the explicit equivalent of the margin scan in the Z1 firmware's `M495` automation. **Probing** on the Prepare toolbar, or **Probing** in **Add operation**, adds one to the selected plate: choose **Outline trace**, and the operation takes a library probe with a laser pointer, such as the Makera Wired Probe 2.0 ([probing](probing.md#adding-a-probing-operation)). Its NC is generated whenever the plate is compiled.
+**Outline trace** is the probing strategy for an outline: it traces the edges of the plate's work area, or chosen edges of its stock and fixtures, with a probe's laser pointer at a safe height, so the outline can be checked against the stock and fixtures before anything is cut. Spinnvill's own NC performs it, the explicit equivalent of the margin scan in the Z1 firmware's `M495` automation. **Probing** on the Prepare toolbar, or **Probing** in **Add operation**, adds one to the selected plate: choose **Outline trace**, and the operation takes a library probe with a laser pointer, such as the Makera Wired Probe 2.0 ([probing](probing.md#adding-a-probing-operation)). Its NC is generated whenever the plate is compiled.
 
 The trace follows the firmware's own margin scan and has been checked against its source; the [firmware background](#firmware-background) explains it.
 
@@ -23,7 +23,7 @@ A new trace on a plate with stock and without machining operations traces the st
 | Trace feed          | Feed of the traced edges                                    | 100–3000 mm/min | 1000 mm/min |
 | Pause after tracing | Pause after the trace to check the outline                  |                 | On          |
 
-On the Z1 the defaults are the firmware's own: its configured clearance Z (`coordinate.clearance_z`: −3 on the Z1 Pro as Makera sets it; the published default file has −1) and margin speed (`atc.margin_rate_mm_m`). Machine Z stays within the Z the Z1 moves in: its firmware stops a move above −1 and below −102. The feeds are OpenSpindle's limits; neither range is a clearance check.
+On the Z1 the defaults are the firmware's own: its configured clearance Z (`coordinate.clearance_z`: −3 on the Z1 Pro as Makera sets it; the published default file has −1) and margin speed (`atc.margin_rate_mm_m`). Machine Z stays within the Z the Z1 moves in: its firmware stops a move above −1 and below −102. The feeds are Spinnvill's limits; neither range is a clearance check.
 
 ## Generated program
 
@@ -90,4 +90,4 @@ The 3D view outlines the bounds, and the design's snap points and selection box 
 
 Before running: home all axes, install the probe, set work X and Y (or read the plate's anchors from its device, so the program sets them), and keep the trace height clear of fixtures.
 
-The strategy is `outline-trace` in `src/domain/probing/strategies.ts`; OpenSpindle's trace that performs it is `src/domain/probing/generic/outline-trace.ts`, made of the Z1's probing NC, with the trace's ranges, in `src/domain/fixtures/makera-z1/probing-nc.ts`. The outline task is in `src/domain/probing/tasks/outline` (parameters, planning and rules) and its settings form in `src/features/probing/outline-settings.tsx`.
+The strategy is `outline-trace` in `src/domain/probing/strategies.ts`; Spinnvill's trace that performs it is `src/domain/probing/generic/outline-trace.ts`, made of the Z1's probing NC, with the trace's ranges, in `src/domain/fixtures/makera-z1/probing-nc.ts`. The outline task is in `src/domain/probing/tasks/outline` (parameters, planning and rules) and its settings form in `src/features/probing/outline-settings.tsx`.

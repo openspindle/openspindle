@@ -1,6 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react"
 import type { ReactNode } from "react"
-import { RpcError } from "@openspindle/rpc"
+import { RpcError } from "@spinnvill/rpc"
 import { toast } from "sonner"
 import { CircleAlert } from "lucide-react"
 import { useWorkspace } from "@/app/workspace/workspace-context"

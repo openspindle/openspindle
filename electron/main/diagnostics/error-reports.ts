@@ -76,7 +76,7 @@ export class ErrorReports {
     if (dsn) {
       Sentry.init({
         dsn,
-        release: `openspindle@${app.getVersion()}`,
+        release: `spinnvill@${app.getVersion()}`,
         environment: app.isPackaged ? "production" : "development",
         ipcMode: Sentry.IPCMode.Classic,
         sendDefaultPii: false,
@@ -123,7 +123,7 @@ export class ErrorReports {
   /** Sends an error the user reports. It went already when reports are automatic. */
   async send(eventId: string): Promise<void> {
     if (!this.transport)
-      throw new Error("This copy of OpenSpindle does not send error reports.")
+      throw new Error("This copy of Spinnvill does not send error reports.")
     const envelope = this.held.get(eventId)
     if (!envelope) {
       this.approve(eventId)
@@ -197,7 +197,7 @@ export class ErrorReports {
     // In place of Electron's own message box for an uncaught exception, with the error's id.
     if (mechanism === "onuncaughtexception")
       showErrorMessage(
-        "OpenSpindle ran into an error",
+        "Spinnvill ran into an error",
         `${report.error.name}: ${report.error.message}\n\nError ID: ${eventId}`
       )
     else this.missed = [...this.missed.slice(-4), report]

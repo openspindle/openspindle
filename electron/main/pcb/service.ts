@@ -3,7 +3,7 @@ import type { BrowserWindow, OpenDialogOptions } from "electron"
 import { constants } from "node:fs"
 import { access, readFile, rename, stat } from "node:fs/promises"
 import path from "node:path"
-import { RpcError } from "@openspindle/rpc"
+import { RpcError } from "@spinnvill/rpc"
 import { z } from "zod"
 import type {
   PcbGeneration,

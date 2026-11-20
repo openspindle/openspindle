@@ -52,7 +52,7 @@ jobs:
         run: |
           mkdir -p packages-out
           if [[ "$RUNNER_OS" == Windows ]]; then
-            cp release/OpenSpindle-Setup-*.exe release/OpenSpindle-Setup-*.exe.blockmap release/latest.yml packages-out/
+            cp release/Spinnvill-Setup-*.exe release/Spinnvill-Setup-*.exe.blockmap release/latest.yml packages-out/
           else
             cp release/*.AppImage release/latest-linux.yml packages-out/
           fi
@@ -60,7 +60,7 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         id: upload
         with:
-          name: OpenSpindle-${{ matrix.platform }}-x64-${{ steps.files.outputs.short-sha }}
+          name: Spinnvill-${{ matrix.platform }}-x64-${{ steps.files.outputs.short-sha }}
           path: packages-out/*
           retention-days: 14
           if-no-files-found: error
@@ -69,5 +69,5 @@ jobs:
           PLATFORM: ${{ matrix.platform }}
           URL: ${{ steps.upload.outputs.artifact-url }}
         run: |
-          printf '### Download OpenSpindle\n\n[Download the %s x64 package](%s)\n' \
+          printf '### Download Spinnvill\n\n[Download the %s x64 package](%s)\n' \
             "$PLATFORM" "$URL" >> "$GITHUB_STEP_SUMMARY"

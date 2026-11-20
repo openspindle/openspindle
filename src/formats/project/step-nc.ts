@@ -7,7 +7,7 @@ import { FILE_KINDS } from "@/platform/contract/files"
 import { decodeBase64Json, encodeBase64Json } from "../base64-json"
 
 /**
- * The OpenSpindle STEP-NC container: an ISO 10303-21 file whose AP238 documentary workplans
+ * The Spinnvill STEP-NC container: an ISO 10303-21 file whose AP238 documentary workplans
  * attach each operation's exact NC text, next to an opaque JSON payload that holds the
  * application data. It knows nothing about the payload; see docs/step-nc-projects.md.
  */
@@ -116,16 +116,16 @@ const emptyProject = (name: string): Placeholder => ({
   kind: "empty",
   executable: "Empty project",
   document: { id: "openspindle-project/archive", name },
-  description: "Empty OpenSpindle project archive; no NC program.",
-  instruction: "Empty OpenSpindle project; no program.",
+  description: "Empty Spinnvill project archive; no NC program.",
+  instruction: "Empty Spinnvill project; no program.",
 })
 
 const emptyPlate = (workplan: StepNcWorkplan, number: string): Placeholder => ({
   kind: "empty",
   executable: "Empty plate",
   document: { id: `${workplan.id}/archive`, name: workplan.name || number },
-  description: "Empty OpenSpindle plate; no NC program.",
-  instruction: "Empty OpenSpindle plate; no program.",
+  description: "Empty Spinnvill plate; no NC program.",
+  instruction: "Empty Spinnvill plate; no program.",
 })
 
 /** ISO 10303-21 control octets and Unicode code points, never surrogate code units. */
@@ -241,7 +241,7 @@ function documentaryGraph(
   property(main, "openspindle:project", payloadItems)
   const sourceType = add(
     "DOCUMENT_TYPE",
-    "OpenSpindle machine-specific NC source"
+    "Spinnvill machine-specific NC source"
   )
   /** The operator instruction and associated document of a leaf, with its properties. */
   const review = (executable: Reference, leaf: Leaf): Reference => {
@@ -251,8 +251,8 @@ function documentaryGraph(
           "DOCUMENT",
           `${leaf.id}/recipe`,
           leaf.name,
-          "Pending operation; configure and generate its preserved recipe in OpenSpindle before execution. No NC source is available.",
-          add("DOCUMENT_TYPE", "OpenSpindle pending operation recipe")
+          "Pending operation; configure and generate its preserved recipe in Spinnvill before execution. No NC source is available.",
+          add("DOCUMENT_TYPE", "Spinnvill pending operation recipe")
         )
         property(executable, "openspindle:operation-state", [
           add("DESCRIPTIVE_REPRESENTATION_ITEM", "state", "pending"),
@@ -260,7 +260,7 @@ function documentaryGraph(
         return add(
           "MACHINING_OPERATOR_INSTRUCTION",
           "Configure operation",
-          "Configure and generate this operation in OpenSpindle before running or exporting NC.",
+          "Configure and generate this operation in Spinnvill before running or exporting NC.",
           "",
           "",
           [recipe]
@@ -271,7 +271,7 @@ function documentaryGraph(
           "DOCUMENT",
           `${leaf.id}${SOURCE_SUFFIX}`,
           leaf.name,
-          "Machine-specific NC source attached to the OpenSpindle instruction; no AP238 motion conversion.",
+          "Machine-specific NC source attached to the Spinnvill instruction; no AP238 motion conversion.",
           sourceType
         )
         property(executable, "openspindle:source", [
@@ -280,7 +280,7 @@ function documentaryGraph(
         return add(
           "MACHINING_OPERATOR_INSTRUCTION",
           "Review source",
-          "Review the attached NC program in OpenSpindle.",
+          "Review the attached NC program in Spinnvill.",
           "",
           "",
           [source]
@@ -292,7 +292,7 @@ function documentaryGraph(
           leaf.document.id,
           leaf.document.name,
           leaf.description,
-          add("DOCUMENT_TYPE", "OpenSpindle project archive")
+          add("DOCUMENT_TYPE", "Spinnvill project archive")
         )
         return add(
           "MACHINING_OPERATOR_INSTRUCTION",
@@ -400,7 +400,7 @@ export function encodeStepNc(archive: StepNcArchive, payload: unknown): string {
     "ISO-10303-21;",
     "HEADER;",
     `FILE_DESCRIPTION((${quote(PROFILE)}),'2;1');`,
-    `FILE_NAME(${quote(archive.name + ".stpnc")},${quote(new Date().toISOString())},(''),(''),'OpenSpindle','OpenSpindle','');`,
+    `FILE_NAME(${quote(archive.name + ".stpnc")},${quote(new Date().toISOString())},(''),(''),'Spinnvill','Spinnvill','');`,
     `FILE_SCHEMA(('${SCHEMA}'));`,
     "ENDSEC;",
     "DATA;",
@@ -684,7 +684,7 @@ export function decodeStepNc<TValue>(
   const header = [reader.record(), reader.record(), reader.record()]
   if (!HeaderSchema.safeParse(header).success)
     throw new Error(
-      "This is not an OpenSpindle STEP-NC project. General CAD STEP and third-party STEP-NC import are not supported."
+      "This is not an Spinnvill STEP-NC project. General CAD STEP and third-party STEP-NC import are not supported."
     )
   reader.expect("ENDSEC;")
   reader.expect("DATA;")
@@ -731,7 +731,7 @@ export function decodeStepNc<TValue>(
     )
   )
     throw new Error(
-      "The STEP-NC structure or NC source differs from the saved OpenSpindle project metadata."
+      "The STEP-NC structure or NC source differs from the saved Spinnvill project metadata."
     )
   return restored.value
 }

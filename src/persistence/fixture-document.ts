@@ -131,7 +131,7 @@ function decodeFixtures(data: unknown): Decoded<FixtureLibrary> {
     })
     if (read.leftOut.length)
       dropped.push(
-        `Fixture definition "${read.data.name}": ${plural(read.leftOut.length, "field")} left out, which this version of OpenSpindle does not use: ${fieldList(value, read.leftOut)}.`
+        `Fixture definition "${read.data.name}": ${plural(read.leftOut.length, "field")} left out, which this version of Spinnvill does not use: ${fieldList(value, read.leftOut)}.`
       )
   }
   const bundles = BundlesSchema.parse(data.bundles)
@@ -168,7 +168,7 @@ function decodeFixtures(data: unknown): Decoded<FixtureLibrary> {
     const verb = leftOut.length === 1 ? "was" : "were"
     if (leftOut.length)
       dropped.push(
-        `Fixture profile "${id}": ${plural(leftOut.length, "field")} ${verb} left out, which this version of OpenSpindle does not use: ${fieldList(value, leftOut)}.`
+        `Fixture profile "${id}": ${plural(leftOut.length, "field")} ${verb} left out, which this version of Spinnvill does not use: ${fieldList(value, leftOut)}.`
       )
   }
   const selectedId =

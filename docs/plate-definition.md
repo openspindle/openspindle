@@ -1,17 +1,17 @@
-# OpenSpindle plate definition
+# Spinnvill plate definition
 
-An NC file exported from OpenSpindle (Prepare › operation › View source › Export NC with setup) begins with semicolon comments that carry the plate, followed by the program body exactly as Run sends it before the machine dialect:
+An NC file exported from Spinnvill (Prepare › operation › View source › Export NC with setup) begins with semicolon comments that carry the plate, followed by the program body exactly as Run sends it before the machine dialect:
 
 ```text
-;@OPENSPINDLE|BEGIN|v=10|encoding=base64-json|bytes=<UTF-8 byte count>|checksum=<8 lowercase hex digits>
-;@OPENSPINDLE|DATA|<base64, up to 120 characters per line>
-;@OPENSPINDLE|END
+;@SPINNVILL|BEGIN|v=10|encoding=base64-json|bytes=<UTF-8 byte count>|checksum=<8 lowercase hex digits>
+;@SPINNVILL|DATA|<base64, up to 120 characters per line>
+;@SPINNVILL|END
 <NC body>
 ```
 
 The payload is UTF-8 JSON, base64 encoded. The checksum is Adler-32 of the decoded bytes, used to detect corruption, not to authenticate. CRLF or LF follows the body; the body itself is never changed. Firmware ignores the comments, and they configure nothing on the machine.
 
-Invalid, incomplete, oversized or corrupted envelopes fail the import outright, and so does an envelope of a newer version of OpenSpindle, or of a version before 4. Versions 4 to 9 import as version 10, read optimistically like a project: a field the schema does not recognize is left out and named in a notice on the plate instead of refusing the file. Setup is limited to 32 MiB, the NC body to 10 MiB and the whole file to 20 MiB.
+Invalid, incomplete, oversized or corrupted envelopes fail the import outright, and so does an envelope of a newer version of Spinnvill, or of a version before 4. Versions 4 to 9 import as version 10, read optimistically like a project: a field the schema does not recognize is left out and named in a notice on the plate instead of refusing the file. Setup is limited to 32 MiB, the NC body to 10 MiB and the whole file to 20 MiB.
 
 ## Version 10
 

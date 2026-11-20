@@ -21,7 +21,7 @@ import { MakeraZ1 } from "./makera-z1/makera-z1"
 
 const MAKERA_Z1 = new MakeraZ1()
 
-/** The kits of the machines OpenSpindle knows. */
+/** The kits of the machines Spinnvill knows. */
 export const FIXTURE_KITS: readonly FixtureKit[] = [MAKERA_Z1]
 
 /**

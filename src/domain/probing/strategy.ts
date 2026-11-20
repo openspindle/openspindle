@@ -2,7 +2,7 @@
  * Probing operations as a strategy and a probe tool: the user picks what the operation is to do,
  * its strategy (an outside corner, a touch-off, a height map…), then one of the library's probes
  * that can do it on the plate's machine, then its settings. A method performs strategies: either
- * OpenSpindle's own NC, made of the machine's probing NC (`MachineProbing.nc`), or a cycle of
+ * Spinnvill's own NC, made of the machine's probing NC (`MachineProbing.nc`), or a cycle of
  * the machine's firmware (`MachineProbing.cycles`). A machine supports a strategy where it has a
  * method for it; which method runs is the machine's to decide, not the user's.
  */
@@ -41,7 +41,7 @@ export type TaskSpecs = {
   readonly origin: OriginSpecs
 }
 
-/** The strategies OpenSpindle knows, by id, as operations store them (`PROBING_STRATEGIES`). */
+/** The strategies Spinnvill knows, by id, as operations store them (`PROBING_STRATEGIES`). */
 export type StrategyId =
   | "outside-corner"
   | "inside-corner"
@@ -86,7 +86,7 @@ export type StrategyInput<TParams> = {
 }
 
 /**
- * A way to perform strategies of one task: OpenSpindle's own NC, or a cycle of a machine's
+ * A way to perform strategies of one task: Spinnvill's own NC, or a cycle of a machine's
  * firmware. It says which machines run it, which probes it probes with, the ranges and defaults
  * of the task's parameters with it, and its NC.
  */

@@ -16,13 +16,13 @@ import type { PlateUpgrade } from "./upgrade/plate"
 /** Setup and editable operations embedded as leading comments of an exported NC file. */
 const MAX_ENVELOPE_BYTES = 32 * 1024 * 1024
 const BEGIN =
-  /^;@OPENSPINDLE\|BEGIN\|v=(\d+)\|encoding=base64-json\|bytes=(\d+)\|checksum=([a-f0-9]{8})$/
-const DATA = ";@OPENSPINDLE|DATA|"
-const END = ";@OPENSPINDLE|END"
+  /^;@SPINNVILL\|BEGIN\|v=(\d+)\|encoding=base64-json\|bytes=(\d+)\|checksum=([a-f0-9]{8})$/
+const DATA = ";@SPINNVILL|DATA|"
+const END = ";@SPINNVILL|END"
 
 /** Whether NC text begins as an exported plate does, with its setup in leading comments. */
 export const carriesPlate = (source: string) =>
-  source.startsWith(";@OPENSPINDLE|")
+  source.startsWith(";@SPINNVILL|")
 
 /**
  * The envelope version exports write.
@@ -103,7 +103,7 @@ export function readEnvelope(source: string): EnvelopeRead {
   )
   const match = BEGIN.exec(header)
   if (!match || Number(match[2]) > MAX_ENVELOPE_BYTES)
-    throw new Error("Unsupported or invalid OpenSpindle setup definition.")
+    throw new Error("Unsupported or invalid Spinnvill setup definition.")
   let cursor = firstEnd + 1
   let encoded = ""
   let complete = false
@@ -122,12 +122,12 @@ export function readEnvelope(source: string): EnvelopeRead {
       !line.startsWith(DATA) ||
       !/^[A-Za-z0-9+/=]{1,120}$/.test(line.slice(DATA.length))
     )
-      throw new Error("Invalid OpenSpindle setup data.")
+      throw new Error("Invalid Spinnvill setup data.")
     encoded += line.slice(DATA.length)
     if (encoded.length > Math.ceil(MAX_ENVELOPE_BYTES / 3) * 4)
-      throw new Error("OpenSpindle setup data exceeds its limit.")
+      throw new Error("Spinnvill setup data exceeds its limit.")
   }
-  if (!complete) throw new Error("Incomplete OpenSpindle setup definition.")
+  if (!complete) throw new Error("Incomplete Spinnvill setup definition.")
   let payload: unknown
   try {
     payload = decodeBase64Json({
@@ -136,7 +136,7 @@ export function readEnvelope(source: string): EnvelopeRead {
       checksum: match[3],
     })
   } catch {
-    throw new Error("OpenSpindle setup data is corrupted.")
+    throw new Error("Spinnvill setup data is corrupted.")
   }
   return { version: Number(match[1]), payload, body: source.slice(cursor) }
 }
@@ -154,7 +154,7 @@ export function writeEnvelope(
   )
   const newline = body.includes("\r\n") ? "\r\n" : "\n"
   const lines = [
-    `;@OPENSPINDLE|BEGIN|v=${version}|encoding=base64-json|bytes=${encoded.bytes}|checksum=${encoded.checksum}`,
+    `;@SPINNVILL|BEGIN|v=${version}|encoding=base64-json|bytes=${encoded.bytes}|checksum=${encoded.checksum}`,
   ]
   for (let offset = 0; offset < encoded.base64.length; offset += 120)
     lines.push(`${DATA}${encoded.base64.slice(offset, offset + 120)}`)

@@ -35,7 +35,13 @@ const RING = { bottom: 24.2, top: 25.6, proud: 0.05 }
 const SCREWS = { radius: 0.8, height: 32.1 }
 /** A thin collar on the body's top, then the shank's neck and the 1/8″ shank. */
 const COLLAR = { radius: 5.2, top: 35 }
-const SHANK = { neck: 1.25, neckTop: 37, radius: 3.175 / 2, top: 45.5, round: 0.5 }
+const SHANK = {
+  neck: 1.25,
+  neckTop: 37,
+  radius: 3.175 / 2,
+  top: 45.5,
+  round: 0.5,
+}
 /** Facets around the axis. */
 const SEGMENTS = 48
 /** Arc steps per quarter circle. */
@@ -244,7 +250,12 @@ for (let screw = 0; screw < 4; screw++) {
   const angle = Math.PI / 4 + (screw * Math.PI) / 2
   const [nx, ny] = [Math.cos(angle), Math.sin(angle)]
   const radius = BODY.radius + 0.01
-  disc(holes, [nx * radius, ny * radius, SCREWS.height], [nx, ny], SCREWS.radius)
+  disc(
+    holes,
+    [nx * radius, ny * radius, SCREWS.height],
+    [nx, ny],
+    SCREWS.radius
+  )
 }
 
 // The shank's neck and the 1/8″ shank, its end rounded.
@@ -294,7 +305,7 @@ await writeFile(
     ],
     {
       name: "Makera 3D Probe",
-      generator: "OpenSpindle 3D probe (scripts/3d-probe.mjs)",
+      generator: "Spinnvill 3D probe (scripts/3d-probe.mjs)",
       extras: {
         dimensions: "estimated from Makera's product photos",
         overallLengthMm: SHANK.top,

@@ -1,6 +1,6 @@
-import { createEndpoint } from "@openspindle/rpc"
-import type { EmptyContract, EndpointLog } from "@openspindle/rpc"
-import { messagePortTransport } from "@openspindle/rpc/message-port"
+import { createEndpoint } from "@spinnvill/rpc"
+import type { EmptyContract, EndpointLog } from "@spinnvill/rpc"
+import { messagePortTransport } from "@spinnvill/rpc/message-port"
 import { RPC_PORT_MESSAGE, RPC_SERVICES } from "./contract/channels"
 import type { RpcService } from "./contract/channels"
 import { hostContract } from "./contract/host-contract"
@@ -9,7 +9,7 @@ import type { Host } from "./host"
 import { createMachineLink } from "./machine-link"
 
 /** Exposed by the preload script; it only asks the main process for the page's RPC ports. */
-export type OpenSpindleBridge = {
+export type SpinnvillBridge = {
   readonly connect: () => void
   /** A file's path on disk, by Electron's webUtils; empty for one that is not on disk. */
   readonly pathOf: (file: File) => string
@@ -17,7 +17,7 @@ export type OpenSpindleBridge = {
 
 declare global {
   interface Window {
-    openSpindleBridge?: OpenSpindleBridge
+    spinnvillBridge?: SpinnvillBridge
   }
 }
 
@@ -46,7 +46,7 @@ function receivePorts(
 
 /** `log` records what the connection refuses: events and results that fail the contract. */
 export async function connectElectronHost(
-  bridge: OpenSpindleBridge,
+  bridge: SpinnvillBridge,
   log: EndpointLog
 ): Promise<Host> {
   const machine = createMachineLink(log)

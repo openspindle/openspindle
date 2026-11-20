@@ -18,7 +18,7 @@ The grid's placement, its anchors, its stock checks and **Fit grid** belong to t
 | Relative to          | Where the grid starts: the probe position, or one of the machine's stored anchors with X and Y from it (see below) |     |           | See below |
 | Review after probing | Pause after probing to review the measured height map                                                              |     |           | On        |
 
-The ranges are OpenSpindle's limits, not a clearance check. NC words carry at most six decimals.
+The ranges are Spinnvill's limits, not a clearance check. NC words carry at most six decimals.
 
 - **Probe position**: position the probe above the grid's lower-left corner before Run; the grid extends towards +X and +Y.
 - **A stored anchor**: the grid starts at one of the machine's [stored anchors](stored-anchors.md) plus **X** and **Y** from it (machine millimetres), as the work origin keeps its X and Y relative to one. As Makera Studio's probing does, the machine first rises to machine Z −3, the clearance Makera configures, then travels there with `G53`, then probes. X and Y are limited to ±10,000 mm, like stored anchors.

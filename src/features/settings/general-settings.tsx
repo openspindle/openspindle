@@ -50,7 +50,7 @@ const fontOptions = (role: FontRole) =>
   FONT_CHOICES[role].map((id) => ({ value: id, label: FONTS[id].label }))
 
 const simulatorHint = (host: string, port: number) =>
-  `A simulated Makera Z1 that OpenSpindle runs at ${host}:${port}, to try jobs without a machine. Connect to it as to a machine.`
+  `A simulated Makera Z1 that Spinnvill runs at ${host}:${port}, to try jobs without a machine. Connect to it as to a machine.`
 
 /** Settings › General: appearance and the simulated Z1. Changes apply at once. */
 export function GeneralSettings() {

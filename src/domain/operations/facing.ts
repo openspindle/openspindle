@@ -504,7 +504,7 @@ export function facingNc(
   const safe = raster.safe
   const layers = Math.ceil(p.removal / p.stepdown)
   const lines = [
-    "(OpenSpindle facing - review setup before Run)",
+    "(Spinnvill facing - review setup before Run)",
     "G21 G90 G17 G94",
     `T${tool} M6`,
     `S${p.rpm} M3`,

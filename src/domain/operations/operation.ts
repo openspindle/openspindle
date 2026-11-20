@@ -131,7 +131,7 @@ export const UnsupportedSourceSchema = z.object({
 
 /**
  * A probing strategy's id, such as "touch-off" (`PROBING_STRATEGIES`). Any such string parses:
- * one OpenSpindle does not know does not resolve (`probing-unsupported`).
+ * one Spinnvill does not know does not resolve (`probing-unsupported`).
  */
 export const StrategyIdSchema = z
   .string()

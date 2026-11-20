@@ -25,7 +25,7 @@ disconnect
 
 The host lists FTDI candidates and resolves the selected ID again immediately before opening. It never accepts an arbitrary serial path. The desktop profile association UI is not exposed by this terminal command; the host uses a stable USB profile identity.
 
-After verifying your particular machine's behavior on open, an operator may explicitly configure `OPENSPINDLE_USB_ID` with a unique hardware ID (`usb:…`, not a path-only `usb-path:…` ID) for one connection attempt at host startup, and optionally `OPENSPINDLE_CAMERA_HOST`. Configure either this USB ID or `OPENSPINDLE_MACHINE_HOST`; setting both is refused. There is no retry, reconnect loop or job resume. A service startup opens the configured port, so verify the driver/firmware does not reset the machine on open before enabling service startup. FreeCAD continues sending packages to the host's authenticated inbox; receiving a package never starts it. Browser access remains monitor-only.
+After verifying your particular machine's behavior on open, an operator may explicitly configure `SPINNVILL_USB_ID` with a unique hardware ID (`usb:…`, not a path-only `usb-path:…` ID) for one connection attempt at host startup, and optionally `SPINNVILL_CAMERA_HOST`. Configure either this USB ID or `SPINNVILL_MACHINE_HOST`; setting both is refused. There is no retry, reconnect loop or job resume. A service startup opens the configured port, so verify the driver/firmware does not reset the machine on open before enabling service startup. FreeCAD continues sending packages to the host's authenticated inbox; receiving a package never starts it. Browser access remains monitor-only.
 
 ## Protocol and packaging
 

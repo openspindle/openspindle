@@ -24,7 +24,7 @@ const TITLES = {
 } as const
 
 function dialogTitle(newer: boolean, unreadable: boolean) {
-  if (newer) return "Saved data is from a newer OpenSpindle"
+  if (newer) return "Saved data is from a newer Spinnvill"
   if (unreadable) return "Saved data could not be restored"
   return "Some saved data could not be restored"
 }
@@ -60,7 +60,7 @@ export function LoadIssuesDialog() {
       )
       return host.files.save({
         kind: "recovery",
-        suggestedName: `openspindle-recovery-${new Date().toISOString().slice(0, 10)}.json`,
+        suggestedName: `spinnvill-recovery-${new Date().toISOString().slice(0, 10)}.json`,
         contents: JSON.stringify(copies, null, 2),
       })
     },

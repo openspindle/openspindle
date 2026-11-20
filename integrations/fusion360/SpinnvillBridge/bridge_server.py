@@ -32,7 +32,7 @@ MAX_PROGRAMS = 100
 LIST_SECONDS = 8
 POST_SECONDS = 120
 NC_EXTENSIONS = frozenset((".nc", ".cnc", ".gcode", ".tap", ".ngc"))
-# The most OpenSpindle apps paired at once, such as an installed one and one in development.
+# The most Spinnvill apps paired at once, such as an installed one and one in development.
 MAX_PAIRINGS = 4
 # Main-thread event info for a completed pairing; request events carry a UUID instead.
 PAIRED = "paired"
@@ -47,7 +47,7 @@ def _token_hash(token):
 
 
 class Pairings:
-    """The OpenSpindle apps paired with this add-in, kept across Fusion sessions in `path`.
+    """The Spinnvill apps paired with this add-in, kept across Fusion sessions in `path`.
 
     Each app has a token of its own. Only a hash of each is stored, so the file alone connects
     nobody. The newest MAX_PAIRINGS stay: pairing another app beyond that forgets the oldest.
@@ -177,7 +177,7 @@ class _MainThreadRequest:
 
     def ensure_live(self):
         if self.cancelled or not _connection_open(self.connection):
-            raise BridgeError(499, "The OpenSpindle request was cancelled.")
+            raise BridgeError(499, "The Spinnvill request was cancelled.")
         if time.monotonic() >= self.deadline:
             raise BridgeError(504, "Fusion did not finish in time. Finish any open Fusion dialog and try again.")
 
@@ -196,9 +196,9 @@ class MainThreadRequests:
         request = _MainThreadRequest(action, program_id, time.monotonic() + seconds, connection)
         with self._lock:
             if self._stopped:
-                raise BridgeError(503, "The OpenSpindle bridge is stopping.")
+                raise BridgeError(503, "The Spinnvill bridge is stopping.")
             if len(self._pending) >= MAX_PENDING_REQUESTS or self._executing:
-                raise BridgeError(409, "Fusion is handling another OpenSpindle request. Try again when it finishes.")
+                raise BridgeError(409, "Fusion is handling another Spinnvill request. Try again when it finishes.")
             # A second explicit import cannot queue behind an earlier import.
             if action == "post" and any(item.action == "post" for item in self._pending.values()):
                 raise BridgeError(409, "An NC program import is already pending in Fusion.")
@@ -262,7 +262,7 @@ class MainThreadRequests:
             self._stopped = True
             for request in self._pending.values():
                 request.cancelled = True
-                request.response = (503, _error_payload("The OpenSpindle bridge is stopping."))
+                request.response = (503, _error_payload("The Spinnvill bridge is stopping."))
                 request.done.set()
             self._pending.clear()
 
@@ -270,7 +270,7 @@ class MainThreadRequests:
 class _SnapshotRequestHandler(BaseHTTPRequestHandler):
     # One request per connection; no keep-alive sockets survive add-in stop.
     protocol_version = "HTTP/1.0"
-    server_version = "OpenSpindleBridge/2"
+    server_version = "SpinnvillBridge/2"
     sys_version = ""
 
     def setup(self):
@@ -297,7 +297,7 @@ class _SnapshotRequestHandler(BaseHTTPRequestHandler):
 
     def _is_local_request(self):
         if self.server.bridge.is_stopping():
-            self._send_json(503, {"error": "The OpenSpindle bridge is stopping."})
+            self._send_json(503, {"error": "The Spinnvill bridge is stopping."})
             return False
         if self.headers.get_all("Host") != [f"{HOST}:{PORT}"]:
             self._send_json(403, {"error": "Invalid host."})
@@ -317,7 +317,7 @@ class _SnapshotRequestHandler(BaseHTTPRequestHandler):
     def _is_authorized(self):
         token = self._bearer()
         if token is None or not self.server.bridge.pairings.accepts(token):
-            self._send_json(401, {"error": "This OpenSpindle app is not connected."})
+            self._send_json(401, {"error": "This Spinnvill app is not connected."})
             return False
         return True
 
@@ -349,7 +349,7 @@ class _SnapshotRequestHandler(BaseHTTPRequestHandler):
                 return
             self._fusion_request("list")
             return
-        self._send_json(404, {"error": "Unknown route. Update the OpenSpindle app and Fusion add-in together."})
+        self._send_json(404, {"error": "Unknown route. Update the Spinnvill app and Fusion add-in together."})
 
     def _read_json(self):
         if self.headers.get_all("Content-Type") != ["application/json"]:
@@ -377,7 +377,7 @@ class _SnapshotRequestHandler(BaseHTTPRequestHandler):
         if not self._is_local_request():
             return
         if self.path != "/v1/pairing":
-            self._send_json(404, {"error": "Unknown route. Update the OpenSpindle app and Fusion add-in together."})
+            self._send_json(404, {"error": "Unknown route. Update the Spinnvill app and Fusion add-in together."})
             return
         if not self._is_authorized():
             return
@@ -398,7 +398,7 @@ class _SnapshotRequestHandler(BaseHTTPRequestHandler):
             return
         match = _PROGRAM_PATH.fullmatch(self.path)
         if not pairing and not match:
-            self._send_json(404, {"error": "Unknown route. Update the OpenSpindle app and Fusion add-in together."})
+            self._send_json(404, {"error": "Unknown route. Update the Spinnvill app and Fusion add-in together."})
             return
         try:
             payload = self._read_json()
@@ -494,19 +494,19 @@ class SnapshotBridge:
         self._server.bridge = self
         self._thread = threading.Thread(
             target=self._server.serve_forever,
-            name="OpenSpindleFusionBridge",
+            name="SpinnvillFusionBridge",
             daemon=True,
         )
         self._announcement_thread = threading.Thread(
             target=self._announce_pairing,
-            name="OpenSpindlePairingAnnouncements",
+            name="SpinnvillPairingAnnouncements",
             daemon=True,
         )
 
     def begin_pairing(self):
         with self._pairing_lock:
             if self._stopping.is_set():
-                raise ValueError("The OpenSpindle bridge is stopping.")
+                raise ValueError("The Spinnvill bridge is stopping.")
             offer = PairingOffer(
                 str(uuid.uuid4()),
                 f"{secrets.randbelow(1_000_000):06d}",
@@ -540,12 +540,12 @@ class SnapshotBridge:
             if offer is None or offer.request_id != request_id:
                 return 410, {"error": "The connection request expired or is no longer available."}
             if offer.attempts >= MAX_PAIRING_ATTEMPTS:
-                return 429, {"error": "Too many attempts. Connect to OpenSpindle again in Fusion."}
+                return 429, {"error": "Too many attempts. Connect to Spinnvill again in Fusion."}
             if not secrets.compare_digest(offer.code, code):
                 offer.attempts += 1
                 if offer.attempts >= MAX_PAIRING_ATTEMPTS:
                     self._announcement_changed.set()
-                    return 429, {"error": "Too many attempts. Connect to OpenSpindle again in Fusion."}
+                    return 429, {"error": "Too many attempts. Connect to Spinnvill again in Fusion."}
                 return 401, {"error": "The code does not match the one shown in Fusion."}
             self._pairing = None
             self._announcement_changed.set()
@@ -578,7 +578,7 @@ class SnapshotBridge:
                             (HOST, DISCOVERY_PORT),
                         )
                     except OSError:
-                        # OpenSpindle may not be running yet. The next tick
+                        # Spinnvill may not be running yet. The next tick
                         # retries the announcement without extending its life.
                         pass
                 self._announcement_changed.wait(timeout=1)

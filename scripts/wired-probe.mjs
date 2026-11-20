@@ -402,7 +402,7 @@ await writeFile(
     ],
     {
       name: "Makera Wired Probe 2.0",
-      generator: "OpenSpindle wired probe (scripts/wired-probe.mjs)",
+      generator: "Spinnvill wired probe (scripts/wired-probe.mjs)",
       extras: {
         dimensions: "estimated from Makera's product photos",
         overallLengthMm: ADAPTER.top,

@@ -89,7 +89,7 @@ export interface OperationKind<TKind extends SourceKind> {
 
 /**
  * A probing operation on a machine that does not probe, or does not support its strategy (has no
- * method for it), named by its label (`strategyLabel`): also a strategy OpenSpindle does not
+ * method for it), named by its label (`strategyLabel`): also a strategy Spinnvill does not
  * know, by its id, or one of another task than the operation's. The operation's inspector shows
  * it; its editor has no settings to add.
  */

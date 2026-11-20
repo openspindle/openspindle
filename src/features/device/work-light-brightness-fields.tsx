@@ -16,11 +16,11 @@ import { MeasurementInput } from "@/components/workspace/measurement-input"
 import { Hint } from "@/components/workspace/hint"
 
 const DAYLIGHT_HINT =
-  "Used with OpenSpindle’s light appearance. With System selected, it follows your system’s appearance."
+  "Used with Spinnvill’s light appearance. With System selected, it follows your system’s appearance."
 const NIGHT_HINT =
-  "Used with OpenSpindle’s dark appearance. With System selected, it follows your system’s appearance."
+  "Used with Spinnvill’s dark appearance. With System selected, it follows your system’s appearance."
 const INACTIVITY_TIMER_HINT =
-  "Turns the light off after this many minutes of machine inactivity while OpenSpindle is connected. 0 means never."
+  "Turns the light off after this many minutes of machine inactivity while Spinnvill is connected. 0 means never."
 
 const BrightnessFieldSchema = z.object({
   percent: z

@@ -45,7 +45,7 @@ export default defineConfig(({ command }) => {
             authToken: process.env.SENTRY_AUTH_TOKEN,
             telemetry: false,
             // The main process names the release; see electron/main/diagnostics.
-            release: { name: `openspindle@${version}`, inject: false },
+            release: { name: `spinnvill@${version}`, inject: false },
             sourcemaps: {
               filesToDeleteAfterUpload: [`out/${target}/**/*.map`],
             },

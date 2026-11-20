@@ -2,7 +2,7 @@ import { createSocket } from "node:dgram"
 import type { Socket } from "node:dgram"
 import { request as httpRequest } from "node:http"
 import type { IncomingMessage } from "node:http"
-import { RpcError } from "@openspindle/rpc"
+import { RpcError } from "@spinnvill/rpc"
 import { z } from "zod"
 import { hasControlCharacter } from "../../../src/machine/contract/index.ts"
 import {
@@ -53,7 +53,7 @@ const BridgeErrorSchema = z.strictObject({
 function invalidResponse(): RpcError {
   return new RpcError(
     "FAILED",
-    "Fusion returned an invalid response. Restart OpenSpindle Bridge in Fusion and retry."
+    "Fusion returned an invalid response. Restart Spinnvill Bridge in Fusion and retry."
   )
 }
 
@@ -71,23 +71,23 @@ function responseError(
     if (status === 410)
       return new RpcError(
         "NOT_FOUND",
-        "This connection request has expired. Click Connect to OpenSpindle in Fusion 360 again."
+        "This connection request has expired. Click Connect to Spinnvill in Fusion 360 again."
       )
     if (status === 429)
       return new RpcError(
         "LIMIT_EXCEEDED",
-        "Too many incorrect codes. Click Connect to OpenSpindle in Fusion 360 to get a new code."
+        "Too many incorrect codes. Click Connect to Spinnvill in Fusion 360 to get a new code."
       )
   }
   if (status === 401 || status === 403)
     return new RpcError(
       "PERMISSION_DENIED",
-      "The Fusion connection has expired. Click Connect to OpenSpindle in Fusion 360 again."
+      "The Fusion connection has expired. Click Connect to Spinnvill in Fusion 360 again."
     )
   if (!pairing && status === 404)
     return new RpcError(
       "UNAVAILABLE",
-      "Update OpenSpindle Bridge from this OpenSpindle app, then restart the add-in in Fusion 360 and reconnect."
+      "Update Spinnvill Bridge from this Spinnvill app, then restart the add-in in Fusion 360 and reconnect."
     )
   if (status === 410)
     return new RpcError(
@@ -121,7 +121,7 @@ function responseError(
     )
   return new RpcError(
     "UNAVAILABLE",
-    "OpenSpindle Bridge could not complete the request. Check Fusion 360, then try again."
+    "Spinnvill Bridge could not complete the request. Check Fusion 360, then try again."
   )
 }
 
@@ -195,7 +195,7 @@ export class FusionService {
     socket.on("error", () => {
       if (this.socket !== socket) return
       this.discoveryError =
-        "Cannot listen for Fusion 360 connections. Close other OpenSpindle instances, then restart OpenSpindle."
+        "Cannot listen for Fusion 360 connections. Close other Spinnvill instances, then restart Spinnvill."
       log.warn(this.discoveryError)
       this.closeSocket()
       this.cancelVerification()
@@ -516,7 +516,7 @@ export class FusionService {
     if (!this.token)
       throw new RpcError(
         "UNAVAILABLE",
-        "Click Connect to OpenSpindle in Fusion 360 to connect."
+        "Click Connect to Spinnvill in Fusion 360 to connect."
       )
     return this.token
   }
@@ -648,7 +648,7 @@ export class FusionService {
       if (timeout.aborted)
         throw new RpcError(
           "TIMEOUT",
-          "Fusion did not respond in time. Check that OpenSpindle Bridge is running and retry."
+          "Fusion did not respond in time. Check that Spinnvill Bridge is running and retry."
         )
       if (signal.aborted)
         throw new RpcError("CANCELLED", "The Fusion request was cancelled.")
@@ -656,7 +656,7 @@ export class FusionService {
       // Do not forward/log network exceptions: they can include request headers.
       throw new RpcError(
         "UNAVAILABLE",
-        "Cannot reach Fusion. Open Fusion and start the OpenSpindle Bridge add-in."
+        "Cannot reach Fusion. Open Fusion and start the Spinnvill Bridge add-in."
       )
     } finally {
       response?.destroy()

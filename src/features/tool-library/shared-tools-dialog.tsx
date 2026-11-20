@@ -60,7 +60,7 @@ export function SharedToolsDialog({ onClose }: { onClose: () => void }) {
         throw new Error("No supported dimensioned cutters to export.")
       const result = await host.files.save({
         kind: "sharedTools",
-        suggestedName: "OpenSpindle.osptools",
+        suggestedName: "Spinnvill.osptools",
         contents: JSON.stringify(
           { schema: "openspindle-shared-tools/1", units: "mm", tools: entries },
           null,

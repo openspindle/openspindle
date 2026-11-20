@@ -17,7 +17,7 @@ const noticesFile = () =>
 /** The folder with Electron's licenses, as the credits name it. */
 const resourcesFolder = () =>
   process.platform === "darwin"
-    ? "OpenSpindle.app/Contents/Resources"
+    ? "Spinnvill.app/Contents/Resources"
     : `the resources folder of ${path.dirname(process.execPath)}`
 
 async function credits(): Promise<string | undefined> {
@@ -25,7 +25,13 @@ async function credits(): Promise<string | undefined> {
     const notices = ThirdPartyNoticesSchema.parse(
       JSON.parse(await readFile(noticesFile(), "utf8"))
     )
-    return creditsText(notices, resourcesFolder())
+    const license = await readFile(
+      app.isPackaged
+        ? path.join(process.resourcesPath, "LICENSE.spinnvill.txt")
+        : fileURLToPath(new URL("../../LICENSE", import.meta.url)),
+      "utf8"
+    )
+    return `Spinnvill (fork of OpenSpindle)\n\n${license.trim()}\n\n${creditsText(notices, resourcesFolder())}`
   } catch (error) {
     log.error("The About panel has no credits", error)
     return undefined
@@ -56,11 +62,11 @@ export async function openCredits(): Promise<void> {
   if (text === undefined) {
     showErrorMessage(
       "The open-source licenses could not be read",
-      "OpenSpindle's log has the details."
+      "Spinnvill's log has the details."
     )
     return
   }
-  const file = path.join(app.getPath("temp"), "OpenSpindle Licenses.txt")
+  const file = path.join(app.getPath("temp"), "Spinnvill Licenses.txt")
   await writeFile(file, text)
   const error = await shell.openPath(file)
   if (error) log.error(`Opening ${file} failed: ${error}`)

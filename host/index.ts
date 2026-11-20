@@ -1,3 +1,4 @@
+import { hostEnvironment } from "./environment"
 import { createReadStream, readFileSync, unlinkSync } from "node:fs"
 import { createServer } from "node:http"
 import type { IncomingMessage, ServerResponse } from "node:http"
@@ -28,22 +29,22 @@ import {
 } from "./camera-contract.ts"
 import { OwnerClient } from "./owner-client.ts"
 
-const bind = process.env.OPENSPINDLE_HOST_BIND ?? "127.0.0.1"
+const bind = hostEnvironment("HOST_BIND") ?? "127.0.0.1"
 const port = z.coerce
   .number()
   .int()
   .min(1)
   .max(65535)
-  .parse(process.env.OPENSPINDLE_HOST_PORT ?? "3210")
-const data = resolve(process.env.OPENSPINDLE_HOST_DATA ?? "./openspindle-data")
-const token = process.env.OPENSPINDLE_HOST_TOKEN
+  .parse(hostEnvironment("HOST_PORT") ?? "3210")
+const data = resolve(hostEnvironment("HOST_DATA") ?? "./openspindle-data")
+const token = hostEnvironment("HOST_TOKEN")
 if (!token || token.length < 32)
   throw new Error(
-    "Set OPENSPINDLE_HOST_TOKEN to an access key of at least 32 characters."
+    "Set SPINNVILL_HOST_TOKEN to an access key of at least 32 characters."
   )
 const expectedKey = createHash("sha256").update(token).digest()
 const web = fileURLToPath(new URL("./web", import.meta.url))
-const publicOrigin = process.env.OPENSPINDLE_HOST_ORIGIN
+const publicOrigin = hostEnvironment("HOST_ORIGIN")
 await mkdir(join(data, "inbox"), { recursive: true })
 const warning = (message: string) => {
   process.stderr.write(message + "\n")
@@ -70,7 +71,7 @@ try {
     else throw reason
   }
   if (!stale)
-    throw new Error("Another OpenSpindle host owns this data directory.")
+    throw new Error("Another Spinnvill host owns this data directory.")
   await rm(lockPath)
   lock = await open(lockPath, "wx")
 }
@@ -84,23 +85,21 @@ process.on("exit", () => {
     /* A lock is never removed on behalf of another owner. */
   }
 })
-if (process.env.OPENSPINDLE_USB_ID && process.env.OPENSPINDLE_MACHINE_HOST)
+if (hostEnvironment("USB_ID") && hostEnvironment("MACHINE_HOST"))
   throw new Error(
-    "Configure either OPENSPINDLE_USB_ID or OPENSPINDLE_MACHINE_HOST, never both."
+    "Configure either SPINNVILL_USB_ID or SPINNVILL_MACHINE_HOST, never both."
   )
-if (process.env.OPENSPINDLE_USB_ID?.startsWith("usb-path:"))
+if (hostEnvironment("USB_ID")?.startsWith("usb-path:"))
   throw new Error(
     "Path-only USB identities require manual selection with connect-usb; startup requires a unique hardware ID."
   )
 const owner = new OwnerClient(
   {
     data,
-    machineHost: process.env.OPENSPINDLE_MACHINE_HOST,
-    usbId: process.env.OPENSPINDLE_USB_ID,
-    cameraHost: process.env.OPENSPINDLE_CAMERA_HOST,
-    machinePort: process.env.OPENSPINDLE_MACHINE_PORT
-      ? Number(process.env.OPENSPINDLE_MACHINE_PORT)
-      : undefined,
+    machineHost: hostEnvironment("MACHINE_HOST"),
+    usbId: hostEnvironment("USB_ID"),
+    cameraHost: hostEnvironment("CAMERA_HOST"),
+    machinePort: Number(hostEnvironment("MACHINE_PORT") ?? 2222),
   },
   warning
 )
@@ -537,7 +536,7 @@ server.requestTimeout = 120000
 server.headersTimeout = 10000
 server.listen(port, bind, () =>
   process.stdout.write(
-    `OpenSpindle monitor listening on ${bind}:${port}. Commands: status, discover, usb, connect-usb <id> [camera-IPv4], disconnect, connect <IPv4> <port>, run <inbox-id> <package-sha256>, stop, pause, resume. Browser access is monitor-only.\n`
+    `Spinnvill monitor listening on ${bind}:${port}. Commands: status, discover, usb, connect-usb <id> [camera-IPv4], disconnect, connect <IPv4> <port>, run <inbox-id> <package-sha256>, stop, pause, resume. Browser access is monitor-only.\n`
   )
 )
 const terminal = createInterface({

@@ -47,7 +47,7 @@ function saveSession(tracking: JobTracking, session: JobSession) {
   )
   const link = document.createElement("a")
   link.href = url
-  link.download = `openspindle-tracking-${tracking.jobId.slice(0, 8)}.json`
+  link.download = `spinnvill-tracking-${tracking.jobId.slice(0, 8)}.json`
   link.click()
   URL.revokeObjectURL(url)
 }

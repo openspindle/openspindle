@@ -35,7 +35,7 @@ export const FILE_KINDS = {
     mime: "text/plain",
   },
   /**
-   * OpenSpindle saves a tool library as a zip archive of its JSON and the tools' photos and 3D
+   * Spinnvill saves a tool library as a zip archive of its JSON and the tools' photos and 3D
    * models; it opens those, the JSON of its earlier versions and Fusion 360's JSON and .tools.
    * Hundreds of MB, not the 13 GB of 10,000 tools with the largest photo and model: an import
    * holds the file, what it unpacks to and the files as data URLs in memory at once.

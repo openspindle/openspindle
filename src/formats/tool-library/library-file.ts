@@ -93,7 +93,7 @@ const ARCHIVE_FILES = new Map([
 /** A file of the archive a tool names, relative to the library's JSON: "models/1.glb". */
 const ARCHIVE_PATH =
   /^(?:[\w-][\w.-]*\/)*[\w-][\w.-]*\.(?:webp|png|jpe?g|glb)$/i
-/** The library's JSON in the archives OpenSpindle exports. */
+/** The library's JSON in the archives Spinnvill exports. */
 const ARCHIVE_LIBRARY = "tool-library.json"
 /**
  * The most entries an archive may list: all a zip without ZIP64 can, and an export writes one

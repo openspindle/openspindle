@@ -195,7 +195,7 @@ function InspectionResults({ report }: { report: InspectionReport }) {
     mutationFn: (format: "json" | "csv") =>
       host.files.save({
         kind: format === "json" ? "inspectionJson" : "inspectionCsv",
-        suggestedName: `openspindle-inspection-${report.jobId.slice(0, 8)}.${format}`,
+        suggestedName: `spinnvill-inspection-${report.jobId.slice(0, 8)}.${format}`,
         contents:
           format === "json"
             ? inspectionJson(report, comparison, reference)

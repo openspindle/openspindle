@@ -24,7 +24,7 @@ export function boundedPointZRequirement(
   if (
     plans.length !== 1 ||
     headers.length !== 1 ||
-    /@OPENSPINDLE_(ANCHOR|DIAMETER|MOVE|Z)_PLAN/.test(source)
+    /@SPINNVILL_(ANCHOR|DIAMETER|MOVE|Z)_PLAN/.test(source)
   )
     throw new Error(
       "Use one reviewed point Z plan with its original signal check."

@@ -144,8 +144,8 @@ function LeftOutFields({ leftOut }: { leftOut: readonly string[] }) {
       <AlertTitle>{plural(leftOut.length, "field")} left out</AlertTitle>
       <AlertDescription>
         <p>
-          This version of OpenSpindle does not use {them}, and saving the
-          project does not keep {them}.
+          This version of Spinnvill does not use {them}, and saving the project
+          does not keep {them}.
         </p>
         <ul className="list-inside list-disc">
           {leftOut.slice(0, NAMED_FIELDS).map((path, index) => (

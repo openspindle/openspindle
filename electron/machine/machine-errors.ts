@@ -1,5 +1,5 @@
-import { RpcError } from "@openspindle/rpc"
-import type { RpcErrorCode } from "@openspindle/rpc"
+import { RpcError } from "@spinnvill/rpc"
+import type { RpcErrorCode } from "@spinnvill/rpc"
 import { MachineError } from "../../src/machine/core/errors.ts"
 import type { MachineErrorCode } from "../../src/machine/core/errors.ts"
 

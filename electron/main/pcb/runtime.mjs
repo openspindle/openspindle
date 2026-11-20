@@ -6,7 +6,7 @@ import { LIMITS } from "../../../src/domain/pcb/manifest.mjs"
 
 /*
  * pcb2gcode is the user's own program. They install it and, unless it is where Homebrew
- * installs it, choose it in PCB settings. OpenSpindle checks it is a program they can run.
+ * installs it, choose it in PCB settings. Spinnvill checks it is a program they can run.
  * Conversions run that program.
  */
 

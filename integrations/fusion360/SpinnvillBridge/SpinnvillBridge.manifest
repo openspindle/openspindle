@@ -2,9 +2,9 @@
   "autodeskProduct": "Fusion",
   "type": "addin",
   "id": "c8d85cfe-a0b7-4c09-aae6-73bc94241914",
-  "author": "OpenSpindle",
+  "author": "Spinnvill",
   "description": {
-    "": "Discover and import Fusion NC programs from OpenSpindle on this computer."
+    "": "Discover and import Fusion NC programs from Spinnvill on this computer."
   },
   "version": "0.1.0",
   "runOnStartup": true,

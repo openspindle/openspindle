@@ -53,7 +53,7 @@ function touchOff(
 }
 
 /**
- * OpenSpindle's own touch-off: from the probe position, or from an anchored start the machine
+ * Spinnvill's own touch-off: from the probe position, or from an anchored start the machine
  * travels to, a fast G38.2 touch down, a back-off and a slow touch, then work Z0 at the contact
  * (G10 L20) and up to the clearance. It touches with G38.2 wherever it starts, so a machine's own
  * Z probe cycle runs the touch-off instead where it can (`methodFor`).

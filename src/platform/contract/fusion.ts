@@ -7,7 +7,7 @@ import { hasFileExtension } from "./files"
 export const FUSION_MAX_NC_BYTES = OPERATION_LIMITS.ncBytes
 export const FUSION_MAX_PROGRAMS = 100
 
-/** A one-use code shown only after Connect to OpenSpindle is clicked in Fusion. */
+/** A one-use code shown only after Connect to Spinnvill is clicked in Fusion. */
 export const FusionOtpSchema = z
   .string()
   .regex(/^\d{6}$/, "Enter the six-digit code shown in Fusion 360.")

@@ -35,9 +35,9 @@ export type MarkedStock = {
   readonly fixtures: readonly MarkedFixture[]
 }
 
-const PREFIX = ";@OPENSPINDLE|"
+const PREFIX = ";@SPINNVILL|"
 
-/** OpenSpindle's markers (`;@OPENSPINDLE|TYPE|key=value|…`) by their type, in program order. */
+/** Spinnvill's markers (`;@SPINNVILL|TYPE|key=value|…`) by their type, in program order. */
 function markers(
   lines: readonly string[]
 ): ReadonlyMap<string, readonly Readonly<Record<string, string>>[]> {
@@ -107,12 +107,12 @@ function fixture(
 }
 
 /**
- * The stock a program describes in OpenSpindle's markers, as the Makera Z1 post for Fusion 360
+ * The stock a program describes in Spinnvill's markers, as the Makera Z1 post for Fusion 360
  * writes them, in millimetres, on `fallback`'s other properties:
- * - `;@OPENSPINDLE|STOCK|width=…|depth=…|height=…`, its size along X, Y and Z;
- * - `;@OPENSPINDLE|WORK_ORIGIN|x=…|y=…|z=…`, the program's zero from its front-left bottom corner;
- * - `;@OPENSPINDLE|STOCK_ANCHOR|relative_to=…|x=…|y=…`, that corner's X and Y from a stored anchor;
- * - `;@OPENSPINDLE|FIXTURE|name=…|x=…|y=…|z=…|width=…|depth=…|height=…`, one for each fixture
+ * - `;@SPINNVILL|STOCK|width=…|depth=…|height=…`, its size along X, Y and Z;
+ * - `;@SPINNVILL|WORK_ORIGIN|x=…|y=…|z=…`, the program's zero from its front-left bottom corner;
+ * - `;@SPINNVILL|STOCK_ANCHOR|relative_to=…|x=…|y=…`, that corner's X and Y from a stored anchor;
+ * - `;@SPINNVILL|FIXTURE|name=…|x=…|y=…|z=…|width=…|depth=…|height=…`, one for each fixture
  *   holding it: its name, its box's front-left bottom corner from that corner, and its size.
  *
  * Null without a stock marker, or with one that does not make a valid stock. A work origin,

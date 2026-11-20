@@ -221,8 +221,8 @@ export function DevicePanel({
         <Alert role="status">
           <LoaderCircle className="animate-spin" />
           <AlertDescription>
-            The machine is restarting. OpenSpindle connects to it again once it
-            is back.
+            The machine is restarting. Spinnvill connects to it again once it is
+            back.
           </AlertDescription>
         </Alert>
       )}

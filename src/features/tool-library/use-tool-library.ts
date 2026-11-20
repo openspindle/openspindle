@@ -173,7 +173,7 @@ export function useToolLibrary({
     mutationFn: async (library: readonly Tool[]) =>
       host.files.save({
         kind: "toolLibrary",
-        suggestedName: `openspindle-tool-library-${new Date().toISOString().slice(0, 10)}.zip`,
+        suggestedName: `spinnvill-tool-library-${new Date().toISOString().slice(0, 10)}.zip`,
         contents: exportToolLibrary(library),
       }),
   })

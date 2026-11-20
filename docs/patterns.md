@@ -87,7 +87,7 @@ safe-Z retract and XY rapid before plunging. Generation, saving, importing,
 and previewing do **not** move any machine. The generator cannot verify the
 physical clearances of the Z1, including the toolsetter, stock or fixtures.
 Before Run, ensure the chosen tool number and library cutter, work origin,
-stock dimensions and safe Z agree with the setup. Review existing OpenSpindle
+stock dimensions and safe Z agree with the setup. Review existing Spinnvill
 diagnostics, and verify simulation and the machine's tool-length probe.
 
 Use conservative feed and plunge values until the cut is verified on scrap.

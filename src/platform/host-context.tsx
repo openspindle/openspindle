@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useRef } from "react"
 import type { ReactNode } from "react"
-import type { EndpointLog } from "@openspindle/rpc"
+import type { EndpointLog } from "@spinnvill/rpc"
 import type { MenuCommand } from "./contract/menu"
 import { connectElectronHost } from "./electron-host"
 import type { Host } from "./host"
@@ -10,9 +10,9 @@ import type { Host } from "./host"
  * app's log, for what the connection refuses.
  */
 export async function createHost(log: EndpointLog): Promise<Host> {
-  if (!window.openSpindleBridge)
-    throw new Error("OpenSpindle runs only as its desktop app.")
-  return connectElectronHost(window.openSpindleBridge, log)
+  if (!window.spinnvillBridge)
+    throw new Error("Spinnvill runs only as its desktop app.")
+  return connectElectronHost(window.spinnvillBridge, log)
 }
 
 const HostContext = createContext<Host | null>(null)

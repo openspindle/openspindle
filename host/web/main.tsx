@@ -129,7 +129,7 @@ function Monitor({ token, onLogout }: { token: string; onLogout: () => void }) {
     <main className="mx-auto flex max-w-7xl flex-col gap-5 p-5">
       <Card>
         <CardHeader>
-          <CardTitle>OpenSpindle host</CardTitle>
+          <CardTitle>Spinnvill host</CardTitle>
           <CardDescription>
             One machine owner · browser monitoring
           </CardDescription>
@@ -305,7 +305,7 @@ function App() {
     <main className="mx-auto max-w-md p-8">
       <Card>
         <CardHeader>
-          <CardTitle>Connect to OpenSpindle host</CardTitle>
+          <CardTitle>Connect to Spinnvill host</CardTitle>
         </CardHeader>
         <CardContent>
           <form

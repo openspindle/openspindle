@@ -1,5 +1,5 @@
 import type { MessageEvent, MessagePortMain } from "electron"
-import type { Transport } from "@openspindle/rpc"
+import type { Transport } from "@spinnvill/rpc"
 
 /** RPC transport over an Electron main-process MessagePort. */
 export function portMainTransport(port: MessagePortMain): Transport {

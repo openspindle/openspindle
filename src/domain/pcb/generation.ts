@@ -15,7 +15,7 @@ export const multipleToolsMessage = (slots: readonly string[], role: string) =>
 /** Generic notices every generation repeats; the editor does not show them. */
 const GENERIC_WARNINGS = new Set([
   "Machining values are examples, not a verified tool/material recipe. Confirm work zero, tooling, clearances and depth before Run.",
-  "SVGs show pcb2gcode geometry before back-side mirroring. OpenSpindle previews the actual generated CNC coordinates.",
+  "SVGs show pcb2gcode geometry before back-side mirroring. Spinnvill previews the actual generated CNC coordinates.",
 ])
 
 /** The warnings worth showing for one generated operation. */

@@ -11,28 +11,28 @@ Requires Node 22.18 or later and the repository's npm dependencies:
 ```sh
 npm ci
 npm run build:host
-# Set OPENSPINDLE_HOST_TOKEN to a newly generated access key of >=32 characters.
+# Set SPINNVILL_HOST_TOKEN to a newly generated access key of >=32 characters.
 # Keep it in a protected environment file, not in shell history or a project.
 npm run start:host
 ```
 
 | Environment variable | Purpose / default |
 |---|---|
-| `OPENSPINDLE_HOST_TOKEN` | Required access key; never returned by the API or printed by startup |
-| `OPENSPINDLE_HOST_BIND` | Listener address; defaults to `127.0.0.1` |
-| `OPENSPINDLE_HOST_PORT` | HTTP port; defaults to `3210` |
-| `OPENSPINDLE_HOST_DATA` | Persistent data directory; defaults to `./openspindle-data` |
-| `OPENSPINDLE_HOST_ORIGIN` | Public browser origin when served through a TLS proxy, e.g. `https://cnc.example` |
-| `OPENSPINDLE_MACHINE_HOST` | Optional explicitly configured IPv4 CNC/simulator address; connects once at startup |
-| `OPENSPINDLE_MACHINE_PORT` | CNC/simulator port; defaults to `2222` |
-| `OPENSPINDLE_USB_ID` | Explicit FTDI ID from the `usb` terminal command; one USB connection attempt at startup; mutually exclusive with the TCP address |
-| `OPENSPINDLE_CAMERA_HOST` | Optional local camera IPv4 when using USB |
-| `OPENSPINDLE_WEBCAM_DEVICE` | Optional local Linux USB webcam endpoint, e.g. `/dev/video0` or a `/dev/v4l/by-id/` path |
-| `OPENSPINDLE_FFMPEG` | Optional ffmpeg executable; defaults to `ffmpeg` on PATH |
+| `SPINNVILL_HOST_TOKEN` | Required access key; never returned by the API or printed by startup |
+| `SPINNVILL_HOST_BIND` | Listener address; defaults to `127.0.0.1` |
+| `SPINNVILL_HOST_PORT` | HTTP port; defaults to `3210` |
+| `SPINNVILL_HOST_DATA` | Persistent data directory; defaults to `./openspindle-data` |
+| `SPINNVILL_HOST_ORIGIN` | Public browser origin when served through a TLS proxy, e.g. `https://cnc.example` |
+| `SPINNVILL_MACHINE_HOST` | Optional explicitly configured IPv4 CNC/simulator address; connects once at startup |
+| `SPINNVILL_MACHINE_PORT` | CNC/simulator port; defaults to `2222` |
+| `SPINNVILL_USB_ID` | Explicit FTDI ID from the `usb` terminal command; one USB connection attempt at startup; mutually exclusive with the TCP address |
+| `SPINNVILL_CAMERA_HOST` | Optional local camera IPv4 when using USB |
+| `SPINNVILL_WEBCAM_DEVICE` | Optional local Linux USB webcam endpoint, e.g. `/dev/video0` or a `/dev/v4l/by-id/` path |
+| `SPINNVILL_FFMPEG` | Optional ffmpeg executable; defaults to `ffmpeg` on PATH |
 
 Open the host URL and enter the access key. The browser keeps the key in memory, not a URL, cookie, saved project or local storage. Use TLS through a same-origin reverse proxy for LAN access, or an SSH tunnel to the default loopback listener. There is no permissive CORS or password-in-query mode. All `/api/` routes require Bearer authentication. `/health` returns only `{status:"ok"}`. The host restricts cross-origin requests, upload size/concurrency and request rate. No API reads arbitrary host paths or executes shell commands.
 
-The sample `host/deploy/openspindle-host.service` assumes an installed checkout in `/opt/openspindle`, a dedicated `openspindle` user, a mode-0600 `/etc/openspindle-host.env` and writable `/var/lib/openspindle`. Set `OPENSPINDLE_HOST_DATA=/var/lib/openspindle`. It is a receiving/monitoring service: stdin commands require running interactively instead. Service restart recovers records as interrupted/unknown; it never resumes a job. A data-directory owner lock prevents two hosts sharing that state directory. Do not connect a second controller to the same CNC.
+The sample `host/deploy/spinnvill-host.service` assumes an installed checkout in `/opt/spinnvill`, a dedicated `spinnvill` user, a mode-0600 `/etc/spinnvill-host.env` and writable `/var/lib/spinnvill`. Set `SPINNVILL_HOST_DATA=/var/lib/spinnvill`. It is a receiving/monitoring service: stdin commands require running interactively instead. Service restart recovers records as interrupted/unknown; it never resumes a job. A data-directory owner lock prevents two hosts sharing that state directory. Do not connect a second controller to the same CNC.
 
 ## FreeCAD handoff
 
@@ -59,3 +59,5 @@ The inbox keeps at most 100 immutable packages/2 GiB. Back up `inbox`, `state.js
 The host supports TCP and experimental [USB serial](usb-serial.md), using the same controller and verified job engine. USB uses 128-byte file blocks, explicit FTDI selection and optional network camera access. No physical Z1 USB connection, unplug behavior, Stop or run has been verified here.
 
 Desktop and host builds, typechecking, lint and formatting must pass before review. Live FreeCAD round trips, browser GPU visuals, service recovery during a real run, camera timing and physical control require operator verification. No automated tests were added or run under the repository's current testing rule.
+
+Existing `OPENSPINDLE_*` environment variables remain accepted when the corresponding `SPINNVILL_*` setting is absent.

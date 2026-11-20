@@ -26,7 +26,7 @@ export type RouterContext = {
 }
 
 export const Route = createRootRouteWithContext<RouterContext>()({
-  head: () => ({ meta: [{ title: "OpenSpindle" }] }),
+  head: () => ({ meta: [{ title: "Spinnvill" }] }),
   component: RootLayout,
 })
 

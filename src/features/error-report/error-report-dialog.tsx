@@ -107,7 +107,7 @@ export function ErrorReportDialog({
       const attachments: ReportAttachment[] = []
       if (fields.attachLog)
         attachments.push({
-          filename: "openspindle.log",
+          filename: "spinnvill.log",
           data: await host.diagnostics.readLog(),
           contentType: "text/plain",
         })

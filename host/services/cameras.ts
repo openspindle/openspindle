@@ -1,3 +1,4 @@
+import { hostEnvironment } from "../environment"
 import { readFile, writeFile, rename } from "node:fs/promises"
 import { join } from "node:path"
 import type { OwnerClient } from "../owner-client.ts"
@@ -30,8 +31,8 @@ export class Cameras {
     private readonly owner: OwnerClient,
     private readonly warning: (message: string) => void
   ) {
-    const ffmpeg = process.env.OPENSPINDLE_FFMPEG ?? "ffmpeg"
-    this.webcam = new Webcam(process.env.OPENSPINDLE_WEBCAM_DEVICE, ffmpeg)
+    const ffmpeg = hostEnvironment("FFMPEG") ?? "ffmpeg"
+    this.webcam = new Webcam(hostEnvironment("WEBCAM_DEVICE"), ffmpeg)
     this.timelapses = new Timelapses(root, ffmpeg, warning)
   }
   async initialize() {

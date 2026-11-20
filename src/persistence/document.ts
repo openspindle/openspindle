@@ -18,7 +18,7 @@ export type DocumentState<TValue> = {
   readonly issues: readonly LoadIssue[]
   /** Nothing usable could be restored (the data is unreadable or from a newer version). */
   readonly unreadable: boolean
-  /** Written by a newer OpenSpindle: only saving a copy, clearing or quitting is safe. */
+  /** Written by a newer Spinnvill: only saving a copy, clearing or quitting is safe. */
   readonly newer: boolean
   readonly saveError: string | null
 }

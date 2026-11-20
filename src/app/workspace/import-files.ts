@@ -9,7 +9,7 @@ import { readTextFile } from "@/platform/read-text-file"
 import { importProgram } from "./import-program"
 import type { ImportContext } from "./import-program"
 
-/** NC programs OpenSpindle imports, by file name; the file kind registry lists them. */
+/** NC programs Spinnvill imports, by file name; the file kind registry lists them. */
 const NC_EXTENSIONS = FILE_KINDS.program.extensions.map(
   (extension) => `.${extension}`
 )

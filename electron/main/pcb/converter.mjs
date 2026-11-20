@@ -327,18 +327,18 @@ function plungedWider(program, diameter) {
   return `The ${listed} holes are smaller than the ${millimetres(diameter)} end mill and come out ${millimetres(diameter)} wide.`
 }
 
-/** `laidOut`: OpenSpindle laid out the cuts in pcb2gcode's program (`maskProgram`). */
+/** `laidOut`: Spinnvill laid out the cuts in pcb2gcode's program (`maskProgram`). */
 export function augmentProgram(source, label, request, laidOut = false) {
   const sources = request.files.map(
     (file) =>
       `; Input: ${comment(file.name)} | SHA256 ${createHash("sha256").update(file.content).digest("hex")}`
   )
   return [
-    "; OpenSpindle PCB",
+    "; Spinnvill PCB",
     `; Toolpath: ${comment(label)}`,
     ...sources,
     laidOut
-      ? "; pcb2gcode's setup and end follow unchanged; OpenSpindle laid out the passes in each opening. Review setup and tooling before Run."
+      ? "; pcb2gcode's setup and end follow unchanged; Spinnvill laid out the passes in each opening. Review setup and tooling before Run."
       : "; Original machining commands follow unchanged. Review setup and tooling before Run.",
     "",
     source,
@@ -352,7 +352,7 @@ export async function generate(
 ) {
   const request = validateRequest(input)
   const { files, parameters } = request
-  const work = await mkdtemp(join(tmpdir(), "openspindle-pcb-"))
+  const work = await mkdtemp(join(tmpdir(), "spinnvill-pcb-"))
   try {
     const drills = files.filter((file) => file.role === "drill")
     const drillNames = drills.map((file, index) =>
@@ -528,7 +528,7 @@ export async function generate(
     programs.sort((a, b) => order.indexOf(a.name) - order.indexOf(b.name))
     const warnings = [
       "Machining values are examples, not a verified tool/material recipe. Confirm work zero, tooling, clearances and depth before Run.",
-      "SVGs show pcb2gcode geometry before back-side mirroring. OpenSpindle previews the actual generated CNC coordinates.",
+      "SVGs show pcb2gcode geometry before back-side mirroring. Spinnvill previews the actual generated CNC coordinates.",
     ]
     if (
       files.some((file) => file.role === "back" || file.role === "back-mask") ||

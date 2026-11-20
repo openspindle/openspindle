@@ -1,6 +1,7 @@
 import { JobHistory } from "../../host/services/job-history"
 import { Menu, app, dialog } from "electron"
 import type { BrowserWindow } from "electron"
+import { existsSync } from "node:fs"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 import { configureAboutPanel, openCredits } from "./about"
@@ -40,16 +41,21 @@ const DEV_ICON = app.isPackaged
   : fileURLToPath(new URL("../../build/icon.png", import.meta.url))
 
 registerAppScheme()
-app.setName("OpenSpindle")
+app.setName("Spinnvill")
 // Windows shows a notification only for an app whose ID its Start menu shortcut carries: the
 // installer gives the shortcut electron-builder.yml's appId.
 if (process.platform === "win32")
   app.setAppUserModelId("com.openspindle.desktop")
-// Dev runs keep their data, and their log, apart from the installed app's.
-if (!app.isPackaged) {
-  app.setPath("userData", `${app.getPath("userData")}-dev`)
+// Existing installations keep their workspace, Chromium preferences and pairings.
+const suffix = app.isPackaged ? "" : "-dev"
+const profile = `${app.getPath("userData")}${suffix}`
+const legacyProfile = path.join(app.getPath("appData"), `OpenSpindle${suffix}`)
+app.setPath(
+  "userData",
+  !existsSync(profile) && existsSync(legacyProfile) ? legacyProfile : profile
+)
+if (!app.isPackaged)
   app.setAppLogsPath(path.join(app.getPath("userData"), "logs"))
-}
 
 let mainWindow: BrowserWindow | null = null
 const currentWindow = () =>
@@ -95,9 +101,9 @@ else {
     .whenReady()
     .then(() => start(diagnostics, openedFiles, files))
     .catch((error: unknown) => {
-      log.error("OpenSpindle failed to start", error)
+      log.error("Spinnvill failed to start", error)
       dialog.showErrorBox(
-        "OpenSpindle failed to start",
+        "Spinnvill failed to start",
         error instanceof Error ? error.message : String(error)
       )
       app.quit()
@@ -121,7 +127,7 @@ function startDiagnostics(): Diagnostics {
     import.meta.env.SENTRY_DSN || undefined
   )
   const { version, os, electron } = appInfo()
-  log.info(`OpenSpindle ${version} started on ${os}, Electron ${electron}`)
+  log.info(`Spinnvill ${version} started on ${os}, Electron ${electron}`)
   return new Diagnostics(settings, reports)
 }
 
@@ -221,7 +227,7 @@ function start(
       machine.dispose()
       simulator.dispose()
       pcb.dispose()
-      log.info("OpenSpindle quit")
+      log.info("Spinnvill quit")
       log.flushSync()
       return
     }

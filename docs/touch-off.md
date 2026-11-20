@@ -29,19 +29,19 @@ The Prepare picker no longer adds Z surface operations; use the separate guide a
 **Z surface** is the stored probing strategy that touches the stock top with a Z-only probe in T0 and sets work Z0 there. Its generated NC takes one of two forms:
 
 - From a stored anchor, on a plate whose program sets work X and Y from its anchors ([stored anchors](stored-anchors.md#work-origin-from-an-anchor)), where the touch point has work coordinates, the firmware's own Z probe (`M495`) touches, as Makera Studio runs it before its auto-level, and the machine reports the touch ([the Z1's Z probe](#the-z1s-z-probe)).
-- Anywhere else, from the probe position or from an anchor on a plate whose program does not set work X and Y (such as one holding the factory-default anchors), OpenSpindle's own touch: a fast and a slow `G38.2` touch straight down, then `G10 L20 P0 Z0` ([OpenSpindle's touch](#openspindles-touch)).
+- Anywhere else, from the probe position or from an anchor on a plate whose program does not set work X and Y (such as one holding the factory-default anchors), Spinnvill's own touch: a fast and a slow `G38.2` touch straight down, then `G10 L20 P0 Z0` ([Spinnvill's touch](#spinnvills-touch)).
 
-The operation stays the same either way: placing it at a stored anchor, or reading the plate's anchors from its device, lets the Z probe touch, and back at the probe position OpenSpindle's touch runs it. The NC is generated from the settings whenever the plate is compiled. The programs follow the firmware's own Z probe and have been checked against its source, but they have not run on a machine yet: read the [firmware background](#firmware-background) and check the work Z they set before cutting.
+The operation stays the same either way: placing it at a stored anchor, or reading the plate's anchors from its device, lets the Z probe touch, and back at the probe position Spinnvill's touch runs it. The NC is generated from the settings whenever the plate is compiled. The programs follow the firmware's own Z probe and have been checked against its source, but they have not run on a machine yet: read the [firmware background](#firmware-background) and check the work Z they set before cutting.
 
 ## Settings
 
 | Setting          | Meaning                                                                                                                         | Range     | Default   |
 | ---------------- | ------------------------------------------------------------------------------------------------------------------------------- | --------- | --------- |
-| Probe travel     | How far the fast touch searches down before the machine alarms (OpenSpindle's touch only)                                       | 1–150 mm  | 108 mm    |
+| Probe travel     | How far the fast touch searches down before the machine alarms (Spinnvill's touch only)                                       | 1–150 mm  | 108 mm    |
 | Clearance height | The lift above the probed surface once work Z is set                                                                            | 0.5–50 mm | 5 mm      |
 | Relative to      | Where the probe touches: the probe position, or one of the machine's stored anchors with X and Y from it, as for the height map |           | See below |
 
-The ranges are the Z1's for both ways of touching, OpenSpindle's limits rather than a clearance check. The Z probe searches down as far as the firmware's tool rack Z (`coordinate.toolrack_z`), whatever the probe travel, so while the Z probe runs the operation, the form leaves **Probe travel** out and the NC ignores what the operation holds; once OpenSpindle's touch runs the operation again, its range checks the stored value again. The default travel is as far as the Z probe searches on the Z1: a probe change, or the travel to an anchor, ends near the top of Z travel, and the search has to reach the stock from there.
+The ranges are the Z1's for both ways of touching, Spinnvill's limits rather than a clearance check. The Z probe searches down as far as the firmware's tool rack Z (`coordinate.toolrack_z`), whatever the probe travel, so while the Z probe runs the operation, the form leaves **Probe travel** out and the NC ignores what the operation holds; once Spinnvill's touch runs the operation again, its range checks the stored value again. The default travel is as far as the Z probe searches on the Z1: a probe change, or the travel to an anchor, ends near the top of Z travel, and the search has to reach the stock from there.
 
 **Probe position** touches below the probe where it is when the operation starts; from one of the machine's [stored anchors](stored-anchors.md) it rises to machine Z −3, travels with `G53` to the anchor plus X and Y, then touches, as Makera Studio's Z probe does. A new Z surface touches the middle of the plate's work area from a stored anchor, as **Center** places it, when the plate has anchors and a work area (on a plate whose program sets work X and Y, with the Z probe); otherwise it touches at the probe position.
 
@@ -53,7 +53,7 @@ The 3D view marks the touch point with a red dot in a half-opaque border, the si
 
 The probed surface always becomes work Z0, so programs that cut down from Z0 on the stock top, as CAM and pcb2gcode write them, cut at their depth whatever the stock height says. A plate with a touch-off keeps its work origin's Z on the stock top to match: opening a project, adding the operation, or changing the stock or the origin puts it back there, the origin's Z field is locked ("Touch-off sets work Z0 on the stock top."), and **Set from stock…** offers only the top. A program written with Z0 on the stock bottom would cut above the stock by its height; the stock-depth check warns that it cuts only above the stock ([workspace-model.md](workspace-model.md)).
 
-## OpenSpindle's touch
+## Spinnvill's touch
 
 Default settings from the probe position, with the Makera Wired Probe 2.0 in T0, produce:
 
@@ -123,7 +123,7 @@ G0 Z5
 M2
 ```
 
-The title names the probe in the plate's T0 entry. The program sets work X and Y before its operations, so the touch point is known in work coordinates, and `M495` with zero `O`/`F` offsets runs the firmware's own Z probe from there (`ATCHandler::fill_zprobe_scripts`). It rises to the clearance and goes over X Y, where the `G53` travel already is, touches fast and slowly like OpenSpindle's touch, sets work Z0 at the contact (`atc.probe.probe_height_mm`, 0 in Z1 configurations) and lifts 1 mm, leaving `G91` on, which the program's `G90` undoes before it lifts to the clearance height. It switches the probe's laser itself, so the program has no `M494.1` or `M494.2`.
+The title names the probe in the plate's T0 entry. The program sets work X and Y before its operations, so the touch point is known in work coordinates, and `M495` with zero `O`/`F` offsets runs the firmware's own Z probe from there (`ATCHandler::fill_zprobe_scripts`). It rises to the clearance and goes over X Y, where the `G53` travel already is, touches fast and slowly like Spinnvill's touch, sets work Z0 at the contact (`atc.probe.probe_height_mm`, 0 in Z1 configurations) and lifts 1 mm, leaving `G91` on, which the program's `G90` undoes before it lifts to the clearance height. It switches the probe's laser itself, so the program has no `M494.1` or `M494.2`.
 
 The firmware's routine replies to every connection, even from a played file, so the machine reports the touch (`[PRB:x,y,z:1]`) and the operation's card in the Job tab shows where it touched the stock top, at machine X and Y and at work X and Y, and the top's machine Z ([device-jobs.md](device-jobs.md#the-job-tab)).
 
@@ -169,4 +169,4 @@ Sources in [Makera's Z1 firmware](https://github.com/MakeraInc/MakeraZ1Firmware/
 
 Before running: home all axes; install, calibrate and test the probe; stop the spindle; with the probe position, place the probe above a point on the stock top; keep every travel clear of fixtures.
 
-The strategy is `touch-off` in `src/domain/probing/strategies.ts`, where `methodFor` chooses how it touches. OpenSpindle's touch is `src/domain/probing/generic/surface-touch.ts`, made of the Z1's probing NC and ranges in `src/domain/fixtures/makera-z1/probing-nc.ts`; the Z1's Z probe is `src/domain/fixtures/makera-z1/strategies/z-probe.ts`. The touch-off task is in `src/domain/probing/tasks/touch-off` (parameters, planning, **Center** and rules) and its settings form in `src/features/probing/touch-off-settings.tsx`. Previews find touch points in any NC file in `src/domain/fixtures/makera-z1/wired-probe/touch-off.ts`, and combining checks a touch-off's blocks in `src/domain/fixtures/makera-z1/nc-grammar.ts`.
+The strategy is `touch-off` in `src/domain/probing/strategies.ts`, where `methodFor` chooses how it touches. Spinnvill's touch is `src/domain/probing/generic/surface-touch.ts`, made of the Z1's probing NC and ranges in `src/domain/fixtures/makera-z1/probing-nc.ts`; the Z1's Z probe is `src/domain/fixtures/makera-z1/strategies/z-probe.ts`. The touch-off task is in `src/domain/probing/tasks/touch-off` (parameters, planning, **Center** and rules) and its settings form in `src/features/probing/touch-off-settings.tsx`. Previews find touch points in any NC file in `src/domain/fixtures/makera-z1/wired-probe/touch-off.ts`, and combining checks a touch-off's blocks in `src/domain/fixtures/makera-z1/nc-grammar.ts`.

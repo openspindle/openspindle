@@ -7,7 +7,7 @@ import {
 } from "@tanstack/react-query"
 import type { QueryClient } from "@tanstack/react-query"
 import { createAtom, useSelector } from "@tanstack/react-store"
-import { RpcError } from "@openspindle/rpc"
+import { RpcError } from "@spinnvill/rpc"
 import { z } from "zod"
 import {
   MachineErrorCodeSchema,

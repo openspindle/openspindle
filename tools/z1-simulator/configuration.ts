@@ -13,7 +13,7 @@ type ConfigurationDefaults = {
 /** Representative development data, independent of any machine's downloaded configuration. */
 export function initialConfiguration(defaults: ConfigurationDefaults) {
   const { limits } = defaults
-  return new TextEncoder().encode(`# OpenSpindle Z1 simulator configuration
+  return new TextEncoder().encode(`# Spinnvill Z1 simulator configuration
 # Development defaults, not a configuration for a real machine.
 # Saved edits persist until the simulator process exits.
 # Motion, anchor and vacuum settings are loaded on reset.

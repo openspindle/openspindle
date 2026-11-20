@@ -1,52 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
-  <!--
-    The OpenSpindle app icon: a spindle turning clockwise seen from above, as M3 turns it.
-    The shape follows the macOS icon grid: an 824 px square with continuous corners
-    (radius 185.4) centred on the 1024 px canvas. Edit this file, then `npm run icon`.
-  -->
-  <defs>
-    <path id="shape" d="M627.36 100c103.83 0 155.75 0 195.41 20.21a185.4 185.4 0 0 1 81.02 81.02c20.21 39.66 20.21 91.58 20.21 195.41L924 627.36c0 103.83 0 155.75-20.21 195.41a185.4 185.4 0 0 1-81.02 81.02c-39.66 20.21-91.58 20.21-195.41 20.21L396.64 924c-103.83 0-155.75 0-195.41-20.21a185.4 185.4 0 0 1-81.02-81.02c-20.21-39.66-20.21-91.58-20.21-195.41L100 396.64c0-103.83 0-155.75 20.21-195.41a185.4 185.4 0 0 1 81.02-81.02c39.66-20.21 91.58-20.21 195.41-20.21Z"/>
-    <path id="bit" d="M473 500H551V772L512 846L473 772Z"/>
-    <clipPath id="bit-clip"><use href="#bit"/></clipPath>
-    <linearGradient id="background" x1="512" y1="100" x2="512" y2="924" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#3b8cff"/>
-      <stop offset="1" stop-color="#1238c4"/>
-    </linearGradient>
-    <linearGradient id="sheen" x1="512" y1="100" x2="512" y2="560" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#fff" stop-opacity="0.16"/>
-      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
-    </linearGradient>
-    <linearGradient id="metal" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0" stop-color="#fff"/>
-      <stop offset="0.55" stop-color="#eef3ff"/>
-      <stop offset="1" stop-color="#bccdf0"/>
-    </linearGradient>
-    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
-      <feDropShadow dx="0" dy="12" stdDeviation="14" flood-color="#08206e" flood-opacity="0.35"/>
-    </filter>
-  </defs>
-
-  <use href="#shape" fill="url(#background)"/>
-  <use href="#shape" fill="url(#sheen)"/>
-
-  <!-- The far side of the rotation ring, behind the bit. -->
-  <path d="M340.9 638.2A178 50 0 0 1 688.3 645" fill="none" stroke="#8ae8ff" stroke-opacity="0.45" stroke-width="20" stroke-linecap="round"/>
-
-  <!-- Motor, collet nut and a V-bit. -->
-  <g filter="url(#shadow)" fill="url(#metal)">
-    <rect x="348" y="176" width="328" height="222" rx="48"/>
-    <path d="M402 414H622L588 484H436Z"/>
-    <use href="#bit"/>
-  </g>
-  <g fill="#1238c4" fill-opacity="0.2">
-    <rect x="412" y="222" width="200" height="14" rx="7"/>
-    <rect x="412" y="256" width="200" height="14" rx="7"/>
-    <rect x="412" y="290" width="200" height="14" rx="7"/>
-  </g>
-  <!-- Right-hand helical flutes. -->
-  <path clip-path="url(#bit-clip)" fill="#1f4fd6" fill-opacity="0.45" d="M463 600L561 560v22L463 622ZM463 654L561 614v22L463 676ZM463 708L561 668v22L463 730ZM463 762L561 722v22L463 784ZM463 816L561 776v22L463 838Z"/>
-
-  <!-- The near side of the ring, ending in the arrow. -->
-  <path d="M689.6 655.5A178 50 0 0 1 361 678.5" fill="none" stroke="#8ae8ff" stroke-width="20" stroke-linecap="round"/>
-  <path d="M302.7 652.3L373.3 651.1L348.7 705.9Z" fill="#8ae8ff" stroke="#8ae8ff" stroke-width="6" stroke-linejoin="round"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect x="3" y="3" width="506" height="506" rx="112" fill="#0d142d"/>
+  <path fill="#ffcc00" d="M434 90C293 35 119 88 82 177c-26 62 29 111 113 115-53-17-58-48-10-82 48-35 129-45 194-25zM80 431c132 52 286-1 333-77 39-62-33-108-109-113 64 29 46 64-12 88-42 18-103 22-156 8z"/>
+  <path fill="#f47a24" d="M233 188l45-9v79l-10 10h-24l-11-10zm11 83h24l3 7-15 29-15-29z"/>
 </svg>

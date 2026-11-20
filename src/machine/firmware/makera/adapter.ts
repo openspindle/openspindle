@@ -109,7 +109,7 @@ const FORGET_TOOL = command("M493.2 T-1")
 
 const makeraJob: JobProtocol = {
   // Where Makera Studio keeps the programs it runs.
-  path: (id) => `/sd/gcodes/openspindle-${id}.nc`,
+  path: (id) => `/sd/gcodes/spinnvill-${id}.nc`,
   homedQuery: command("G28.6"),
   homed: parseHomedReport,
   assistPlan,
@@ -163,9 +163,9 @@ const toSetting = (value: number) => Number(settingText(value))
  */
 const addedKey = (slot: number) => `openspindle.anchor${slot + 3}`
 const ADDED_REPLY =
-  /^(sd|cached): (openspindle\.anchor\d+) is (?:set to (.*)|not in config)$/
+  /^(sd|cached): (spinnvill\.anchor\d+) is (?:set to (.*)|not in config)$/
 const ADDED_SET_REPLY =
-  /^sd: (openspindle\.anchor\d+) (?:has been set to (.*)|not enough space to overwrite existing key\/value)$/
+  /^sd: (spinnvill\.anchor\d+) (?:has been set to (.*)|not enough space to overwrite existing key\/value)$/
 const NUMBER = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/
 /** A free place's value. */
 const FREE = "-"

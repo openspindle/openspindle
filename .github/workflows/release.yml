@@ -110,9 +110,9 @@ jobs:
 
       - name: Check that the app is notarized and can update
         run: |
-          xcrun stapler validate release/mac-universal/OpenSpindle.app
-          spctl --assess --type execute -vv release/mac-universal/OpenSpindle.app
-          if [ ! -f release/latest-mac.yml ] || [ ! -f release/mac-universal/OpenSpindle.app/Contents/Resources/app-update.yml ]; then
+          xcrun stapler validate release/mac-universal/Spinnvill.app
+          spctl --assess --type execute -vv release/mac-universal/Spinnvill.app
+          if [ ! -f release/latest-mac.yml ] || [ ! -f release/mac-universal/Spinnvill.app/Contents/Resources/app-update.yml ]; then
             echo "::error::No update feed: electron-builder found no repository in package.json"
             exit 1
           fi
@@ -177,7 +177,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-        run: gh release upload "$TAG" release/OpenSpindle-Setup-*.exe release/OpenSpindle-Setup-*.exe.blockmap release/latest.yml --clobber
+        run: gh release upload "$TAG" release/Spinnvill-Setup-*.exe release/Spinnvill-Setup-*.exe.blockmap release/latest.yml --clobber
 
   # The draft is published only once both apps are attached: published releases are immutable.
   publish:
@@ -193,4 +193,4 @@ jobs:
           GH_REPO: ${{ github.repository }}
           TAG: ${{ needs.release-please.outputs.tag }}
           VERSION: ${{ needs.release-please.outputs.version }}
-        run: gh release edit "$TAG" --title "OpenSpindle $VERSION" --draft=false --latest
+        run: gh release edit "$TAG" --title "Spinnvill $VERSION" --draft=false --latest

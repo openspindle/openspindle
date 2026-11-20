@@ -154,7 +154,7 @@ export function PatternEditor({ initial, onApply }: Props) {
     const url = URL.createObjectURL(blob)
     const anchor = window.document.createElement("a")
     anchor.href = url
-    anchor.download = "openspindle-pattern.gcode"
+    anchor.download = "spinnvill-pattern.gcode"
     anchor.click()
     URL.revokeObjectURL(url)
   }
@@ -483,7 +483,7 @@ export function PatternEditor({ initial, onApply }: Props) {
           </div>
           <p className="shrink-0 text-xs text-muted-foreground">
             Recheck work origin, safe Z, V-bit width, fixtures and toolsetter in
-            OpenSpindle before machining.
+            Spinnvill before machining.
           </p>
         </div>
       </div>

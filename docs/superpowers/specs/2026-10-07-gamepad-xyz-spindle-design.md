@@ -2,7 +2,7 @@
 
 ## Intent and approval
 
-Joseph uses a GameSir Xbox-style controller through its USB wireless dock to position his Makera Z1 and eventually control simple cuts. The local OpenSpindle prototype already has finite XY Step jogging, proportional XY Direct steering, RB step-size selection, and a live 3D simulator preview. A manual trial confirmed the clock-skew fix, repeated releases, and focus-loss end.
+Joseph uses a GameSir Xbox-style controller through its USB wireless dock to position his Makera Z1 and eventually control simple cuts. The local Spinnvill prototype already has finite XY Step jogging, proportional XY Direct steering, RB step-size selection, and a live 3D simulator preview. A manual trial confirmed the clock-skew fix, repeated releases, and focus-loss end.
 
 Joseph requested Z in both Step and Direct and controller RPM adjustment plus spindle start/stop. He approved the conversational design and the bindings below on 2026-10-07. This document records the approved shared ownership, finite-move semantics and verification requirements. Joseph pre-approved the written spec and requested implementation without further approval checkpoints.
 

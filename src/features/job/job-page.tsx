@@ -175,7 +175,7 @@ function ProgramPanel({
   requestedLine: number | null
 }) {
   const layout = useDefaultLayout({
-    id: "openspindle-job-program",
+    id: "spinnvill-job-program",
     panelIds: ["job-code", "job-console"],
     onlySaveAfterUserInteractions: true,
   })
@@ -246,7 +246,7 @@ export function JobPage({
   const timeline = useJobTimeline(subject, followTarget(view))
   const prediction = useCutPrediction(subject)
   const layout = useDefaultLayout({
-    id: "openspindle-job",
+    id: "spinnvill-job",
     panelIds: ["job-panel", "job-viewer", "job-program"],
     onlySaveAfterUserInteractions: true,
   })

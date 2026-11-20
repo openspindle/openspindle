@@ -165,7 +165,7 @@ export class MachineGateway {
     if (this.principal.kind !== "app")
       throw new MachineError(
         "permission",
-        "Only the OpenSpindle app may do this."
+        "Only the Spinnvill app may do this."
       )
   }
 }

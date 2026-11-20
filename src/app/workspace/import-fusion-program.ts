@@ -36,7 +36,7 @@ export function fusionPlate(
     operations[0].source.nc !== program.contents
   )
     return fail(
-      "The Fusion post must produce plain NC without an OpenSpindle plate envelope."
+      "The Fusion post must produce plain NC without an Spinnvill plate envelope."
     )
   const checked = PlateSchema.safeParse({
     ...imported.value,

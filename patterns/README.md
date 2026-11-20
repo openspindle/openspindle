@@ -18,5 +18,5 @@ The Rust and renderer generator have the same bounds and path ordering.
 Safety: output uses work-coordinate Z0 as surface and performs explicit
 retracts before XY rapids. Neither the generator nor its preview proves the real
 machine is clear of clamps, toolsetter, stock or other fixtures. Reconfirm
-work offset, cutter, tool length and safe Z, inspect OpenSpindle's design rules,
+work offset, cutter, tool length and safe Z, inspect Spinnvill's design rules,
 simulate, and only then run. Editing and generating never move the machine.

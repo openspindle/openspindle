@@ -1,12 +1,12 @@
 # Nå bør vi teste på ekte oppsett
 
-Dato: 12. november 2026. Oppdater **både OpenSpindle og FreeCadMakeraBridge fra `main`** før du begynner. Denne filen er en manuell testliste, ikke en bekreftelse på at maskinvaretestene allerede er gjennomført.
+Dato: 12. november 2026. Oppdater **både Spinnvill og FreeCadMakeraBridge fra `main`** før du begynner. Denne filen er en manuell testliste, ikke en bekreftelse på at maskinvaretestene allerede er gjennomført.
 
 Kodekontroller og bygg er kontrollert under utvikling. USB på Z1, ekte kamerakilder, FreeCAD-eksport i det installerte oppsettet og ytelse på Raspberry Pi må nå prøves av operatør. Start med visning og tilkobling, og bruk en liten jobb uten skjæring før ordinær fresing. Noter firmwareversjon, OS, FreeCAD-versjon, tilkoblingstype og commit-ID fra begge repoene.
 
 ## 1. Desktop og FreeCAD uten maskinbevegelse
 
-- [ ] Oppdater/installér bridgen fra `main`, og start FreeCAD og OpenSpindle helt på nytt.
+- [ ] Oppdater/installér bridgen fra `main`, og start FreeCAD og Spinnvill helt på nytt.
 - [ ] Send en hel CAM-jobb og deretter én operasjon. Kontroller navn, riktig operasjonsutvalg, verktøynavn og at original G-kode følger med.
 - [ ] Kontroller at ferdigmodellen kommer frem med riktig størrelse, orientering og plassering i forhold til stock og verktøybaner.
 - [ ] Kontroller materialnavn og utseende fra FreeCAD: farge, metall/ruhet, tekstur og normal maps. Sammenlign kanter og V-spor i materialfjerningen med forventet geometri. Normal maps endrer lyssetting, ikke heightmap-oppløsning eller fysisk geometri.
@@ -44,7 +44,7 @@ Detaljer: [USB-oppsett](docs/usb-serial.md) og [ADR 0001](adr/0001-reliable-z1-c
 
 ## 5. Begge kameraer og timelapse
 
-- [ ] Installér ffmpeg på Linux-hosten, velg riktig USB-webkamera via `OPENSPINDLE_WEBCAM_DEVICE` og kontroller videotilgang for servicebrukeren.
+- [ ] Installér ffmpeg på Linux-hosten, velg riktig USB-webkamera via `SPINNVILL_WEBCAM_DEVICE` og kontroller videotilgang for servicebrukeren.
 - [ ] Aktivér Makera-kameraet og webkameraet separat. Bytt mellom ett kamera og begge samtidig i nettleseren.
 - [ ] Sett eget timelapse-intervall per kamera, lagre, og kjør en kort jobb med begge kameraer aktivert. Opptak krever både aktivt kamera og aktivert jobb-timelapse.
 - [ ] Lukk nettleseren under opptak og åpne igjen. Begge bildeseriene skal fortsatt vokse mens jobben er aktiv.
@@ -60,7 +60,7 @@ Detaljer og lagringsgrenser: [kameraer og timelapse](docs/host-cameras.md). Linu
 | Område | Resultat / observasjon |
 | --- | --- |
 | OS, maskin, firmware og FreeCAD-versjon | Ikke testet ennå |
-| OpenSpindle- og bridge-commit | Ikke fylt inn |
+| Spinnvill- og bridge-commit | Ikke fylt inn |
 | Modell, materialer og normal maps | Ikke testet ennå |
 | Felles verktøybibliotek | Ikke testet ennå |
 | USB, Stop og verktøyskift | Ikke testet ennå |

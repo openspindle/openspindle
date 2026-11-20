@@ -81,7 +81,7 @@ export class Diagnostics {
     const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-")
     return files.save({
       kind: "log",
-      suggestedName: `openspindle-${stamp}.log`,
+      suggestedName: `spinnvill-${stamp}.log`,
       contents: await log.read(),
     })
   }

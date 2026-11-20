@@ -61,7 +61,7 @@ function useUpdateDiagnosticsSettings() {
 const LOG_LEVEL_HINT =
   "How much the log records (Help › Export Log). Debug records the most, to track down a problem."
 const REPORT_HINT =
-  "Errors go to the OpenSpindle developers as they happen, with the app version, your system and what led up to them, never your projects. Otherwise you choose in the error dialog."
+  "Errors go to the Spinnvill developers as they happen, with the app version, your system and what led up to them, never your projects. Otherwise you choose in the error dialog."
 
 /** Settings › Privacy: what the log records, and whether errors are reported without asking. */
 export function PrivacySettings() {

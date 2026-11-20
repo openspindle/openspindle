@@ -2,7 +2,7 @@
 
 ## Purpose and scope
 
-Joseph wants his GameSir Xbox-style controller to position a Makera Z1 and eventually steer simple cuts. The working local OpenSpindle prototype already detects his controller, performs finite XY steps, changes step size with RB + D-pad, and shows the simulator's live tool in a rotatable 3D view.
+Joseph wants his GameSir Xbox-style controller to position a Makera Z1 and eventually steer simple cuts. The working local Spinnvill prototype already detects his controller, performs finite XY steps, changes step size with RB + D-pad, and shows the simulator's live tool in a rotatable 3D view.
 
 This next change adds direct, proportional XY steering to that simulator prototype. Success means holding LB and steering continuously, including diagonals; centring the stick or releasing LB brings motion to rest; focus loss or stale input stops and disarms. It remains throwaway feasibility code. Physical connections remain blocked.
 

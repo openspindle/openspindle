@@ -1,5 +1,5 @@
 import type { HistoryStore } from "../../../src/platform/contract/history"
-import type { Handlers } from "@openspindle/rpc"
+import type { Handlers } from "@spinnvill/rpc"
 import type { HostContract } from "../../../src/platform/contract/host-contract"
 import type { FileService } from "../services/file-service"
 import type { FusionService } from "../services/fusion-service"

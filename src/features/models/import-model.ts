@@ -48,7 +48,7 @@ export async function importModel(
     const tessellated = await tessellateStep(source, { signal: options.signal })
     mesh = writeGlb(tessellated.mesh, {
       name,
-      generator: "OpenSpindle STEP import (occt-import-js)",
+      generator: "Spinnvill STEP import (occt-import-js)",
       extras: { source: file.name },
     })
     if (mesh.byteLength > MODEL_LIMITS.meshBytes)

@@ -1,3 +1,4 @@
+import { copyFile } from "node:fs/promises"
 import { build } from "vite"
 import react from "@vitejs/plugin-react"
 import tailwindcss from "@tailwindcss/vite"
@@ -39,3 +40,5 @@ await build({
   resolve: { alias },
   build: { outDir: resolve("dist-host/web"), emptyOutDir: true },
 })
+
+await copyFile("LICENSE", "dist-host/LICENSE")

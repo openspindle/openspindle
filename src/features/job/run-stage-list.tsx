@@ -528,7 +528,7 @@ function operationResults(
     source.kind === "probing" &&
     (source.task === "touch-off" || source.task === "grid")
   ) {
-    // OpenSpindle's own touch-off reports nothing; the machine's cycles report from an anchor.
+    // Spinnvill's own touch-off reports nothing; the machine's cycles report from an anchor.
     const machine = kitForPlate(subject.plate).probing
     const method = machine && methodFor(source, machine, subject.plate)
     description =

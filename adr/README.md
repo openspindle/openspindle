@@ -1,6 +1,6 @@
 # Architecture Decision Records
 
-This directory records proposed and accepted design decisions that affect OpenSpindle's architecture, machine safety, interfaces or platform support. An ADR describes an explicit decision and its trade-offs; it is not evidence that the proposed behavior has already shipped.
+This directory records proposed and accepted design decisions that affect Spinnvill's architecture, machine safety, interfaces or platform support. An ADR describes an explicit decision and its trade-offs; it is not evidence that the proposed behavior has already shipped.
 
 ## Index
 

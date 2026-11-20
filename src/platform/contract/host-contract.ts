@@ -1,5 +1,5 @@
 import { historyMethods } from "./history"
-import { defineContract } from "@openspindle/rpc"
+import { defineContract } from "@spinnvill/rpc"
 import { z } from "zod"
 import {
   LinkedFileReadSchema,

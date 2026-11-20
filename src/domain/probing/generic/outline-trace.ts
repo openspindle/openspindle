@@ -143,7 +143,7 @@ function traceEdges(
 }
 
 /**
- * OpenSpindle's own trace of the plate's toolpath bounds, rounded outwards, with the probe's
+ * Spinnvill's own trace of the plate's toolpath bounds, rounded outwards, with the probe's
  * pointer: the pointer on, up to a machine Z clear of the stock, then the rectangle in work
  * coordinates from its lower-left corner at the trace feed, and a pause to check it if the
  * operation asks for one. Nothing touches, so the job reviews no measurement.

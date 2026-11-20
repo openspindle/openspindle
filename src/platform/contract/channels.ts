@@ -13,5 +13,6 @@ export type RpcService = (typeof RPC_SERVICES)[number]
 
 /** The packaged renderer's origin. */
 export const APP_SCHEME = "app"
+// Preserve the storage origin of installed upgrades.
 export const APP_HOST = "openspindle"
 export const APP_ORIGIN = `${APP_SCHEME}://${APP_HOST}`

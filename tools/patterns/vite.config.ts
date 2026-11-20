@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs"
 import { fileURLToPath } from "node:url"
 import { defineConfig } from "vite"
 import react from "@vitejs/plugin-react"
@@ -9,7 +10,20 @@ export default defineConfig({
   resolve: {
     alias: { "@": fileURLToPath(new URL("../../src", import.meta.url)) },
   },
-  plugins: [react(), tailwindcss()],
+  plugins: [
+    react(),
+    tailwindcss(),
+    {
+      name: "spinnvill-license",
+      generateBundle() {
+        this.emitFile({
+          type: "asset",
+          fileName: "LICENSE",
+          source: readFileSync(new URL("../../LICENSE", import.meta.url)),
+        })
+      },
+    },
+  ],
   build: {
     outDir: "dist-patterns",
     emptyOutDir: true,

@@ -101,7 +101,7 @@ const alarm: StageRule<"diagnosis"> = {
     if (!named)
       return {
         title: `Machine alarm ${code}`,
-        problem: "The machine halted with an alarm OpenSpindle does not name.",
+        problem: "The machine halted with an alarm Spinnvill does not name.",
         advice: CLEARING.unlock.advice,
       }
     return {

@@ -10,8 +10,8 @@ import type { LogLevel } from "../../../src/platform/contract/diagnostics"
 
 /** Past this size the log rolls over to the earlier file, so it keeps 4 to 8 MB. */
 const MAX_BYTES = 4 * 1024 * 1024
-const CURRENT = "openspindle.log"
-const EARLIER = "openspindle.1.log"
+const CURRENT = "spinnvill.log"
+const EARLIER = "spinnvill.1.log"
 /** Records wait this long to be written together, errors not at all. */
 const WRITE_DELAY_MS = 200
 

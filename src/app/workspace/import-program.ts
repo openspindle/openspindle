@@ -93,7 +93,7 @@ function leftOutNotice(leftOut: readonly string[]): string {
   const list =
     more > 0 ? `${named.join(", ")}, and ${more} more` : named.join(", ")
   const verb = leftOut.length === 1 ? "was" : "were"
-  return `${plural(leftOut.length, "field")} of its embedded setup ${verb} left out, which this version of OpenSpindle does not use: ${list}.`
+  return `${plural(leftOut.length, "field")} of its embedded setup ${verb} left out, which this version of Spinnvill does not use: ${list}.`
 }
 
 /**
@@ -179,7 +179,7 @@ export function importProgram(
           context.describedTools
         )
       )
-    // The stock OpenSpindle's markers describe, where they put it, else the stock its CAM's
+    // The stock Spinnvill's markers describe, where they put it, else the stock its CAM's
     // markers describe; one its machine's work area cannot hold stays unspecified.
     const kit = kitForSetup({
       deviceId: context.placement?.deviceId ?? null,
@@ -225,10 +225,10 @@ export function importProgram(
     })
   }
   if (envelope.version > PLATE_ENVELOPE_VERSION)
-    return fail("It was exported by a newer version of OpenSpindle.")
+    return fail("It was exported by a newer version of Spinnvill.")
   if (envelope.version < OLDEST_PLATE_ENVELOPE_VERSION)
     return fail(
-      "It was exported by an earlier version of OpenSpindle, which this version cannot read."
+      "It was exported by an earlier version of Spinnvill, which this version cannot read."
     )
   // An earlier version's payload has its probing operations upgraded before reading it
   // optimistically. Its other sources are read upgraded through the schema, so fields that

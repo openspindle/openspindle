@@ -6,8 +6,8 @@ import {
 } from "electron"
 import type { BrowserWindow, MessagePortMain, UtilityProcess } from "electron"
 import { fileURLToPath } from "node:url"
-import { createEndpoint } from "@openspindle/rpc"
-import type { EmptyContract, Peer } from "@openspindle/rpc"
+import { createEndpoint } from "@spinnvill/rpc"
+import type { EmptyContract, Peer } from "@spinnvill/rpc"
 import {
   disconnectedSnapshot,
   isJobActive,
@@ -107,7 +107,7 @@ export class MachineHost {
       cancelId: 1,
       message: "A job is running on the machine.",
       detail:
-        "Quitting disconnects OpenSpindle, but the machine keeps running the program. Use Stop first to end it.",
+        "Quitting disconnects Spinnvill, but the machine keeps running the program. Use Stop first to end it.",
     })
     return response === 0
   }
@@ -119,7 +119,7 @@ export class MachineHost {
       if (!this.system) throw new Error("The machine process is not running.")
       await files.save({
         kind: "trace",
-        suggestedName: `openspindle-protocol-${stamp}.txt`,
+        suggestedName: `spinnvill-protocol-${stamp}.txt`,
         contents: await this.system.call("machine.protocolTrace", undefined),
       })
     } catch (error) {
@@ -156,7 +156,7 @@ export class MachineHost {
 
   private fork(start: { reconnect: boolean; error: string | null }) {
     const child = utilityProcess.fork(MACHINE_PROCESS, [], {
-      serviceName: "OpenSpindle Machine",
+      serviceName: "Spinnvill Machine",
     })
     this.child = child
     child.on("message", (message: FromMachine) => this.receive(message))
@@ -228,8 +228,8 @@ export class MachineHost {
     ]
     const again = this.exits.length <= RESTARTS
     const error = again
-      ? `OpenSpindle's machine process stopped (exit code ${code}), which ended the connection. A running program keeps running on the machine: connect again to follow or stop it.`
-      : `OpenSpindle's machine process stopped ${this.exits.length} times within a minute (exit code ${code}) and was not started again. A running program keeps running on the machine: restart OpenSpindle to connect again.`
+      ? `Spinnvill's machine process stopped (exit code ${code}), which ended the connection. A running program keeps running on the machine: connect again to follow or stop it.`
+      : `Spinnvill's machine process stopped ${this.exits.length} times within a minute (exit code ${code}) and was not started again. A running program keeps running on the machine: restart Spinnvill to connect again.`
     this.options.reports.processError("machine", new Error(error), "onexit")
     this.changed(disconnectedSnapshot(0, "Connect a device first.", error))
     if (!again) return

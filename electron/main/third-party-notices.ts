@@ -39,7 +39,7 @@ export const ThirdPartyNoticesSchema = z
 export type ThirdPartyNotices = z.infer<typeof ThirdPartyNoticesSchema>
 
 const intro = (resources: string) => [
-  "OpenSpindle includes the open-source software below, each under its license. The license texts follow the list.",
+  "Spinnvill includes the open-source software below, each under its license. The license texts follow the list.",
   `Electron also includes Chromium, Node.js and other open-source software. Their licenses are in LICENSES.chromium.txt, in ${resources}.`,
 ]
 

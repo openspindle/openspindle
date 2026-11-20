@@ -177,11 +177,11 @@ function readPayload(
   const { schemaVersion } = version.data
   if (schemaVersion > PROJECT_SCHEMA_VERSION)
     throw new Error(
-      `This project was saved by a newer version of OpenSpindle (project format ${schemaVersion}). Update OpenSpindle to open it.`
+      `This project was saved by a newer version of Spinnvill (project format ${schemaVersion}). Update Spinnvill to open it.`
     )
   if (schemaVersion < MINIMUM_SCHEMA_VERSION)
     throw new Error(
-      `This project was saved by an earlier version of OpenSpindle (project format ${schemaVersion}), which this version cannot open.`
+      `This project was saved by an earlier version of Spinnvill (project format ${schemaVersion}), which this version cannot open.`
     )
   // Rule settings move to different paths, and probing operations take their current shape:
   // read the converted fields optimistically there.

@@ -1,11 +1,15 @@
-# OpenSpindle
+# Spinnvill
 
-OpenSpindle is a desktop app for preparing, checking and running jobs on a Makera Z1 CNC machine. Nothing moves the machine until you run a job or use a control, and every command is checked against what the machine reports.
+![Spinnvill logo](docs/spinnvill-logo.jpg)
+
+Spinnvill is an independent fork of [OpenSpindle](https://github.com/openspindle/openspindle). Original copyright and the MIT license are preserved in [LICENSE](LICENSE). Existing projects and tool libraries remain readable; their format identifiers and the identifiers used by older integrations are kept for compatibility.
+
+Spinnvill is a desktop app for preparing, checking and running jobs on a Makera Z1 CNC machine. Nothing moves the machine until you run a job or use a control, and every command is checked against what the machine reports.
 
 ![The Job tab running a PCB job on a Z1: the run's stages, the 3D view with the machine's camera feed, the G-code as the machine receives it and the console](docs/images/job.webp)
 
 > [!WARNING]
-> OpenSpindle is early ALPHA software for a machine that can hurt you and itself. Some features have not run on a real Z1 yet: see [Status and safety](#status-and-safety). Review every program before you run it, and keep the machine's emergency stop within reach.
+> Spinnvill is early ALPHA software for a machine that can hurt you and itself. Some features have not run on a real Z1 yet: see [Status and safety](#status-and-safety). Review every program before you run it, and keep the machine's emergency stop within reach.
 
 ## Features
 
@@ -40,26 +44,26 @@ OpenSpindle is a desktop app for preparing, checking and running jobs on a Maker
 
 ## Install
 
-**macOS:** download `OpenSpindle-<version>-universal.dmg` from the [latest release](../../releases/latest) and drag OpenSpindle to **Applications**. Allow local network access when macOS asks, or OpenSpindle cannot reach the machine; you can turn it on later in **System Settings › Privacy & Security › Local Network**.
+**macOS:** download `Spinnvill-<version>-universal.dmg` from the [latest release](../../releases/latest) and drag Spinnvill to **Applications**. Allow local network access when macOS asks, or Spinnvill cannot reach the machine; you can turn it on later in **System Settings › Privacy & Security › Local Network**.
 
-**Windows:** download `OpenSpindle-Setup-<version>.exe` from the [latest release](../../releases/latest) and run it: it installs OpenSpindle for your user, without administrator rights, and starts it. The installer is for x64 PCs and runs on Windows on Arm too. It is not signed yet, so Windows warns before running it: choose **More info**, then **Run anyway**. Allow OpenSpindle through the firewall when Windows asks, or it does not find machines on the network; entering a machine's IP address works either way.
+**Windows:** download `Spinnvill-Setup-<version>.exe` from the [latest release](../../releases/latest) and run it: it installs Spinnvill for your user, without administrator rights, and starts it. The installer is for x64 PCs and runs on Windows on Arm too. It is not signed yet, so Windows warns before running it: choose **More info**, then **Run anyway**. Allow Spinnvill through the firewall when Windows asks, or it does not find machines on the network; entering a machine's IP address works either way.
 
 **Linux (x64):** download the AppImage from the repository's release or a
 [Windows and Linux packages build](docs/releasing.md#packages-on-a-fork).
 Mark it executable and open it. For FreeCAD handoff, select that executable
-AppImage as the OpenSpindle program.
+AppImage as the Spinnvill program.
 
 ## Quick start
 
 1. **Connect:** click the device card in **Prepare** and choose your Z1, enter its IP address, or use **Scan USB** for the experimental [USB serial transport](docs/usb-serial.md).
-2. **Import:** drop your CAM's NC files on the window, open them with OpenSpindle from Finder or Explorer, or choose **File › Import…** or **File › Import from Fusion 360**. When a program splits into operations, or holds what the Z1 would not run as written, OpenSpindle asks first: which plate it goes to, how to split it and how to fix it.
+2. **Import:** drop your CAM's NC files on the window, open them with Spinnvill from Finder or Explorer, or choose **File › Import…** or **File › Import from Fusion 360**. When a program splits into operations, or holds what the Z1 would not run as written, Spinnvill asks first: which plate it goes to, how to split it and how to fix it.
 3. **Set up:** place the stock, set the work origin and assign the tools that were not matched from your library.
 4. **Check:** play the program back on the **Job** tab.
 5. **Run:** once the run checklist passes. **Machine › Stop** (⌘. on macOS, Ctrl+. on Windows) stops at any time.
 
 ### SpaceMouse navigation
 
-OpenSpindle detects compatible 3Dconnexion SpaceMouse and SpaceNavigator controllers in **Prepare** and **Job**. In **Settings › SpaceMouse**, choose which direction zooms, turn pan/zoom or rotation on or off, and set sensitivity and direction per axis. The other zoom direction pans vertically. **Dominant axis** uses only the strongest enabled input at a time. The six live meters show the input before navigation settings are applied. The 3D view keeps Z pointing up, so roll is shown on the meter only. **Center input** takes the cap's resting position as neutral for the current connection. Navigation preferences are saved automatically.
+Spinnvill detects compatible 3Dconnexion SpaceMouse and SpaceNavigator controllers in **Prepare** and **Job**. In **Settings › SpaceMouse**, choose which direction zooms, turn pan/zoom or rotation on or off, and set sensitivity and direction per axis. The other zoom direction pans vertically. **Dominant axis** uses only the strongest enabled input at a time. The six live meters show the input before navigation settings are applied. The 3D view keeps Z pointing up, so roll is shown on the meter only. **Center input** takes the cap's resting position as neutral for the current connection. Navigation preferences are saved automatically.
 
 The mouse wheel zooms the work view. Wheel events that arrive during or shortly after a forward or backward SpaceMouse push or tilt are ignored in the work view to reduce driver-emulated scrolling. This also affects wheel input from a regular mouse if both devices are used at the same time.
 
@@ -84,7 +88,7 @@ If something behaves differently, **Help › Export Protocol Trace…** saves th
 - [Guided workshop](docs/guided-workshop.md): setup, facing, cutting presets, measurement proposals, reusable processes, material removal and simulator trials
 - [Probing](docs/probing.md): [Z surface](docs/touch-off.md), [height map](docs/height-map.md), [outline trace](docs/outline-trace.md), and [corners and centres](docs/3d-probing.md) with the 3D probe
 - [PCB operations](docs/pcb.md) from KiCad Gerber and Excellon files, and setting up pcb2gcode
-- [Patterns / Textures](docs/patterns.md): a standalone Rust/WASM formula generator, ten engraving presets, and editing an OpenSpindle operation
+- [Patterns / Textures](docs/patterns.md): a standalone Rust/WASM formula generator, ten engraving presets, and editing an Spinnvill operation
 - [Fusion 360](docs/fusion360.md): install the add-in, connect, and import and update NC programs
 - [Stored anchors](docs/stored-anchors.md), [models](docs/models.md) and [design rules](docs/design-rules.md)
 - [Device controls](docs/device-controls.md) and [diagnosis](docs/device-controls.md#diagnosis), [running programs](docs/device-jobs.md) and [the height map](docs/device-height-map.md)
@@ -121,6 +125,6 @@ The release pull request updates the version and CHANGELOG.md ([releasing](docs/
 
 ## Acknowledgements
 
-Framing, model identification and the probing sequences are documented in [Makera's Z1 firmware](https://github.com/MakeraInc/MakeraZ1Firmware/tree/b3a2e26a9eaa2b01358f74ccdef549b993a08175), and discovery and the file transfer in [Makera's controller](https://github.com/MakeraInc/CarveraController/tree/3914c912452f83fbd5b5d90c730cb78795198438). The camera stream is the one the Z1's own web page shows, at the frame size its configuration sets, numbered as in [Espressif's camera driver](https://github.com/espressif/esp32-camera/blob/2bba0d1d57219ddacd18d2c5701927e1884a51d1/driver/sensor.c#L26-L54). OpenSpindle implements these protocols itself and includes none of that code.
+Framing, model identification and the probing sequences are documented in [Makera's Z1 firmware](https://github.com/MakeraInc/MakeraZ1Firmware/tree/b3a2e26a9eaa2b01358f74ccdef549b993a08175), and discovery and the file transfer in [Makera's controller](https://github.com/MakeraInc/CarveraController/tree/3914c912452f83fbd5b5d90c730cb78795198438). The camera stream is the one the Z1's own web page shows, at the frame size its configuration sets, numbered as in [Espressif's camera driver](https://github.com/espressif/esp32-camera/blob/2bba0d1d57219ddacd18d2c5701927e1884a51d1/driver/sensor.c#L26-L54). Spinnvill implements these protocols itself and includes none of that code.
 
-The About panel lists the open-source libraries OpenSpindle is built with, such as Electron, React and three.js, with their licenses.
+The About panel lists the open-source libraries Spinnvill is built with, such as Electron, React and three.js, with their licenses.

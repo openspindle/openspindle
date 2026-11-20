@@ -24,7 +24,7 @@ export function boundedMoveRequirement(
   if (
     headers.length !== 1 ||
     plans.length !== 1 ||
-    /@OPENSPINDLE_(ANCHOR|DIAMETER|Z)_PLAN/.test(source)
+    /@SPINNVILL_(ANCHOR|DIAMETER|Z)_PLAN/.test(source)
   )
     throw new Error(
       "Use one protected probe positioning plan and its signal check."

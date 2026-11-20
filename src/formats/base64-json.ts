@@ -2,7 +2,7 @@ import { strToU8 } from "fflate"
 
 /**
  * JSON as UTF-8, then base64, with the byte length and Adler-32 checksum of the UTF-8: how
- * OpenSpindle files embed application data in text. Adler-32 detects accidental corruption; it
+ * Spinnvill files embed application data in text. Adler-32 detects accidental corruption; it
  * is not a signature.
  */
 export type Base64Json = {

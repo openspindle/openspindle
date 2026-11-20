@@ -1,6 +1,6 @@
 # JavaScript is bundled except the serial runtime and its N-API prebuilds.
 appId: com.openspindle.desktop
-productName: OpenSpindle
+productName: Spinnvill
 directories:
   output: release
 files:
@@ -16,13 +16,15 @@ npmRebuild: false
 # The About panel's credits, which production builds keep in build/third-party-notices.json, and the
 # licenses of Electron and of the Chromium, Node.js and other software it includes, which they refer to.
 extraResources:
+  - from: LICENSE
+    to: LICENSE.spinnvill.txt
   - from: build/third-party-notices.json
     to: third-party-notices.json
   - from: node_modules/electron/dist/LICENSE
     to: LICENSE.electron.txt
   # Fusion loads the Python add-in from a folder outside app.asar.
-  - from: integrations/fusion360/OpenSpindleBridge
-    to: fusion360/OpenSpindleBridge
+  - from: integrations/fusion360/SpinnvillBridge
+    to: fusion360/SpinnvillBridge
     filter:
       - "**/*.py"
       - "**/*.manifest"
@@ -47,7 +49,7 @@ electronFuses:
 # from the git remote; without one, a build leaves both out and cannot update.
 publish:
   provider: github
-# The files OpenSpindle opens (FILE_KINDS in src/platform/contract/files.ts): the system opens
+# The files Spinnvill opens (FILE_KINDS in src/platform/contract/files.ts): the system opens
 # its own projects with it, and lists it under Open With for NC programs without taking them
 # from the CAM or editor that opens them now (mac below; build/installer.nsh on Windows). The app
 # imports what it is handed as it imports dropped files (electron/main/services/opened-files.ts).
@@ -79,7 +81,7 @@ mac:
     - target: zip
       arch: universal
   extendInfo:
-    NSLocalNetworkUsageDescription: OpenSpindle finds and controls CNC machines on your local network.
+    NSLocalNetworkUsageDescription: Spinnvill finds and controls CNC machines on your local network.
     LSAppNapIsDisabled: true
 win:
   # English only, as on macOS: Windows names Chromium's resources by region.

@@ -67,7 +67,7 @@ jobs:
     steps:
       - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with:
-          pattern: OpenSpindle-*-x64-*
+          pattern: Spinnvill-*-x64-*
           path: release-assets
           merge-multiple: true
       - name: Create draft with both packages
@@ -76,7 +76,7 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: |
           gh release create "$GITHUB_REF_NAME" --verify-tag --draft \
-            --title "OpenSpindle $GITHUB_REF_NAME" --generate-notes release-assets/*
+            --title "Spinnvill $GITHUB_REF_NAME" --generate-notes release-assets/*
 
   signed-release:
     name: Signed release
@@ -121,8 +121,8 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           version=$(node -p "require('./package.json').version")
-          file="OpenSpindle-$version-${HEAD_SHA::7}-universal-mac.zip"
-          ditto -c -k --keepParent release/mac-universal/OpenSpindle.app "$file"
+          file="Spinnvill-$version-${HEAD_SHA::7}-universal-mac.zip"
+          ditto -c -k --keepParent release/mac-universal/Spinnvill.app "$file"
           echo "file=$file" >> "$GITHUB_OUTPUT"
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -145,7 +145,7 @@ jobs:
             echo "[$FILE]($URL): the universal app, ad-hoc signed and not notarized."
             echo
             echo "- macOS blocks its first launch: open it once, then choose **Open Anyway** in System Settings → Privacy & Security."
-            echo "- Quit an installed OpenSpindle first: this build uses the same data folder, and only one runs at a time."
+            echo "- Quit an installed Spinnvill first: this build uses the same data folder, and only one runs at a time."
             echo "- It does not update itself."
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -180,8 +180,8 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           version=$(node -p "require('./package.json').version")
-          file="OpenSpindle-Setup-$version-${HEAD_SHA::7}.exe"
-          mv "release/OpenSpindle-Setup-$version.exe" "$file"
+          file="Spinnvill-Setup-$version-${HEAD_SHA::7}.exe"
+          mv "release/Spinnvill-Setup-$version.exe" "$file"
           echo "file=$file" >> "$GITHUB_OUTPUT"
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -204,6 +204,6 @@ jobs:
             echo "[$FILE]($URL): the x64 installer, not signed."
             echo
             echo "- Windows warns before it runs it: choose **More info**, then **Run anyway**."
-            echo "- It replaces an installed OpenSpindle and uses the same data folder."
+            echo "- It replaces an installed Spinnvill and uses the same data folder."
             echo "- It does not update to the release it becomes: install that once it is published."
           } >> "$GITHUB_STEP_SUMMARY"

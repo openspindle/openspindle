@@ -6,7 +6,7 @@ fn main() {
         eprintln!("{err}");
         std::process::exit(1);
     }
-    match openspindle_pattern_engine::generate_pattern(&input) {
+    match spinnvill_pattern_engine::generate_pattern(&input) {
         Ok(value) => println!("{value}"),
         Err(err) => {
             eprintln!("{err}");

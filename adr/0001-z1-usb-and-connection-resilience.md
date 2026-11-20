@@ -3,14 +3,14 @@
 - **Status:** Proposed
 - **Date:** 2026-11-10
 - **Scope:** Makera Z1 / Z1 Pro device communication, health detection, and recovery
-- **Decision owners:** OpenSpindle maintainers
+- **Decision owners:** Spinnvill maintainers
 - **Implementation status:** Design only; no runtime behavior changed by this ADR
 
 ## Context and problem
 
-A Z1 user reports intermittent disconnections from OpenSpindle over Wi-Fi. This is not yet a diagnosed radio failure. OpenSpindle can deliberately close a healthy TCP socket when status replies are delayed, and the existing implementation does not attempt recovery after an ordinary unexpected disconnect. A disconnection while cutting is especially serious: the Z1 can continue executing an uploaded program, while OpenSpindle loses its progress view and the ability to issue software Stop.
+A Z1 user reports intermittent disconnections from Spinnvill over Wi-Fi. This is not yet a diagnosed radio failure. Spinnvill can deliberately close a healthy TCP socket when status replies are delayed, and the existing implementation does not attempt recovery after an ordinary unexpected disconnect. A disconnection while cutting is especially serious: the Z1 can continue executing an uploaded program, while Spinnvill loses its progress view and the ability to issue software Stop.
 
-The Z1 officially supports a USB cable as a control connection. Community Carvera Controller also implements serial USB control of the Z1. OpenSpindle currently cannot select or use that connection.
+The Z1 officially supports a USB cable as a control connection. Community Carvera Controller also implements serial USB control of the Z1. Spinnvill currently cannot select or use that connection.
 
 We need **two complementary changes**, not just a new connection picker: (1) make network failures observable and recoverable without duplicating any machine action, and (2) add correctly framed, USB-compatible serial control and transfers.
 
@@ -31,9 +31,9 @@ We need **two complementary changes**, not just a new connection picker: (1) mak
 
 1. [Makera's official Z1 Quick Start](https://wiki.makera.com/en/Z1/QuickStart) explicitly lists USB, the built-in Wi-Fi hotspot, and LAN Wi-Fi as control connection methods.
 2. [Carvera Community Controller's USBStream](https://github.com/Carvera-Community/Carvera_Controller/blob/e5623ece10309597d43a708dde35ae41c7854cb8/carveracontroller/USBStream.py) opens serial at **115200 baud, 8 data bits, no parity, one stop bit**, without software/hardware flow control, and manipulates DTR on open. This is evidence of one working controller implementation, **not** proof that all Z1 firmware versions react identically to DTR.
-3. The community controller's [Makera protocol implementation](https://github.com/Carvera-Community/Carvera_Controller/blob/e5623ece10309597d43a708dde35ae41c7854cb8/carveracontroller/protocols/makera.py) uses the Makera binary framing, not an unframed G-code stream. The existing [OpenSpindle codec](../src/machine/firmware/makera/codec.ts) implements the same frame envelope: 0x8668 header, big-endian length, frame type, payload, CRC-16, 0x55AA footer.
-4. **Critical:** the community controller's [XMODEM framed-transfer code](https://github.com/Carvera-Community/Carvera_Controller/blob/e5623ece10309597d43a708dde35ae41c7854cb8/carveracontroller/XMODEM.py) uses **128-byte data blocks for USB** and **8192-byte blocks for Wi-Fi** (see `_framed_packet_size`). Simply replacing TCP with serial while retaining OpenSpindle's 8192-byte transfer blocks is not a valid USB implementation. [Z1 firmware SerialConsole.cpp](https://github.com/MakeraInc/MakeraZ1Firmware/blob/8ae81f3b1b092ca55842cf4f875c8169631de9e2/src/modules/communication/SerialConsole.cpp) also shows a bounded framed UART receive buffer, corroborating the need for transport-aware transfer sizes.
-5. [Community Controller release notes](https://github.com/Carvera-Community/Carvera_Controller/releases) record previously fixed USB-only failures: DTR/boot-time false disconnects, failed higher-baud upgrades, reconnecting to the wrong transport, and serial device selection instability. These are relevant hazards to validate in OpenSpindle, not functionality to copy blindly.
+3. The community controller's [Makera protocol implementation](https://github.com/Carvera-Community/Carvera_Controller/blob/e5623ece10309597d43a708dde35ae41c7854cb8/carveracontroller/protocols/makera.py) uses the Makera binary framing, not an unframed G-code stream. The existing [Spinnvill codec](../src/machine/firmware/makera/codec.ts) implements the same frame envelope: 0x8668 header, big-endian length, frame type, payload, CRC-16, 0x55AA footer.
+4. **Critical:** the community controller's [XMODEM framed-transfer code](https://github.com/Carvera-Community/Carvera_Controller/blob/e5623ece10309597d43a708dde35ae41c7854cb8/carveracontroller/XMODEM.py) uses **128-byte data blocks for USB** and **8192-byte blocks for Wi-Fi** (see `_framed_packet_size`). Simply replacing TCP with serial while retaining Spinnvill's 8192-byte transfer blocks is not a valid USB implementation. [Z1 firmware SerialConsole.cpp](https://github.com/MakeraInc/MakeraZ1Firmware/blob/8ae81f3b1b092ca55842cf4f875c8169631de9e2/src/modules/communication/SerialConsole.cpp) also shows a bounded framed UART receive buffer, corroborating the need for transport-aware transfer sizes.
+5. [Community Controller release notes](https://github.com/Carvera-Community/Carvera_Controller/releases) record previously fixed USB-only failures: DTR/boot-time false disconnects, failed higher-baud upgrades, reconnecting to the wrong transport, and serial device selection instability. These are relevant hazards to validate in Spinnvill, not functionality to copy blindly.
 
 **Unknown until hardware verification:** whether the user's exact Z1 reports a stable VID/PID/serial; whether opening its port resets any controller; the default protocol/mode of each firmware revision; the negotiated file-transfer behavior; and whether any camera network address is available while machine control is USB-only.
 
@@ -97,7 +97,7 @@ Refactor `MakeraTransfer` to take a validated transfer capability, including the
 - USB: start with **128-byte blocks** as shown in Community Controller.
 - Encode the negotiated packet count and block size in `PTYPE_FILE_VIEW` and calculate sequence, payload offsets, bytes sent and readback boundaries from that block size.
 - Bound USB payloads to the receiving firmware's capability; do not use the 8192-byte constant when constructing USB `PTYPE_FILE_DATA` frames.
-- Keep OpenSpindle's **upload → full readback → explicit play** transaction. Do not automatically resend data or a command after ambiguous loss; the existing narrowly scoped readback-request repeat remains subject to protocol evidence.
+- Keep Spinnvill's **upload → full readback → explicit play** transaction. Do not automatically resend data or a command after ambiguous loss; the existing narrowly scoped readback-request repeat remains subject to protocol evidence.
 - Account for serial throughput and per-frame/roundtrip overhead in `preparationMs`, stall and stage deadlines; an 8192-byte frame at 115200 8N1 alone needs roughly 0.71 seconds of wire time, while 128-byte USB frames incur many more request/response exchanges.
 - Suspended status polling during a transfer must not be classified as a status timeout. File-transfer progress, timeouts, connection health and UART-buffer backpressure are separate signals.
 
@@ -120,7 +120,7 @@ Record the transport kind, device endpoint (redacted as appropriate in exported 
 
 The current 5-second watchdog is a **status silence watchdog**, not a Wi-Fi detector. Its `silentMs` counts due poll intervals, resets on a valid status and pauses during transfer. First gather traces and controlled reproduction, then explicitly model `healthy → degraded → unreachable`. Candidate *starting values for validation*, not a silently accepted timeout policy: show "degraded" at 5 seconds of eligible unanswered status queries and sever/reconnect at 10 seconds. Disable new machine-changing commands while status is degraded; an already running program's state is **unknown**, not automatically stopped. Keep hard per-command deadlines and fail closed on unsafe uncertainty. Do not solve the issue by arbitrarily increasing `STALE_MS` alone.
 
-Provide an optional user-facing diagnostic recipe: sustained ping to the machine IP and a simultaneous OpenSpindle protocol trace. Ping success does **not** establish firmware responsiveness, but loss of ping alongside loss of status helps distinguish network issues.
+Provide an optional user-facing diagnostic recipe: sustained ping to the machine IP and a simultaneous Spinnvill protocol trace. Ping success does **not** establish firmware responsiveness, but loss of ping alongside loss of status helps distinguish network issues.
 
 ### 5. Recovery is a new observation session, not a replay
 
@@ -173,7 +173,7 @@ Expose concise distinctions: "Connected via USB", "Connected via Wi-Fi", "Status
 
 ## Implementation sequence
 
-**Phase 0 — establish baseline and hardware gates (no application behavior changes):** Collect timestamped OpenSpindle protocol traces and a continuous ping for a reproduced disconnect. Record whether the machine is idle, uploading or cutting, router/AP mode, firmware revision, host OS, status RSSI if exposed and exact disconnect message. Test Makera Studio/Community Controller over USB with the same physical machine. Document serial port identity, DTR/RTS transitions, whether the controller reboots, framing and 128-byte transfer/readback before proceeding.
+**Phase 0 — establish baseline and hardware gates (no application behavior changes):** Collect timestamped Spinnvill protocol traces and a continuous ping for a reproduced disconnect. Record whether the machine is idle, uploading or cutting, router/AP mode, firmware revision, host OS, status RSSI if exposed and exact disconnect message. Test Makera Studio/Community Controller over USB with the same physical machine. Document serial port identity, DTR/RTS transitions, whether the controller reboots, framing and 128-byte transfer/readback before proceeding.
 
 **Phase 1 — connection diagnostics and conservative network recovery:** Extend telemetry/logging; separate transport closure from status staleness; model degraded/unreachable; preserve uncertain-outcome lockout; add cancellable, opt-in network reconnect with fresh identity/state verification. No automatic command replay and no automatic resumption of multipart jobs.
 
@@ -224,7 +224,7 @@ Open questions requiring a real Z1: exact USB VID/PID/serial and OS driver; whet
 ## References
 
 - [Makera Z1 Quick Start — official connection methods](https://wiki.makera.com/en/Z1/QuickStart)
-- [OpenSpindle architecture](../docs/architecture.md), [running programs](../docs/device-jobs.md), [device controls](../docs/device-controls.md)
+- [Spinnvill architecture](../docs/architecture.md), [running programs](../docs/device-jobs.md), [device controls](../docs/device-controls.md)
 - [Community Controller USBStream, pinned](https://github.com/Carvera-Community/Carvera_Controller/blob/e5623ece10309597d43a708dde35ae41c7854cb8/carveracontroller/USBStream.py)
 - [Community Controller XMODEM, pinned — USB 128 / Wi-Fi 8192 blocks](https://github.com/Carvera-Community/Carvera_Controller/blob/e5623ece10309597d43a708dde35ae41c7854cb8/carveracontroller/XMODEM.py)
 - [Community Controller Makera framing, pinned](https://github.com/Carvera-Community/Carvera_Controller/blob/e5623ece10309597d43a708dde35ae41c7854cb8/carveracontroller/protocols/framing.py)

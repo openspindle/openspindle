@@ -80,17 +80,17 @@ export const PROBING_STRATEGIES: readonly ProbingStrategy[] = [
 ]
 
 /**
- * OpenSpindle's own methods, which a machine runs where it gives what they are made of
+ * Spinnvill's own methods, which a machine runs where it gives what they are made of
  * (`ProbingMethod.runsOn`).
  */
 const GENERIC_METHODS: readonly TaskMethod[] = [GENERIC_TOUCH, GENERIC_TRACE]
 
-/** A strategy by its id; null for an id OpenSpindle does not know. */
+/** A strategy by its id; null for an id Spinnvill does not know. */
 export function strategyById(id: string): ProbingStrategy | null {
   return PROBING_STRATEGIES.find((strategy) => strategy.id === id) ?? null
 }
 
-/** A strategy's label by its id; the id itself for one OpenSpindle does not know. */
+/** A strategy's label by its id; the id itself for one Spinnvill does not know. */
 export function strategyLabel(id: string): string {
   return strategyById(id)?.label ?? id
 }
