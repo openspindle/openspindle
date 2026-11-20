@@ -1,3 +1,4 @@
+import { useNavigate } from "@tanstack/react-router"
 import {
   Box,
   CircuitBoard,
@@ -31,6 +32,7 @@ import { ArrangeTools } from "./arrange/arrange-tools"
  * and the workspace settings.
  */
 export function PrepareToolbar() {
+  const navigate = useNavigate()
   const probingReason = useProbingReason()
   const workspace = useWorkspaceStore()
   const hasPlate = useWorkspace((state) => selectedPlate(state) !== null)
@@ -70,7 +72,7 @@ export function PrepareToolbar() {
             label="Facing wizard"
             description="Create an editable facing raster with cutting data from your tool library."
             reason={hasPlate ? null : "Create a plate with Guided setup first."}
-            onClick={() => openDialog({ kind: "facing" })}
+            onClick={() => void navigate({ to: "/facing" })}
           >
             <Layers />
           </ToolbarButton>

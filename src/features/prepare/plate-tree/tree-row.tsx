@@ -846,6 +846,11 @@ function OperationRow(
           title={suppressed ? `${operation.name} (suppressed)` : operation.name}
           onClick={() => props.onSelectOperation(plate.id, operation.id)}
           onDoubleClick={() => {
+            if (operation.source.kind === "facing")
+              void navigate({
+                to: "/facing",
+                search: { plate: plate.id, operation: operation.id },
+              })
             if (operation.source.kind === "pattern")
               void navigate({
                 to: "/patterns",

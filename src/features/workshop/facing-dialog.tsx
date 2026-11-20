@@ -301,15 +301,25 @@ function FacingFields({
   )
 }
 
-export function FacingDialog({
+type FacingEditorProps = {
+  plateId?: string
+  operationId?: string
+  onSaved?: (plateId: string, operationId: string) => void
+  onClose?: () => void
+}
+
+export function FacingDialog(
+  props: FacingEditorProps & { onClose: () => void }
+) {
+  return <FacingEditor {...props} />
+}
+
+export function FacingEditor({
   plateId: requestedPlate,
   operationId,
   onClose,
-}: {
-  plateId?: string
-  operationId?: string
-  onClose: () => void
-}) {
+  onSaved,
+}: FacingEditorProps) {
   const workspace = useWorkspaceStore()
   const selected = useWorkspace(selectedPlate)
   const [plateId] = useState(requestedPlate ?? selected?.id ?? null)
@@ -320,7 +330,7 @@ export function FacingDialog({
   const selection = usePrepareSelection()
   const operation = plate?.operations.find((op) => op.id === operationId)
   const source = operation?.source.kind === "facing" ? operation.source : null
-  const [revision] = useState(operation?.revision)
+  const [revision, setRevision] = useState(operation?.revision)
   const existingToolId = plate?.tools.find(
     (entry) =>
       entry.number ===
@@ -419,7 +429,9 @@ export function FacingDialog({
       tool: source?.tool ?? 1,
       params,
     }
+    let savedId: string
     if (operation) {
+      savedId = operation.id
       const result = workspace.dispatch({
         type: "operation.source",
         plateId: plate.id,
@@ -443,297 +455,314 @@ export function FacingDialog({
         toast.error(result.error)
         return
       }
+      savedId = added.id
       selection.selectOperation(plate.id, added.id)
     }
-    onClose()
+    if (onSaved && operation) {
+      const saved = workspace.state.plates
+        .find((item) => item.id === plate.id)
+        ?.operations.find((item) => item.id === savedId)
+      setRevision(saved?.revision)
+    }
+    onSaved?.(plate.id, savedId)
+    onClose?.()
   }
-  return (
-    <AppDialog
-      title={operation ? "Edit facing" : "Facing wizard"}
-      width="wide"
-      onClose={onClose}
-      footer={
-        <Button disabled={guard} onClick={apply}>
-          {operation ? "Apply parameters" : "Create facing operation"}
-        </Button>
-      }
-    >
-      <FieldGroup>
+  const footer = (
+    <Button disabled={guard} onClick={apply}>
+      {operation ? "Apply parameters" : "Create facing operation"}
+    </Button>
+  )
+  const fields = (
+    <FieldGroup>
+      <FieldDescription>
+        Creates an editable rectangular raster in work coordinates. Choose
+        outside-stock entry or a measured clear pocket. Review the generated
+        program and clamp clearances on Job before Run. This does not set
+        physical work Z or change the stock model.
+      </FieldDescription>
+      {!!kit?.facingKeepOuts.length && (
         <FieldDescription>
-          Creates an editable rectangular raster in work coordinates. Choose
-          outside-stock entry or a measured clear pocket. Review the generated
-          program and clamp clearances on Job before Run. This does not set
-          physical work Z or change the stock model.
+          Automatically avoids{" "}
+          {kit.facingKeepOuts.map((area) => area.name.toLowerCase()).join(", ")}
+          , including the cutter radius and at least{" "}
+          {Math.max(...kit.facingKeepOuts.map((area) => area.margin))} mm
+          clearance. Pocket entry connects rows at cutting feed around protected
+          areas; travel clears the modeled equipment top. The protected patch
+          stays unfaced.
         </FieldDescription>
-        {!!kit?.facingKeepOuts.length && (
-          <FieldDescription>
-            Automatically avoids{" "}
-            {kit.facingKeepOuts
-              .map((area) => area.name.toLowerCase())
-              .join(", ")}
-            , including the cutter radius and at least{" "}
-            {Math.max(...kit.facingKeepOuts.map((area) => area.margin))} mm
-            clearance. Pocket entry connects rows at cutting feed around
-            protected areas; travel clears the modeled equipment top. The
-            protected patch stays unfaced.
-          </FieldDescription>
-        )}
-        {!plate && (
-          <Button
-            variant="outline"
-            onClick={() => openDialog({ kind: "guided-setup" })}
-          >
-            Create a setup first
-          </Button>
-        )}
-        <Field>
-          <FieldLabel>Cutter</FieldLabel>
-          <OptionSelect
-            value={toolId}
-            disabled={!!operation}
-            options={tools
-              .filter((item) => !facingToolIssue(item))
-              .map((item) => ({
-                value: item.id,
-                label: `${item.name} · Ø${item.diameter} mm`,
-              }))}
-            onValueChange={(id) => {
-              setToolId(id)
-              setPresetId("")
-              const diameter = tools.find((t) => t.id === id)?.diameter ?? 1
-              const next = {
-                ...params,
-                diameter,
-                stepover: Math.min(params.stepover, diameter / 2),
-                entryConfirmed: false,
-              }
-              setParams(next)
-              setValid(FacingParamsSchema.safeParse(next).success)
-            }}
-          />
-        </Field>
-        {issue && (
-          <FieldDescription>
-            {issue}{" "}
-            {operation
-              ? "Assign a suitable cutter in the plate's tool table before editing Facing."
-              : "Edit the tool library before continuing."}
-          </FieldDescription>
-        )}
-        {tool && tool.diameter !== params.diameter && (
-          <Button
-            variant="outline"
-            onClick={() => {
-              const diameter = tool.diameter ?? params.diameter
-              const next = {
-                ...params,
-                diameter,
-                stepover: Math.min(params.stepover, diameter / 2),
-                entryConfirmed: false,
-              }
-              setParams(next)
-              setValid(FacingParamsSchema.safeParse(next).success)
-            }}
-          >
-            Use current cutter diameter · {tool.diameter} mm
-          </Button>
-        )}
-        <FieldDescription>
-          Feeds and speeds assistant: load cutting data supplied for your cutter
-          and material, or enter your own. These values require operator review.
-          Imported G-code keeps its original cutting data.
-          {kit?.spindleRange &&
-            ` This machine's spindle range is ${kit.spindleRange.min}–${kit.spindleRange.max} rpm.`}
-        </FieldDescription>
-        <Field>
-          <FieldLabel>Library cutting preset</FieldLabel>
-          <OptionSelect
-            value={presetId}
-            options={[
-              { value: "", label: "Choose a preset" },
-              ...(tool?.presets.map((item) => ({
-                value: item.id,
-                label: `${item.name}${item.material ? ` · ${item.material}` : ""}`,
-              })) ?? []),
-            ]}
-            onValueChange={setPresetId}
-          />
-        </Field>
+      )}
+      {!plate && (
         <Button
           variant="outline"
-          disabled={!preset}
-          onClick={() => {
-            if (!preset) return
+          onClick={() => openDialog({ kind: "guided-setup" })}
+        >
+          Create a setup first
+        </Button>
+      )}
+      <Field>
+        <FieldLabel>Cutter</FieldLabel>
+        <OptionSelect
+          value={toolId}
+          disabled={!!operation}
+          options={tools
+            .filter((item) => !facingToolIssue(item))
+            .map((item) => ({
+              value: item.id,
+              label: `${item.name} · Ø${item.diameter} mm`,
+            }))}
+          onValueChange={(id) => {
+            setToolId(id)
+            setPresetId("")
+            const diameter = tools.find((t) => t.id === id)?.diameter ?? 1
             const next = {
               ...params,
-              rpm: preset.rpm ?? 0,
-              feed: preset.feedRate ?? 0,
-              plunge: preset.plungeFeed ?? 0,
-              stepdown:
-                preset.useStepdown === true
-                  ? (preset.stepdown ?? params.stepdown)
-                  : params.stepdown,
-              stepover:
-                preset.useStepover === true
-                  ? (preset.stepover ?? params.stepover)
-                  : params.stepover,
+              diameter,
+              stepover: Math.min(params.stepover, diameter / 2),
+              entryConfirmed: false,
             }
-            setValid(FacingParamsSchema.safeParse(next).success)
             setParams(next)
+            setValid(FacingParamsSchema.safeParse(next).success)
+          }}
+        />
+      </Field>
+      {issue && (
+        <FieldDescription>
+          {issue}{" "}
+          {operation
+            ? "Assign a suitable cutter in the plate's tool table before editing Facing."
+            : "Edit the tool library before continuing."}
+        </FieldDescription>
+      )}
+      {tool && tool.diameter !== params.diameter && (
+        <Button
+          variant="outline"
+          onClick={() => {
+            const diameter = tool.diameter ?? params.diameter
+            const next = {
+              ...params,
+              diameter,
+              stepover: Math.min(params.stepover, diameter / 2),
+              entryConfirmed: false,
+            }
+            setParams(next)
+            setValid(FacingParamsSchema.safeParse(next).success)
           }}
         >
-          Apply preset to facing parameters
+          Use current cutter diameter · {tool.diameter} mm
         </Button>
-        <FacingFields
-          key={`${toolId}-${draft.key}`}
-          value={params}
-          setup={plate?.setup}
-          onChange={draft.onChange}
-          onValidityChange={setValid}
+      )}
+      <FieldDescription>
+        Feeds and speeds assistant: load cutting data supplied for your cutter
+        and material, or enter your own. These values require operator review.
+        Imported G-code keeps its original cutting data.
+        {kit?.spindleRange &&
+          ` This machine's spindle range is ${kit.spindleRange.min}–${kit.spindleRange.max} rpm.`}
+      </FieldDescription>
+      <Field>
+        <FieldLabel>Library cutting preset</FieldLabel>
+        <OptionSelect
+          value={presetId}
+          options={[
+            { value: "", label: "Choose a preset" },
+            ...(tool?.presets.map((item) => ({
+              value: item.id,
+              label: `${item.name}${item.material ? ` · ${item.material}` : ""}`,
+            })) ?? []),
+          ]}
+          onValueChange={setPresetId}
         />
-        {params.entryMode === "pocket" && kit && plate && (
-          <>
-            <Field>
-              <FieldLabel>Modeled MDF recess · candidate only</FieldLabel>
-              <OptionSelect
-                value=""
-                options={[
-                  {
-                    value: "",
-                    label:
-                      "Choose a recess to inspect, or enter measurements above",
-                  },
-                  ...kit.facingEntryPockets.map((pocket, index) => ({
-                    value: String(index),
-                    label: pocket.name,
-                  })),
-                ]}
-                onValueChange={(value) => {
-                  if (value === "") return
-                  const index = Number(value)
-                  if (
-                    !Number.isInteger(index) ||
-                    index < 0 ||
-                    index >= kit.facingEntryPockets.length
-                  )
-                    return
-                  const pocket = kit.facingEntryPockets[index]
-                  const next = {
-                    ...params,
-                    entryX:
-                      pocket.xy[0] +
-                      bedOffsetOf(plate.setup.anchors)[0] -
-                      plate.setup.workOrigin[0],
-                    entryY:
-                      pocket.xy[1] +
-                      bedOffsetOf(plate.setup.anchors)[1] -
-                      plate.setup.workOrigin[1],
-                    entryDiameter: pocket.diameter,
-                    entryDepth: pocket.depth,
-                    entryConfirmed: false,
-                  }
-                  setParams(next)
-                  setValid(false)
-                }}
-              />
-            </Field>
-            <FieldDescription>
-              The STEP model's screw recesses are Ø10 mm × 2 mm deep; the
-              smaller through bore is Ø5.4 mm. Screws can reduce the usable
-              depth. Choosing a candidate fills modeled dimensions; replace them
-              with your measurements.
-            </FieldDescription>
-            <Button
-              variant="outline"
-              onClick={() => {
+      </Field>
+      <Button
+        variant="outline"
+        disabled={!preset}
+        onClick={() => {
+          if (!preset) return
+          const next = {
+            ...params,
+            rpm: preset.rpm ?? 0,
+            feed: preset.feedRate ?? 0,
+            plunge: preset.plungeFeed ?? 0,
+            stepdown:
+              preset.useStepdown === true
+                ? (preset.stepdown ?? params.stepdown)
+                : params.stepdown,
+            stepover:
+              preset.useStepover === true
+                ? (preset.stepover ?? params.stepover)
+                : params.stepover,
+          }
+          setValid(FacingParamsSchema.safeParse(next).success)
+          setParams(next)
+        }}
+      >
+        Apply preset to facing parameters
+      </Button>
+      <FacingFields
+        key={`${toolId}-${draft.key}`}
+        value={params}
+        setup={plate?.setup}
+        onChange={draft.onChange}
+        onValidityChange={setValid}
+      />
+      {params.entryMode === "pocket" && kit && plate && (
+        <>
+          <Field>
+            <FieldLabel>Modeled MDF recess · candidate only</FieldLabel>
+            <OptionSelect
+              value=""
+              options={[
+                {
+                  value: "",
+                  label:
+                    "Choose a recess to inspect, or enter measurements above",
+                },
+                ...kit.facingEntryPockets.map((pocket, index) => ({
+                  value: String(index),
+                  label: pocket.name,
+                })),
+              ]}
+              onValueChange={(value) => {
+                if (value === "") return
+                const index = Number(value)
+                if (
+                  !Number.isInteger(index) ||
+                  index < 0 ||
+                  index >= kit.facingEntryPockets.length
+                )
+                  return
+                const pocket = kit.facingEntryPockets[index]
                 const next = {
                   ...params,
-                  x: kit.workAreaOrigin[0] - plate.setup.workOrigin[0],
-                  y: kit.workAreaOrigin[1] - plate.setup.workOrigin[1],
-                  width: kit.workArea[0],
-                  depth: kit.workArea[1],
+                  entryX:
+                    pocket.xy[0] +
+                    bedOffsetOf(plate.setup.anchors)[0] -
+                    plate.setup.workOrigin[0],
+                  entryY:
+                    pocket.xy[1] +
+                    bedOffsetOf(plate.setup.anchors)[1] -
+                    plate.setup.workOrigin[1],
+                  entryDiameter: pocket.diameter,
+                  entryDepth: pocket.depth,
                   entryConfirmed: false,
                 }
                 setParams(next)
                 setValid(false)
               }}
-            >
-              Use modeled XY travel as cutter-centre rectangle
-            </Button>
-          </>
-        )}
-        {pocketIssue && <FieldDescription>{pocketIssue}</FieldDescription>}
-        <FieldDescription className="font-numeric">
-          Diameter: {params.diameter} mm · Chip load:{" "}
-          {tool && valid && chipLoad(tool, params) !== null
-            ? `${chipLoad(tool, params)?.toFixed(4)} mm/tooth`
-            : "Enter RPM, feed and flute count"}
-          . Chip load = feed ÷ (RPM × cutting teeth); it is a calculation, not a
-          suitability check.
-        </FieldDescription>
-        {tool && valid && (
-          <ChipLoadCalculator
-            tool={tool}
-            params={params}
-            onApply={(feed) => {
-              const next = { ...params, feed }
-              setParams(next)
-              setValid(FacingParamsSchema.safeParse(next).success)
-            }}
-          />
-        )}
-        <Field>
-          <FieldLabel htmlFor={presetNameId}>
-            Save these cutting values as a preset
-          </FieldLabel>
-          <presetForm.Field name="name">
-            {(field) => (
-              <Input
-                id={presetNameId}
-                value={field.state.value}
-                onChange={(event) => field.handleChange(event.target.value)}
-                onBlur={field.handleBlur}
-                placeholder="Name for this cutter and material"
-                maxLength={200}
-              />
-            )}
-          </presetForm.Field>
-        </Field>
-        <Button
-          variant="outline"
-          disabled={!tool || !valid || !presetName.trim()}
-          onClick={savePreset}
-        >
-          Save named cutting preset
-        </Button>
-        {!!operation && (
+            />
+          </Field>
+          <FieldDescription>
+            The STEP model's screw recesses are Ø10 mm × 2 mm deep; the smaller
+            through bore is Ø5.4 mm. Screws can reduce the usable depth.
+            Choosing a candidate fills modeled dimensions; replace them with
+            your measurements.
+          </FieldDescription>
           <Button
             variant="outline"
-            onClick={() =>
-              openDialog({
-                kind: "source",
-                plateId: plateId!,
-                operationId: operation.id,
-              })
-            }
+            onClick={() => {
+              const next = {
+                ...params,
+                x: kit.workAreaOrigin[0] - plate.setup.workOrigin[0],
+                y: kit.workAreaOrigin[1] - plate.setup.workOrigin[1],
+                width: kit.workArea[0],
+                depth: kit.workArea[1],
+                entryConfirmed: false,
+              }
+              setParams(next)
+              setValid(false)
+            }}
           >
-            View committed program
+            Use modeled XY travel as cutter-centre rectangle
           </Button>
-        )}
-        {!valid && (
-          <FieldDescription>
-            Complete all numeric fields with valid cutting data. Invalid drafts
-            cannot be applied.
-          </FieldDescription>
-        )}
-        {!!operationId && operation?.revision !== revision && (
-          <FieldDescription>
-            This operation changed while the dialog was open. Reopen it to edit
-            the current version.
-          </FieldDescription>
-        )}
-      </FieldGroup>
-    </AppDialog>
+        </>
+      )}
+      {pocketIssue && <FieldDescription>{pocketIssue}</FieldDescription>}
+      <FieldDescription className="font-numeric">
+        Diameter: {params.diameter} mm · Chip load:{" "}
+        {tool && valid && chipLoad(tool, params) !== null
+          ? `${chipLoad(tool, params)?.toFixed(4)} mm/tooth`
+          : "Enter RPM, feed and flute count"}
+        . Chip load = feed ÷ (RPM × cutting teeth); it is a calculation, not a
+        suitability check.
+      </FieldDescription>
+      {tool && valid && (
+        <ChipLoadCalculator
+          tool={tool}
+          params={params}
+          onApply={(feed) => {
+            const next = { ...params, feed }
+            setParams(next)
+            setValid(FacingParamsSchema.safeParse(next).success)
+          }}
+        />
+      )}
+      <Field>
+        <FieldLabel htmlFor={presetNameId}>
+          Save these cutting values as a preset
+        </FieldLabel>
+        <presetForm.Field name="name">
+          {(field) => (
+            <Input
+              id={presetNameId}
+              value={field.state.value}
+              onChange={(event) => field.handleChange(event.target.value)}
+              onBlur={field.handleBlur}
+              placeholder="Name for this cutter and material"
+              maxLength={200}
+            />
+          )}
+        </presetForm.Field>
+      </Field>
+      <Button
+        variant="outline"
+        disabled={!tool || !valid || !presetName.trim()}
+        onClick={savePreset}
+      >
+        Save named cutting preset
+      </Button>
+      {!!operation && (
+        <Button
+          variant="outline"
+          onClick={() =>
+            openDialog({
+              kind: "source",
+              plateId: plateId!,
+              operationId: operation.id,
+            })
+          }
+        >
+          View committed program
+        </Button>
+      )}
+      {!valid && (
+        <FieldDescription>
+          Complete all numeric fields with valid cutting data. Invalid drafts
+          cannot be applied.
+        </FieldDescription>
+      )}
+      {!!operationId && operation?.revision !== revision && (
+        <FieldDescription>
+          This operation changed while the dialog was open. Reopen it to edit
+          the current version.
+        </FieldDescription>
+      )}
+    </FieldGroup>
+  )
+  if (onClose)
+    return (
+      <AppDialog
+        title={operation ? "Edit facing" : "Facing wizard"}
+        width="wide"
+        onClose={onClose}
+        footer={footer}
+      >
+        {fields}
+      </AppDialog>
+    )
+  return (
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="min-h-0 flex-1 overflow-y-auto p-4">{fields}</div>
+      <div className="shrink-0 border-t p-4">{footer}</div>
+    </div>
   )
 }
 

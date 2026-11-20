@@ -1,8 +1,8 @@
 import { useEffect, useId, useMemo } from "react"
 import { FileCode2, RefreshCw, Waves } from "lucide-react"
-import { useNavigate } from "@tanstack/react-router"
+import { Link, useNavigate } from "@tanstack/react-router"
 import { toast } from "sonner"
-import { Button } from "@/components/ui/button"
+import { Button, buttonVariants } from "@/components/ui/button"
 import {
   Field,
   FieldContent,
@@ -417,18 +417,13 @@ export function OperationEditor({
       return <PatternNavigate operationId={operation.id} />
     case "facing":
       return (
-        <Button
-          variant="outline"
-          onClick={() =>
-            openDialog({
-              kind: "facing",
-              plateId: plate.id,
-              operationId: operation.id,
-            })
-          }
+        <Link
+          to="/facing"
+          search={{ plate: plate.id, operation: operation.id }}
+          className={buttonVariants({ variant: "outline" })}
         >
           Edit facing and cutting data
-        </Button>
+        </Link>
       )
     case "file":
       return <FileEditor plate={plate} operation={{ ...operation, source }} />

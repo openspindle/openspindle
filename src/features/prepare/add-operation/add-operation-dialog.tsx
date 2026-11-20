@@ -1,5 +1,6 @@
+import { useNavigate } from "@tanstack/react-router"
 import { useState } from "react"
-import { ArrowLeft, CircuitBoard, Crosshair, Waves } from "lucide-react"
+import { ArrowLeft, CircuitBoard, Crosshair, Layers, Waves } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { FieldSet } from "@/components/ui/field"
 import { ImporterView } from "@/features/pcb/importer"
@@ -22,6 +23,7 @@ export function AddOperationDialog({
   preset?: "pcb"
   onClose: () => void
 }) {
+  const navigate = useNavigate()
   const probingReason = useProbingReason()
   const addPattern = useAddOperation()
   const [chosen, choose] = useState<"pcb" | "probing" | null>(preset ?? null)
@@ -68,6 +70,15 @@ export function AddOperationDialog({
               })
             )
               onClose()
+          }}
+        />
+        <SourceItem
+          icon={<Layers />}
+          title="Facing"
+          description="Create a facing operation from the plate and cutter settings."
+          onSelect={() => {
+            onClose()
+            void navigate({ to: "/facing" })
           }}
         />
         <SourceItem

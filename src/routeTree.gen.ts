@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as WorkspaceRouteImport } from './routes/_workspace'
 import { Route as WorkspaceDeviceRouteImport } from './routes/_workspace/device'
+import { Route as WorkspaceFacingRouteImport } from './routes/_workspace/facing'
 import { Route as WorkspaceJobRouteImport } from './routes/_workspace/job'
 import { Route as WorkspacePatternsRouteImport } from './routes/_workspace/patterns'
 import { Route as WorkspacePrepareRouteImport } from './routes/_workspace/prepare'
@@ -28,6 +29,11 @@ const WorkspaceRoute = WorkspaceRouteImport.update({
 const WorkspaceDeviceRoute = WorkspaceDeviceRouteImport.update({
   id: '/device',
   path: '/device',
+  getParentRoute: () => WorkspaceRoute,
+} as any)
+const WorkspaceFacingRoute = WorkspaceFacingRouteImport.update({
+  id: '/facing',
+  path: '/facing',
   getParentRoute: () => WorkspaceRoute,
 } as any)
 const WorkspaceJobRoute = WorkspaceJobRouteImport.update({
@@ -49,6 +55,7 @@ const WorkspacePrepareRoute = WorkspacePrepareRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/device': typeof WorkspaceDeviceRoute
+  '/facing': typeof WorkspaceFacingRoute
   '/job': typeof WorkspaceJobRoute
   '/patterns': typeof WorkspacePatternsRoute
   '/prepare': typeof WorkspacePrepareRoute
@@ -56,6 +63,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/device': typeof WorkspaceDeviceRoute
+  '/facing': typeof WorkspaceFacingRoute
   '/job': typeof WorkspaceJobRoute
   '/patterns': typeof WorkspacePatternsRoute
   '/prepare': typeof WorkspacePrepareRoute
@@ -65,20 +73,22 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_workspace': typeof WorkspaceRouteWithChildren
   '/_workspace/device': typeof WorkspaceDeviceRoute
+  '/_workspace/facing': typeof WorkspaceFacingRoute
   '/_workspace/job': typeof WorkspaceJobRoute
   '/_workspace/patterns': typeof WorkspacePatternsRoute
   '/_workspace/prepare': typeof WorkspacePrepareRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/device' | '/job' | '/patterns' | '/prepare'
+  fullPaths: '/' | '/device' | '/facing' | '/job' | '/patterns' | '/prepare'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/device' | '/job' | '/patterns' | '/prepare'
+  to: '/' | '/device' | '/facing' | '/job' | '/patterns' | '/prepare'
   id:
     | '__root__'
     | '/'
     | '/_workspace'
     | '/_workspace/device'
+    | '/_workspace/facing'
     | '/_workspace/job'
     | '/_workspace/patterns'
     | '/_workspace/prepare'
@@ -112,6 +122,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof WorkspaceDeviceRouteImport
       parentRoute: typeof WorkspaceRoute
     }
+    '/_workspace/facing': {
+      id: '/_workspace/facing'
+      path: '/facing'
+      fullPath: '/facing'
+      preLoaderRoute: typeof WorkspaceFacingRouteImport
+      parentRoute: typeof WorkspaceRoute
+    }
     '/_workspace/job': {
       id: '/_workspace/job'
       path: '/job'
@@ -138,6 +155,7 @@ declare module '@tanstack/react-router' {
 
 interface WorkspaceRouteChildren {
   WorkspaceDeviceRoute: typeof WorkspaceDeviceRoute
+  WorkspaceFacingRoute: typeof WorkspaceFacingRoute
   WorkspaceJobRoute: typeof WorkspaceJobRoute
   WorkspacePatternsRoute: typeof WorkspacePatternsRoute
   WorkspacePrepareRoute: typeof WorkspacePrepareRoute
@@ -145,6 +163,7 @@ interface WorkspaceRouteChildren {
 
 const WorkspaceRouteChildren: WorkspaceRouteChildren = {
   WorkspaceDeviceRoute: WorkspaceDeviceRoute,
+  WorkspaceFacingRoute: WorkspaceFacingRoute,
   WorkspaceJobRoute: WorkspaceJobRoute,
   WorkspacePatternsRoute: WorkspacePatternsRoute,
   WorkspacePrepareRoute: WorkspacePrepareRoute,
