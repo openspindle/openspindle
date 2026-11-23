@@ -1,0 +1,3 @@
+# Trivy exclusions, kept for the standard security scans. This repository ships a
+# desktop app, not a container image, so nothing is excluded so far. Add one line
+# per accepted finding with its advisory id and the reason.

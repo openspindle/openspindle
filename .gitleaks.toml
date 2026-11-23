@@ -1,0 +1,4 @@
+# gitleaks configuration, used by the pre-commit hook (.pre-commit-config.yaml).
+# The default rules apply; list any accepted false positive or extra rule here.
+[extend]
+useDefault = true
