@@ -2,7 +2,7 @@
   "version": 1,
   "bundles": {
     "electron": [
-      "electron@44.4.5"
+      "electron@44.11.5"
     ],
     "frame": [
       "@base-ui/react@1.8.0",
@@ -56,7 +56,7 @@
       "semver@7.7.4",
       "supports-color@7.2.0",
       "universalify@2.0.1",
-      "zod@4.6.5"
+      "zod@4.6.7"
     ],
     "plugin-pcb-companion": [
       "zod@4.6.5"
@@ -115,7 +115,7 @@
       "sonner@2.0.8",
       "three@0.186.1",
       "use-sync-external-store@1.7.0",
-      "zod@4.6.5"
+      "zod@4.6.7"
     ],
     "styles": [
       "shadcn@4.21.4",
@@ -524,7 +524,7 @@
       ],
       "text": "13250117ec91ac9d"
     },
-    "electron@44.4.5": {
+    "electron@44.11.5": {
       "license": "MIT",
       "source": "https://github.com/electron/electron",
       "attribution": [
@@ -754,6 +754,14 @@
       "text": "69793ded754c3949"
     },
     "zod@4.6.5": {
+      "license": "MIT",
+      "source": "https://github.com/colinhacks/zod",
+      "attribution": [
+        "Copyright (c) 2025 Colin McDonnell"
+      ],
+      "text": "03929576e354afce"
+    },
+    "zod@4.6.7": {
       "license": "MIT",
       "source": "https://github.com/colinhacks/zod",
       "attribution": [
